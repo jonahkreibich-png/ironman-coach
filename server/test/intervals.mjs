@@ -19,14 +19,17 @@ const plan = { meta: {}, weeks: [{ weekNumber: 1, days: [
 await call('POST', '/api/sync', { since: 0, changes: [
   { kind: 'plan', key: 'main', data: plan, updatedAt: 1000 },
   { kind: 'trend', key: y, data: { date: y, restingHR: 55, illness: 'Halskratzen' }, updatedAt: 1000 },
-  { kind: 'session', key: 'p-t-bike', data: { completed: false, notes: 'Beine schwer', metrics: { hr: '139' } }, updatedAt: 1000 }
+  { kind: 'session', key: 'p-t-bike', data: { completed: false, notes: 'Beine schwer', metrics: { hr: '139' } }, updatedAt: 1000 },
+  { kind: 'custom', key: 'custom-fb', data: { id: 'custom-fb', date: today, sport: 'football', title: 'Fußball', description: 'Training', plannedMinutes: 90, quality: 'good' }, updatedAt: 1000 }
 ] }, T);
 
 console.log('Erster Abruf');
 r = await call('POST', '/api/intervals/import', null, T);
 ok(r.status === 200 && r.data.ok, 'Abruf erfolgreich' + (r.data && r.data.error ? ': ' + r.data.error : ''));
 ok(r.data.wellnessDays === 2, 'Zwei Wellness-Tage übernommen');
-ok(r.data.matched === 1 && r.data.extras === 1, 'Rad zugeordnet, Lauf als Extra (matched ' + r.data.matched + ', extras ' + r.data.extras + ')');
+ok(r.data.matched === 2 && r.data.extras === 1, 'Rad und eigene Fußball-Einheit zugeordnet, Lauf als Extra (matched ' + r.data.matched + ', extras ' + r.data.extras + ')');
+ok(r.data.activities.total === 5 && r.data.activities.stubs === 1 && r.data.activities.sources.STRAVA === 1, 'Übersicht zählt Strava-Hülle: ' + JSON.stringify(r.data.activities));
+ok(r.data.activities.ignored.Walk === 1 && r.data.activities.ignored['ohne Sportart'] === 1, 'Ignorierte Sportarten werden gezählt');
 ok(r.data.custom.includes('OuraTempDeviation'), 'Zusatzfelder erkannt: ' + r.data.custom.join(', '));
 
 r = await call('POST', '/api/sync', { since: 0, changes: [] }, T);
@@ -42,7 +45,10 @@ const bike = rec('session', 'p-t-bike');
 ok(bike.completed === true && bike.metrics.km === 27.5 && bike.metrics.min === 60 && bike.metrics.speed === 27.5, 'Rad-Einheit abgehakt mit km, min, km/h');
 ok(bike.metrics.hr === '139', 'Manueller Puls in der Einheit bleibt');
 ok(bike.notes === 'Beine schwer' && bike.rpe === '6' && bike.icuLoad === 58, 'Notiz bleibt, RPE und Trainingslast übernommen');
-const extra = r.data.records.find(x => x.kind === 'custom');
+const fb = rec('custom', 'custom-fb');
+ok(fb.icuId === 'i1004' && fb.metrics.hr === 152 && fb.plannedMinutes === 90 && fb.quality === 'good' && fb.description === 'Training', 'Eigene Fußball-Einheit ergänzt (Puls), nichts überschrieben');
+ok(r.data.records.filter(x => x.kind === 'custom').length === 2, 'Keine doppelte Fußball-Einheit');
+const extra = r.data.records.find(x => x.kind === 'custom' && x.key.startsWith('icu-'));
 ok(extra && extra.data.sport === 'run' && extra.data.metrics.pace === '6:00' && extra.data.date === today, 'Lauf ohne Plan-Einheit am Tag → Extra-Einheit mit Pace 6:00');
 ok(!r.data.records.find(x => x.kind === 'custom' && x.data.title === 'Spaziergang'), 'Spaziergang wird ignoriert');
 ok(!rec('session', 'p-t-swim'), 'Schwimmen ohne Aktivität bleibt offen');

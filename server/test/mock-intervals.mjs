@@ -11,7 +11,9 @@ export const FIXTURE = {
   activities: [
     { id: 'i1001', start_date_local: today + 'T07:10:00', type: 'Ride', name: 'Morgenrunde', moving_time: 3600, distance: 27500, average_heartrate: 141.4, average_speed: 7.64, icu_training_load: 58, icu_rpe: 6 },
     { id: 'i1002', start_date_local: today + 'T16:00:00', type: 'Run', name: 'Lockerer Lauf', moving_time: 1800, distance: 5000, average_heartrate: 150, icu_training_load: 35 },
-    { id: 'i1003', start_date_local: today + 'T18:30:00', type: 'Walk', name: 'Spaziergang', moving_time: 1200, distance: 1800 }
+    { id: 'i1003', start_date_local: today + 'T18:30:00', type: 'Walk', name: 'Spaziergang', moving_time: 1200, distance: 1800 },
+    { id: 'i1004', start_date_local: today + 'T19:00:00', type: 'Soccer', name: 'Fußballtraining', moving_time: 5400, average_heartrate: 152, icu_training_load: 80, source: 'APPLE_WATCH' },
+    { id: '9999', start_date_local: y + 'T10:00:00', source: 'STRAVA', _note: 'STRAVA activities are not available via the API' }
   ]
 };
 let lastAuth = null;

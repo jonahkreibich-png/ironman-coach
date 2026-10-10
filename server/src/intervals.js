@@ -148,19 +148,30 @@ export async function runImport(env, opts) {
     status.custom = [...customSeen];
 
     // Aktivitäten
-    const acts = await icuGet(env, `/api/v1/athlete/${athlete}/activities?oldest=${oldest}&newest=${today}T23:59:59`);
     const linked = (await getMeta(env, 'icu_links')) || {};
+    // Solange noch nie eine Aktivität übernommen wurde, 6 Wochen zurück schauen
+    const actOldest = Object.keys(linked).length ? oldest : addDaysStr(today, -42);
+    const acts = await icuGet(env, `/api/v1/athlete/${athlete}/activities?oldest=${actOldest}&newest=${today}`);
     const planRec = await getRecord(env, 'plan', 'main');
     const byDate = planSessionsByDate(planRec && planRec.data);
     const sessIds = Object.values(byDate).flat().map(s => s.id);
     const sessRecs = await getRecords(env, 'session', sessIds);
     const usedThisRun = new Set(Object.values(linked).filter(l => l.kind === 'session').map(l => l.key));
+    const usedCustom = new Set(Object.values(linked).filter(l => l.kind === 'custom').map(l => l.key));
+    let customsByKey = null, manual = null;
     const sorted = (acts || []).filter(a => a && a.id && a.start_date_local).sort((a, b) => a.start_date_local.localeCompare(b.start_date_local));
+    // Übersicht ohne Werte: wie viele Aktivitäten, aus welcher Quelle, welche Sportarten
+    const A = status.activities = { total: (acts || []).length, already: 0, ignored: {}, sources: {}, stubs: 0 };
+    for (const a of acts || []) {
+      const src = String((a && a.source) || 'unbekannt');
+      A.sources[src] = (A.sources[src] || 0) + 1;
+      if (a && !a.type && !a.moving_time) A.stubs++;
+    }
     for (const a of sorted) {
       const id = String(a.id);
-      if (linked[id]) continue;
+      if (linked[id]) { A.already++; continue; }
       const sport = sportOf(a.type);
-      if (!sport) continue;
+      if (!sport) { const t = String(a.type || 'ohne Sportart'); A.ignored[t] = (A.ignored[t] || 0) + 1; continue; }
       const date = a.start_date_local.slice(0, 10);
       const metrics = activityMetrics(a, sport);
       const extra = { icuId: id };
@@ -177,6 +188,18 @@ export async function runImport(env, opts) {
         sessRecs[cand.id] = st; usedThisRun.add(cand.id);
         changes.push({ kind: 'session', key: cand.id, data: st, updatedAt: t });
         linked[id] = { kind: 'session', key: cand.id, date };
+        status.matched++;
+      } else if ((customsByKey = customsByKey || await getRecords(env, 'custom')) &&
+                 (manual = Object.values(customsByKey).find(c => c && c.date === date && c.sport === sport && !c.icuId && !usedCustom.has(c.id)))) {
+        // Selbst eingetragene Extra-Einheit desselben Tages und Sports: nur ergänzen, nicht doppelt anlegen
+        const c = Object.assign({}, manual);
+        c.metrics = Object.assign({}, c.metrics || {});
+        fillEmpty(c.metrics, metrics);
+        if (empty(c.plannedMinutes) && metrics.min) c.plannedMinutes = metrics.min;
+        Object.assign(c, extra);
+        usedCustom.add(c.id);
+        changes.push({ kind: 'custom', key: c.id, data: c, updatedAt: t });
+        linked[id] = { kind: 'custom', key: c.id, date };
         status.matched++;
       } else {
         const key = 'icu-' + id;
