@@ -2,7 +2,9 @@
    Ein Nutzer, kein Registrierungssystem. Geheimnisse nur über env (Cloudflare-Secrets). */
 import { berlinDate, berlinParts, putRecords, getMeta } from './store.js';
 import { runImport } from './intervals.js';
-import { runDaily, runWeekly } from './coach.js';
+import { runDaily, runWeekly, loadState } from './coach.js';
+import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliver } from './notify.js';
+import { vapidPublicKey } from './webpush.js';
 
 const KINDS = new Set(['session', 'trend', 'nutrition', 'custom', 'illness', 'milestone', 'weekNote', 'settings', 'plan', 'adjust']);
 const PAIR_TTL_MS = 10 * 60 * 1000;
@@ -100,6 +102,7 @@ export async function dailyBackup(env) {
   await env.DB.prepare('DELETE FROM backups WHERE day < ?').bind(cutoff).run();
   await env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(Date.now()).run();
   await env.DB.prepare('DELETE FROM pair_attempts WHERE ts < ?').bind(Date.now() - 86400000).run();
+  await env.DB.prepare('DELETE FROM push_log WHERE day < ?').bind(berlinDate(Date.now() - 14 * 86400000)).run();
   return { day, count: records.length };
 }
 
@@ -111,6 +114,11 @@ async function route(req, env, url) {
   if (p === '/api/health' && M === 'GET') {
     const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM devices').first();
     return { ok: true, setup: (n && n.n) > 0, time: Date.now() };
+  }
+  // Öffentlicher VAPID-Schlüssel (kein Geheimnis)
+  if (p === '/api/push/key' && M === 'GET') {
+    if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind auf dem Server noch nicht eingerichtet.');
+    return { key: vapidPublicKey(env) };
   }
 
   // Erstes Gerät einrichten. Geht nur, solange noch kein Gerät existiert.
@@ -159,6 +167,7 @@ async function route(req, env, url) {
   if (delDev && M === 'DELETE') {
     if (delDev[1] === dev.id) throw new HttpError(400, 'Dieses Gerät kann sich nicht selbst entfernen.');
     await env.DB.prepare('DELETE FROM devices WHERE id = ?').bind(delDev[1]).run();
+    await env.DB.prepare('DELETE FROM push_subs WHERE device_id = ?').bind(delDev[1]).run();
     return { ok: true };
   }
 
@@ -199,6 +208,39 @@ async function route(req, env, url) {
     return { configured: !!(env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID), last: await getMeta(env, 'intervals_last') };
   }
 
+  // Push-Abo dieses Geräts speichern / löschen / testen
+  if (p === '/api/push/subscribe' && M === 'POST') {
+    const body = await readJson(req);
+    const s = body.subscription || {};
+    const keys = s.keys || {};
+    const okEndpoint = /^https:\/\//.test(s.endpoint || '') || (env.ALLOW_TEST_ROUTES === '1' && /^http:\/\/127\.0\.0\.1:/.test(s.endpoint || ''));
+    if (!okEndpoint || !keys.p256dh || !keys.auth) throw new HttpError(400, 'Ungültiges Abo');
+    await env.DB.prepare('DELETE FROM push_subs WHERE device_id = ? OR endpoint = ?').bind(dev.id, s.endpoint).run();
+    await env.DB.prepare('INSERT INTO push_subs (id, device_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('sub-' + randomToken(9), dev.id, s.endpoint, keys.p256dh, keys.auth, Date.now()).run();
+    return { ok: true };
+  }
+  if (p === '/api/push/unsubscribe' && M === 'POST') {
+    await env.DB.prepare('DELETE FROM push_subs WHERE device_id = ?').bind(dev.id).run();
+    return { ok: true };
+  }
+  if (p === '/api/push/status' && M === 'GET') {
+    const me = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE device_id = ?').bind(dev.id).first();
+    const all = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs').first();
+    return { configured: !!env.VAPID_PRIVATE_JWK, thisDevice: !!(me && me.n), devices: (all && all.n) || 0 };
+  }
+  if (p === '/api/push/test' && M === 'POST') {
+    if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind auf dem Server noch nicht eingerichtet.');
+    const n = await deliver(env, { title: 'Ironman Coach', body: 'Mitteilungen funktionieren. 💪', url: './?go=heute', tag: 'test' });
+    return { delivered: n };
+  }
+
+  // Nur für lokale Tests: einen 5-Minuten-Lauf zu einer bestimmten Uhrzeit simulieren
+  if (p === '/api/test/tick' && M === 'POST' && env.ALLOW_TEST_ROUTES === '1') {
+    const body = await readJson(req);
+    return await everyFive(env, { date: body.date, hour: body.hour, minute: body.minute, dow: body.dow });
+  }
+
   // Plan-Anpassungen (Phase 4) von Hand auslösen
   if (p === '/api/coach/daily' && M === 'POST') return await runDaily(env, { force: true });
   if (p === '/api/coach/weekly' && M === 'POST') {
@@ -209,15 +251,29 @@ async function route(req, env, url) {
   throw new HttpError(404, 'Unbekannte Adresse');
 }
 
-/* Alle 30 Minuten, aber nur zwischen 6 und 23 Uhr deutscher Zeit */
-async function halfHourly(env) {
-  const b = berlinParts();
-  if (b.hour < 6 || b.hour > 23) return;
-  if (env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID) await runImport(env);
-  // Morgens nach dem Abruf: Tagesampel → Plan anpassen (einmal pro Tag)
-  try { await runDaily(env); } catch (e) { console.error('Tagesanpassung:', e && e.message); }
-  // Sonntag 18 Uhr: nächste Woche planen
-  if (b.dow === 0 && b.hour === 18) { try { await runWeekly(env); } catch (e) { console.error('Wochenanpassung:', e && e.message); } }
+/* Alle 5 Minuten. Abruf und Anpassungen alle 30 Minuten zwischen 6 und 23 Uhr deutscher Zeit, Mitteilungen bei jedem Lauf. */
+export async function everyFive(env, b) {
+  b = b || berlinParts();
+  let L = null;
+  if (b.hour >= 6 && b.hour <= 23 && b.minute % 30 < 5) {
+    if (env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID) { try { await runImport(env); } catch (e) { console.error('Abruf:', e && e.message); } }
+    let daily = null;
+    // Morgens nach dem Abruf: Tagesampel → Plan anpassen (einmal pro Tag)
+    try { daily = await runDaily(env); } catch (e) { console.error('Tagesanpassung:', e && e.message); }
+    // Sonntag ab 18 Uhr: nächste Woche planen (einmal)
+    if (b.dow === 0 && b.hour >= 18) { try { await runWeekly(env); } catch (e) { console.error('Wochenanpassung:', e && e.message); } }
+    if (env.VAPID_PRIVATE_JWK) {
+      try {
+        L = await loadState(env);
+        if (L.plan) {
+          await queueAfterImport(env, L, b.date);
+          if (daily && daily.adjustments) await queueAdjustments(env, daily.adjustments, b.date);
+          await queueAchievements(env, await checkAchievements(env, L, b.date));
+        }
+      } catch (e) { console.error('Warnungen:', e && e.message); }
+    }
+  }
+  try { return await notifyTick(env, { berlin: b, state: L }); } catch (e) { console.error('Mitteilungen:', e && e.message); return { error: e.message }; }
 }
 
 export default {
@@ -237,6 +293,6 @@ export default {
   },
   async scheduled(event, env, ctx) {
     if (event.cron === '0 2 * * *') ctx.waitUntil(dailyBackup(env));
-    if (event.cron === '*/30 * * * *') ctx.waitUntil(halfHourly(env));
+    if (event.cron === '*/5 * * * *') ctx.waitUntil(everyFive(env));
   }
 };

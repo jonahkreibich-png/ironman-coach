@@ -7,18 +7,19 @@ import { berlinParts, getRecord, getRecords, putRecords, getMeta, setMeta } from
 const C = globalThis.CoachCore;
 
 export async function loadState(env) {
-  const [planRec, settingsRec, sessions, customs, trend, illness, weekNotes, adjustments] = await Promise.all([
+  const [planRec, settingsRec, sessions, customs, trend, illness, weekNotes, adjustments, nutrition] = await Promise.all([
     getRecord(env, 'plan', 'main'), getRecord(env, 'settings', 'main'),
     getRecords(env, 'session'), getRecords(env, 'custom'), getRecords(env, 'trend'),
-    getRecords(env, 'illness'), getRecords(env, 'weekNote'), getRecords(env, 'adjust')
+    getRecords(env, 'illness'), getRecords(env, 'weekNote'), getRecords(env, 'adjust'), getRecords(env, 'nutrition')
   ]);
   const customWorkouts = {};
   Object.values(customs).forEach(w => { if (w && w.date) (customWorkouts[w.date] = customWorkouts[w.date] || []).push(w); });
   const plan = planRec ? planRec.data : null;
   return {
     plan, baseWeeks: (plan && plan.weeks) || [], planMeta: (plan && plan.meta) || {},
+    nutritionProfile: (settingsRec && settingsRec.data && settingsRec.data.nutritionProfile) || null,
     state: {
-      sessions, customWorkouts, weekNotes, adjustments,
+      sessions, customWorkouts, weekNotes, adjustments, nutrition,
       trend: Object.values(trend).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date)),
       illnessPeriods: Object.values(illness).filter(Boolean),
       settings: (settingsRec && settingsRec.data && settingsRec.data.settings) || {}

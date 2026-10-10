@@ -586,6 +586,9 @@ function sessionCard(s) {
       ${(s.sport === 'run' || s.sport === 'bike') ? `<span class="lbl">Temp °C</span><input class="inp sm" type="number" step="any" data-f="temp" value="${esc(st.temp ?? '')}">` : ''}</div>
       ${metricsBlock(s.sport, st.metrics)}
     </div>`;
+  } else if (status === 'open' && s.sport !== 'rest') {
+    const tAuto = CoachCore.sessionTime(s, null);
+    extra = `<div class="wo-row"><span class="lbl">Uhrzeit</span><input class="inp sm" type="time" data-f="time" value="${esc(st.time || '')}" placeholder="${esc(tAuto || '')}" aria-label="Uhrzeit für die Erinnerung"><span class="hint" style="margin:0">${st.time ? 'Erinnerung 1 h vorher' : tAuto ? 'laut Plan ' + esc(tAuto) : 'für die Erinnerung (optional)'}</span></div>`;
   } else if (status === 'skipped') {
     extra = `<div class="fld"><label>Grund (optional)</label><input class="inp" type="text" data-f="skipReason" value="${esc(st.skipReason || '')}" placeholder="z. B. Krankheit, Termin, Ruhetag"></div>`;
   }
@@ -1339,6 +1342,7 @@ function renderSheet() {
         <button class="btn ghost small" data-act="ill-add">+ Phase hinzufügen</button></div></div>
 
       ${BUILD === 'pwa' && typeof window.syncSection === 'function' ? window.syncSection() : ''}
+      ${BUILD === 'pwa' && typeof window.notifySection === 'function' ? window.notifySection() : ''}
       ${BUILD === 'pwa' ? planUpdateSection() : ''}
       <div class="sec"><div class="sec-h"><h2>Backup</h2>${STATE.lastBackupAt ? `<span class="aside">zuletzt ${fmtDate(STATE.lastBackupAt.slice(0, 10))}</span>` : ''}</div><div class="panel">
         <div class="hint">${syncOn() ? 'Der Server sichert deine Daten jeden Tag automatisch (siehe Sync). Ein Datei-Backup ist zusätzlich möglich.' : `Deine Daten liegen nur auf diesem Gerät. ${BUILD === 'pwa' ? 'Sichere sie einmal pro Woche als Datei, z. B. in iCloud Drive. Dann bist du sicher, auch wenn das Handy kaputtgeht.' : 'Kopiere das Backup regelmäßig, z. B. in eine Notiz.'}`}</div>
@@ -1414,6 +1418,7 @@ function render() {
   for (const k in CHARTS) delete CHARTS[k];
   VIEWS[UI.view]();
   renderHeader();
+  updateBadge();
   document.querySelectorAll('.tab').forEach(b => { const on = b.dataset.go === UI.view; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
 }
 function go(view, scrollTarget) {
@@ -1661,9 +1666,32 @@ async function shareBackupFile() {
   } catch (err) { toast('Sichern als Datei klappt hier nicht. Nutze „Backup kopieren“.'); }
 }
 
+/* ================= Mitteilungen: Ziel öffnen, App-Icon-Badge ================= */
+/* Links aus Mitteilungen: ?go=heute|plan|werte|fortschritt|essen und &open=checkin|export|week|settings */
+function openFromUrl(href) {
+  let u; try { u = new URL(href, location.href); } catch (e) { return; }
+  const view = u.searchParams.get('go'), open = u.searchParams.get('open');
+  if (!view && !open) return;
+  if (!HAS_PLAN) return;
+  if (SHEET) closeSheet();
+  if (view && VIEWS[view]) go(view, open === 'checkin' ? 'checkin' : null);
+  if (open === 'checkin') { const f = document.querySelector('#checkin details'); if (f) f.open = true; }
+  if (open === 'export' || open === 'week') { openSheet('export', todayStr()); if (open === 'week') { SHEET.mode = 'week'; renderSheet(); } }
+  if (open === 'settings') { openSheet('settings'); if (typeof window.syncOnSettingsOpen === 'function') window.syncOnSettingsOpen(); }
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'open') openFromUrl(e.data.url); });
+function updateBadge() {
+  if (!HAS_PLAN || !('setAppBadge' in navigator)) return;
+  const day = findDay(todayStr());
+  const n = day ? day.sessions.filter(s => { const st = effStatus({ ...s, date: day.date }); return st === 'open'; }).length : 0;
+  (n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+}
+
 /* ================= Init ================= */
 try { const th = localStorage.getItem('theme_pref'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
 render();
+openFromUrl(location.href);
 // Datumswechsel um Mitternacht oder beim Zurückkehren in die App
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); WERTE_DATE = null; NUT_DATE = null; rerender(); } });

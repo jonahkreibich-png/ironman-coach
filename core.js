@@ -482,7 +482,86 @@
     return { adjustments: res, summary: S };
   }
 
+  /* ================= Phase 5: Hilfen für Mitteilungen ================= */
+  /* Uhrzeit einer Einheit: von Hand eingetragen (Session-Zustand) > Feld im Plan > erste Uhrzeit im Text. */
+  function sessionTime(s, st) {
+    const cand = [st && st.time, s && (s.time || s.startTime)];
+    for (const c of cand) if (c && /^\d{1,2}:\d{2}$/.test(c)) return c.padStart(5, '0');
+    // Uhrzeit wie "17:30" oder "6.15 Uhr", aber keine Pace wie "5:39/km" oder "2:05 min"
+    const m = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?![\d.,:]|\s*(?:\/|min|km|m\b|s\b))/i.exec(((s && s.title) || '') + ' ' + ((s && s.description) || ''));
+    return m ? m[1].padStart(2, '0') + ':' + m[2] : null;
+  }
+  function isEarly(s, st) {
+    const t = sessionTime(s, st);
+    if (t) return t < '08:00';
+    return /vor der schule|früh|morgens/i.test(((s && s.title) || '') + ' ' + ((s && s.description) || ''));
+  }
+  const DEFAULT_ZONES = [{ zone: 1, low: 0, high: 81 }, { zone: 2, low: 81, high: 89 }, { zone: 3, low: 90, high: 93 }, { zone: 4, low: 94, high: 102 }, { zone: 5, low: 102, high: 999 }];
+  function zoneBpm(s, settings, zonePercents) {
+    if (!s || (s.sport !== 'run' && s.sport !== 'bike') || !s.zone) return null;
+    const nums = [...String(s.zone).matchAll(/\d/g)].map(m => +m[0]);
+    const zones = (zonePercents && zonePercents.length ? zonePercents : DEFAULT_ZONES);
+    const lthr = s.sport === 'bike' ? ((settings && settings.lthrBike) || 165) : ((settings && settings.lthrRun) || 170);
+    const hit = nums.map(n => zones.find(z => z.zone === n)).filter(Boolean);
+    if (!hit.length) return null;
+    const lo = Math.min(...hit.map(z => Math.round(lthr * z.low / 100)));
+    const hi = Math.max(...hit.map(z => z.high >= 999 ? Math.round(lthr * z.low / 100) + 30 : Math.round(lthr * z.high / 100)));
+    return `${lo}-${hi} bpm`;
+  }
+  /* Untergrenze des Kalorienziels wie in der App (Mifflin-St Jeor × Alltagsfaktor + Training). */
+  const MET = s => {
+    const intense = /sweet|schwelle|intervall|zone 4|zone 5/i.test((s.zone || '') + ' ' + (s.title || ''));
+    return ({ run: intense ? 11 : 9, bike: intense ? 9.5 : 7, swim: 6, strength: 4, football: 7.5 })[s.sport] || 0;
+  };
+  function nutritionKcalLow(state, weeks, date, profile) {
+    const p = Object.assign({ age: 17, heightCm: 184, weightKg: 73, pal: 1.4 }, profile || {});
+    const ws = Object.entries(state.nutrition || {}).filter(([d, v]) => v && v.weight != null && d <= date).sort((a, b) => a[0].localeCompare(b[0])).slice(-7).map(x => x[1].weight);
+    const w = ws.length ? ws.reduce((a, b) => a + b, 0) / ws.length : p.weightKg;
+    const daily = (10 * w + 6.25 * p.heightCm - 5 * p.age + 5) * p.pal;
+    let act = 0;
+    const day = planDays(weeks).find(d => d.date === date);
+    if (day) day.sessions.forEach(s => {
+      if (s.sport === 'rest' || s.cancelled) return;
+      const st = (state.sessions || {})[s.id] || {};
+      if (st.skipped || illnessAt(state.illnessPeriods, date)) return;
+      const min = st.completed && st.metrics && toNum(st.metrics.min) != null ? toNum(st.metrics.min) : defaultMinutes(s);
+      act += (MET(s) - 1) * w * min / 60;
+    });
+    ((state.customWorkouts || {})[date] || []).forEach(x => { const min = toNum((x.metrics || {}).min) != null ? toNum(x.metrics.min) : (x.plannedMinutes || defaultMinutes(x)); act += (MET(x) - 1) * w * min / 60; });
+    return Math.round((daily + act) / 50) * 50;
+  }
+  /* Bestwerte: Schwimm-Pace /100 m, Züge pro Bahn, Lauf-Effizienz (m pro Herzschlag). */
+  function paceSec(v) { const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v == null ? '' : v).trim()); return m ? +m[1] * 60 + +m[2] : null; }
+  function perfEntries(state, weeks) {
+    const out = [];
+    const addE = (date, sport, m, id) => {
+      if (!m) return;
+      const min = toNum(m.min), km = toNum(m.km), hr = toNum(m.hr), meters = toNum(m.meters);
+      if (sport === 'swim') {
+        let p100 = paceSec(m.pace100); if (p100 == null && meters && min) p100 = min * 60 / (meters / 100);
+        out.push({ id, date, sport, pace100: p100, spl: toNum(m.spl) });
+      } else if (sport === 'run') {
+        let pace = paceSec(m.pace); if (pace == null && km && min) pace = min * 60 / km;
+        out.push({ id, date, sport, eff: pace && hr ? (60000 / pace) / hr : null });
+      }
+    };
+    planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed) addE(d.date, s.sport, st.metrics, s.id); }));
+    Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach(w => addE(d, w.sport, w.metrics, w.id)));
+    return out;
+  }
+  function bests(entries) {
+    const b = {};
+    const better = (k, v, lower) => v != null && isFinite(v) && v > 0 && (b[k] == null || (lower ? v < b[k].v : v > b[k].v));
+    entries.forEach(e => {
+      if (better('swimPace', e.pace100, true)) b.swimPace = { v: e.pace100, id: e.id, date: e.date };
+      if (better('spl', e.spl, true)) b.spl = { v: e.spl, id: e.id, date: e.date };
+      if (better('runEff', e.eff, false)) b.runEff = { v: e.eff, id: e.id, date: e.date };
+    });
+    return b;
+  }
+
   root.CoachCore = {
+    sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
     addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, baselineOf, BASE_DAYS, MIN_DAYS,
     isGame, isIntervals, isLong, isKey, isHard, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
     dailyLoads, ownLoadSeries, groinFlag, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive

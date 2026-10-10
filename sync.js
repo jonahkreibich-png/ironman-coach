@@ -316,10 +316,82 @@
       <div class="hint">Erzeuge dort unter Einstellungen → Sync → <b>Gerät hinzufügen</b> einen Code und gib ihn hier ein. Plan und Daten kommen dann automatisch.</div>
       <div class="row"><input class="inp" id="sync-code" type="text" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" style="flex:1;min-width:140px"><button class="btn" data-act="sync-pair">Koppeln</button></div></div>`;
   };
+  /* ---------- Mitteilungen (Phase 5) ---------- */
+  const NOTIFY_DEFAULTS = {
+    types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
+    times: { morningSchool: '06:45', morningWeekend: '09:00', eveEarly: '21:00', evening: '20:30', adductors: '19:00', food: '18:00', weekly: '18:00' },
+    quietStart: '22:30', quietEnd: '06:00', holidays: false
+  };
+  const NOTIFY_ROWS = [
+    ['morning', 'Morgens: Ampel und Einheit des Tages', [['morningSchool', 'Schultage'], ['morningWeekend', 'Wochenende']]],
+    ['preSession', '1 h vor Nachmittagseinheiten (Puls, Snack)', []],
+    ['eveEarly', 'Vorabend früher Einheiten', [['eveEarly', 'Uhrzeit']]],
+    ['evening', 'Abends: „Wie war\'s?“', [['evening', 'Uhrzeit']]],
+    ['warnings', 'Warnungen sofort (Rot, Temperatur, Plan angepasst)', []],
+    ['adductors', 'Adduktoren-Übungen Mo/Mi/Fr', [['adductors', 'Uhrzeit']]],
+    ['food', 'Essens-Hinweis an Trainingstagen', [['food', 'Uhrzeit']]],
+    ['weekly', 'Sonntag: Wochenrückblick und Vorschau', [['weekly', 'Uhrzeit']]],
+    ['achievements', 'Erfolge: neue Bestwerte', []]
+  ];
+  function notifyPrefs() {
+    const p = (STATE.settings && STATE.settings.notify) || {};
+    return Object.assign({}, NOTIFY_DEFAULTS, p, { types: Object.assign({}, NOTIFY_DEFAULTS.types, p.types || {}), times: Object.assign({}, NOTIFY_DEFAULTS.times, p.times || {}) });
+  }
+  let PUSH = null; // { configured, thisDevice, devices }
+  function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function b64ToBytes(s) { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+  window.notifySection = function () {
+    if (!API || !AUTH) return '';
+    const P = notifyPrefs();
+    const iosNotInstalled = (typeof isIOS === 'function' && isIOS()) && !(typeof isStandalone === 'function' && isStandalone());
+    let head;
+    if (!pushSupported() || iosNotInstalled) head = `<div class="hint">Mitteilungen gehen auf dem iPhone nur in der <b>installierten App</b> (Home-Bildschirm, ab iOS 16.4). Öffne die App über das Icon und komm hierher zurück.</div>`;
+    else if (PUSH && PUSH.configured === false) head = '<div class="hint">Auf dem Server sind Mitteilungen noch nicht eingerichtet.</div>';
+    else if (Notification.permission === 'denied') head = '<div class="hint">Mitteilungen sind für diese App blockiert. Erlauben kannst du sie in den iPhone-Einstellungen → Mitteilungen → Ironman.</div>';
+    else if (PUSH && PUSH.thisDevice && Notification.permission === 'granted') head = `<div class="row" style="justify-content:space-between"><span class="sync-st ok">Mitteilungen sind an</span><button class="btn ghost small" data-act="sync-notify-test">Test senden</button></div>`;
+    else head = `<div class="hint">Damit dich die App erinnern kann, musst du Mitteilungen einmal erlauben.</div><button class="btn small" data-act="sync-notify-allow">Mitteilungen erlauben</button>`;
+    const rows = NOTIFY_ROWS.map(([k, label, times]) => `<div class="nrow-set">
+      <label class="switch"><input type="checkbox" data-np="types.${k}" ${P.types[k] ? 'checked' : ''}><span>${esc(label)}</span></label>
+      ${times.length ? `<div class="ntimes">${times.map(([tk, tl]) => `<label>${esc(tl)} <input class="inp sm" type="time" data-np="times.${tk}" value="${esc(P.times[tk])}"></label>`).join('')}</div>` : ''}</div>`).join('');
+    return `<div class="sec"><div class="sec-h"><h2>Mitteilungen</h2></div><div class="panel">${head}
+      <div class="hr"></div>${rows}
+      <label class="switch"><input type="checkbox" data-np="holidays" ${P.holidays ? 'checked' : ''}><span>Ferien: auch an Schultagen die Wochenend-Zeit</span></label>
+      <div class="ntimes"><label>Ruhezeit von <input class="inp sm" type="time" data-np="quietStart" value="${esc(P.quietStart)}"></label><label>bis <input class="inp sm" type="time" data-np="quietEnd" value="${esc(P.quietEnd)}"></label></div>
+      <div class="hint">Höchstens 4 Mitteilungen pro Tag. Ein Tipp auf die Mitteilung öffnet die passende Stelle in der App. Für die Erinnerung vor einer Einheit trägst du ihre Uhrzeit in der Einheit ein (oder sie steht im Plan).</div>
+      ${PUSH && PUSH.thisDevice ? '<button class="link" data-act="sync-notify-off" style="align-self:flex-start">Mitteilungen auf diesem Gerät ausschalten</button>' : ''}</div></div>`;
+  };
+  document.addEventListener('change', e => {
+    const el = e.target; const path = el.dataset && el.dataset.np; if (!path) return;
+    STATE.settings.notify = notifyPrefs();
+    const val = el.type === 'checkbox' ? el.checked : el.value;
+    const parts = path.split('.');
+    if (parts.length === 2) STATE.settings.notify[parts[0]][parts[1]] = val; else STATE.settings.notify[path] = val;
+    saveState(); toast('Gespeichert');
+  });
+  async function loadPushStatus() {
+    try { PUSH = await api('GET', '/api/push/status'); } catch (e) { PUSH = null; }
+  }
+  async function enablePush() {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw Object.assign(new Error('Ohne Erlaubnis kann die App keine Mitteilungen schicken.'), { status: 1 });
+    const reg = await navigator.serviceWorker.ready;
+    const { key } = await api('GET', '/api/push/key', null, true);
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+    await api('POST', '/api/push/subscribe', { subscription: sub.toJSON() });
+    await loadPushStatus();
+  }
+  async function disablePush() {
+    try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
+    await api('POST', '/api/push/unsubscribe');
+    await loadPushStatus();
+  }
+
   async function loadLists() {
     if (!AUTH) return;
     try { DEVICES = (await api('GET', '/api/devices')).devices; } catch (e) { DEVICES = []; }
     try { BACKUPS = (await api('GET', '/api/backups')).backups; } catch (e) { BACKUPS = []; }
+    await loadPushStatus();
     if (SHEET && SHEET.kind === 'settings') { const P = $('#sheetPanel'); const y = P.scrollTop; renderSheet(); P.scrollTop = y; }
   }
   window.syncOnSettingsOpen = function () { DEVICES = null; BACKUPS = null; loadLists(); };
@@ -372,6 +444,13 @@
         if (!st.ok) toast(st.error || 'Abruf fehlgeschlagen');
         else toast(st.wellnessDays || st.matched || st.extras ? `Übernommen: ${st.wellnessDays} Tage Werte, ${st.matched} Einheiten, ${st.extras} Extra` : 'Nichts Neues bei intervals.icu');
         if (SHEET && SHEET.kind === 'settings') renderSheet(); rerender();
+      } else if (act === 'sync-notify-allow') {
+        busy(true); await enablePush(); toast('Mitteilungen sind an'); renderSheet();
+      } else if (act === 'sync-notify-test') {
+        busy(true); const r = await api('POST', '/api/push/test'); toast(r.delivered ? 'Test-Mitteilung ist unterwegs' : 'Kein Gerät hat die Mitteilung angenommen'); busy(false);
+      } else if (act === 'sync-notify-off') {
+        if (!armed(b, 'Wirklich ausschalten?')) return;
+        busy(true); await disablePush(); toast('Mitteilungen auf diesem Gerät aus'); renderSheet();
       } else if (act === 'sync-pair-create') {
         busy(true); PAIR = await api('POST', '/api/pair/create'); renderSheet();
         setTimeout(() => { if (SHEET && SHEET.kind === 'settings') renderSheet(); }, PAIR.expiresAt - Date.now() + 500);

@@ -1,5 +1,5 @@
 /* Offline-Cache für Ironman Coach. Bei jeder neuen Version ändert sich VERSION. */
-const VERSION = '2026-10-10-fe3bc4e7';
+const VERSION = '2026-10-10-33280284';
 const CACHE = 'ironman-coach-' + VERSION;
 const ASSETS = [
   "./",
@@ -44,6 +44,29 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+/* Push-Mitteilungen vom eigenen Server */
+self.addEventListener('push', event => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { body: event.data ? event.data.text() : '' }; }
+  const tasks = [self.registration.showNotification(d.title || 'Ironman Coach', {
+    body: d.body || '', tag: d.tag || undefined, icon: './icons/icon-192.png', badge: './icons/icon-192.png',
+    data: { url: d.url || './' }
+  })];
+  if (typeof d.badge === 'number' && self.navigator && 'setAppBadge' in self.navigator) {
+    tasks.push((d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()).catch(() => {}));
+  }
+  event.waitUntil(Promise.all(tasks));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || './', self.registration.scope).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const c = list.find(x => x.url.startsWith(self.registration.scope));
+    if (c) { c.postMessage({ type: 'open', url }); return c.focus(); }
+    return self.clients.openWindow(url);
+  }));
 });
 
 self.addEventListener('fetch', event => {

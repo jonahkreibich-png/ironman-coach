@@ -47,3 +47,26 @@ CREATE TABLE IF NOT EXISTS backups (
   created_at INTEGER NOT NULL,
   data TEXT NOT NULL
 );
+
+-- Push-Mitteilungen (Phase 5)
+CREATE TABLE IF NOT EXISTS push_subs (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS push_log (
+  key TEXT NOT NULL,
+  day TEXT NOT NULL,
+  type TEXT NOT NULL,
+  sent_at INTEGER NOT NULL,
+  PRIMARY KEY (day, key)
+);
+CREATE TABLE IF NOT EXISTS push_queue (
+  key TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
