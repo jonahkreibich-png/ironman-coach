@@ -292,7 +292,8 @@ export default {
     }
   },
   async scheduled(event, env, ctx) {
+    // Nachts das Backup, jeder andere Zeitplan (auch ein alter, noch nicht umgestellter) löst den normalen Lauf aus
     if (event.cron === '0 2 * * *') ctx.waitUntil(dailyBackup(env));
-    if (event.cron === '*/5 * * * *') ctx.waitUntil(everyFive(env));
+    else ctx.waitUntil(everyFive(env));
   }
 };

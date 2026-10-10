@@ -171,8 +171,8 @@ export async function notifyTick(env, ctx) {
   const b = ctx.berlin || berlinParts();
   const min = b.hour * 60 + b.minute;
   const tick = (await getMeta(env, 'notify_tick')) || {};
-  // Nur kurz zurückschauen, damit nach einer Pause keine alten Mitteilungen nachkommen
-  const prevMin = Math.max(tick.date === b.date ? tick.min : -1, min - 15);
+  // Nur begrenzt zurückschauen (35 min, reicht auch bei 30-Minuten-Läufen), damit nach einer Pause keine alten Mitteilungen nachkommen
+  const prevMin = Math.max(tick.date === b.date ? tick.min : -1, min - 35);
   await setMeta(env, 'notify_tick', { date: b.date, min });
   const subs = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs').first();
   if (!subs || !subs.n) return { skipped: 'keine Geräte angemeldet' };
