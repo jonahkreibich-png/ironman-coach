@@ -20,12 +20,22 @@ const isNum = v => typeof v === 'number' && isFinite(v);
 const empty = v => v == null || v === '';
 function secToPace(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
 
+/* Verrät nie den Schlüssel selbst, nur Länge und Format, damit Tippfehler beim Einfügen auffallen. */
+export function accessHint(env, status) {
+  const key = String(env.INTERVALS_API_KEY || ''), id = String(env.INTERVALS_ATHLETE_ID || '').trim();
+  const idOk = /^i\d+$/.test(id);
+  const keyInfo = `Schlüssel hat ${key.length} Zeichen${key.length < 15 ? ' (zu kurz, wahrscheinlich nicht richtig eingefügt)' : ''}${/\s/.test(key) ? ', enthält Leerzeichen' : ''}`;
+  const idInfo = idOk ? 'Athleten-ID-Format ok' : `Athleten-ID-Format falsch (soll wie i123456 aussehen, hat ${id.length} Zeichen)`;
+  const what = status === 401 ? 'lehnt den API-Schlüssel ab' : 'kennt die Athleten-ID nicht oder erlaubt keinen Zugriff';
+  return `intervals.icu ${what} (Fehler ${status}). ${keyInfo}, ${idInfo}.`;
+}
+
 async function icuGet(env, path) {
   const base = env.INTERVALS_BASE || 'https://intervals.icu';
   const res = await fetch(base + path, {
-    headers: { Authorization: 'Basic ' + btoa('API_KEY:' + env.INTERVALS_API_KEY), Accept: 'application/json' }
+    headers: { Authorization: 'Basic ' + btoa('API_KEY:' + String(env.INTERVALS_API_KEY).trim()), Accept: 'application/json' }
   });
-  if (res.status === 401 || res.status === 403) throw new Error('intervals.icu lehnt den Schlüssel ab. Prüfe API-Schlüssel und Athleten-ID.');
+  if (res.status === 401 || res.status === 403 || res.status === 404) throw new Error(accessHint(env, res.status));
   if (!res.ok) throw new Error('intervals.icu antwortet mit Fehler ' + res.status);
   return res.json();
 }
@@ -117,7 +127,7 @@ export async function runImport(env, opts) {
     const last = await getMeta(env, 'intervals_last');
     const today = berlinDate();
     const oldest = addDaysStr(today, last && last.ok ? -(opts.days || 7) : -42);
-    const athlete = encodeURIComponent(env.INTERVALS_ATHLETE_ID);
+    const athlete = encodeURIComponent(String(env.INTERVALS_ATHLETE_ID).trim());
     const changes = [];
     const t = Date.now();
 
