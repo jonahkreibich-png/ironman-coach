@@ -24,13 +24,15 @@ async function hmac(keyBytes, data) {
   return new Uint8Array(await crypto.subtle.sign('HMAC', key, data));
 }
 
+/* trim() entfernt auch ein unsichtbares BOM, das beim Einfügen entstehen kann */
+function vapidJwk(env) { return JSON.parse(String(env.VAPID_PRIVATE_JWK).trim()); }
 export function vapidPublicKey(env) {
-  const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+  const jwk = vapidJwk(env);
   return b64urlEncode(concat(new Uint8Array([4]), b64urlDecode(jwk.x), b64urlDecode(jwk.y)));
 }
 
 async function vapidHeader(env, endpoint) {
-  const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+  const jwk = vapidJwk(env);
   const key = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, d: jwk.d, ext: true }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   const header = b64urlEncode(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
   const claims = b64urlEncode(enc.encode(JSON.stringify({
