@@ -7,7 +7,7 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "ironman"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "f09acda6-8ded-4b02-a17c-c89aa4480ce9"
 
 [triggers]
 # Zeiten in UTC. Der Code prüft selbst die Uhrzeit in Europe/Berlin.

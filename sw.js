@@ -1,5 +1,5 @@
 /* Offline-Cache für Ironman Coach. Bei jeder neuen Version ändert sich VERSION. */
-const VERSION = '2026-10-10-eb933de1';
+const VERSION = '2026-10-10-c74144aa';
 const CACHE = 'ironman-coach-' + VERSION;
 const ASSETS = [
   "./",
