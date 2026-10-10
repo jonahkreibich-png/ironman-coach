@@ -1,0 +1,21 @@
+{
+  "name": "ironman-coach-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Server für Ironman Coach: Sync, intervals.icu, Push (Cloudflare Workers + D1)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8787",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute ironman --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute ironman --remote --file=schema.sql",
+    "test": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261006.1": true
+  }
+}

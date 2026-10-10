@@ -127,6 +127,7 @@ function saveState() {
   clearTimeout(saveTimer);
   try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); }
   catch (e) { if (!saveWarned) { saveWarned = true; toast('Dieser Browser speichert gerade nicht. Mach ein Backup unter Einstellungen.'); } }
+  if (typeof window.syncNotify === 'function') window.syncNotify();
 }
 let saveTimer = null;
 function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveState, 350); }
@@ -705,6 +706,7 @@ function renderHeute() {
   const haveToday = hasRecovery(todayPoint);
   const lightIcon = R.level === 0 ? uiIcon('bolt') : R.level === 1 ? uiIcon('walk') : uiIcon('pause');
   let h = `<h1 class="view-title">${dowLong(t)}<small>${fmtDate(t)} · ${day ? PLAN.weeks[day.weekIdx].label + ' · ' + esc(PLAN.weeks[day.weekIdx].focus) : 'außerhalb des aktuellen Blocks'}</small></h1>`;
+  if (typeof window.syncStatusLine === 'function') h += window.syncStatusLine();
 
   h += `<div class="ready l${R.level}">
     <div class="ready-head"><div class="light">${lightIcon}</div><div><div class="ready-t">${esc(R.title)}</div><div class="ready-s">${esc(R.sub)}</div></div></div>
@@ -1242,9 +1244,10 @@ function renderSheet() {
           <div class="fld" style="justify-content:flex-end"><button class="btn danger small" data-act="ill-del">Löschen</button></div></div>`).join('') : '<div class="empty">Keine Einträge.</div>'}
         <button class="btn ghost small" data-act="ill-add">+ Phase hinzufügen</button></div></div>
 
+      ${BUILD === 'pwa' && typeof window.syncSection === 'function' ? window.syncSection() : ''}
       ${BUILD === 'pwa' ? planUpdateSection() : ''}
       <div class="sec"><div class="sec-h"><h2>Backup</h2>${STATE.lastBackupAt ? `<span class="aside">zuletzt ${fmtDate(STATE.lastBackupAt.slice(0, 10))}</span>` : ''}</div><div class="panel">
-        <div class="hint">Deine Daten liegen nur auf diesem Gerät. ${BUILD === 'pwa' ? 'Sichere sie einmal pro Woche als Datei, z. B. in iCloud Drive. Dann bist du sicher, auch wenn das Handy kaputtgeht.' : 'Kopiere das Backup regelmäßig, z. B. in eine Notiz.'}</div>
+        <div class="hint">${syncOn() ? 'Der Server sichert deine Daten jeden Tag automatisch (siehe Sync). Ein Datei-Backup ist zusätzlich möglich.' : `Deine Daten liegen nur auf diesem Gerät. ${BUILD === 'pwa' ? 'Sichere sie einmal pro Woche als Datei, z. B. in iCloud Drive. Dann bist du sicher, auch wenn das Handy kaputtgeht.' : 'Kopiere das Backup regelmäßig, z. B. in eine Notiz.'}`}</div>
         <div class="row">${BUILD === 'pwa' ? '<button class="btn small" data-act="backup-file">Als Datei sichern</button>' : ''}<button class="btn ${BUILD === 'pwa' ? 'ghost ' : ''}small" data-act="backup-copy">Backup kopieren</button></div>
         <textarea class="inp" id="bk-out" rows="3" readonly style="font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
         <div class="hr"></div>
@@ -1261,8 +1264,9 @@ function renderSheet() {
 
 /* ================= Backup reminder / welcome / plan update ================= */
 const CAN_SHARE = BUILD === 'pwa' && typeof navigator.share === 'function';
+function syncOn() { return typeof window.isSyncOn === 'function' && window.isSyncOn(); }
 function backupReminder() {
-  if (BUILD !== 'pwa') return '';
+  if (BUILD !== 'pwa' || syncOn()) return '';
   const last = STATE.lastBackupAt ? STATE.lastBackupAt.slice(0, 10) : null;
   const age = last ? daysBetween(last, todayStr()) : 999;
   if (age < 7) return '';
@@ -1291,7 +1295,8 @@ function renderWelcome() {
       <div class="hint">Öffne die alte App, tippe auf Einstellungen und dann auf <b>Backup kopieren</b>. Füge den Text hier ein. Oder wähle eine Backup-Datei aus.</div>
       <textarea class="inp" id="bk-in" rows="4" placeholder="Backup-Text hier einfügen" style="font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
       <div class="row"><button class="btn" data-act="welcome-load">Daten laden</button><label class="btn ghost" for="bk-file">Datei wählen</label><input type="file" id="bk-file" accept="application/json,.json,.txt,text/plain" hidden></div>
-      <div class="hint">Der Trainingsplan steckt im Backup mit drin. Deine Daten bleiben auf diesem Handy und werden nirgendwohin geschickt.</div></div>
+      <div class="hint">Der Trainingsplan steckt im Backup mit drin. Deine Daten bleiben auf diesem Handy, bis du unter Einstellungen den Sync mit deinem eigenen Server einrichtest.</div></div>
+    ${typeof window.syncWelcomePanel === 'function' ? window.syncWelcomePanel() : ''}
   </div>`;
 }
 function planUpdateSection() {
@@ -1447,7 +1452,7 @@ document.addEventListener('click', async e => {
       catch (err) { ta.focus(); ta.select(); try { document.execCommand('copy'); toast('Kopiert. Jetzt im Chat einfügen.'); } catch (e2) { toast('Text ist markiert. Bitte manuell kopieren.'); } }
       break;
     }
-    case 'settings-open': openSheet('settings'); break;
+    case 'settings-open': openSheet('settings'); if (typeof window.syncOnSettingsOpen === 'function') window.syncOnSettingsOpen(); break;
     case 'sheet-close': closeSheet(); break;
     case 'theme': applyTheme(b.dataset.v); renderSheet(); rerender(); break;
     case 'save-ready': {

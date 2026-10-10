@@ -7,6 +7,7 @@ const ASSETS = [
   "./styles.css",
   "./app.js",
   "./pwa.js",
+  "./sync.js",
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
