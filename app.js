@@ -273,46 +273,17 @@ function zoneRangeText(sport, zoneStr) {
 }
 
 /* ================= Readiness ================= */
+/* Tagesampel mit persönlichen Normalbereichen (CoachCore, core.js). Krankheit und Wiedereinstieg haben Vorrang. */
 function computeReadiness() {
   const t = todayStr();
-  const R = STATE.settings.readiness;
   const ill = activeIllness();
   const ret = returnPhase(t);
-  const today = trendAt(t);
-  let p = hasRecovery(today) ? today : null;
-  let stale = false;
-  if (!p) { const prev = [...STATE.trend].reverse().find(x => x.date < t && x.date >= addDays(t, -2) && hasRecovery(x)); if (prev) { p = prev; stale = true; } }
-  const crits = [];
-  let level = 0;
-  const reasons = [];
-  const bump = (l, why) => { if (l > level) level = l; if (why) reasons.push(why); };
-
-  if (p && p.restingHR != null) {
-    const v = p.restingHR; const st = v <= R.rhrMax ? 'ok' : (v <= R.rhrMax + 2 ? 'warn' : 'bad');
-    crits.push({ k: 'Ruhepuls', v: de(v), t: `Ziel ≤${R.rhrMax}`, st });
-    if (st === 'warn') bump(1, 'Ruhepuls leicht erhöht'); if (st === 'bad') bump(2, 'Ruhepuls deutlich erhöht');
-  }
-  if (p && p.hrv != null) {
-    const v = p.hrv; const st = v >= R.hrvMin ? 'ok' : (v >= R.hrvMin - 7 ? 'warn' : 'bad');
-    crits.push({ k: 'HFV', v: de(v) + ' ms', t: `Ziel ≥${R.hrvMin}`, st });
-    if (st === 'warn') bump(1, 'HFV etwas niedrig'); if (st === 'bad') bump(2, 'HFV deutlich niedrig');
-  }
-  if (p && p.bodyTemp != null) {
-    const v = p.bodyTemp; const st = v < R.tempMax - 0.2 ? 'ok' : (v < R.tempMax ? 'warn' : 'bad');
-    crits.push({ k: 'Temp.', v: (v > 0 ? '+' : '') + de(v) + ' °C', t: `Grenze +${de(R.tempMax)}`, st });
-    if (st === 'warn') bump(1, 'Temperatur leicht erhöht'); if (st === 'bad') bump(2, 'Temperatur erhöht');
-  }
-  if (p && p.sleepQuality != null) {
-    const v = p.sleepQuality; const st = v >= 7 ? 'ok' : (v >= 5 ? 'warn' : 'bad');
-    crits.push({ k: 'Schlaf', v: de(v) + '/10', t: p.sleepHours != null ? de(p.sleepHours) + ' h' : '', st });
-    if (st !== 'ok') bump(1, 'Schlaf nicht optimal');
-  }
+  const r = CoachCore.readinessFor(STATE.trend, STATE.illnessPeriods, t, STATE.settings.readiness);
+  const { crits, reasons, stale, personal, score } = r;
+  const p = r.point;
   const lt = latestTrend();
-  if (lt && lt.tsb != null && !ill) {
-    const v = lt.tsb; const st = v >= -10 ? 'ok' : (v >= -20 ? 'warn' : 'bad');
-    crits.push({ k: 'TSB', v: de(v), t: 'Form', st });
-    if (st === 'warn') bump(1, 'TSB im Minus'); if (st === 'bad') bump(2, 'TSB stark im Minus');
-  }
+  const level = r.level === 3 ? 0 : r.level;
+  const history = CoachCore.readinessHistory(STATE.trend, STATE.illnessPeriods, t, 14, STATE.settings.readiness);
 
   let title, sub, kind = level;
   if (ill) {
@@ -328,9 +299,16 @@ function computeReadiness() {
   } else if (level === 1) {
     title = 'Nur locker'; sub = 'Lockere Einheiten ja, Intervalle auf einen besseren Tag schieben.';
   } else {
-    title = 'Ruhe'; sub = 'Heute Pause oder höchstens ein Spaziergang.';
+    title = 'Ruhe'; sub = 'Heute Ruhetag oder höchstens 20-30 min ganz locker.';
   }
-  return { level: kind, title, sub, crits, reasons, stale, point: p, ill, ret };
+  return { level: kind, title, sub, crits, reasons, stale, point: p, ill, ret, score, personal, history };
+}
+function readinessHistoryHtml(hist) {
+  if (!hist || !hist.some(h => h.level != null)) return '';
+  const col = l => l === 0 ? 'var(--good)' : l === 1 ? 'var(--warn)' : l === 2 ? 'var(--bad)' : 'var(--line)';
+  return `<div class="rhist" role="img" aria-label="Ampel der letzten 14 Tage">${hist.map(h =>
+    `<i title="${dowShort(h.date)} ${fmtDate(h.date)}${h.score != null ? ': ' + h.score : ''}" style="height:${h.score != null ? Math.max(12, h.score) : 12}%;background:${h.ill ? 'var(--rest)' : col(h.level)}${h.level == null ? ';opacity:.5' : ''}"></i>`).join('')}</div>
+    <div class="rhist-l"><span>vor 14 Tagen</span><span>heute</span></div>`;
 }
 
 /* ================= Scores ================= */
@@ -710,8 +688,11 @@ function renderHeute() {
   if (typeof window.syncStatusLine === 'function') h += window.syncStatusLine();
 
   h += `<div class="ready l${R.level}">
-    <div class="ready-head"><div class="light">${lightIcon}</div><div><div class="ready-t">${esc(R.title)}</div><div class="ready-s">${esc(R.sub)}</div></div></div>
+    <div class="ready-head"><div class="light">${lightIcon}</div><div style="flex:1;min-width:0"><div class="ready-t">${esc(R.title)}</div><div class="ready-s">${esc(R.sub)}</div></div>${R.score != null && !ill ? `<div class="ready-score num" aria-label="Bereitschaft ${R.score} von 100"><b>${R.score}</b><span>/100</span></div>` : ''}</div>
+    ${R.reasons.length && !ill ? `<ul class="ready-why">${R.reasons.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${R.crits.length ? `<div class="crits">${R.crits.map(c => `<span class="crit ${c.st}"><i></i>${c.k} <b>${c.v}</b>${c.t ? `<span class="t">${c.t}</span>` : ''}</span>`).join('')}</div>` : ''}
+    ${readinessHistoryHtml(R.history)}
+    ${R.point && !R.personal ? `<div class="hint">Noch weniger als ${CoachCore.MIN_DAYS} Tage Werte: Die Ampel nutzt feste Grenzwerte, bis dein persönlicher Normalbereich steht.</div>` : ''}
     <div class="ready-foot"><span class="hint">${R.stale ? `Werte vom ${fmtDate(R.point.date)}. Heute noch nichts eingetragen.` : (haveToday ? 'Morgenwerte von heute.' : '')}</span>
       ${ill ? '' : `<button class="btn ghost small" data-act="ill-start">Ich bin krank</button>`}</div>
   </div>`;
@@ -831,13 +812,18 @@ function renderWerte() {
     <div class="hint">CTL ist deine Fitness (Belastung der letzten 6 Wochen), ATL die Ermüdung der letzten Woche, TSB die Differenz. TSB unter -20 heißt: Erholung einplanen.</div></div></div>`;
 
   const R = STATE.settings.readiness;
+  const bH = CoachCore.baselineOf(STATE.trend, STATE.illnessPeriods, addDays(t, 1), 'hrv', Math.log);
+  const bR = CoachCore.baselineOf(STATE.trend, STATE.illnessPeriods, addDays(t, 1), 'restingHR');
+  const hrvLine = bH && bH.n >= CoachCore.MIN_DAYS ? { v: Math.round(Math.exp(bH.mean)), label: `dein Normalwert ${Math.round(Math.exp(bH.mean))}`, color: 'var(--good)' } : { v: R.hrvMin, label: `Ziel ≥${R.hrvMin}`, color: 'var(--good)' };
+  const rhrLine = bR && bR.n >= CoachCore.MIN_DAYS ? { v: Math.round(bR.mean), label: `dein Normalwert ${Math.round(bR.mean)}`, color: 'var(--good)' } : { v: R.rhrMax, label: `Ziel ≤${R.rhrMax}`, color: 'var(--good)' };
   const hp = STATE.trend.filter(p => p.hrv != null).map((p, i, arr) => ({ date: p.date, hrv: p.hrv, avg: rollingAvg(arr, 'hrv', i, 7), note: p.illness || '' }));
   const rp = STATE.trend.filter(p => p.restingHR != null).map(p => ({ date: p.date, rhr: p.restingHR, note: p.illness || '' }));
   const tpts = STATE.trend.filter(p => p.bodyTemp != null).map(p => ({ date: p.date, temp: p.bodyTemp, note: p.illness || '' }));
   h += `<div class="sec"><div class="sec-h"><h2>Erholung</h2><span class="aside">Rot hinterlegt: krank</span></div>
-    <div class="panel"><div class="lbl">HFV (ms) mit 7-Tage-Schnitt</div>${lineChart(hp, [{ key: 'hrv', name: 'HFV', color: 'var(--info)', area: true }, { key: 'avg', name: 'Ø 7 Tage', color: 'var(--ink-2)', dashed: true }], { legend: true, shade: illnessShades(), lines: [{ v: R.hrvMin, label: `Ziel ≥${R.hrvMin}`, color: 'var(--good)' }], label: 'HFV Verlauf' })}</div>
-    <div class="panel"><div class="lbl">Ruhepuls (bpm)</div>${lineChart(rp, [{ key: 'rhr', name: 'Ruhepuls', color: 'var(--run)', area: true }], { shade: illnessShades(), lines: [{ v: R.rhrMax, label: `Ziel ≤${R.rhrMax}`, color: 'var(--good)' }], label: 'Ruhepuls Verlauf' })}</div>
-    <div class="panel"><div class="lbl">Temperatur-Abweichung (°C)</div>${lineChart(tpts, [{ key: 'temp', name: 'Temp.', color: 'var(--warn)', fmt: v => (v > 0 ? '+' : '') + de(v, 1) }], { h: 140, shade: illnessShades(), lines: [{ v: R.tempMax, label: `Grenze +${de(R.tempMax)}`, color: 'var(--bad)' }], label: 'Temperatur Verlauf' })}</div>
+    <div class="panel"><div class="lbl">HFV (ms) mit 7-Tage-Schnitt</div>${lineChart(hp, [{ key: 'hrv', name: 'HFV', color: 'var(--info)', area: true }, { key: 'avg', name: 'Ø 7 Tage', color: 'var(--ink-2)', dashed: true }], { legend: true, shade: illnessShades(), lines: [hrvLine], label: 'HFV Verlauf' })}</div>
+    <div class="panel"><div class="lbl">Ruhepuls (bpm)</div>${lineChart(rp, [{ key: 'rhr', name: 'Ruhepuls', color: 'var(--run)', area: true }], { shade: illnessShades(), lines: [rhrLine], label: 'Ruhepuls Verlauf' })}
+      <div class="hint">Die Ampel wird gelb, wenn der Ruhepuls 3 Schläge über deinem Normalwert liegt, und rot ab 5 Schlägen. Bei der HFV zählt der 3-Tage-Schnitt im Vergleich zu deinen letzten 28 Tagen.</div></div>
+    <div class="panel"><div class="lbl">Temperatur-Abweichung (°C)</div>${lineChart(tpts, [{ key: 'temp', name: 'Temp.', color: 'var(--warn)', fmt: v => (v > 0 ? '+' : '') + de(v, 1) }], { h: 140, shade: illnessShades(), lines: [{ v: 0.3, label: 'Gelb +0,3', color: 'var(--warn)' }, { v: 0.5, label: 'Rot +0,5', color: 'var(--bad)' }], label: 'Temperatur Verlauf' })}</div>
   </div>`;
 
   const rows = STATE.trend.filter(p => hasRecovery(p) || p.illness).slice(-10).reverse();
@@ -1223,8 +1209,8 @@ function renderSheet() {
     P.innerHTML = sheetHead('Einstellungen') + `<div class="stack">
       <div class="sec" style="margin-top:0"><div class="sec-h"><h2>Darstellung</h2></div><div class="seg">${[['', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button class="${theme === v ? 'on' : ''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
 
-      <div class="sec"><div class="sec-h"><h2>Ampel-Grenzwerte</h2></div><div class="panel">
-        <div class="hint">Ab diesen Morgenwerten zeigt „Heute“ Grün für Intervalle. Darunter wird es Gelb oder Rot.</div>
+      <div class="sec"><div class="sec-h"><h2>Ampel-Grenzwerte</h2><span class="aside">nur als Rückfall</span></div><div class="panel">
+        <div class="hint">Die Ampel vergleicht deine Werte mit deinem persönlichen Normalbereich der letzten 28 Tage (ohne Krankheitstage). Diese festen Grenzen gelten nur, solange weniger als ${CoachCore.MIN_DAYS} Tage Werte da sind. Temperatur: ab +0,3 °C Gelb, ab +0,5 °C Rot.</div>
         <div class="fgrid"><div class="fld"><label for="r-rhr">Ruhepuls max</label><input class="inp" type="number" id="r-rhr" value="${R.rhrMax}"></div><div class="fld"><label for="r-hrv">HFV min</label><input class="inp" type="number" id="r-hrv" value="${R.hrvMin}"></div><div class="fld"><label for="r-temp">Temp. max °C</label><input class="inp" type="number" step="0.1" id="r-temp" value="${R.tempMax}"></div></div>
         <button class="btn small" data-act="save-ready">Speichern</button></div></div>
 

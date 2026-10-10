@@ -382,3 +382,12 @@ img { max-width: 100%; }
   .pair-code { font: 700 34px/1.1 var(--f-display); letter-spacing: .12em; color: var(--accent); text-align: center; padding: 6px 0; }  .sync-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
   .sync-icu { font-size: 13px; color: var(--ink-2); }
   .pill-icu { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+  /* Tagesampel: Score, Gründe, 14-Tage-Verlauf */
+  .ready-score { flex-shrink: 0; text-align: right; line-height: 1; color: var(--st); }
+  .ready-score b { font: 700 30px/1 var(--f-display); }
+  .ready-score span { font-size: 12px; color: var(--ink-2); margin-left: 1px; }
+  .ready-why { margin: 2px 0 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 3px; }
+  .ready-why li::marker { color: var(--st); }
+  .rhist { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; align-items: end; height: 34px; margin-top: 4px; }
+  .rhist i { display: block; border-radius: 3px 3px 1px 1px; min-height: 4px; }
+  .rhist-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); margin-top: -4px; }

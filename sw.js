@@ -1,5 +1,5 @@
 /* Offline-Cache für Ironman Coach. Bei jeder neuen Version ändert sich VERSION. */
-const VERSION = '2026-10-10-79b35491';
+const VERSION = '2026-10-10-1765547a';
 const CACHE = 'ironman-coach-' + VERSION;
 const ASSETS = [
   "./",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./app.js",
   "./pwa.js",
   "./sync.js",
+  "./core.js",
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
