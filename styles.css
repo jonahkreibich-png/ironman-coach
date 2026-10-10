@@ -391,3 +391,17 @@ img { max-width: 100%; }
   .rhist { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; align-items: end; height: 34px; margin-top: 4px; }
   .rhist i { display: block; border-radius: 3px 3px 1px 1px; min-height: 4px; }
   .rhist-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); margin-top: -4px; }
+  /* Plan-Anpassungen */
+  .pill-adj { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .adj-info { font-size: 13.5px; }
+  .adj-info summary { cursor: pointer; color: var(--warn); font-weight: 600; list-style: none; display: flex; align-items: center; gap: 4px; }
+  .adj-info summary::-webkit-details-marker { display: none; }
+  .adj-info[open] summary svg { transform: rotate(180deg); }
+  .adj-info .hint { margin-top: 6px; }
+  .moved-note { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; }
+  .moved-note svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .adj { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+  .adj:first-of-type { border-top: 0; }
+  .adj-h { display: flex; gap: 8px; align-items: center; }
+  .adj-t { font-size: 14.5px; }
+  .adj.undone .adj-t { text-decoration: line-through; color: var(--ink-2); }

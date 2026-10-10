@@ -1,12 +1,10 @@
 # Führt alle Server-Tests nacheinander aus, jeweils mit frischer lokaler Datenbank.
 # Aufruf im Ordner server:  powershell -ExecutionPolicy Bypass -File test\all.ps1
-param([string[]]$Tests = @('run.mjs', 'intervals.mjs'))
+param([string[]]$Tests = @('run.mjs', 'intervals.mjs', 'coach-server.mjs'))
 $ErrorActionPreference = 'Continue'
 $mock = Start-Process node -ArgumentList 'test/mock-intervals.mjs' -PassThru -WindowStyle Hidden
 $failed = 0
-Write-Output '=== core.mjs ==='
-node test/core.mjs
-if ($LASTEXITCODE -ne 0) { $failed++ }
+foreach ($u in 'core.mjs', 'coach.mjs') { Write-Output "=== $u ==="; node "test/$u"; if ($LASTEXITCODE -ne 0) { $failed++ } }
 foreach ($t in $Tests) {
   Remove-Item -Recurse -Force .wrangler\state -ErrorAction SilentlyContinue
   npx.cmd wrangler d1 execute ironman --local --file=schema.sql *> $null

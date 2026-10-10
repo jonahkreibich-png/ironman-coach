@@ -94,6 +94,7 @@ function defaultState() {
     weekNotes: {}, nutrition: {},
     nutritionProfile: { age: 17, heightCm: 184, weightKg: 73, pal: 1.4 },
     illnessPeriods: clone(PLAN.seedIllness || []),
+    adjustments: {},
     lastBackupAt: null
   };
 }
@@ -114,6 +115,7 @@ function mergeIntoDefaults(partial) {
   if (!out.nutrition) out.nutrition = {};
   if (!out.nutritionProfile) out.nutritionProfile = base.nutritionProfile;
   if (!Array.isArray(out.illnessPeriods)) out.illnessPeriods = clone(PLAN.seedIllness || []);
+  if (!out.adjustments || typeof out.adjustments !== 'object') out.adjustments = {};
   out.trend.sort((a, b) => a.date.localeCompare(b.date));
   return out;
 }
@@ -145,13 +147,21 @@ function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(UI)); } ca
 const UI = Object.assign({ view: 'heute', perfSport: 'swim', volMode: null }, loadUi());
 
 /* ================= Plan index ================= */
+/* PLAN.weeks ist der effektive Plan: Coach-Plan (BASE_WEEKS, bleibt unverändert) plus aktive Anpassungen. */
+const BASE_WEEKS = clone(PLAN.weeks);
 const DAYS = [];
-PLAN.weeks.forEach((w, wi) => w.days.forEach(d => DAYS.push({ ...d, weekIdx: wi })));
 const DAY_BY_DATE = {};
-DAYS.forEach(d => { DAY_BY_DATE[d.date] = d; });
 const SESS = [];
 const SESS_BY_ID = {};
-DAYS.forEach(d => d.sessions.forEach(s => { const x = { ...s, date: d.date }; SESS.push(x); SESS_BY_ID[s.id] = x; }));
+function rebuildPlanIndex() {
+  PLAN.weeks = CoachCore.applyAdjustments(BASE_WEEKS, STATE.adjustments || {});
+  DAYS.length = 0; SESS.length = 0;
+  Object.keys(DAY_BY_DATE).forEach(k => delete DAY_BY_DATE[k]); Object.keys(SESS_BY_ID).forEach(k => delete SESS_BY_ID[k]);
+  PLAN.weeks.forEach((w, wi) => w.days.forEach(d => DAYS.push({ ...d, weekIdx: wi })));
+  DAYS.forEach(d => { DAY_BY_DATE[d.date] = d; });
+  DAYS.forEach(d => d.sessions.forEach(s => { const x = { ...s, date: d.date }; SESS.push(x); SESS_BY_ID[s.id] = x; }));
+}
+rebuildPlanIndex();
 function findDay(date) { return DAY_BY_DATE[date] || null; }
 function currentWeekIdx() {
   if (!PLAN.weeks.length) return 0;
@@ -220,6 +230,7 @@ function effStatus(s) {
   if (s.sport === 'rest') return 'rest';
   const st = sessState(s.id);
   if (st.completed) return 'done';
+  if (s.cancelled) return 'cancelled';
   if (st.skipped) return 'skipped';
   if (illnessAt(s.date)) return 'sick';
   if (s.date < todayStr()) return 'missed';
@@ -227,7 +238,7 @@ function effStatus(s) {
 }
 function forgottenSessions() { return SESS.filter(s => effStatus(s) === 'missed'); }
 function dayStats(d) {
-  const real = d.sessions.filter(s => s.sport !== 'rest');
+  const real = d.sessions.filter(s => s.sport !== 'rest' && !(s.cancelled && !sessState(s.id).completed));
   const st = real.map(s => effStatus({ ...s, date: d.date }));
   const done = st.filter(x => x === 'done').length;
   const skipped = st.filter(x => x === 'skipped').length;
@@ -495,7 +506,7 @@ function illnessShades() { return STATE.illnessPeriods.filter(p => p.start).map(
 /* ================= Backup ================= */
 function backupObject() {
   const o = clone(STATE);
-  if (HAS_PLAN) o.plan = PLAN;
+  if (HAS_PLAN) o.plan = readPlan() || Object.assign({}, PLAN, { weeks: BASE_WEEKS }); // immer der Plan des Coachs, ohne Anpassungen
   o.backupVersion = 2; o.exportedAt = new Date().toISOString();
   return o;
 }
@@ -515,6 +526,7 @@ function applyBackup(data) {
   delete data.plan; delete data.exportedAt; delete data.backupVersion;
   STATE = mergeIntoDefaults(data);
   STATE.lastBackupAt = STATE.lastBackupAt || new Date().toISOString();
+  rebuildPlanIndex();
   saveState();
   if (BUILD === 'pwa' && isPlan(plan)) {
     try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (e) { toast('Speichern nicht möglich. Ist der Speicher voll?'); return false; }
@@ -558,8 +570,14 @@ function sessionCard(s) {
   const sp = SPORTS[s.sport] || SPORTS.rest;
   const meta = [s.plannedMinutes ? s.plannedMinutes + ' min' : null, s.plannedKm ? de(s.plannedKm) + ' km' : null].filter(Boolean).join(' · ');
   const zone = s.zone ? `<span class="wo-zone">${esc(zoneRangeText(s.sport, s.zone))}</span>` : '';
-  const pill = ({ skipped: '<span class="pill pill-skipped">Ausgefallen</span>', sick: '<span class="pill pill-sick">Krank · entfällt</span>', missed: '<span class="pill pill-missed">Nicht eingetragen</span>' }[status] || '') +
+  const pill = ({ skipped: '<span class="pill pill-skipped">Ausgefallen</span>', sick: '<span class="pill pill-sick">Krank · entfällt</span>', missed: '<span class="pill pill-missed">Nicht eingetragen</span>', cancelled: '<span class="pill pill-skipped">Entfällt</span>' }[status] || '') +
+    (s._adj && s._adj.length ? `<span class="pill pill-adj">${s.movedFrom ? 'Verschoben' : 'Angepasst'}</span>` : '') +
     (status === 'done' && st.icuId ? '<span class="pill pill-icu">intervals.icu</span>' : '');
+  if (status === 'cancelled') {
+    return `<article class="wo is-skipped" data-sid="${esc(s.id)}" style="--sc:${sp.color}">
+      <div class="wo-top"><div class="wo-main">${sportTag(s.sport, pill)}<h3 class="wo-title">${esc(s.title)}</h3></div></div>
+      <p class="wo-desc">${esc(s.cancelReason || 'Entfällt wegen einer Anpassung.')} Rückgängig unter Plan → Anpassungen.</p></article>`;
+  }
   let extra = '';
   if (status === 'done') {
     extra = `<div class="wo-extra">
@@ -579,8 +597,18 @@ function sessionCard(s) {
   return `<article class="wo is-${status}" data-sid="${esc(s.id)}" style="--sc:${sp.color}">
     <div class="wo-top"><div class="wo-main">${sportTag(s.sport, zone + pill)}<h3 class="wo-title">${esc(s.title)}</h3>${meta ? `<div class="wo-meta">${meta}</div>` : ''}</div>${btns}</div>
     ${s.description && status !== 'sick' ? `<p class="wo-desc ${s.description.length > 95 ? 'clamp' : ''}">${esc(s.description)}</p>${s.description.length > 95 ? '<button class="link" data-act="expand" style="align-self:flex-start">Mehr anzeigen</button>' : ''}` : ''}
+    ${s._adj && s._adj.length ? adjInfo(s) : ''}
     ${extra}${notes}
   </article>`;
+}
+/* Warum die Einheit angepasst wurde und wie das Original aussah */
+function adjInfo(s) {
+  const list = s._adj.map(id => (STATE.adjustments || {})[id]).filter(Boolean);
+  const o = s._orig || {};
+  const orig = [o.title, o.plannedMinutes ? o.plannedMinutes + ' min' : null, o.plannedKm ? de(o.plannedKm) + ' km' : null, o.zone].filter(Boolean).join(' · ');
+  return `<details class="adj-info"><summary>${uiIcon('chev', 14)} Warum angepasst? · Original ansehen</summary>
+    <div class="hint">${list.map(a => `${esc(a.what)}${a.reason ? `<br><span class="muted">Grund: ${esc(a.reason)}</span>` : ''}`).join('<br>')}</div>
+    ${orig ? `<div class="hint"><b>Original${o.date && s.movedFrom ? ' (' + dowShort(o.date) + ' ' + fmtDate(o.date) + ')' : ''}:</b> ${esc(orig)}${o.description ? '<br>' + esc(o.description) : ''}</div>` : ''}</details>`;
 }
 function customCard(w, date) {
   const sp = SPORTS[w.sport] || SPORTS.rest;
@@ -626,6 +654,7 @@ function dayCard(d, opts) {
       <span class="row" style="flex-wrap:nowrap">${dayBadge(d)}<span class="chev">${uiIcon('chev', 18)}</span></span></button>`}
     <div class="day-b" ${opts.noHead ? 'style="padding-top:12px"' : ''}>
       ${d.sessions.map(s => sessionCard({ ...s, date: d.date })).join('')}
+      ${(d.moved || []).map(m => `<div class="moved-note">${icon(m.sport)}<span>${esc(m.title)} wurde auf <b>${dowShort(m.to)} ${fmtDate(m.to)}</b> verschoben.</span></div>`).join('')}
       ${customs.map(w => customCard(w, d.date)).join('')}
       ${addBlock(d.date)}
     </div></section>`;
@@ -769,7 +798,38 @@ function renderPlan() {
       <textarea class="inp" rows="2" data-f="weeknote" data-week="${week.weekNumber}" placeholder="Wochennotiz: wie hat sich die Woche angefühlt?">${esc(STATE.weekNotes[week.weekNumber] || '')}</textarea>
     </div>
     <div class="sec">${week.days.map(d => dayCard({ ...d, weekIdx: PLAN_WEEK })).join('')}</div>`;
+  h += adjustmentsSection();
   $('#app').innerHTML = h;
+}
+/* Liste aller automatischen Anpassungen, gruppiert, mit Rückgängig */
+function adjustmentGroups() {
+  const groups = {};
+  Object.values(STATE.adjustments || {}).forEach(a => {
+    if (!a || !a.id) return;
+    const g = a.group || a.id;
+    (groups[g] = groups[g] || { id: g, items: [], createdAt: 0, date: a.date }).items.push(a);
+    groups[g].createdAt = Math.max(groups[g].createdAt, a.createdAt || 0);
+  });
+  return Object.values(groups).sort((a, b) => b.createdAt - a.createdAt);
+}
+function adjustmentsSection() {
+  const from = addDays(todayStr(), -30);
+  const groups = adjustmentGroups().filter(g => !g.date || g.date >= from);
+  const body = groups.length ? groups.map(g => {
+    const undone = g.items.every(a => a.undone);
+    const note = g.items.find(a => a.type === 'note');
+    const changes = g.items.filter(a => a.type !== 'note');
+    const reason = (note && note.reason) || (changes[0] && changes[0].reason) || '';
+    return `<div class="adj ${undone ? 'undone' : ''}" data-group="${esc(g.id)}">
+      <div class="adj-h"><span class="lbl">${g.date ? dowShort(g.date) + ' ' + fmtDate(g.date) : ''}</span>${undone ? '<span class="pill pill-skipped">Rückgängig gemacht</span>' : ''}</div>
+      ${note ? `<div class="adj-t">${esc(note.what)}</div>` : ''}
+      ${changes.map(a => `<div class="adj-t">${esc(a.what || '')}</div>`).join('')}
+      ${changes.length || !note ? '' : '<div class="hint">Keine Einheit geändert.</div>'}
+      <div class="hint">Warum: ${esc(reason)}</div>
+      ${changes.length ? `<button class="btn ghost small" data-act="adj-undo">${undone ? 'Wieder anwenden' : 'Rückgängig'}</button>` : ''}</div>`;
+  }).join('') : '<div class="empty">Noch keine automatischen Anpassungen. Die App passt den Plan morgens nach der Ampel und sonntags um 18 Uhr für die nächste Woche an.</div>';
+  return `<div class="sec"><div class="sec-h"><h2>Anpassungen</h2><span class="aside">letzte 30 Tage</span></div><div class="panel">
+    <div class="hint">Große Änderungen wie neue Blöcke, Tests und Wettkämpfe kommen weiter vom Coach über „Plan aktualisieren“.</div>${body}</div></div>`;
 }
 
 /* ================= WERTE ================= */
@@ -790,6 +850,13 @@ function renderWerte() {
     <div class="tile"><div class="k">VO2max</div><div class="v">${de(vo2 && vo2.vo2max)} ${arrow('vo2max')}</div><div class="s">Garmin</div></div>
     <div class="tile"><div class="k">Cardio-Erh.</div><div class="v">${de(cardio && cardio.cardioRecovery)} ${arrow('cardioRecovery')}</div><div class="s">bpm</div></div>
   </div>`;
+  const own = CoachCore.ownLoadSeries(STATE, PLAN.weeks, t);
+  const ol = own.length ? own[own.length - 1] : null;
+  if (ol) h += `<div class="lbl" style="margin-top:12px">Eigene Berechnung aus deinen Einheiten</div><div class="tiles">
+    <div class="tile"><div class="k">CTL</div><div class="v">${de(ol.ctl, 0)}</div><div class="s">eigen</div></div>
+    <div class="tile"><div class="k">ATL</div><div class="v">${de(ol.atl, 0)}</div><div class="s">eigen</div></div>
+    <div class="tile ${tsbCls(ol.tsb)}"><div class="k">TSB</div><div class="v">${de(ol.tsb, 0)}</div><div class="s">eigen</div></div>
+    <div class="tile"><div class="k">Heute</div><div class="v">${de(ol.load, 0)}</div><div class="s">Belastung</div></div></div>`;
   if (ill) h += `<div class="banner info" style="margin-top:10px">Du bist gerade krank. CTL und ATL sinken, weil keine Trainingslast dazukommt, und TSB steigt. Das zeigt keine echte Erholung und keinen echten Fitnessverlust.</div>`;
 
   const withBoth = STATE.trend.filter(p => p.ctl != null && p.atl != null && p.ctl > 0);
@@ -805,11 +872,16 @@ function renderWerte() {
   }
   h += `<div class="sec"><div class="sec-h"><h2>Belastungsverhältnis</h2></div><div class="panel">${gauge}</div></div>`;
 
-  const tp = STATE.trend.filter(p => p.ctl != null || p.atl != null || p.tsb != null);
+  const tpMap = {};
+  STATE.trend.filter(p => p.ctl != null || p.atl != null || p.tsb != null).forEach(p => { tpMap[p.date] = { date: p.date, ctl: p.ctl, atl: p.atl, tsb: p.tsb, note: p.illness || '' }; });
+  const firstTp = Object.keys(tpMap).sort()[0];
+  own.filter(o => !firstTp || o.date >= firstTp).forEach(o => { tpMap[o.date] = Object.assign(tpMap[o.date] || { date: o.date }, { octl: o.ctl }); });
+  const tp = Object.values(tpMap).sort((a, b) => a.date.localeCompare(b.date));
   h += `<div class="sec"><div class="sec-h"><h2>Fitness, Ermüdung, Form</h2></div><div class="panel">${lineChart(tp, [
-    { key: 'ctl', name: 'CTL', color: 'var(--info)', area: true }, { key: 'atl', name: 'ATL', color: 'var(--run)' }, { key: 'tsb', name: 'TSB', color: 'var(--good)' }
+    { key: 'ctl', name: 'CTL', color: 'var(--info)', area: true }, { key: 'atl', name: 'ATL', color: 'var(--run)' }, { key: 'tsb', name: 'TSB', color: 'var(--good)' },
+    ...(own.length ? [{ key: 'octl', name: 'CTL eigen', color: 'var(--info)', dashed: true }] : [])
   ], { h: 200, legend: true, legendExtra: '<span><i class="box" style="--c:var(--bad)"></i>krank</span>', shade: illnessShades(), lines: [{ v: 0, label: '' }], label: 'CTL ATL TSB Verlauf' })}
-    <div class="hint">CTL ist deine Fitness (Belastung der letzten 6 Wochen), ATL die Ermüdung der letzten Woche, TSB die Differenz. TSB unter -20 heißt: Erholung einplanen.</div></div></div>`;
+    <div class="hint">CTL ist deine Fitness (Belastung der letzten 6 Wochen), ATL die Ermüdung der letzten Woche, TSB die Differenz. TSB unter -20 heißt: Erholung einplanen.${own.length ? ' Die gestrichelte Linie rechnet die App selbst aus deinen Einheiten: mit Puls als hrTSS (LTHR Rad 162, Laufen 170), ohne Puls über die RPE. Liefert intervals.icu eine Trainingslast, zählt diese.' : ''}</div></div></div>`;
 
   const R = STATE.settings.readiness;
   const bH = CoachCore.baselineOf(STATE.trend, STATE.illnessPeriods, addDays(t, 1), 'hrv', Math.log);
@@ -1186,6 +1258,40 @@ function buildExportText(date) {
   return L.join('\n');
 }
 
+/* Wochenbericht für den Coach: Umsetzung, Belastung, Ampel-Verlauf, Anpassungen, Auffälligkeiten */
+function buildWeekReport(date) {
+  const S = CoachCore.weekSummary(STATE, BASE_WEEKS, date);
+  const L = [];
+  L.push(`Wochenbericht ${fmtDate(S.mon)}-${fmtDate(S.sun)}`);
+  L.push('');
+  L.push(`Umsetzung: ${S.nDone} von ${S.nPlanned} Einheiten erledigt, Belastung ${S.done} von geplant ${S.planned}${S.ratio != null ? ` (${Math.round(S.ratio * 100)} %)` : ''}${S.extra ? `, davon ${S.extra} aus Extra-Einheiten` : ''}.`);
+  const own = CoachCore.ownLoadSeries(STATE, PLAN.weeks, S.sun < todayStr() ? S.sun : todayStr());
+  const o = own.length ? own[own.length - 1] : null;
+  const icu = latestWithKey('ctl', S.sun);
+  const parts = [];
+  if (o) parts.push(`eigen CTL ${de(o.ctl, 0)} / ATL ${de(o.atl, 0)} / TSB ${de(o.tsb, 0)}`);
+  if (icu) parts.push(`intervals.icu CTL ${de(icu.ctl, 0)} / ATL ${de(icu.atl, 0)}`);
+  if (S.loadRatio != null) parts.push(`ATL/CTL ${de(S.loadRatio, 2)}`);
+  if (parts.length) L.push('Belastung: ' + parts.join(' · '));
+  const sym = l => l === 0 ? '🟢' : l === 1 ? '🟡' : l === 2 ? '🔴' : '⚪';
+  L.push('Ampel: ' + S.history.map(h => `${dowShort(h.date)} ${h.ill ? '🤒' : sym(h.level)}${h.score != null ? ' ' + h.score : ''}`).join(', '));
+  const adj = adjustmentGroups().filter(g => g.date && g.date >= S.mon && g.date <= addDays(S.sun, 1));
+  if (adj.length) {
+    L.push(''); L.push('Anpassungen der App:');
+    adj.forEach(g => g.items.forEach(a => L.push(`- ${fmtDate(a.date || g.date)} ${a.what || ''}${a.reason ? ' (' + a.reason + ')' : ''}${a.undone ? ' [rückgängig gemacht]' : ''}`)));
+  }
+  const notes = [];
+  if (S.red) notes.push(`${S.red} rote${S.red === 1 ? 'r' : ''} Tag${S.red === 1 ? '' : 'e'}`);
+  if (S.sick) notes.push('Krankheit in dieser Woche');
+  if (S.missedKey.length) notes.push('Schlüsseleinheiten verpasst: ' + S.missedKey.join(', '));
+  if (S.sleepAvg != null && S.sleepAvg < 8.5) notes.push(`Schlaf im Schnitt ${de(S.sleepAvg, 1)} h (Bedarf 8,5-9 h)`);
+  if (CoachCore.groinFlag(STATE, PLAN.weeks, S.sun < todayStr() ? S.sun : todayStr())) notes.push('Leistenschmerz über 2/10 in den Notizen');
+  L.push(''); L.push('Auffälligkeiten: ' + (notes.length ? notes.join('; ') : 'keine'));
+  const wk = PLAN.weeks.find(w => w.startDate === S.mon);
+  if (wk && STATE.weekNotes[wk.weekNumber]) { L.push(''); L.push('Wochennotiz: ' + STATE.weekNotes[wk.weekNumber]); }
+  return L.join('\n');
+}
+
 /* ================= Sheets ================= */
 let SHEET = null;
 function openSheet(kind, arg) { SHEET = { kind, arg }; renderSheet(); $('#sheet').hidden = false; document.body.style.overflow = 'hidden'; }
@@ -1200,7 +1306,8 @@ function renderSheet() {
       <div class="hint">Enthält die Einheiten des Tages, deinen Status, die Erholungswerte und die Ernährung. Kopieren und in den Chat einfügen.</div>
       <div class="row"><div class="fld" style="flex:1;min-width:150px"><label for="ex-date">Datum</label><input class="inp" type="date" id="ex-date" value="${d}"></div>
       <button class="btn" data-act="export-copy" style="align-self:flex-end">Kopieren</button>${CAN_SHARE ? '<button class="btn ghost" data-act="export-share" style="align-self:flex-end">Teilen</button>' : ''}</div>
-      <textarea class="inp" id="ex-text" rows="14" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">${esc(buildExportText(d))}</textarea></div>`;
+      <div class="seg" role="tablist">${[['day', 'Tag'], ['week', 'Wochenbericht für den Coach']].map(([k, l]) => `<button class="${(SHEET.mode || 'day') === k ? 'on' : ''}" data-act="export-mode" data-mode="${k}">${l}</button>`).join('')}</div>
+      <textarea class="inp" id="ex-text" rows="14" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">${esc(SHEET.mode === 'week' ? buildWeekReport(d) : buildExportText(d))}</textarea></div>`;
   } else if (SHEET.kind === 'settings') {
     const S = STATE.settings, R = S.readiness;
     const theme = (() => { try { return localStorage.getItem('theme_pref') || ''; } catch (e) { return ''; } })();
@@ -1382,6 +1489,12 @@ document.addEventListener('click', async e => {
       saveState(); rerender(); toast(`${list.length} Einheiten als ausgefallen markiert`); break;
     }
     case 'week': PLAN_WEEK = parseInt(b.dataset.i); ADD_OPEN = null; rerender(); break;
+    case 'adj-undo': {
+      const g = adjustmentGroups().find(x => x.id === b.closest('[data-group]').dataset.group); if (!g) return;
+      const undo = !g.items.every(a => a.undone);
+      g.items.forEach(a => { STATE.adjustments[a.id] = Object.assign({}, a, { undone: undo }); });
+      rebuildPlanIndex(); saveState(); rerender(); toast(undo ? 'Anpassung rückgängig gemacht' : 'Anpassung wieder angewendet'); break;
+    }
     case 'score': STATE.scoreAdjust[b.dataset.sport] = (STATE.scoreAdjust[b.dataset.sport] || 0) + parseInt(b.dataset.dir); saveState(); rerender(); break;
     case 'perf': UI.perfSport = b.dataset.sport; saveUi(); rerender(); break;
     case 'vol': UI.volMode = b.dataset.mode; saveUi(); rerender(); break;
@@ -1433,6 +1546,7 @@ document.addEventListener('click', async e => {
       saveState(); rerender(); toast('Einstellungen gespeichert'); break;
     }
     case 'export-open': openSheet('export', b.dataset.date || t); break;
+    case 'export-mode': SHEET.mode = b.dataset.mode; SHEET.arg = ($('#ex-date') || {}).value || SHEET.arg; renderSheet(); break;
     case 'export-copy': {
       const ta = $('#ex-text');
       try { await navigator.clipboard.writeText(ta.value); toast('Kopiert. Jetzt im Chat einfügen.'); }
@@ -1477,7 +1591,7 @@ document.addEventListener('click', async e => {
       let obj; try { obj = parseBackupText(raw); } catch (err) { toast('Der Plan-Code ist unvollständig. Kopiere ihn nochmal ganz.'); return; }
       const upd = obj.plan && !obj.weeks ? obj.plan : obj;
       if (!isPlan(upd)) { toast('Das ist kein Plan-Code.'); return; }
-      const next = mergePlan(PLAN, upd);
+      const next = mergePlan(readPlan() || Object.assign({}, PLAN, { weeks: BASE_WEEKS }), upd);
       try { localStorage.setItem(PLAN_KEY, JSON.stringify(next)); } catch (err) { toast('Speichern nicht möglich.'); return; }
       toast('Plan übernommen'); setTimeout(() => location.reload(), 600); break;
     }
@@ -1507,7 +1621,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const el = e.target;
-  if (el.id === 'ex-date') { $('#ex-text').value = buildExportText(el.value || todayStr()); return; }
+  if (el.id === 'ex-date') { SHEET.arg = el.value || todayStr(); $('#ex-text').value = SHEET.mode === 'week' ? buildWeekReport(SHEET.arg) : buildExportText(SHEET.arg); return; }
   if (el.id === 'w-date') { WERTE_DATE = el.value || todayStr(); rerender(); return; }
   if (el.id === 'nut-date') { NUT_DATE = el.value || todayStr(); rerender(); return; }
   if (el.id === 'nut-type') {

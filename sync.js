@@ -33,6 +33,7 @@
     (STATE.illnessPeriods || []).forEach(p => put('illness', itemKey(p, 'ill'), p));
     (STATE.milestones || []).forEach(p => put('milestone', itemKey(p, 'ms'), p));
     Object.entries(STATE.weekNotes || {}).forEach(([w, t]) => put('weekNote', w, t));
+    Object.entries(STATE.adjustments || {}).forEach(([id, a]) => put('adjust', id, a));
     put('settings', 'main', { settings: STATE.settings, nutritionProfile: STATE.nutritionProfile, scoreAdjust: STATE.scoreAdjust, scoreCalibVersion: STATE.scoreCalibVersion ?? null });
     if (HAS_PLAN) { const raw = rawPlan(); if (raw) m.set('plan|main', { kind: 'plan', key: 'main', data: null, raw }); }
     return m;
@@ -67,7 +68,7 @@
   }
 
   /* ---------- Datensätze vom Server übernehmen ---------- */
-  let planChanged = false;
+  let planChanged = false, adjustChanged = false;
   function applyRecord(rec) {
     const k = rec.kind + '|' + rec.key;
     const p = META.pending[k];
@@ -98,6 +99,11 @@
         if (!del) STATE.milestones.push(d); break;
       }
       case 'weekNote': if (del) delete STATE.weekNotes[rec.key]; else STATE.weekNotes[rec.key] = d; break;
+      case 'adjust': {
+        STATE.adjustments = STATE.adjustments || {};
+        if (del) delete STATE.adjustments[rec.key]; else STATE.adjustments[rec.key] = d;
+        adjustChanged = true; break;
+      }
       case 'settings': {
         if (del || !d) break;
         if (d.settings) STATE.settings = d.settings;
@@ -171,6 +177,7 @@
   function afterRemoteApply() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
     if (planChanged) { planChanged = false; toast('Neuer Stand vom Server. App lädt neu …'); setTimeout(() => location.reload(), 900); return; }
+    if (adjustChanged) { adjustChanged = false; if (typeof rebuildPlanIndex === 'function') rebuildPlanIndex(); }
     safeRerender();
   }
   let rerenderPending = false;
@@ -319,7 +326,7 @@
 
   function backupFromRecords(records) {
     const base = mergeIntoDefaults(null);
-    base.sessions = {}; base.trend = []; base.nutrition = {}; base.customWorkouts = {}; base.illnessPeriods = []; base.milestones = []; base.weekNotes = {};
+    base.sessions = {}; base.trend = []; base.nutrition = {}; base.customWorkouts = {}; base.illnessPeriods = []; base.milestones = []; base.weekNotes = {}; base.adjustments = {};
     let plan = null;
     records.forEach(r => {
       const d = r.data;
@@ -330,6 +337,7 @@
       else if (r.kind === 'illness') base.illnessPeriods.push(d);
       else if (r.kind === 'milestone') base.milestones.push(d);
       else if (r.kind === 'weekNote') base.weekNotes[r.key] = d;
+      else if (r.kind === 'adjust') base.adjustments[r.key] = d;
       else if (r.kind === 'settings' && d) { Object.assign(base, { settings: d.settings || base.settings, nutritionProfile: d.nutritionProfile || base.nutritionProfile, scoreAdjust: d.scoreAdjust || base.scoreAdjust }); if (d.scoreCalibVersion != null) base.scoreCalibVersion = d.scoreCalibVersion; }
       else if (r.kind === 'plan') plan = d;
     });

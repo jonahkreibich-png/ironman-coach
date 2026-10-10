@@ -2,8 +2,9 @@
    Ein Nutzer, kein Registrierungssystem. Geheimnisse nur über env (Cloudflare-Secrets). */
 import { berlinDate, berlinParts, putRecords, getMeta } from './store.js';
 import { runImport } from './intervals.js';
+import { runDaily, runWeekly } from './coach.js';
 
-const KINDS = new Set(['session', 'trend', 'nutrition', 'custom', 'illness', 'milestone', 'weekNote', 'settings', 'plan']);
+const KINDS = new Set(['session', 'trend', 'nutrition', 'custom', 'illness', 'milestone', 'weekNote', 'settings', 'plan', 'adjust']);
 const PAIR_TTL_MS = 10 * 60 * 1000;
 const MAX_BODY = 6 * 1024 * 1024;
 const BACKUP_KEEP_DAYS = 30;
@@ -198,6 +199,13 @@ async function route(req, env, url) {
     return { configured: !!(env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID), last: await getMeta(env, 'intervals_last') };
   }
 
+  // Plan-Anpassungen (Phase 4) von Hand auslösen
+  if (p === '/api/coach/daily' && M === 'POST') return await runDaily(env, { force: true });
+  if (p === '/api/coach/weekly' && M === 'POST') {
+    const body = await readJson(req);
+    return await runWeekly(env, { force: true, date: /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : undefined });
+  }
+
   throw new HttpError(404, 'Unbekannte Adresse');
 }
 
@@ -206,6 +214,10 @@ async function halfHourly(env) {
   const b = berlinParts();
   if (b.hour < 6 || b.hour > 23) return;
   if (env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID) await runImport(env);
+  // Morgens nach dem Abruf: Tagesampel → Plan anpassen (einmal pro Tag)
+  try { await runDaily(env); } catch (e) { console.error('Tagesanpassung:', e && e.message); }
+  // Sonntag 18 Uhr: nächste Woche planen
+  if (b.dow === 0 && b.hour === 18) { try { await runWeekly(env); } catch (e) { console.error('Wochenanpassung:', e && e.message); } }
 }
 
 export default {
