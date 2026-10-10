@@ -1,5 +1,7 @@
-/* Ironman Coach Server: Geräte-Login, Datensatz-Sync, tägliches Backup.
+/* Ironman Coach Server: Geräte-Login, Datensatz-Sync, tägliches Backup, intervals.icu-Abruf.
    Ein Nutzer, kein Registrierungssystem. Geheimnisse nur über env (Cloudflare-Secrets). */
+import { berlinDate, berlinParts, putRecords, getMeta } from './store.js';
+import { runImport } from './intervals.js';
 
 const KINDS = new Set(['session', 'trend', 'nutrition', 'custom', 'illness', 'milestone', 'weekNote', 'settings', 'plan']);
 const PAIR_TTL_MS = 10 * 60 * 1000;
@@ -47,9 +49,6 @@ async function readJson(req) {
 }
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 function cleanName(n) { return String(n || 'Gerät').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40) || 'Gerät'; }
-function berlinDate(ts) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts || Date.now()));
-}
 
 /* ---------- Geräte ---------- */
 async function createDevice(env, name) {
@@ -75,20 +74,6 @@ async function authDevice(req, env) {
 function validChange(c) {
   return c && KINDS.has(c.kind) && typeof c.key === 'string' && c.key.length > 0 && c.key.length <= 200 &&
     Number.isFinite(c.updatedAt) && c.updatedAt > 0 && (c.deleted ? true : c.data !== undefined);
-}
-async function applyChanges(env, changes) {
-  const stmts = [];
-  for (const c of changes) {
-    stmts.push(env.DB.prepare("UPDATE meta SET v = CAST(v AS INTEGER) + 1 WHERE k = 'rev'"));
-    stmts.push(env.DB.prepare(
-      `INSERT INTO records (kind, key, data, updated_at, deleted, rev)
-       VALUES (?1, ?2, ?3, ?4, ?5, (SELECT CAST(v AS INTEGER) FROM meta WHERE k = 'rev'))
-       ON CONFLICT (kind, key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, deleted = excluded.deleted, rev = excluded.rev
-       WHERE excluded.updated_at > records.updated_at`
-    ).bind(c.kind, c.key, c.deleted ? null : JSON.stringify(c.data), Math.round(c.updatedAt), c.deleted ? 1 : 0));
-  }
-  // D1 führt einen Batch als Transaktion aus. In Paketen, damit einzelne Batches klein bleiben.
-  for (let i = 0; i < stmts.length; i += 200) await env.DB.batch(stmts.slice(i, i + 200));
 }
 async function changesSince(env, since, limit) {
   const rows = await env.DB.prepare('SELECT kind, key, data, updated_at, deleted, rev FROM records WHERE rev > ? ORDER BY rev LIMIT ?')
@@ -183,11 +168,12 @@ async function route(req, env, url) {
     if (changes.length > 5000) throw new HttpError(413, 'Zu viele Änderungen auf einmal');
     const bad = changes.find(c => !validChange(c));
     if (bad) throw new HttpError(400, 'Ungültiger Datensatz: ' + String(bad && bad.kind) + '/' + String(bad && bad.key));
-    if (changes.length) await applyChanges(env, changes);
+    if (changes.length) await putRecords(env, changes);
     const since = Number.isFinite(body.since) ? body.since : 0;
     const out = await changesSince(env, since, 2000);
     out.time = Date.now();
     out.accepted = changes.length;
+    out.intervals = { configured: !!(env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID), last: await getMeta(env, 'intervals_last') };
     return out;
   }
 
@@ -203,7 +189,23 @@ async function route(req, env, url) {
     return { day: row.day, records: JSON.parse(row.data) };
   }
 
+  // intervals.icu
+  if (p === '/api/intervals/import' && M === 'POST') {
+    const st = await runImport(env, { days: 14 });
+    return Object.assign({ configured: !!(env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID) }, st);
+  }
+  if (p === '/api/intervals/status' && M === 'GET') {
+    return { configured: !!(env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID), last: await getMeta(env, 'intervals_last') };
+  }
+
   throw new HttpError(404, 'Unbekannte Adresse');
+}
+
+/* Alle 30 Minuten, aber nur zwischen 6 und 23 Uhr deutscher Zeit */
+async function halfHourly(env) {
+  const b = berlinParts();
+  if (b.hour < 6 || b.hour > 23) return;
+  if (env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID) await runImport(env);
 }
 
 export default {
@@ -223,5 +225,6 @@ export default {
   },
   async scheduled(event, env, ctx) {
     if (event.cron === '0 2 * * *') ctx.waitUntil(dailyBackup(env));
+    if (event.cron === '*/30 * * * *') ctx.waitUntil(halfHourly(env));
   }
 };

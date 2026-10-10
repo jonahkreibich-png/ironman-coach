@@ -153,6 +153,7 @@
         sent.forEach(c => { const k = c.kind + '|' + c.key; if (META.pending[k] && META.pending[k].updatedAt === c.updatedAt) delete META.pending[k]; });
         (res.records || []).forEach(r => { if (applyRecord(r)) appliedAny = true; });
         META.cursor = res.cursor;
+        if (res.intervals) META.intervals = res.intervals;
         more = !!res.more || Object.keys(META.pending).length > 0;
       }
       META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok';
@@ -246,10 +247,31 @@
     document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = statusText(); el.className = 'sync-st ' + statusClass(); });
   }
   window.isSyncOn = () => !!AUTH;
+  function icuText() {
+    const I = META.intervals;
+    if (!I || !I.configured) return '';
+    const L = I.last;
+    if (!L) return 'intervals.icu: noch kein Abruf';
+    const d = new Date(L.at);
+    const when = (ymd(d) === todayStr() ? 'heute ' : fmtDate(ymd(d)) + ' ') + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    return L.ok ? `intervals.icu: ${when}` : `intervals.icu: Fehler (${when})`;
+  }
   window.syncStatusLine = function () {
     if (!AUTH) return '';
-    return `<div class="sync-line"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span></div>`;
+    const icu = icuText();
+    return `<div class="sync-line"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>${icu ? `<span class="sync-icu">${esc(icu)}</span><button class="link" data-act="sync-icu-import">Jetzt abrufen</button>` : ''}</div>`;
   };
+  function icuPanel() {
+    const I = META.intervals;
+    if (!I) return '';
+    if (!I.configured) return `<div class="lbl">intervals.icu</div><div class="hint">Noch nicht verbunden. Der API-Schlüssel kommt als Geheimnis auf den Server (nicht in die App).</div><div class="hr"></div>`;
+    const L = I.last;
+    const detail = !L ? 'Noch kein Abruf.' : L.ok
+      ? `Letzte Übernahme: ${esc(icuText().replace('intervals.icu: ', ''))}. ${L.wellnessDays} Tage Werte, ${L.matched} Einheiten abgehakt, ${L.extras} Extra-Einheiten.`
+      : `Letzter Abruf fehlgeschlagen: ${esc(L.error || 'unbekannt')}`;
+    return `<div class="lbl">intervals.icu</div><div class="hint">${detail} Automatisch alle 30 Minuten zwischen 6 und 23 Uhr. Von Hand eingetragene Werte werden nie überschrieben.</div>
+      <button class="btn ghost small" data-act="sync-icu-import">Jetzt abrufen</button><div class="hr"></div>`;
+  }
 
   let PAIR = null; // { code, expiresAt }
   let DEVICES = null, BACKUPS = null;
@@ -274,6 +296,7 @@
     return `<div class="sec"><div class="sec-h"><h2>Sync</h2></div><div class="panel">
       <div class="row" style="justify-content:space-between"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span><button class="btn ghost small" data-act="sync-now">Jetzt abgleichen</button></div>
       <div class="hr"></div>
+      ${icuPanel()}
       <div class="lbl">Geräte</div>${devHtml}
       ${pairHtml}
       <div class="hr"></div>
@@ -334,6 +357,13 @@
         toast('Gekoppelt. Daten sind abgeglichen.'); syncOnSettingsOpen(); if (SHEET) renderSheet(); render();
       } else if (act === 'sync-now') {
         busy(true); await syncNow(); toast(STATUS === 'ok' ? 'Abgeglichen' : statusText()); busy(false);
+      } else if (act === 'sync-icu-import') {
+        busy(true); b.textContent = 'Wird abgerufen …';
+        const st = await api('POST', '/api/intervals/import');
+        await syncNow();
+        if (!st.ok) toast(st.error || 'Abruf fehlgeschlagen');
+        else toast(st.wellnessDays || st.matched || st.extras ? `Übernommen: ${st.wellnessDays} Tage Werte, ${st.matched} Einheiten, ${st.extras} Extra` : 'Nichts Neues bei intervals.icu');
+        if (SHEET && SHEET.kind === 'settings') renderSheet(); rerender();
       } else if (act === 'sync-pair-create') {
         busy(true); PAIR = await api('POST', '/api/pair/create'); renderSheet();
         setTimeout(() => { if (SHEET && SHEET.kind === 'settings') renderSheet(); }, PAIR.expiresAt - Date.now() + 500);

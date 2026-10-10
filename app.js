@@ -580,7 +580,8 @@ function sessionCard(s) {
   const sp = SPORTS[s.sport] || SPORTS.rest;
   const meta = [s.plannedMinutes ? s.plannedMinutes + ' min' : null, s.plannedKm ? de(s.plannedKm) + ' km' : null].filter(Boolean).join(' · ');
   const zone = s.zone ? `<span class="wo-zone">${esc(zoneRangeText(s.sport, s.zone))}</span>` : '';
-  const pill = { skipped: '<span class="pill pill-skipped">Ausgefallen</span>', sick: '<span class="pill pill-sick">Krank · entfällt</span>', missed: '<span class="pill pill-missed">Nicht eingetragen</span>' }[status] || '';
+  const pill = ({ skipped: '<span class="pill pill-skipped">Ausgefallen</span>', sick: '<span class="pill pill-sick">Krank · entfällt</span>', missed: '<span class="pill pill-missed">Nicht eingetragen</span>' }[status] || '') +
+    (status === 'done' && st.icuId ? '<span class="pill pill-icu">intervals.icu</span>' : '');
   let extra = '';
   if (status === 'done') {
     extra = `<div class="wo-extra">
@@ -607,7 +608,7 @@ function customCard(w, date) {
   const sp = SPORTS[w.sport] || SPORTS.rest;
   const meta = [w.plannedMinutes ? w.plannedMinutes + ' min' : null, w.plannedKm ? de(w.plannedKm) + ' km' : null].filter(Boolean).join(' · ');
   return `<article class="wo is-done" data-cid="${esc(w.id)}" data-cdate="${esc(date)}" style="--sc:${sp.color}">
-    <div class="wo-top"><div class="wo-main">${sportTag(w.sport, '<span class="pill pill-extra">Nicht im Plan</span>')}<h3 class="wo-title">${esc(w.title)}</h3>${meta ? `<div class="wo-meta">${meta}</div>` : ''}</div>
+    <div class="wo-top"><div class="wo-main">${sportTag(w.sport, '<span class="pill pill-extra">Nicht im Plan</span>' + (w.icuId ? '<span class="pill pill-icu">intervals.icu</span>' : ''))}<h3 class="wo-title">${esc(w.title)}</h3>${meta ? `<div class="wo-meta">${meta}</div>` : ''}</div>
       <button class="btn danger small" data-act="cust-remove">Entfernen</button></div>
     <div class="wo-row">${qualitySeg('cust-quality', w.quality)}</div>
     ${metricsBlock(w.sport, w.metrics)}

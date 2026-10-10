@@ -379,4 +379,6 @@ img { max-width: 100%; }
   .sync-st { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
   .sync-st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
   .sync-st.warn::before { background: var(--warn); }
-  .pair-code { font: 700 34px/1.1 var(--f-display); letter-spacing: .12em; color: var(--accent); text-align: center; padding: 6px 0; }
+  .pair-code { font: 700 34px/1.1 var(--f-display); letter-spacing: .12em; color: var(--accent); text-align: center; padding: 6px 0; }  .sync-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .sync-icu { font-size: 13px; color: var(--ink-2); }
+  .pill-icu { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }

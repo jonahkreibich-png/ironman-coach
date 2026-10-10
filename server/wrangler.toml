@@ -11,7 +11,7 @@ database_id = "f09acda6-8ded-4b02-a17c-c89aa4480ce9"
 
 [triggers]
 # Zeiten in UTC. Der Code prüft selbst die Uhrzeit in Europe/Berlin.
-crons = ["0 2 * * *"]
+crons = ["0 2 * * *", "*/30 * * * *"]
 
 [vars]
 ALLOWED_ORIGINS = "https://jonahkreibich-png.github.io,http://localhost:8765"
