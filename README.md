@@ -9,8 +9,9 @@ Der Ordner ist fertig gebaut. Lade ihn unverändert als öffentliches Repository
 ## Auf dem iPhone installieren
 
 1. Öffne die Pages-Adresse in **Safari**.
-2. Tippe auf **Teilen** und dann auf **Zum Home-Bildschirm**.
-3. Öffne die App über das neue Icon und lade dort dein Backup.
+2. Tippe unten rechts auf die **drei Punkte (•••)** und dann auf **Teilen**. Bei älteren iOS-Versionen liegt **Teilen** direkt unten in der Leiste.
+3. Wähle **Zum Home-Bildschirm**, lass **Als Web-App öffnen** eingeschaltet und tippe auf **Hinzufügen**.
+4. Öffne die App über das neue Icon und lade dort dein Backup.
 
 ## Datenschutz
 

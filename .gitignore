@@ -1,0 +1,7 @@
+# Persönliche Notizen und lokale Server-Dateien nie ins öffentliche Repository
+AUFTRAG.md
+node_modules/
+.wrangler/
+.dev.vars
+*.local.*
+.claude/

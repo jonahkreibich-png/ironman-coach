@@ -1271,11 +1271,14 @@ function backupReminder() {
 function isStandalone() { return window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
 function isIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 const SHARE_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M12 3v12M8 7l4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>';
+const DOTS_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="vertical-align:-3px"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 function installSteps() {
   return `<ol class="howto">
-    <li>Unten in Safari auf <b>Teilen</b> ${SHARE_SVG} tippen.</li>
+    <li>Unten rechts in Safari auf die <b>drei Punkte</b> ${DOTS_SVG} tippen.</li>
+    <li><b>Teilen</b> ${SHARE_SVG} wählen.</li>
     <li>Nach unten scrollen und <b>Zum Home-Bildschirm</b> wählen.</li>
-    <li>Auf <b>Hinzufügen</b> tippen und die App ab jetzt über das neue Icon öffnen.</li></ol>`;
+    <li><b>Als Web-App öffnen</b> eingeschaltet lassen, auf <b>Hinzufügen</b> tippen und die App ab jetzt über das neue Icon öffnen.</li></ol>
+    <div class="hint">Ältere iOS-Version ohne drei Punkte: Das Teilen-Symbol ${SHARE_SVG} liegt direkt unten in der Leiste.</div>`;
 }
 function renderWelcome() {
   const needInstall = isIOS() && !isStandalone();
