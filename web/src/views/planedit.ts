@@ -32,7 +32,7 @@ function issuesOf(adjustments: any): string[] {
 }
 let PENDING: { adj: any[]; warnings: string[]; label: string } | null = null;
 /* Änderung vorschlagen: ohne neue Hinweise sofort übernehmen, sonst freundlich nachfragen */
-function propose(adj: any[], label: string) {
+export function propose(adj: any[], label: string) {
   const before = new Set(issuesOf(STATE.adjustments));
   const after = issuesOf({ ...STATE.adjustments, ...Object.fromEntries(adj.map(a => [a.id, a])) });
   const fresh = after.filter(x => !before.has(x));
