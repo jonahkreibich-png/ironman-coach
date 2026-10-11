@@ -229,7 +229,17 @@ test.describe('mit Server', () => {
     expect(JSON.parse((await startReq).postData() || '{}').returnTo).toBe('onboarding');
     await page.waitForURL(/\/$|go=/);
     await expect(page.locator('.ob-block[data-block="devices"]')).toBeVisible({ timeout: 10000 });
-    expect((await stored(page)).onboarding.answers.why).toBe('Gesund bleiben');
+    await expect.poll(async () => { try { return ((await stored(page)) || {}).onboarding?.answers?.why; } catch (e) { return null; } }).toBe('Gesund bleiben');
   });
 });
 void TODAY;
+
+test('A1: alte, auf dem Gerät gespeicherte Standardwerte einer anderen Person werden durch eigene Schätzungen ersetzt', async ({ page }) => {
+  await seed(page, { extra: d => { d.settings = { ...d.settings, lthrRun: 170, lthrBike: 165, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28, readiness: { rhrMax: 65, hrvMin: 35, tempMax: 0.5 } }; d.profile = { birthYear: 1976, sports: ['bike', 'run'], thresholds: { lthrRun: 170, lthrBike: 162, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28 } }; } });
+  await open(page, '/?go=einstellungen');
+  await expect(page.locator('[data-estimated]')).toBeVisible();
+  const th = (await stored(page)).profile.thresholds;
+  expect(th.lthrRun).not.toBe(170); expect(th.thresholdPaceRunSec).not.toBe(339); expect(th.thresholdSpeedBikeKmh).not.toBe(28);
+  expect(th.lthrRun).toBe(Math.round((208 - 0.7 * 50) * 0.89));
+  expect((await stored(page)).settings.readiness.hrvMin).toBeUndefined();
+});

@@ -192,4 +192,26 @@ export function saveProfile(p: Profile): void {
   setLang(p.lang); setUnits(p.units);
   saveState();
 }
-if (ensureProfileAndGoals()) saveState();
+/* Einmalige Bereinigung (Auftrag 4 A1): Frühere Versionen haben auf jedem Gerät die Werte des Betreibers als Standard gespeichert
+   (Schwellenpuls 170/162 bzw. 165, Schwellen-Pace 5:39, Rad 28 km/h). Auf Geräten, die nicht zum Betreiber-Konto gehören, gelten sie
+   ab jetzt als „geschätzt“ und werden aus dem eigenen Profil neu berechnet. Eigene Eingaben (andere Zahlen) bleiben. */
+export function scrubLegacyDefaults(): boolean {
+  let owner: any = null; try { owner = JSON.parse(localStorage.getItem(STORAGE.owner) || 'null'); } catch (e) {}
+  if (owner === 1 || STATE.legacyScrubbed) return false;
+  const OLD: Record<string, number[]> = { lthrRun: [170], lthrBike: [162, 165], thresholdPaceRunSec: [339], thresholdSpeedBikeKmh: [28] };
+  const s = STATE.settings || {};
+  const looksOld = (o: any) => !!o && o.lthrRun === 170 && o.thresholdPaceRunSec === 339 && o.thresholdSpeedBikeKmh === 28;
+  let changed = false;
+  if (looksOld(s)) { Object.keys(OLD).forEach(k => { delete s[k]; }); changed = true; }
+  if (s.readiness && s.readiness.rhrMax === 65 && s.readiness.hrvMin === 35) { s.readiness = { tempMax: s.readiness.tempMax ?? 0.5 }; changed = true; }
+  const th = STATE.profile && STATE.profile.thresholds;
+  if (looksOld(th)) {
+    const est = new Set<string>(th.estimated || []);
+    Object.entries(OLD).forEach(([k, vals]) => { if (vals.includes(th[k])) { th[k] = 0; est.add(k); } });
+    th.estimated = [...est]; changed = true;
+    STATE.profile = { ...profile(), updatedAt: Date.now() }; // Schätzungen gleich speichern (auch für den Server)
+  }
+  STATE.legacyScrubbed = true;
+  void changed; return true; // beim ersten Lauf immer speichern (Merker legacyScrubbed)
+}
+{ const a = scrubLegacyDefaults(); const b = ensureProfileAndGoals(); if (a || b) saveState(); }
