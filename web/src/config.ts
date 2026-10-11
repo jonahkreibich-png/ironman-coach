@@ -12,6 +12,8 @@ export const STORAGE = {
   syncAuth: 'ec_sync_auth',
   syncMeta: 'ec_sync',
   errors: 'ec_errors',
+  /** Nutzer-Nummer auf dem Server, dem die Daten auf diesem Gerät gehören */
+  owner: 'ec_owner',
   legacyState: [] as string[]
 };
 

@@ -63,12 +63,12 @@ export async function setup(env: Env, body: any) {
     return { deviceId: d.id, token: d.token, userId: 1, time: Date.now() };
   }
   await guardAttempts(env);
-  const row = inviteCode.length === 8 ? await env.DB.prepare('SELECT code_hash, expires_at, used_by, created_by FROM invites WHERE code_hash = ?').bind(await sha256(inviteCode)).first() : null;
+  const row = inviteCode.length === 8 ? await env.DB.prepare('SELECT code_hash, expires_at, used_by, created_by, test FROM invites WHERE code_hash = ?').bind(await sha256(inviteCode)).first() : null;
   if (!row || row.used_by || row.expires_at < Date.now()) {
     await failedAttempt(env);
     throw new HttpError(403, 'Die Einladung stimmt nicht, ist abgelaufen oder wurde schon benutzt.');
   }
-  const res = await env.DB.prepare("INSERT INTO users (name, role, features, invited_by, created_at) VALUES (?, 'user', '{}', ?, ?)").bind(cleanName(body.userName), row.created_by, Date.now()).run();
+  const res = await env.DB.prepare("INSERT INTO users (name, role, features, invited_by, created_at, test) VALUES (?, 'user', '{}', ?, ?, ?)").bind(cleanName(body.userName), row.created_by, Date.now(), row.test ? 1 : 0).run();
   const uid = res.meta.last_row_id;
   await env.DB.prepare('UPDATE invites SET used_by = ?, used_at = ? WHERE code_hash = ?').bind(uid, Date.now(), row.code_hash).run();
   const d = await createDevice(env, uid, body.name);
@@ -96,15 +96,15 @@ export async function redeemPairCode(env: Env, body: any) {
 }
 
 /* Einladungen: nur der Admin */
-export async function createInvite(env: Env, a: Auth, note: unknown) {
+export async function createInvite(env: Env, a: Auth, note: unknown, test = false) {
   if (a.role !== 'admin') throw new HttpError(403, 'Nur der Admin kann Einladungen erzeugen.');
   const code = newCode();
   const expires = Date.now() + INVITE_TTL_MS;
-  await env.DB.prepare('INSERT INTO invites (code_hash, created_by, note, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').bind(await sha256(normCode(code)), a.uid, cleanName(note, 60), Date.now(), expires).run();
+  await env.DB.prepare('INSERT INTO invites (code_hash, created_by, note, created_at, expires_at, test) VALUES (?, ?, ?, ?, ?, ?)').bind(await sha256(normCode(code)), a.uid, cleanName(note, 60), Date.now(), expires, test ? 1 : 0).run();
   return { code, expiresAt: expires };
 }
 export async function listInvites(env: Env, a: Auth) {
   if (a.role !== 'admin') throw new HttpError(403, 'Nur der Admin sieht Einladungen.');
-  const rows = await env.DB.prepare('SELECT note, created_at, expires_at, used_by, used_at FROM invites WHERE created_by = ? ORDER BY created_at DESC LIMIT 50').bind(a.uid).all();
-  return { invites: (rows.results || []).map((r: any) => ({ note: r.note, createdAt: r.created_at, expiresAt: r.expires_at, used: !!r.used_by, usedAt: r.used_at })) };
+  const rows = await env.DB.prepare('SELECT note, created_at, expires_at, used_by, used_at, test FROM invites WHERE created_by = ? ORDER BY created_at DESC LIMIT 50').bind(a.uid).all();
+  return { invites: (rows.results || []).map((r: any) => ({ note: r.note, createdAt: r.created_at, expiresAt: r.expires_at, used: !!r.used_by, usedAt: r.used_at, test: !!r.test, userId: r.used_by || null })) };
 }

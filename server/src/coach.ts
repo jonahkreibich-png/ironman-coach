@@ -25,7 +25,7 @@ export async function loadState(env: Env, uid: number): Promise<any> {
     settings: sdata.settings || {}, nutritionProfile: sdata.nutritionProfile || null
   };
   const today = berlinParts().date;
-  const profile = mergeProfile(profileRec && profileRec.data, profileFromLegacy({ ...state, planWeeks: (plan && plan.weeks) || [] }, today));
+  const profile = mergeProfile(profileRec && profileRec.data, profileFromLegacy({ ...state, planWeeks: (plan && plan.weeks) || [] }, today), today);
   let goalList: Goal[] = Object.values(goals).filter(Boolean);
   if (!goalList.length && plan) { const g = goalFromPlanMeta(plan.meta); if (g) goalList = [g]; }
   state.profile = profile;

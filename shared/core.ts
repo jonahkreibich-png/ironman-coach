@@ -1,5 +1,6 @@
 /* Gemeinsame Coach-Logik für App und Server (keine Abhängigkeiten, keine DOM-Zugriffe). */
 // Bewusst locker typisiert: Datensätze kommen aus Sync und Backups und sind nicht immer vollständig.
+import { GENERIC_LTHR } from './profile';
 /* ---------- Datum ---------- */
 function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
@@ -47,10 +48,11 @@ function latestLoad(trend, date) {
 /**
  * Bewertet einen Tag. Liefert Stufe (0 grün, 1 gelb, 2 rot, 3 keine Werte), Score 0-100,
  * 1-3 Gründe in einfachen Worten und die einzelnen Kriterien.
- * fallback: { rhrMax, hrvMin, tempMax } aus den Einstellungen.
+ * fallback: { rhrMax, hrvMin, tempMax } aus den eigenen Einstellungen. Fehlen sie, gibt es in den ersten 7 Tagen
+ * keine feste Grenze: die App lernt den persönlichen Normalbereich und bewertet HFV und Ruhepuls erst danach.
  */
 function readinessFor(trend, illness, date, fallback) {
-  fallback = fallback || { rhrMax: 56, hrvMin: 65, tempMax: 0.5 };
+  fallback = fallback || {};
   const { p, stale } = pointFor(trend, date);
   const crits = [], reasons = [];
   let level = 0, score = 100;
@@ -71,6 +73,8 @@ function readinessFor(trend, illness, date, fallback) {
         score -= Math.max(0, -z) * 15;
         if (st === 'bad') bump(2, 'HFV deutlich unter deinem Normalbereich', 3);
         else if (st === 'warn') bump(1, 'HFV etwas unter deinem Normalbereich', 2);
+      } else if (num(fallback.hrvMin) == null) {
+        crits.push({ k: 'HFV', v: fmt(p.hrv, 0) + ' ms', t: `Normalbereich wird gelernt (${base ? base.n : 0}/${MIN_DAYS} Tage)`, st: 'ok' });
       } else {
         const st = p.hrv >= fallback.hrvMin ? 'ok' : (p.hrv >= fallback.hrvMin - 7 ? 'warn' : 'bad');
         crits.push({ k: 'HFV', v: fmt(p.hrv, 0) + ' ms', t: `Ziel ≥${fallback.hrvMin}`, st });
@@ -89,6 +93,8 @@ function readinessFor(trend, illness, date, fallback) {
         score -= Math.max(0, d) * 4;
         if (st === 'bad') bump(2, `Ruhepuls ${fmt(d, 0)} Schläge über normal`, 3);
         else if (st === 'warn') bump(1, `Ruhepuls ${fmt(d, 0)} Schläge über normal`, 2);
+      } else if (num(fallback.rhrMax) == null) {
+        crits.push({ k: 'Ruhepuls', v: fmt(p.restingHR, 0), t: `Normalbereich wird gelernt (${base ? base.n : 0}/${MIN_DAYS} Tage)`, st: 'ok' });
       } else {
         const st = p.restingHR <= fallback.rhrMax ? 'ok' : (p.restingHR <= fallback.rhrMax + 2 ? 'warn' : 'bad');
         crits.push({ k: 'Ruhepuls', v: fmt(p.restingHR, 0), t: `Ziel ≤${fallback.rhrMax}`, st });
@@ -150,8 +156,8 @@ function readinessHistory(trend, illness, date, n, fallback) {
 }
 
 /* ================= Phase 4: Belastung ================= */
-/* Schwellenpuls aus Profil oder Einstellungen, sonst allgemeine Startwerte */
-const LTHR_DEFAULT = { bike: 162, run: 170 };
+/* Schwellenpuls aus Profil oder Einstellungen, sonst eine allgemeine Formel (keine Werte einer Person) */
+const LTHR_DEFAULT = GENERIC_LTHR;
 function thrOf(state) { return (state && state.profile && state.profile.thresholds) || (state && state.settings) || {}; }
 const toNum = v => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -536,7 +542,7 @@ function zoneBpm(s, settings, zonePercents) {
   if (!s || (s.sport !== 'run' && s.sport !== 'bike') || !s.zone) return null;
   const nums = [...String(s.zone).matchAll(/\d/g)].map(m => +m[0]);
   const zones = (zonePercents && zonePercents.length ? zonePercents : DEFAULT_ZONES);
-  const lthr = s.sport === 'bike' ? ((settings && settings.lthrBike) || 165) : ((settings && settings.lthrRun) || 170);
+  const lthr = s.sport === 'bike' ? ((settings && settings.lthrBike) || LTHR_DEFAULT.bike) : ((settings && settings.lthrRun) || LTHR_DEFAULT.run);
   const hit = nums.map(n => zones.find(z => z.zone === n)).filter(Boolean);
   if (!hit.length) return null;
   const lo = Math.min(...hit.map(z => Math.round(lthr * z.low / 100)));

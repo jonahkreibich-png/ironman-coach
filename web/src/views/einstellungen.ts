@@ -5,6 +5,7 @@ import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr, addDays } from 
 import { t, num } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel } from '../kit';
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
+import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
 import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
 import { invalidate, D } from '../data';
 import { needsParentConsent } from '../../../shared/features';
@@ -58,15 +59,24 @@ function zonesCard(): string {
   const paceRange = (i: number) => { const [lo, hi] = PCT[i]; return lo === 0 ? '> ' + pace(hi) : hi >= 999 ? '< ' + pace(lo) : `${pace(hi)}–${pace(lo)}`; };
   const tbl = (rows: string[]) => `<div class="scroll-x"><table class="tbl"><tbody>${rows.join('')}</tbody></table></div>`;
   const hasRun = p.sports.includes('run'), hasBike = p.sports.includes('bike'), hasSwim = p.sports.includes('swim');
-  return `<div class="card stack"><div class="fgrid">
-    ${hasRun ? field('z-lr', t('set.lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + field('z-tp', t('set.paceRun'), secToPace(th.thresholdPaceRunSec), { inputmode: 'decimal', placeholder: '5:00', data: 'data-ch="thr" data-k="thresholdPaceRunSec"' }) : ''}
-    ${hasBike ? field('z-lb', t('set.lthrBike'), th.lthrBike, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrBike"' }) + field('z-ftp', t('set.ftp'), th.ftp ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="ftp"' }) + field('z-ts', t('set.speedBike'), th.thresholdSpeedBikeKmh, { inputmode: 'decimal', data: 'data-ch="thr" data-k="thresholdSpeedBikeKmh"' }) : ''}
-    ${hasSwim ? field('z-css', t('set.css'), th.cssSec ? secToPace(th.cssSec) : '', { inputmode: 'decimal', placeholder: '1:55', data: 'data-ch="thr" data-k="cssSec"' }) : ''}
-    ${field('z-max', t('set.maxHr'), th.maxHr ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="maxHr"' })}</div>
+  const est = (k: ThresholdKey) => isEstimated(p, k) ? ' ' + t('set.estShort') : '';
+  return `<div class="card stack">${estimatedNote(p)}<div class="fgrid">
+    ${hasRun ? field('z-lr', t('set.lthrRun') + est('lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + field('z-tp', t('set.paceRun') + est('thresholdPaceRunSec'), secToPace(th.thresholdPaceRunSec), { inputmode: 'decimal', placeholder: '5:00', data: 'data-ch="thr" data-k="thresholdPaceRunSec"' }) : ''}
+    ${hasBike ? field('z-lb', t('set.lthrBike') + est('lthrBike'), th.lthrBike, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrBike"' }) + field('z-ftp', t('set.ftp'), th.ftp ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="ftp"' }) + field('z-ts', t('set.speedBike') + est('thresholdSpeedBikeKmh'), th.thresholdSpeedBikeKmh, { inputmode: 'decimal', data: 'data-ch="thr" data-k="thresholdSpeedBikeKmh"' }) : ''}
+    ${hasSwim ? field('z-css', t('set.css') + est('cssSec'), th.cssSec ? secToPace(th.cssSec) : '', { inputmode: 'decimal', placeholder: '1:55', data: 'data-ch="thr" data-k="cssSec"' }) : ''}
+    ${field('z-max', t('set.maxHr') + est('maxHr'), th.maxHr ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="maxHr"' })}</div>
     ${hasRun ? `<div class="lbl">${esc(sportLabel('run'))}</div>` + tbl(run.map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${paceRange(i)}/km</td></tr>`)) : ''}
     ${hasBike ? `<div class="lbl">${esc(sportLabel('bike'))}</div>` + tbl(bike.map((z, i) => { const pw = th.ftp ? powerZonesFor(th.ftp)[i] : null; return `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${pw ? `${pw.lo}${pw.hi ? '–' + pw.hi : '+'} W` : ''}</td></tr>`; })) : ''}
     ${hasSwim && th.cssSec ? `<div class="lbl">${esc(sportLabel('swim'))}</div>` + tbl(swimZonesFor(th.cssSec).map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${secToPace(z.fast)}–${secToPace(z.slow)} /100 m</td></tr>`)) : ''}
     <div class="hint">${esc(t('set.zonesHint'))}</div></div>`;
+}
+/* Geschätzte Werte: Hinweis mit Herkunft und Test-Vorschlag */
+function estimatedNote(p: any): string {
+  const est = (p.thresholds.estimated || []) as ThresholdKey[];
+  if (!est.length) return '';
+  const basis = estimateThresholds(p, todayStr()).basis;
+  const names = est.map(k => `${t('set.thr.' + k)} (${basis[k] || t('set.estimated')})`).join(', ');
+  return `<div class="banner info" data-estimated>${esc(t('set.estimatedNote', { list: names }))}</div>`;
 }
 onChange('thr', el => {
   const p = profile(); const k = el.dataset.k!; const raw = (el as HTMLInputElement).value.trim();
@@ -75,8 +85,7 @@ onChange('thr', el => {
   else if (v == null || v <= 0) { toast(t('common.invalidNumber')); return; }
   const lim: Record<string, [number, number]> = { lthrRun: [100, 215], lthrBike: [100, 215], maxHr: [120, 230], ftp: [50, 600], thresholdSpeedBikeKmh: [10, 60], thresholdPaceRunSec: [150, 600], cssSec: [50, 240] };
   if (v != null && lim[k] && (v < lim[k][0] || v > lim[k][1])) { toast(t('set.outOfRange')); return; }
-  (p.thresholds as any)[k] = v;
-  saveProfile(p); invalidate(); nav.rerender(); toast(t('common.saved'));
+  saveProfile(setThreshold(p, k as ThresholdKey, v)); invalidate(); nav.rerender(); toast(t('common.saved'));
 });
 
 /* ---------- Mitteilungen ---------- */

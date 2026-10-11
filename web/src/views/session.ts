@@ -1,7 +1,7 @@
 /* Einheit: Ansicht und Bearbeiten im Sheet, Abhaken. Werte von der Uhr tragen ihre Quelle,
    Korrekturen von Hand gelten ab dann, „Auf Original zurücksetzen“ holt die Werte der Uhr zurück. */
 import * as C from '../../../shared/core';
-import { STATE, SESS_BY_ID, saveState, saveSoon } from '../store';
+import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { duration, dist, num, pace, swimPace, speed, mmss } from '../../../shared/i18n';
@@ -13,7 +13,7 @@ import { toast } from '../toast';
 import { SPORT_COLOR } from '../icons';
 
 export function zoneText(s: any): string {
-  const bpm = C.zoneBpm(s, STATE.settings, null);
+  const bpm = C.zoneBpm(s, profile().thresholds, null);
   return [s.zone, bpm].filter(Boolean).join(' · ');
 }
 export function metaLine(s: any): string {

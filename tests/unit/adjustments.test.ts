@@ -29,13 +29,13 @@ function trend(upto, today) {
 const GREEN = { hrv: 70, restingHR: 50, sleepHours: 8.7, sleepQuality: 8 };
 
 console.log('Belastung');
-ok(C.sessionLoad({ sport: 'bike' }, { metrics: { min: 60, hr: 140 } }) === 75, 'hrTSS Rad: 1 h, Ø 140 bei LTHR 162 → 75');
+ok(C.sessionLoad({ sport: 'bike' }, { metrics: { min: 60, hr: 140 } }, { lthrBike: 162 }) === 75, 'hrTSS Rad: 1 h, Ø 140 bei LTHR 162 → 75');
 ok(C.sessionLoad({ sport: 'football', title: 'Fußballtraining' }, { completed: true }) === 67, 'Fußball ohne Uhr und RPE: 90 min, RPE 6 → 67');
 ok(C.sessionLoad({ sport: 'football', title: 'Spiel' }, {}) === 60, 'Spiel ohne RPE: 60 min, RPE 7 → 60');
 ok(C.sessionLoad({ sport: 'bike' }, { icuLoad: 88, metrics: { min: 60, hr: 140 } }) === 88, 'Trainingslast von intervals.icu hat Vorrang');
 ok(C.sessionLoad({ sport: 'swim', plannedMinutes: 45 }, { rpe: '6', metrics: { hr: 150 } }) === 33, 'Schwimmen über RPE, nicht über Puls');
 ok(C.sessionLoad({ sport: 'run' }, { rpe: 10, metrics: { min: 60 } }) === 110, 'IF höchstens 1,05');
-const st1 = { sessions: { 'w1-di': { completed: true, metrics: { min: 60, hr: 145 } }, 'w1-so': { completed: true, rpe: 5 } }, customWorkouts: {}, trend: [] };
+const st1 = { sessions: { 'w1-di': { completed: true, metrics: { min: 60, hr: 145 } }, 'w1-so': { completed: true, rpe: 5 } }, customWorkouts: {}, trend: [], profile: { thresholds: { lthrRun: 170, lthrBike: 162 } } };
 const ser = C.ownLoadSeries(st1, plan(), '2026-10-11');
 ok(ser.length === 6 && ser[0].load === 80 && ser[5].ctl > 0 && ser[5].atl > ser[5].ctl, 'Eigene CTL/ATL: 42/7 Tage, ATL reagiert schneller');
 

@@ -1,10 +1,10 @@
 /* Daten und Geräte: Sync mit dem eigenen Server, Geräte koppeln, Server-Sicherungen, Datei-Backup,
    Einladungen (nur Admin), Fehlerprotokoll und App-Info. */
-import { STATE, HAS_PLAN } from '../store';
+import { STATE, HAS_PLAN, hasLocalData } from '../store';
 import { esc, fmtDate, dowShort, ymd, daysBetween, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, armed, more, empty } from '../kit';
-import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, backupFromRecords, ago, syncInfo, syncNotify } from '../sync';
+import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify } from '../sync';
 import { backupText, parseBackupText, isBackup, isPlan, applyBackup, markBackedUp, shareBackupFile } from '../backup';
 import { readErrors } from '../errlog';
 import { checkForUpdate } from '../pwa';
@@ -32,10 +32,12 @@ export function resetDatenCache() { DEVICES = null; BACKUPS = null; ME = null; I
 const time = (ts: number) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
 /* Verbinden: Einrichtungscode, Kopplungscode, Einladung. Auch auf dem Start-Bildschirm. */
+/* Liegen schon Daten auf dem Gerät, fragt die App, ob es die eigenen sind. Standard: nein (dann werden sie gelöscht). */
+function keepLocalToggle(id: string): string { return hasLocalData() ? `<label class="switch"><input type="checkbox" id="${id}"><span>${esc(t('data.keepLocal'))}</span></label><div class="hint">${esc(t('data.keepLocalHint'))}</div>` : ''; }
 export function connectPanel(): string {
   return `<div class="stack">
-    ${more(t('data.pairTitle'), `<div class="hint">${esc(t('data.pairHint'))}</div><div class="row"><input class="inp grow" id="sync-code" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" aria-label="${esc(t('data.pairCode'))}"><button class="btn" data-act="sync-pair">${esc(t('data.pairBtn'))}</button></div>`, true)}
-    ${more(t('data.inviteTitle'), `<div class="hint">${esc(t('data.inviteHint'))}</div><div class="fgrid">${field('inv-code', t('data.inviteCode'), '', { placeholder: 'ABCD-EFGH' })}${field('inv-name', t('data.yourName'), '')}</div><button class="btn" data-act="sync-invite">${esc(t('data.inviteBtn'))}</button>`)}
+    ${more(t('data.pairTitle'), `<div class="hint">${esc(t('data.pairHint'))}</div><div class="row"><input class="inp grow" id="sync-code" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" aria-label="${esc(t('data.pairCode'))}"><button class="btn" data-act="sync-pair">${esc(t('data.pairBtn'))}</button></div>${keepLocalToggle('keep-pair')}`, true)}
+    ${more(t('data.inviteTitle'), `<div class="hint">${esc(t('data.inviteHint'))}</div><div class="fgrid">${field('inv-code', t('data.inviteCode'), '', { placeholder: 'ABCD-EFGH' })}${field('inv-name', t('data.yourName'), '')}</div>${keepLocalToggle('keep-inv')}<button class="btn" data-act="sync-invite">${esc(t('data.inviteBtn'))}</button>`)}
     ${more(t('data.setupTitle'), `<div class="hint">${esc(t('data.setupHint'))}</div><div class="row"><input class="inp grow" id="setup-code" type="password" autocomplete="off" aria-label="${esc(t('data.setupCode'))}" placeholder="${esc(t('data.setupCode'))}"><button class="btn ghost" data-act="sync-setup">${esc(t('data.setupBtn'))}</button></div>`)}
   </div>`;
 }
@@ -55,6 +57,7 @@ export function renderDaten(): string {
     if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside'));
   }
   h += sec(t('data.backup'), backupCard(), STATE.lastBackupAt ? t('data.lastBackup', { d: fmtDate(STATE.lastBackupAt.slice(0, 10)) }) : '');
+  if (isSyncOn() || hasLocalData()) h += sec(t('data.signOut'), `<div class="card stack"><div class="hint">${esc(t(isSyncOn() ? 'data.signOutHint' : 'data.wipeHint'))}</div><button class="btn danger" data-act="sign-out">${esc(t(isSyncOn() ? 'data.signOutBtn' : 'data.wipeBtn'))}</button></div>`);
   h += sec(t('data.errors'), errorsCard());
   h += sec(t('data.app'), appCard(), t('data.version', { v: APP_VERSION }));
   return h;
@@ -130,16 +133,19 @@ on('sync-setup', el => {
 });
 on('sync-pair', el => {
   const code = val('sync-code'); if (code.replace(/[^A-Za-z0-9]/g, '').length !== 8) { toast(t('data.codeLen')); return; }
-  return busy(el, async () => { await pair(code); resetDatenCache(); toast(t('data.paired')); afterConnect(); });
+  const keep = !!(document.getElementById('keep-pair') as HTMLInputElement | null)?.checked;
+  return busy(el, async () => { await pair(code, keep); resetDatenCache(); toast(t('data.paired')); afterConnect(); });
 });
 on('sync-invite', el => {
   const code = val('inv-code'); if (code.replace(/[^A-Za-z0-9]/g, '').length !== 8) { toast(t('data.codeLen')); return; }
-  return busy(el, async () => { await setupWithInvite(code, val('inv-name')); resetDatenCache(); toast(t('data.inviteDone')); afterConnect(); });
+  const keep = !!(document.getElementById('keep-inv') as HTMLInputElement | null)?.checked;
+  return busy(el, async () => { await setupWithInvite(code, val('inv-name'), keep); resetDatenCache(); toast(t('data.inviteDone')); afterConnect(); });
 });
 function afterConnect() {
   // Neuer Plan vom Server → die App lädt in sync.ts selbst neu. Sonst neu zeichnen.
   invalidate(); nav.render();
 }
+on('sign-out', el => { if (!armed(el, t('data.signOutSure'))) return; return busy(el, async () => { await signOut(); }); });
 on('sync-off', el => { if (!armed(el, t('data.syncOffSure'))) return; stopSync(); resetDatenCache(); nav.rerender(); });
 on('pair-create', el => busy(el, async () => { PAIR = await apiCall('POST', '/api/pair/create'); nav.rerender(); }));
 on('dev-del', el => {

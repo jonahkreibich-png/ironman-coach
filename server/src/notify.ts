@@ -102,7 +102,7 @@ export function buildJobs(L, b, prefs, prevMin) {
     const at = toMin(t) - (prefs.preSessionMinutes || 60);
     const hh = String(Math.floor(at / 60)).padStart(2, '0') + ':' + String(at % 60).padStart(2, '0');
     if (!due(hh)) return;
-    const bpm = C.zoneBpm(s, L.state.settings, L.plan && L.plan.zonePercents);
+    const bpm = C.zoneBpm(s, L.profile.thresholds, L.plan && L.plan.zonePercents);
     jobs.push({ type: 'preSession', key: 'pre-' + s.id, title: `${t} ${s.title}`, body: [bpm ? 'Puls ' + bpm : (s.zone || null), SNACKS[new Date(date).getUTCDate() % SNACKS.length]].filter(Boolean).join(', '), url: './?go=heute' });
   });
   // Vorabend früher Einheiten
@@ -118,10 +118,12 @@ export function buildJobs(L, b, prefs, prevMin) {
   // Abends: nicht abgehakt oder ohne Gefühl
   if (T.evening && due(X.evening) && !ill) {
     const open = list.filter(s => { const st = L.state.sessions[s.id] || {}; return !st.skipped && (!st.completed || !st.quality); });
-    if (open.length) jobs.push({ type: 'evening', key: 'evening', title: 'Wie war\'s?', body: `${open.map(s => s.title).join(', ')}: kurz abhaken und Gefühl eintragen. Ein Tipp schickt den Bericht an deinen Coach.`, url: './?go=heute&open=export' });
+    if (open.length) jobs.push({ type: 'evening', key: 'evening', title: 'Wie war\'s?', body: `${open.map(s => s.title).join(', ')}: kurz abhaken und Gefühl eintragen.`, url: './?go=heute&open=export' });
   }
   // Routinen
-  if (T.adductors && [1, 3, 5].includes(b.dow) && due(X.adductors) && !ill) jobs.push({ type: 'adductors', key: 'adductors', title: 'Adduktoren-Übungen', body: 'Kurz die Adduktoren-Übungen machen, 10 Minuten reichen.', url: './?go=heute' });
+  // Abend-Check nur für Teamsportler (Leiste und Adduktoren bei Fußball und Laufen), sonst nie
+  const team = !!(L.profile && (L.profile.teamSport || (L.profile.sports || []).includes('football')));
+  if (T.adductors && team && [1, 3, 5].includes(b.dow) && due(X.adductors) && !ill) jobs.push({ type: 'adductors', key: 'adductors', title: 'Adduktoren-Übungen', body: 'Kurz die Adduktoren-Übungen machen, 10 Minuten reichen.', url: './?go=heute' });
   if (T.food && due(X.food) && list.length && !ill) {
     const low = C.nutritionKcalLow(L.state, weeks, date, L.nutritionProfile);
     const eaten = ((L.state.nutrition || {})[date] || {}).kcal || 0;

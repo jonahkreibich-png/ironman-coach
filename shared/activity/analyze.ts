@@ -1,6 +1,7 @@
 /* Auswertung einer Aufzeichnung: Kennzahlen, Zeit in Pulszonen, aerobe Entkopplung, Runden und Intervalle,
    Schwimmbahnen mit Zügen. Ergebnis ist ein kompakter Datensatz (kind "activity"), die Rohverläufe werden verkleinert. */
 import type { RawActivity, ActSport } from './types';
+import { GENERIC_LTHR } from '../profile';
 
 export type Source = 'healthfit' | 'file' | 'shortcut' | 'intervals' | 'oura' | 'whoop' | 'polar' | 'withings' | 'fitbit' | 'suunto' | 'coros' | 'wahoo' | 'zepp' | 'healthkit' | 'manual';
 
@@ -75,7 +76,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   const T = raw.totals;
   const sport = raw.sport;
   const recs = raw.records;
-  const lthr = sport === 'bike' ? (o.lthr && o.lthr.bike) || 162 : (o.lthr && o.lthr.run) || 170;
+  const lthr = sport === 'bike' ? (o.lthr && o.lthr.bike) || GENERIC_LTHR.bike : (o.lthr && o.lthr.run) || GENERIC_LTHR.run;
   const movingSec = T.movingSec ?? T.elapsedSec ?? null;
   const dist = T.distanceM ?? null;
   const hrVals = recs.map(r => r.hr).filter((x): x is number => x != null && x > 30);

@@ -19,9 +19,8 @@ export function readPlan(): any {
 }
 const PLAN_RAW = readPlan();
 export const HAS_PLAN = !!(PLAN_RAW && Array.isArray(PLAN_RAW.weeks) && PLAN_RAW.weeks.length);
-export const PLAN: any = HAS_PLAN ? PLAN_RAW : { meta: { eventDate: '2029-09-15' }, weeks: [], keyDates: [] };
-if (!PLAN.meta) PLAN.meta = { eventDate: '2029-09-15' };
-if (!PLAN.meta.eventDate) PLAN.meta.eventDate = '2029-09-15';
+export const PLAN: any = HAS_PLAN ? PLAN_RAW : { meta: {}, weeks: [], keyDates: [] };
+if (!PLAN.meta) PLAN.meta = {};
 if (!PLAN.meta.baseScores) PLAN.meta.baseScores = { swim: 20, bike: 20, run: 20, strength: 20 };
 if (!Array.isArray(PLAN.zonePercents) || !PLAN.zonePercents.length) PLAN.zonePercents = DEFAULT_ZONES;
 if (!Array.isArray(PLAN.keyDates)) PLAN.keyDates = [];
@@ -34,11 +33,8 @@ export function defaultState(): any {
     scoreAdjust: { swim: 0, bike: 0, run: 0, strength: 0 },
     customWorkouts: {}, openDays: {},
     milestones: clone(PLAN.seedMilestones || []),
-    settings: {
-      lthrRun: PLAN.meta.defaultLthrRun || 170, lthrBike: PLAN.meta.defaultLthrBike || 165,
-      thresholdPaceRunSec: PLAN.meta.defaultThresholdPaceRunSec || 339, thresholdSpeedBikeKmh: PLAN.meta.defaultThresholdSpeedBikeKmh || 28,
-      readiness: { rhrMax: 65, hrvMin: 35, tempMax: 0.5 }
-    },
+    // Keine Schwellen als Vorgabe: sie stehen im Profil (eigene Werte oder aus dem Profil geschätzt)
+    settings: { readiness: { tempMax: 0.5 } },
     weekNotes: {}, nutrition: {},
     nutritionProfile: { pal: 1.4 },
     illnessPeriods: clone(PLAN.seedIllness || []),
@@ -57,9 +53,7 @@ export function mergeIntoDefaults(partial: any): any {
   if (!out.openDays) out.openDays = {};
   if (!Array.isArray(out.milestones)) out.milestones = base.milestones;
   if (!out.settings) out.settings = base.settings;
-  const bs = defaultState().settings;
-  ['lthrRun', 'lthrBike', 'thresholdPaceRunSec', 'thresholdSpeedBikeKmh'].forEach(k => { if (out.settings[k] == null) out.settings[k] = bs[k]; });
-  if (!out.settings.readiness) out.settings.readiness = bs.readiness;
+  if (!out.settings.readiness) out.settings.readiness = defaultState().settings.readiness;
   if (!out.weekNotes) out.weekNotes = {};
   if (!out.nutrition) out.nutrition = {};
   if (!out.nutritionProfile) out.nutritionProfile = base.nutritionProfile;
@@ -73,6 +67,24 @@ function loadState(): any {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) return mergeIntoDefaults(JSON.parse(raw)); } catch (e) {}
   for (const k of STORAGE.legacyState) { try { const old = localStorage.getItem(k); if (old) return mergeIntoDefaults(JSON.parse(old)); } catch (e) {} }
   return mergeIntoDefaults(null);
+}
+
+/* Alle Daten des Nutzers auf diesem Gerät löschen (Nutzerwechsel, Abmelden, Zurücksetzen durch den Betreiber).
+   Nur die Darstellung (hell/dunkel) bleibt. keepAuth: die Anmeldung bleibt (z. B. beim Zurücksetzen). */
+export function wipeLocalData(keepAuth = false): void {
+  try {
+    const keep = new Set<string>([STORAGE.theme, ...(keepAuth ? [STORAGE.syncAuth, STORAGE.owner] : [])]);
+    Object.keys(localStorage).filter(k => /^ec_/.test(k) && !keep.has(k)).forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+  const fresh = mergeIntoDefaults(null);
+  Object.keys(STATE).forEach(k => { delete STATE[k]; });
+  Object.assign(STATE, fresh);
+  Object.keys(UI).forEach(k => { delete UI[k]; });
+  Object.assign(UI, { view: 'heute', tab: 'heute' });
+}
+/* Liegen auf diesem Gerät schon Daten (Plan, Einheiten, Werte, Profil)? */
+export function hasLocalData(): boolean {
+  return HAS_PLAN || !!STATE.profile || Object.keys(STATE.sessions || {}).length > 0 || (STATE.trend || []).length > 0 || !!STATE.onboarding;
 }
 
 /* STATE ist ein fester Behälter. replaceState tauscht den Inhalt aus, damit alle Module dieselbe Referenz behalten. */
@@ -147,7 +159,7 @@ export function mergePlan(cur: any, upd: any): any {
 /* Profil: gespeichert, sonst aus den alten Einstellungen abgeleitet (einmalig übernommen und gespeichert). */
 export function profile(): Profile {
   const fb = profileFromLegacy({ ...STATE, planWeeks: BASE_WEEKS }, todayStr());
-  return mergeProfile(STATE.profile, fb);
+  return mergeProfile(STATE.profile, fb, todayStr());
 }
 export function goals(): Goal[] { return Object.values(STATE.goals || {}).filter(Boolean) as Goal[]; }
 export function ensureProfileAndGoals(): boolean {

@@ -34,7 +34,7 @@ test('Kalorienziel steigt mit dem Training', () => {
 });
 
 test('Belastung: Puls, RPE, Fußball ohne Daten', () => {
-  expect(C.sessionLoad({ sport: 'run', plannedMinutes: 60 }, { metrics: { min: '60', hr: '170' } })).toBe(100);
+  expect(C.sessionLoad({ sport: 'run', plannedMinutes: 60 }, { metrics: { min: '60', hr: '170' } }, { lthrRun: 170 })).toBe(100);
   expect(C.sessionLoad({ sport: 'swim', plannedMinutes: 45 }, { rpe: '9' })).toBe(75);
   expect(C.sessionLoad({ sport: 'football', title: 'Spiel' }, {})).toBe(Math.round(1 * (7 / 9) ** 2 * 100));
   expect(C.sessionLoad({ sport: 'bike' }, { icuLoad: 77 })).toBe(77);

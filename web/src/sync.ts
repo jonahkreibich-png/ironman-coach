@@ -3,7 +3,7 @@
    Konflikte: die neueste Änderung pro Datensatz gewinnt. Offline bleibt alles in der Warteschlange.
    Dazu: Einrichtung (Einrichtungscode, Kopplung, Einladung), allgemeiner Server-Aufruf, KI-Status, Mitteilungen. */
 // @ts-nocheck
-import { STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave } from './store';
+import { STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData } from './store';
 import { esc, fmtDate, ymd } from './util';
 import { toast } from './toast';
 import { STORAGE, API_BASE } from './config';
@@ -219,20 +219,32 @@ function deviceName() {
   if (/iPhone/.test(ua)) return 'iPhone'; if (/iPad/.test(ua)) return 'iPad'; if (/Android/.test(ua)) return 'Android';
   if (/Windows/.test(ua)) return 'Windows-PC'; if (/Mac/.test(ua)) return 'Mac'; return 'Gerät';
 }
+/* Wem gehören die Daten auf diesem Gerät? (Nutzer-Nummer auf dem Server, null = noch nie verbunden) */
+export function localOwner(): number | null { const o = readJson(STORAGE.owner, null); return typeof o === 'number' ? o : null; }
+/* Vor dem Verbinden: Daten einer anderen Person entfernen. keep: Nutzer hat bestätigt, dass die Daten auf diesem Gerät seine eigenen sind. */
+function prepareDevice(uid: number | null, keep: boolean) {
+  const owner = localOwner();
+  if (owner != null && uid != null && owner !== uid) { wipeLocalData(); return; }
+  if (owner == null && !keep && hasLocalData()) wipeLocalData();
+}
 function connected(res, first) {
   AUTH = { token: res.token, deviceId: res.deviceId, connectedAt: Date.now() };
   writeJson(AUTH_KEY, AUTH);
+  if (res.userId != null) writeJson(STORAGE.owner, res.userId);
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
   // Einmalige Migration: der vorhandene Stand dieses Geräts wird hochgeladen.
   // Das erste Gerät gewinnt mit "jetzt", ein gekoppeltes Gerät füllt nur Lücken (Zeitstempel 1).
   detect(first ? now() : 1);
 }
-async function pairWith(code) {
+async function pairWith(code, keep?: boolean) {
   const res = await api('POST', '/api/pair/redeem', { code, name: deviceName() }, true);
+  prepareDevice(res.userId ?? null, !!keep);
   connected(res, false);
   await syncNow();
   if (!planChanged) rebaseline();
+  if (!keep) reloadSoon();
 }
+function reloadSoon() { try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {} setTimeout(() => location.reload(), 600); }
 function disconnect(silent?) {
   AUTH = null; ME = null; try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem('ec_me'); } catch (e) {}
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
@@ -263,18 +275,31 @@ export async function uploadFiles(files: File[]): Promise<any> {
 /* Erstes Gerät (mit Einrichtungscode) oder neuer Nutzer (mit Einladung) */
 export async function setupFirst(setupCode?: string) {
   const res = await api('POST', '/api/setup', { name: deviceName(), ...(setupCode ? { setupCode: setupCode.trim() } : {}) }, true);
+  // Betreiber (Nutzer 1): vorhandene Daten dieses Geräts sind seine (alte App), außer sie gehören erkennbar jemand anderem
+  prepareDevice(res.userId ?? 1, true);
   connected(res, true);
   await syncNow(); if (!planChanged) rebaseline();
   return res;
 }
-export async function setupWithInvite(invite: string, userName: string) {
+/* Neuer Nutzer mit Einladung. Daten, die schon auf dem Gerät liegen, werden nur übernommen, wenn der Nutzer das ausdrücklich will
+   (sonst könnten Daten einer anderen Person in sein Konto wandern). */
+export async function setupWithInvite(invite: string, userName: string, keepLocal = false) {
   const res = await api('POST', '/api/setup', { name: deviceName(), invite, userName }, true);
+  prepareDevice(res.userId ?? null, keepLocal);
   connected(res, true);
   await syncNow(); rebaseline();
+  reloadSoon();
   return res;
 }
-export async function pair(code: string) { await pairWith(code); }
+export async function pair(code: string, keepLocal = false) { await pairWith(code, keepLocal); }
 export function stopSync() { disconnect(false); }
+/* Abmelden und Gerät für eine andere Person freimachen: Gerät beim Server abmelden, alle lokalen Daten löschen */
+export async function signOut() {
+  if (AUTH) { try { await api('POST', '/api/devices/self/logout'); } catch (e) {} }
+  disconnect(true);
+  wipeLocalData();
+  location.href = location.pathname;
+}
 
 /* KI-Status (der KI-Coach ist im Testbetrieb abgeschaltet, solange kein Schlüssel hinterlegt ist) */
 let AI = { entitled: false, food: false, active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30 };
@@ -286,7 +311,21 @@ let ME = readJson('ec_me', null);
 export function me() { return ME || { role: null, entitlements: {} }; }
 export function isAdmin() { return !!ME && ME.role === 'admin'; }
 export function entitled(k: string) { return !!(ME && ME.entitlements && ME.entitlements[k]); }
-export async function loadMe() { if (!AUTH) return me(); try { ME = await api('GET', '/api/me'); writeJson('ec_me', ME); } catch (e) {} return me(); }
+export async function loadMe() {
+  if (!AUTH) return me();
+  try {
+    ME = await api('GET', '/api/me'); writeJson('ec_me', ME);
+    const owner = localOwner();
+    // Daten auf dem Gerät gehören zu einem anderen Konto → lokal löschen und neu vom Server holen
+    if (owner != null && ME.userId != null && owner !== ME.userId) { wipeLocalData(true); writeJson(STORAGE.owner, ME.userId); resetSyncMeta(); location.reload(); return me(); }
+    if (owner == null && ME.userId != null) writeJson(STORAGE.owner, ME.userId);
+    // Vom Betreiber zurückgesetzt (Test-Nutzer): lokal neu anfangen
+    const seen = readJson('ec_reset_seen', 0);
+    if (ME.resetAt && ME.resetAt > seen) { wipeLocalData(true); writeJson('ec_reset_seen', ME.resetAt); resetSyncMeta(); location.href = location.pathname; return me(); }
+  } catch (e) {}
+  return me();
+}
+function resetSyncMeta() { META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta(); }
 
 /* Mitteilungen (Web Push) */
 export function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }

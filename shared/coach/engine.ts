@@ -132,8 +132,8 @@ export function morningBriefing(ctx: EngineCtx, date: string, adjustments: any[]
     else lines.push(`${R.level === 1 ? T.yellow(seed) : T.red(seed)} ${facts.length ? joinDe(facts).replace(/^d/, 'D') + '.' : (R.reasons.join(', ') + '.')}`);
   }
   if (!ill) lines.push(list.length ? `Heute: ${joinDe(list.map(sessLabel))}.` : 'Heute ist kein Training geplant. Genieß den Ruhetag.');
-  const zoneTip = list.find((s: any) => C.zoneBpm(s, ctx.state.settings, null));
-  if (zoneTip && !ill) lines.push(`Puls für ${zoneTip.title}: ${C.zoneBpm(zoneTip, ctx.state.settings, null)}.`);
+  const zoneTip = list.find((s: any) => C.zoneBpm(s, ctx.profile.thresholds, null));
+  if (zoneTip && !ill) lines.push(`Puls für ${zoneTip.title}: ${C.zoneBpm(zoneTip, ctx.profile.thresholds, null)}.`);
   return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 || !C.hasRecovery((ctx.state.trend || []).find((x: any) => x && x.date === date)) ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2 });
 }
 
