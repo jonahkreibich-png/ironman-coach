@@ -10,6 +10,7 @@ import { transitionPlan } from '../../../shared/plangen';
 import { goalAllowed } from '../../../shared/rules';
 import { parseBackupText, isBackup, isPlan, applyBackup } from '../backup';
 import { connectPanel, installSteps } from './daten';
+import { isSyncOn, syncNow } from '../sync';
 import { isIOS, isStandalone } from './einstellungen';
 import { goalLabel } from './profil';
 import { D, invalidate } from '../data';
@@ -27,7 +28,7 @@ export function renderWelcome(): string {
     <div style="text-align:center;margin:var(--s4) 0 var(--s2)"><img src="icons/icon-192.png" alt="" width="72" height="72" style="border-radius:18px"><h1 style="margin:var(--s2) 0 4px">${esc(APP.name)}</h1><div class="muted">${esc(t('welcome.tagline'))}</div></div>
     ${needInstall ? `<div class="card stack"><div class="lbl">${esc(t('welcome.step1'))}</div><div class="hint">${esc(t('welcome.installFirst'))}</div>${installSteps()}</div>` : ''}
     <div class="card stack"><div class="lbl">${esc(t('welcome.newTitle'))}</div><div class="hint">${esc(t('welcome.newHint'))}</div><button class="btn block" data-act="ob-start">${ic('wand')} ${esc(t('welcome.newBtn'))}</button></div>
-    <div class="card stack"><div class="lbl">${esc(t('welcome.haveTitle'))}</div>${connectPanel()}</div>
+    ${isSyncOn() ? `<div class="banner info"><b>${esc(t('welcome.connectedNoData'))}</b><br>${esc(t('welcome.connectedNoDataHint'))}</div><button class="btn ghost" data-act="sync-recheck">${ic('sync')} ${esc(t('welcome.recheck'))}</button>` : `<div class="card stack"><div class="lbl">${esc(t('welcome.haveTitle'))}</div>${connectPanel()}</div>`}
     <div class="card">${more(t('welcome.backupTitle'), `<div class="hint">${esc(t('welcome.backupHint'))}</div><textarea class="inp" id="bk-in" rows="3" placeholder="${esc(t('data.restorePh'))}" style="font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
       <div class="row"><button class="btn" data-act="welcome-load">${esc(t('welcome.load'))}</button><label class="btn ghost" for="bk-file">${esc(t('data.pickFile'))}</label><input type="file" id="bk-file" data-ch="bk-file" accept="application/json,.json,.txt,text/plain" hidden></div>`)}</div>
     <div class="hint" style="text-align:center">${esc(t('welcome.privacy'))}</div></div>`;
@@ -185,3 +186,5 @@ on('ob-apply', el => {
   setTimeout(() => { location.href = location.pathname + '?go=heute'; }, 700);
 });
 void esc; void saveProfile;
+
+on('sync-recheck', async () => { await syncNow(); toast(t('welcome.stillNoData')); });
