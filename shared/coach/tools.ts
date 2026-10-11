@@ -2,7 +2,7 @@
    Kleine Änderungen gelten sofort (als Anpassung mit Rückgängig), große werden als Vorschlag mit „Übernehmen“/„Ablehnen“ gespeichert.
    Verstößt etwas gegen die Regeln, bekommt die KI eine Fehlermeldung und sucht eine andere Lösung. */
 import * as C from '../core';
-import { validateWeeks, isIntense } from '../rules';
+import { validateWeeks, isIntense, weekMinutes } from '../rules';
 import { GOALS, type GoalType } from '../goals';
 import { isMinor } from '../profile';
 import type { EngineCtx } from './engine';
@@ -40,11 +40,11 @@ function findSession(weeks: any[], id: string) {
   return null;
 }
 /* Regeln für die betroffene Woche (plus Vorwoche als Vergleich) */
-function ruleCheck(ctx: EngineCtx, weeks: any[], date: string): string[] {
+function ruleCheck(ctx: EngineCtx, weeks: any[], date: string): any[] {
   const i = weeks.findIndex(w => (w.days || []).some((d: any) => d.date === date));
   if (i < 0) return [];
   const prev = weeks.slice(Math.max(0, i - 2), i);
-  return validateWeeks([weeks[i]], { minor: isMinor(ctx.profile, ctx.today), illness: ctx.state.illnessPeriods }, prev).map(v => v.msg);
+  return validateWeeks([weeks[i]], { minor: isMinor(ctx.profile, ctx.today), illness: ctx.state.illnessPeriods }, prev);
 }
 let seq = 0;
 function adjId(prefix: string, ctx: EngineCtx) { return `ai-${prefix}-${ctx.now}-${++seq}`; }
@@ -91,10 +91,13 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
     a.from_ai = true; a.createdAt = ctx.now; a.date = today; a.group = 'ai-' + ctx.now;
     const after = effective(ctx, [a]);
     const target = name === 'move_session' ? input.to_date : hit.d.date;
-    const problems = [...new Set([...ruleCheck(ctx, after, target), ...(name === 'move_session' ? ruleCheck(ctx, after, hit.d.date) : [])])];
-    // vorhandene Verstöße (vor der Änderung) zählen nicht
-    const before = new Set([...ruleCheck(ctx, weeks, target), ...ruleCheck(ctx, weeks, hit.d.date)]);
-    const fresh = problems.filter(p => !before.has(p));
+    const problems = [...ruleCheck(ctx, after, target), ...(name === 'move_session' ? ruleCheck(ctx, after, hit.d.date) : [])];
+    // Verstöße, die schon vorher bestanden, zählen nur, wenn die Änderung sie verschlimmert (mehr Umfang)
+    const key = (v: any) => v.rule + '|' + (v.week ?? v.date ?? '');
+    const before = new Set([...ruleCheck(ctx, weeks, target), ...ruleCheck(ctx, weeks, hit.d.date)].map(key));
+    const minsOf = (ws: any[], d: string) => { const w = ws.find(x => (x.days || []).some((dd: any) => dd.date === d)); return w ? weekMinutes(w) : 0; };
+    const more = minsOf(after, target) > minsOf(weeks, target);
+    const fresh = [...new Map(problems.filter(v => !before.has(key(v)) || ((v.rule === 'volume' || v.rule === 'runVolume') && more)).map(v => [key(v), v.msg])).values()];
     if (fresh.length) return err('Abgelehnt von der Regel-Engine: ' + fresh.join(' ') + ' Finde eine andere Lösung.');
     // groß: Dauer um mehr als 30 % höher, eine lockere Einheit wird hart
     const s2 = findSession(after, hit.s.id);

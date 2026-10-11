@@ -123,7 +123,9 @@ export function morningBriefing(ctx: EngineCtx, date: string, adjustments: any[]
   const name = (ctx.profile.name || '').split(' ')[0];
   const lines: string[] = [T.greet(seed, name)];
   if (ill) lines.push('Heute kein Training. Schlafen, trinken, genug essen. Sag mir Bescheid, wenn es dir besser geht.');
-  else if (R.level === 3) lines.push('Noch keine Morgenwerte. Sobald Schlaf und Ruhepuls da sind, sage ich dir, wie hart es heute sein darf.');
+  else if (R.level === 3 || !C.hasRecovery((ctx.state.trend || []).find((x: any) => x && x.date === date))) {
+    lines.push('Noch keine Morgenwerte für heute. Sobald Schlaf und Ruhepuls da sind, sage ich dir, wie hart es heute sein darf.' + (R.level !== 3 && R.stale ? ` Nach den Werten von gestern sah es ${['gut', 'eher nach locker', 'nach Ruhe'][R.level] || 'unklar'} aus.` : ''));
+  }
   else {
     const facts = readinessFacts(ctx, date);
     if (R.level === 0) lines.push(`${T.green(seed)} Ampel grün (${R.score}/100).`);
@@ -132,7 +134,7 @@ export function morningBriefing(ctx: EngineCtx, date: string, adjustments: any[]
   if (!ill) lines.push(list.length ? `Heute: ${joinDe(list.map(sessLabel))}.` : 'Heute ist kein Training geplant. Genieß den Ruhetag.');
   const zoneTip = list.find((s: any) => C.zoneBpm(s, ctx.state.settings, null));
   if (zoneTip && !ill) lines.push(`Puls für ${zoneTip.title}: ${C.zoneBpm(zoneTip, ctx.state.settings, null)}.`);
-  return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2 });
+  return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 || !C.hasRecovery((ctx.state.trend || []).find((x: any) => x && x.date === date)) ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2 });
 }
 
 export function weeklyReview(ctx: EngineCtx, date: string, adjustments: any[], summary: any): CoachMsg {

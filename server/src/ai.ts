@@ -188,7 +188,7 @@ export async function decideProposal(env: Env, uid: number, msgId: string, accep
   const rec = await getRecord(env, uid, 'coachMsg', msgId);
   if (!rec || !rec.data || !rec.data.proposal) throw new HttpError(404, 'Vorschlag nicht gefunden.');
   if (rec.data.proposal.status !== 'open') throw new HttpError(409, 'Über diesen Vorschlag wurde schon entschieden.');
-  const t = Date.now();
+  const t = Math.max(Date.now(), rec.updatedAt + 1);
   const changes = accept ? (rec.data.proposal.changes || []).map((c: any, i: number) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })) : [];
   changes.push({ kind: 'coachMsg', key: msgId, data: { ...rec.data, proposal: { ...rec.data.proposal, status: accept ? 'accepted' : 'rejected' } }, updatedAt: t + 99 });
   await putRecords(env, uid, changes);
