@@ -1,5 +1,5 @@
 /* Extra-Einheiten (nicht im Plan): anlegen, ansehen, korrigieren, entfernen. */
-import { STATE, saveState, saveSoon } from '../store';
+import { STATE, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, parseNum } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, openSheet, closeSheet, field, select, armed, srcBadge } from '../kit';
@@ -9,7 +9,8 @@ import { toast } from '../toast';
 
 let CUR: { id: string | null; date: string } = { id: null, date: '' };
 const find = () => ((STATE.customWorkouts || {})[CUR.date] || []).find((w: any) => w.id === CUR.id);
-const SPORTS = (): [string, string][] => ['run', 'bike', 'swim', 'strength', 'football'].map(k => [k, t('sport.' + k)] as [string, string]);
+/* Teamsport nur für Nutzer mit Teamsport (Auftrag 4 B3) */
+const SPORTS = (): [string, string][] => { const p = profile(); const team = !!(p.teamSport || p.sports.includes('football')); return ['run', 'bike', 'swim', 'strength', ...(team ? ['football'] : [])].map(k => [k, k === 'football' && p.teamSport ? p.teamSport.name : t('sport.' + k)] as [string, string]); };
 
 function addSheet(): string {
   return `<div class="stack"><div class="hint">${dowShort(CUR.date)} ${fmtDate(CUR.date)}</div><div class="fgrid">

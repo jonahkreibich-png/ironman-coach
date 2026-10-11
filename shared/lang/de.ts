@@ -98,7 +98,7 @@ export const de: Record<string, string> = {
   'v.notePh': 'z. B. Halskratzen', 'v.editHint': 'Was du von Hand einträgst, bleibt. Neue Messwerte überschreiben es nicht. „Auf Original zurücksetzen“ holt den gemessenen Wert zurück.',
 
   /* ---------- Essen ---------- */
-  'food.type.rest': 'Ruhetag', 'food.type.training': 'Trainingstag', 'food.type.hard': 'Langer oder harter Tag', 'food.type.match': 'Spieltag', 'food.type.sick': 'Krankheitstag',
+  'food.type.rest': 'Ruhetag', 'food.type.training': 'Trainingstag', 'food.type.hard': 'Langer oder harter Tag', 'food.type.match': 'Spieltag', 'food.type.race': 'Wettkampftag', 'food.note.race': 'Wettkampf: gewohntes Frühstück 3 h vorher, unterwegs nach Verpflegungsplan, danach Kohlenhydrate und Protein.', 'food.type.sick': 'Krankheitstag',
   'food.note.rest': 'Kein Training: Grundbedarf decken, viel Gemüse und genug Eiweiß.',
   'food.note.training': 'Normales Training: Kohlenhydrate rund um die Einheit legen.',
   'food.note.hard': 'Lange oder harte Einheit: viele Kohlenhydrate. Bei Einheiten über 75 min unterwegs 30-60 g pro Stunde.',

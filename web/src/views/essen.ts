@@ -5,7 +5,7 @@ import { esc, fmtDate, dowShort, dowLong, addDays, parseNum, todayStr } from '..
 import { t, num, weight } from '../../../shared/i18n';
 import { D } from '../data';
 import { on, onChange, sec, field, select, ic, more, openSheet, closeSheet, refreshSheet } from '../kit';
-import { nutritionTargets, NUTRI_TYPES, NUTRI_SLOTS, mealsFor, underEatingCheck, type DaySession } from '../../../shared/nutrition';
+import { nutritionTargets, NUTRI_SLOTS, mealsFor, underEatingCheck, dayTypesFor, type DaySession } from '../../../shared/nutrition';
 import { effStatus, sessState } from '../domain';
 import { lineChart } from '../charts';
 import { nav } from '../nav';
@@ -22,7 +22,7 @@ function sessionsFor(date: string): DaySession[] {
     const status = effStatus(s); if (status === 'skipped' || status === 'sick' || status === 'missed' || status === 'cancelled') return;
     const m = sessState(s.id).metrics || {};
     const min = status === 'done' && m.min ? parseNum(m.min) : (s.plannedMinutes || (s.sport === 'football' ? (/spiel/i.test(s.title) ? 60 : 90) : 0));
-    out.push({ sport: s.sport, title: s.title, zone: s.zone, minutes: min || 0 });
+    out.push({ sport: s.sport, title: s.title, zone: s.zone, minutes: min || 0, race: !!s.race });
   });
   ((STATE.customWorkouts || {})[date] || []).forEach((w: any) => out.push({ sport: w.sport, title: w.title, minutes: parseNum((w.metrics || {}).min) ?? w.plannedMinutes ?? 0, custom: true }));
   return out.filter(x => x.minutes > 0);
@@ -35,8 +35,9 @@ function weightFor(date: string): number {
 export function targetsFor(date: string) {
   const p = D().profile;
   const age = ageOf(p, date) ?? STATE.nutritionProfile.age ?? 30;
-  return nutritionTargets({ age, heightCm: p.heightCm || STATE.nutritionProfile.heightCm || 175, weightKg: weightFor(date), pal: p.pal || 1.4, sex: p.sex, sessions: sessionsFor(date), ill: !!C.illnessAt(STATE.illnessPeriods, date), override: ((STATE.nutrition || {})[date] || {}).typeOverride || null });
+  return nutritionTargets({ age, heightCm: p.heightCm || STATE.nutritionProfile.heightCm || 175, weightKg: weightFor(date), pal: p.pal || 1.4, sex: p.sex, sessions: sessionsFor(date), ill: !!C.illnessAt(STATE.illnessPeriods, date), override: ((STATE.nutrition || {})[date] || {}).typeOverride || null, team: hasTeam() });
 }
+const hasTeam = () => { const p = D().profile; return !!(p.teamSport || p.sports.includes('football')); };
 export function nutritionToday() {
   const d = D().today; const tg = targetsFor(d); const e = (STATE.nutrition || {})[d] || {};
   return { typeLabel: t('food.type.' + tg.type), low: tg.kcal[0], high: tg.kcal[1], eaten: e.kcal ?? null };
@@ -51,7 +52,7 @@ export function renderEssen(): string {
   const date = UI.foodDate || D().today;
   const tg = targetsFor(date); const e = (STATE.nutrition || {})[date] || {};
   const minor = D().minor;
-  let h = `<div class="spread" style="margin-bottom:var(--s3)"><input class="inp" type="date" value="${date}" data-ch="food-date" style="max-width:180px">${select('food-type', '', tg.overridden ? tg.type : 'auto', [['auto', t('food.auto', { t: t('food.type.' + tg.typeAuto) })], ...Object.keys(NUTRI_TYPES).map(k => [k, t('food.type.' + k)] as [string, string])], 'data-ch="food-type"').replace('<label for="food-type"></label>', '')}</div>
+  let h = `<div class="spread" style="margin-bottom:var(--s3)"><input class="inp" type="date" value="${date}" data-ch="food-date" style="max-width:180px">${select('food-type', '', tg.overridden ? tg.type : 'auto', [['auto', t('food.auto', { t: t('food.type.' + tg.typeAuto) })], ...dayTypesFor({ team: hasTeam(), races: D().goals.some(g => !!g.date) }).map(k => [k, t('food.type.' + k)] as [string, string])], 'data-ch="food-type"').replace('<label for="food-type"></label>', '')}</div>
   <div class="card"><div class="lbl">${esc(t('food.target'))}</div><div class="big">${tg.kcal[0]}-${tg.kcal[1]} kcal</div>
     <div class="hint num">${esc(t('food.macros', { c: `${tg.carbs[0]}-${tg.carbs[1]}`, p: `${tg.protein[0]}-${tg.protein[1]}`, f: `${tg.fat[0]}-${tg.fat[1]}` }))}</div>
     ${nbar(t('food.kcal'), e.kcal ?? null, tg.kcal[0], tg.kcal[1], '')}${nbar(t('food.carbs'), e.carbs ?? null, tg.carbs[0], tg.carbs[1], ' g')}${nbar(t('food.protein'), e.protein ?? null, tg.protein[0], tg.protein[1], ' g')}

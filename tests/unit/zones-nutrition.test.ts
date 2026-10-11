@@ -39,3 +39,14 @@ test('Belastung: Puls, RPE, Fußball ohne Daten', () => {
   expect(C.sessionLoad({ sport: 'football', title: 'Spiel' }, {})).toBe(Math.round(1 * (7 / 9) ** 2 * 100));
   expect(C.sessionLoad({ sport: 'bike' }, { icuLoad: 77 })).toBe(77);
 });
+
+/* Auftrag 4 E1: Tagestypen passend zur Person */
+import { classifyDay, dayTypesFor } from '../../shared/nutrition';
+test('Spieltag nur mit Teamsport, Wettkampftag aus dem Plan', () => {
+  const game = [{ sport: 'football', title: 'Fußball: Spiel', minutes: 80 }];
+  expect(classifyDay(game, false, { team: true })).toBe('match');
+  expect(classifyDay(game, false, {})).not.toBe('match');
+  expect(classifyDay([{ sport: 'run', title: '10 km', minutes: 50, race: true }], false)).toBe('race');
+  expect(dayTypesFor({ team: false, races: true })).toEqual(['rest', 'training', 'hard', 'race', 'sick']);
+  expect(dayTypesFor({ team: true, races: false })).toContain('match');
+});

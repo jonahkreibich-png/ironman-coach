@@ -1,11 +1,12 @@
 /* Ernährung: Tagestyp, Bedarf, Vorschläge und Verpflegung im Wettkampf.
    Grundsatz: Die App hilft, GENUG zu essen. Sie zeigt nie ein Kalorien-Defizit und für Minderjährige keine Gewichtsziele. */
 
-export type DayType = 'rest' | 'training' | 'hard' | 'match' | 'sick';
+export type DayType = 'rest' | 'training' | 'hard' | 'race' | 'match' | 'sick';
 export const NUTRI_TYPES: Record<DayType, { label: string; carbs: [number, number]; note: string }> = {
   rest: { label: 'Ruhetag', carbs: [4, 5], note: 'Kein Training: Basis decken, viel Gemüse und genug Protein.' },
   training: { label: 'Trainingstag', carbs: [5, 6], note: 'Normales Training: Kohlenhydrate rund um die Einheit legen.' },
   hard: { label: 'Langer/harter Tag', carbs: [6, 8], note: 'Lange oder harte Einheit: viel Kohlenhydrate. Bei Einheiten über 75 min unterwegs 30-60 g Kohlenhydrate pro Stunde.' },
+  race: { label: 'Wettkampftag', carbs: [7, 10], note: 'Wettkampf: gewohntes Frühstück 3 h vorher, unterwegs nach Verpflegungsplan, danach Kohlenhydrate und Protein.' },
   match: { label: 'Spieltag', carbs: [6, 7], note: 'Spiel: 3-4 h vorher eine große Kohlenhydrat-Mahlzeit, danach schnell auffüllen.' },
   sick: { label: 'Krankheitstag', carbs: [4, 5], note: 'Krank: auch ohne Hunger regelmäßig kleine Portionen. Suppe, Reis, Toast, Banane, viel Tee und Wasser. Tracken ist optional.' }
 };
@@ -13,6 +14,7 @@ export const NUTRI_SLOTS: Record<DayType, [string, number, string][]> = {
   rest: [['Frühstück', 28, 'breakfast'], ['Mittagessen', 32, 'main'], ['Abendessen', 30, 'main'], ['Snack', 10, 'snack']],
   training: [['Frühstück', 25, 'breakfast'], ['Mittagessen', 28, 'main'], ['Abendessen', 27, 'main'], ['Snack', 10, 'snack'], ['Nach dem Training', 10, 'post']],
   hard: [['Frühstück', 22, 'breakfast'], ['Vor dem Training (1-2 h)', 8, 'pre'], ['Mittagessen', 22, 'main'], ['Nach dem Training', 13, 'post'], ['Abendessen', 25, 'main'], ['Snack', 10, 'snack']],
+  race: [['Frühstück (3 h vorher)', 25, 'pre'], ['Vor dem Start', 8, 'pre'], ['Nach dem Wettkampf', 20, 'post'], ['Abendessen', 30, 'main'], ['Snack', 17, 'snack']],
   match: [['Frühstück', 22, 'breakfast'], ['Mittagessen (3-4 h vor dem Spiel)', 25, 'main'], ['Vor dem Spiel (1-1,5 h)', 8, 'pre'], ['Nach dem Spiel', 15, 'post'], ['Abendessen', 20, 'main'], ['Snack', 10, 'snack']],
   sick: [['Frühstück', 25, 'breakfast'], ['Mittagessen', 30, 'sick'], ['Abendessen', 30, 'sick'], ['Snack', 15, 'snack']]
 };
@@ -59,15 +61,17 @@ export function mealsFor(cat: string, diet?: { vegetarian?: boolean; vegan?: boo
   return list;
 }
 
-export interface DaySession { sport: string; title: string; zone?: string; minutes: number; custom?: boolean }
+export interface DaySession { sport: string; title: string; zone?: string; minutes: number; custom?: boolean; race?: boolean }
 export function sessionMet(s: { sport: string; zone?: string; title?: string }): number {
   const intense = /sweet|schwelle|intervall|zone 4|zone 5/i.test((s.zone || '') + ' ' + (s.title || ''));
   return ({ run: intense ? 11 : 9, bike: intense ? 9.5 : 7, swim: 6, strength: 4, football: 7.5 } as Record<string, number>)[s.sport] || 0;
 }
-export function classifyDay(sessions: DaySession[], ill: boolean): DayType {
+/* Tagestyp aus dem eigenen Plan. Spieltag nur für Teamsportler (Auftrag 4 E1). */
+export function classifyDay(sessions: DaySession[], ill: boolean, o: { team?: boolean } = {}): DayType {
   if (ill && !sessions.length) return 'sick';
   if (!sessions.length) return 'rest';
-  if (sessions.some(s => s.sport === 'football' && /spiel|match/i.test(s.title || ''))) return 'match';
+  if (sessions.some(s => s.race)) return 'race';
+  if (o.team && sessions.some(s => s.sport === 'football' && /spiel|match/i.test(s.title || ''))) return 'match';
   const total = sessions.reduce((a, s) => a + s.minutes, 0);
   const longest = Math.max(0, ...sessions.filter(s => s.sport !== 'strength').map(s => s.minutes));
   const intense = sessions.some(s => s.sport !== 'strength' && /sweet|schwelle|intervall|zone 4|zone 5/i.test((s.zone || '') + ' ' + (s.title || '')));
@@ -76,14 +80,18 @@ export function classifyDay(sessions: DaySession[], ill: boolean): DayType {
 const r5 = (x: number) => Math.round(x / 5) * 5, r50 = (x: number) => Math.round(x / 50) * 50;
 export interface Targets { weight: number; bmr: number; daily: number; act: number; tdee: number; type: DayType; typeAuto: DayType; overridden: boolean; kcal: [number, number]; carbs: [number, number]; protein: [number, number]; fat: [number, number]; actDetails: (DaySession & { kcal: number })[] }
 /* Grundumsatz nach Mifflin-St Jeor × Alltagsfaktor + Training. Der Zielbereich beginnt beim Verbrauch, nie darunter. */
-export function nutritionTargets(o: { age: number; heightCm: number; weightKg: number; pal: number; sex?: 'f' | 'm' | 'd' | null; sessions: DaySession[]; ill: boolean; override?: DayType | null }): Targets {
+/* Tagestypen, die zu dieser Person passen (Auswahl im Essen-Bildschirm) */
+export function dayTypesFor(o: { team: boolean; races: boolean }): DayType[] {
+  return (['rest', 'training', 'hard', 'race', 'match', 'sick'] as DayType[]).filter(k => (k !== 'match' || o.team) && (k !== 'race' || o.races));
+}
+export function nutritionTargets(o: { age: number; heightCm: number; weightKg: number; pal: number; sex?: 'f' | 'm' | 'd' | null; sessions: DaySession[]; ill: boolean; override?: DayType | null; team?: boolean }): Targets {
   const w = o.weightKg;
   const bmr = 10 * w + 6.25 * o.heightCm - 5 * o.age + (o.sex === 'f' ? -161 : 5);
   const daily = bmr * o.pal;
   const actDetails = o.sessions.map(s => ({ ...s, kcal: Math.round((sessionMet(s) - 1) * w * s.minutes / 60) }));
   const act = actDetails.reduce((a, s) => a + s.kcal, 0);
   const tdee = daily + act;
-  const typeAuto = classifyDay(o.sessions, o.ill);
+  const typeAuto = classifyDay(o.sessions, o.ill, { team: o.team });
   const type = o.override && NUTRI_TYPES[o.override] ? o.override : typeAuto;
   const t = NUTRI_TYPES[type];
   return { weight: w, bmr, daily, act, tdee, type, typeAuto, overridden: !!(o.override && NUTRI_TYPES[o.override]), actDetails,
