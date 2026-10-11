@@ -4,7 +4,8 @@
    3. der Weitergabe von Gesundheitsdaten zugestimmt hat (Einwilligungs-Bildschirm).
    Ohne das läuft nur die Regel-Engine. Budget: Monatsbudget und Höchstzahl an Nachrichten pro Tag. */
 import Anthropic from '@anthropic-ai/sdk';
-import { type Env, berlinDate, putRecords, getRecord } from './store';
+import { type Env, berlinDate, putRecords, getRecord, userEntitlements } from './store';
+import { needsParentConsent } from '../../shared/features';
 import { HttpError } from './http';
 import { COACHING_HANDBOOK } from '../../shared/coach/handbook';
 import { TOOL_DEFS, runTool, type ToolChange } from '../../shared/coach/tools';
@@ -39,9 +40,11 @@ function creator(env: Env): CreateFn {
   return (params: any) => client.beta.messages.create(params);
 }
 
-export interface AiStatus { keyPresent: boolean; enabled: boolean; consent: boolean; active: boolean; monthUsd: number; budgetUsd: number; todayMessages: number; maxPerDay: number }
-/* minor: unter 18 zählt die Einwilligung nur zusammen mit der eines Elternteils (parentConsent) */
-export async function aiStatus(env: Env, uid: number, settings: any, minor = false): Promise<AiStatus> {
+export interface AiStatus { entitled: boolean; food: boolean; keyPresent: boolean; enabled: boolean; consent: boolean; active: boolean; monthUsd: number; budgetUsd: number; todayMessages: number; maxPerDay: number }
+/* parentNeeded: unter 16 zählt die Einwilligung nur zusammen mit der eines Elternteils (parentConsent).
+   entitled: Admin immer, andere Nutzer nur mit Freischaltung „ai“. */
+export async function aiStatus(env: Env, uid: number, settings: any, parentNeeded = false): Promise<AiStatus> {
+  const ent = await userEntitlements(env, uid);
   const ai = (settings && settings.ai) || {};
   const month = berlinDate().slice(0, 7);
   const m = await env.DB.prepare('SELECT COALESCE(SUM(cost_micro),0) AS c FROM ai_usage WHERE user_id = ? AND day LIKE ?').bind(uid, month + '%').first();
@@ -49,8 +52,8 @@ export async function aiStatus(env: Env, uid: number, settings: any, minor = fal
   const keyPresent = !!(env.ANTHROPIC_API_KEY && String(env.ANTHROPIC_API_KEY).trim().length > 20) || !!createOverride;
   const budgetUsd = Math.min(Number(ai.budgetUsd || env.AI_MONTHLY_BUDGET_USD || 5), Number(env.AI_MONTHLY_BUDGET_MAX_USD || 20));
   const maxPerDay = Number(ai.maxPerDay || env.AI_MAX_MESSAGES_PER_DAY || 30);
-  const st = { keyPresent, enabled: !!ai.enabled, consent: !!ai.consentAt && (!minor || !!ai.parentConsent), monthUsd: (m ? m.c : 0) / 1e6, budgetUsd, todayMessages: d ? d.messages : 0, maxPerDay, active: false };
-  st.active = st.keyPresent && st.enabled && st.consent && st.monthUsd < st.budgetUsd && st.todayMessages < st.maxPerDay;
+  const st = { entitled: ent.ai, food: ent.ai && ent.foodPhoto, keyPresent, enabled: !!ai.enabled, consent: !!ai.consentAt && (!parentNeeded || !!ai.parentConsent), monthUsd: (m ? m.c : 0) / 1e6, budgetUsd, todayMessages: d ? d.messages : 0, maxPerDay, active: false };
+  st.active = st.entitled && st.keyPresent && st.enabled && st.consent && st.monthUsd < st.budgetUsd && st.todayMessages < st.maxPerDay;
   return st;
 }
 async function addUsage(env: Env, uid: number, model: string, usage: any, countMessage: boolean) {
@@ -93,13 +96,13 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   const ctx = aiSafeCtx(ctx0);
   const now = Date.now();
   const userMsg: CoachMsg = { id: `msg-user-${now}`, at: now, date: ctx.today, kind: 'user', from: 'user', text: String(text).slice(0, 2000) };
-  const out: ChatResult = { messages: [userMsg], changes: [], status: await aiStatus(env, uid, ctx.state.settings, isMinor(ctx.profile, ctx.today)) };
+  const out: ChatResult = { messages: [userMsg], changes: [], status: await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today))) };
   // Sicherheit zuerst: Notfall, Medikamente und Diagnosen beantwortet die App selbst, ohne KI
   const hits = checkMessage(text);
   const hard = hits.find(h => h.flag === 'emergency' || h.flag === 'medication');
   if (hard) { out.messages.push({ id: `msg-safe-${now}`, at: now + 1, date: ctx.today, kind: 'warning', from: 'coach', text: hard.text, important: hard.flag === 'emergency' }); out.blocked = hard.flag; return out; }
   if (!out.status.active) {
-    const why = !out.status.keyPresent ? 'Der KI-Coach ist noch nicht eingerichtet (kein API-Schlüssel).' : !out.status.consent ? 'Für den KI-Coach fehlt deine Einwilligung.' : !out.status.enabled ? 'Der KI-Coach ist ausgeschaltet.' : out.status.monthUsd >= out.status.budgetUsd ? 'Das Monatsbudget für den KI-Coach ist aufgebraucht.' : 'Für heute sind alle KI-Nachrichten verbraucht.';
+    const why = !out.status.entitled ? 'Der KI-Coach ist für dein Konto noch nicht freigeschaltet.' : !out.status.keyPresent ? 'Der KI-Coach ist noch nicht eingerichtet (kein API-Schlüssel).' : !out.status.consent ? 'Für den KI-Coach fehlt deine Einwilligung.' : !out.status.enabled ? 'Der KI-Coach ist ausgeschaltet.' : out.status.monthUsd >= out.status.budgetUsd ? 'Das Monatsbudget für den KI-Coach ist aufgebraucht.' : 'Für heute sind alle KI-Nachrichten verbraucht.';
     throw new HttpError(403, why + ' Die Schnellfragen und „Mit Claude besprechen“ funktionieren weiter.');
   }
   const create = creator(env);
@@ -139,14 +142,14 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   // Warnhinweise (z. B. Fieber, Essen) zusätzlich zur Antwort
   hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
   out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: finalText || 'Erledigt.' });
-  out.status = await aiStatus(env, uid, ctx.state.settings, isMinor(ctx.profile, ctx.today));
+  out.status = await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today)));
   return out;
 }
 
 /* Routine: Text der Engine natürlicher formulieren (günstiges Modell). Fällt bei Fehlern auf den Engine-Text zurück. */
 export async function aiRephrase(env: Env, uid: number, ctx: EngineCtx, msg: CoachMsg): Promise<CoachMsg> {
   try {
-    const st = await aiStatus(env, uid, ctx.state.settings, isMinor(ctx.profile, ctx.today));
+    const st = await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today)));
     if (!st.active || st.monthUsd > st.budgetUsd * 0.8) return msg;
     // Nachrichten, die auf Oura-Werten beruhen, nie an die KI geben
     const p = (ctx.state.trend || []).find((x: any) => x && x.date === msg.date);
@@ -165,8 +168,9 @@ export async function aiRephrase(env: Env, uid: number, ctx: EngineCtx, msg: Coa
 
 /* Essen per Foto: Schätzung als Bereich. Das Foto wird nicht gespeichert. */
 export interface FoodEstimate { kcal: [number, number]; carbs: [number, number]; protein: [number, number]; fat: [number, number]; items: string[]; note: string }
-export async function aiFoodEstimate(env: Env, uid: number, settings: any, imageB64: string, mediaType: string, question: string, minor: boolean): Promise<{ estimate: FoodEstimate; status: AiStatus }> {
-  const st = await aiStatus(env, uid, settings, minor);
+export async function aiFoodEstimate(env: Env, uid: number, settings: any, imageB64: string, mediaType: string, question: string, minor: boolean, parentNeeded = false): Promise<{ estimate: FoodEstimate; status: AiStatus }> {
+  const st = await aiStatus(env, uid, settings, parentNeeded);
+  if (st.active && !st.food) throw new HttpError(403, 'Essen per Foto ist für dein Konto noch nicht freigeschaltet.');
   if (!st.active) throw new HttpError(403, 'Essen per Foto braucht den KI-Coach. Bis dahin kannst du Foto und Frage an die Claude-App schicken.');
   if (!/^image\/(jpeg|png|webp|gif)$/.test(mediaType)) throw new HttpError(400, 'Nur Fotos (JPEG, PNG, WebP).');
   if (imageB64.length > 5 * 1024 * 1024) throw new HttpError(413, 'Das Foto ist zu groß.');
@@ -181,7 +185,7 @@ export async function aiFoodEstimate(env: Env, uid: number, settings: any, image
   let est: any;
   try { est = JSON.parse(text.slice(a, b + 1)); } catch (e) { throw new HttpError(502, 'Die Schätzung konnte nicht gelesen werden. Versuch es nochmal.'); }
   const rng = (v: any): [number, number] => Array.isArray(v) && v.length === 2 ? [Math.max(0, Math.round(+v[0])), Math.max(0, Math.round(+v[1]))] : [0, 0];
-  return { estimate: { kcal: rng(est.kcal), carbs: rng(est.carbs), protein: rng(est.protein), fat: rng(est.fat), items: Array.isArray(est.items) ? est.items.slice(0, 8).map(String) : [], note: String(est.note || '').slice(0, 200) }, status: await aiStatus(env, uid, settings, minor) };
+  return { estimate: { kcal: rng(est.kcal), carbs: rng(est.carbs), protein: rng(est.protein), fat: rng(est.fat), items: Array.isArray(est.items) ? est.items.slice(0, 8).map(String) : [], note: String(est.note || '').slice(0, 200) }, status: await aiStatus(env, uid, settings, parentNeeded) };
 }
 
 /* Vorschlag übernehmen oder ablehnen */

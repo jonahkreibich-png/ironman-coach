@@ -11,22 +11,24 @@ import { checkForUpdate } from '../pwa';
 import { APP, APP_VERSION } from '../config';
 import { isIOS, isStandalone } from './einstellungen';
 import { invalidate } from '../data';
+import { FEATURE_KEYS } from '../../../shared/features';
 import { nav } from '../nav';
 import { toast } from '../toast';
 
 let PAIR: { code: string; expiresAt: number } | null = null;
 let DEVICES: any[] | null = null, BACKUPS: any[] | null = null, ME: any = null, INVITES: any[] | null = null, NEW_INVITE: string | null = null, SERVER_ERR: any[] | null = null;
+let USERS: any[] | null = null;
 let loading = false;
 async function loadLists() {
   if (!isSyncOn() || loading) return; loading = true;
   try {
     const [d, b, m] = await Promise.all([apiCall('GET', '/api/devices'), apiCall('GET', '/api/backups'), apiCall('GET', '/api/me')]);
     DEVICES = d.devices; BACKUPS = b.backups; ME = m;
-    if (ME && ME.role === 'admin') INVITES = (await apiCall('GET', '/api/invites')).invites;
+    if (ME && ME.role === 'admin') { INVITES = (await apiCall('GET', '/api/invites')).invites; USERS = (await apiCall('GET', '/api/admin/users')).users; }
   } catch (e) { DEVICES = DEVICES || []; BACKUPS = BACKUPS || []; }
   loading = false; nav.rerender();
 }
-export function resetDatenCache() { DEVICES = null; BACKUPS = null; ME = null; INVITES = null; }
+export function resetDatenCache() { DEVICES = null; BACKUPS = null; ME = null; INVITES = null; USERS = null; }
 const time = (ts: number) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
 /* Verbinden: Einrichtungscode, Kopplungscode, Einladung. Auch auf dem Start-Bildschirm. */
@@ -50,7 +52,7 @@ export function renderDaten(): string {
       ${DEVICES == null ? `<div class="hint">${esc(t('common.loading'))}</div>` : `<div class="list">${DEVICES.map(d => `<div class="li" data-dev="${esc(d.id)}"><span class="ic">${ic('phone')}</span><span class="grow"><span class="t">${esc(d.name)}${d.self ? ' ' + pill(t('data.thisDevice')) : ''}</span><br><span class="s">${esc(t('data.lastSeen', { ago: d.lastSeen ? ago(d.lastSeen) : '–' }))}</span></span>${d.self ? '' : `<button class="btn danger sm" data-act="dev-del">${esc(t('common.remove'))}</button>`}</div>`).join('')}</div>`}
       ${PAIR && PAIR.expiresAt > Date.now() ? `<div class="pair-code num">${esc(PAIR.code)}</div><div class="hint">${esc(t('data.pairShow', { time: time(PAIR.expiresAt) }))}</div>` : `<button class="btn ghost" data-act="pair-create">${ic('plus')} ${esc(t('data.addDevice'))}</button>`}
       <button class="link" data-act="sync-off">${esc(t('data.syncOff'))}</button></div>`);
-    if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside'));
+    if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside'));
   }
   h += sec(t('data.backup'), backupCard(), STATE.lastBackupAt ? t('data.lastBackup', { d: fmtDate(STATE.lastBackupAt.slice(0, 10)) }) : '');
   h += sec(t('data.errors'), errorsCard());
@@ -64,6 +66,21 @@ function invitesCard(): string {
     <div class="row">${field('inv-note', t('data.inviteFor'), '', { placeholder: t('data.inviteForPh'), wide: true })}<button class="btn" data-act="invite-create" style="align-self:flex-end">${esc(t('data.inviteCreate'))}</button></div>
     <div class="list">${(INVITES || []).map(i => `<div class="li"><span class="grow"><span class="t">${esc(i.note || t('data.inviteNoNote'))}</span><br><span class="s">${esc(i.used ? t('data.inviteUsed', { d: fmtDate(ymd(new Date(i.usedAt))) }) : i.expiresAt < Date.now() ? t('data.inviteExpired') : t('data.inviteOpen', { d: fmtDate(ymd(new Date(i.expiresAt))) }))}</span></span></div>`).join('') || `<div class="li"><span class="muted">${esc(t('data.noInvites'))}</span></div>`}</div></div>`;
 }
+
+/* Nutzer und Freischaltungen (nur Admin). Der Admin selbst hat immer alles. */
+function usersCard(): string {
+  if (!USERS) return `<div class="card">${empty(t('common.loading'))}</div>`;
+  return `<div class="card stack"><div class="hint">${esc(t('data.usersHint'))}</div><div class="list">${USERS.map(u => `<div class="li" style="display:block">
+    <div class="spread"><span class="t">${esc(u.name || t('data.userN', { n: u.id }))}${u.self ? ' ' + pill(t('data.you')) : ''}</span>${u.role === 'admin' ? pill(t('data.admin'), 'accent') : ''}</div>
+    <div class="chips" style="margin-top:6px">${FEATURE_KEYS.map(k => { const onK = !!u.entitlements[k]; return `<button class="chip ${onK ? 'on' : ''}" aria-pressed="${onK}" data-act="feat-toggle" data-uid="${u.id}" data-k="${k}" ${u.role === 'admin' ? 'disabled' : ''}>${esc(t('feature.' + k))}</button>`; }).join('')}</div></div>`).join('')}</div></div>`;
+}
+on('feat-toggle', el => busy(el, async () => {
+  const u = (USERS || []).find(x => String(x.id) === el.dataset.uid); if (!u || u.role === 'admin') return;
+  const next = { ...(u.features || {}) }; const k = el.dataset.k!;
+  if (next[k]) delete next[k]; else next[k] = true;
+  await apiCall('POST', `/api/admin/users/${u.id}/features`, { features: next });
+  USERS = (await apiCall('GET', '/api/admin/users')).users; nav.rerender(); toast(t('common.saved'));
+}));
 
 function backupCard(): string {
   const srv = isSyncOn() && BACKUPS ? (BACKUPS.length ? `<div class="lbl">${esc(t('data.serverBackups'))}</div><div class="list">${BACKUPS.slice(0, 7).map(b => `<div class="li" data-bk="${esc(b.day)}"><span class="grow"><span class="t">${dowShort(b.day)} ${fmtDate(b.day)}</span></span><button class="btn ghost sm" data-act="bk-restore">${esc(t('data.restore'))}</button></div>`).join('')}</div>` : `<div class="hint">${esc(t('data.firstBackupTonight'))}</div>`) : '';

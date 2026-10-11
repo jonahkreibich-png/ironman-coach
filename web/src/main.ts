@@ -29,7 +29,8 @@ import { initErrorLog } from './errlog';
 import { nav } from './nav';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
-import { isSyncOn, loadAiState } from './sync';
+import { isSyncOn, loadAiState, loadMe, entitled } from './sync';
+export const canGenerate = () => FEATURES.generator || entitled('generator');
 
 initErrorLog();
 
@@ -43,7 +44,7 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
 ];
 const SUBS: Record<string, () => string> = {
   werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
-  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, ...(FEATURES.generator ? { generator: renderGenerator } : {})
+  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, generator: () => canGenerate() ? renderGenerator() : renderMehr()
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
 const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen']);
@@ -166,7 +167,7 @@ try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } 
 render();
 openFromUrl(location.href);
 startPwa();
-if (isSyncOn()) { loadAiState().then(() => { if (UI.tab === 'coach' || UI.sub === 'einstellungen') rerender(); }); loadConnections(); }
+if (isSyncOn()) { loadMe().then(() => { if (UI.tab === 'mehr') rerender(); }); loadAiState().then(() => { if (UI.tab === 'coach' || UI.sub === 'einstellungen') rerender(); }); loadConnections(); }
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); rerender(); } });
 void checkForUpdate;

@@ -14,7 +14,7 @@ Befehle immer im Ordner `ironman-coach` ausführen. Für `wrangler`-Befehle in `
    Liest die echte Datenbank nur (Sicherung landet in `data-export/`, nicht im Repo), spielt sie in die Test-Datenbank und testet dabei die Umstellung auf mehrere Nutzer. Am Ende steht „Fertig“. Steht da „ACHTUNG“: nichts freigeben, Ausgabe an Claude geben.
    *Alternative ohne PC:* alte App → Einstellungen → „Backup kopieren“, dann in der Test-App auf dem Startbildschirm „Backup laden“.
 
-2. **Test-App aufs iPhone (5 min).** Safari → https://stamio-test.pages.dev → drei Punkte → Teilen → „Zum Home-Bildschirm“. Über das neue Icon öffnen → „Schon dabei?“ → „Server zum ersten Mal einrichten“ → Einrichtungscode eingeben. Deine Daten kommen vom Server. Das alte Icon bleibt, beide Apps laufen getrennt.
+2. **Test-App aufs iPhone (5 min).** Safari → https://stamio-test.pages.dev → drei Punkte → Teilen → „Zum Home-Bildschirm“. Über das neue Icon öffnen → „Schon dabei?“ → „Server zum ersten Mal einrichten“ → Einrichtungscode eingeben. Deine Daten kommen vom Server – den Fragebogen brauchst du nicht. Als Betreiber hast du alle Funktionen freigeschaltet. Das alte Icon bleibt, beide Apps laufen getrennt.
 
 3. **Mitteilungen erlauben (2 min).** Test-App → Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“ → „Test senden“.
 

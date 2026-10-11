@@ -27,7 +27,9 @@ Die App nimmt das starke Modell nur für echte Gespräche (Chat, Planänderungen
 
 Grenzen in der App: Monatsbudget (Standard 5 $, höchstens 20 $), höchstens 30 Nachrichten pro Tag. Ist das Budget erreicht, übernimmt automatisch der kostenlose Coach.
 
-**Alter:** Die Nutzungsbedingungen von Anthropic sehen für Endnutzer ein Mindestalter von 18 vor bzw. verlangen bei Minderjährigen besondere Schutzmaßnahmen. Die App verlangt deshalb unter 18 die Einwilligung eines Elternteils, antwortet vorsichtiger (keine Gewichtsziele, keine Medikamente, kein Ersatz für Ärzte) und filtert Oura-Daten immer heraus. Vor dem Einschalten für Minderjährige: aktuelle Bedingungen von Anthropic noch einmal prüfen.
+**Alter:** Der KI-Coach ist ab 16 mit eigener Einwilligung nutzbar, unter 16 nur zusätzlich mit Einwilligung eines Elternteils. Unter 18 antwortet er vorsichtiger (keine Gewichtsziele, keine Medikamente, kein Ersatz für Ärzte). Anthropic erlaubt Apps für Minderjährige nur mit solchen Schutzmaßnahmen – vor dem Einschalten für Nutzer unter 18 die aktuellen Bedingungen noch einmal prüfen.
+
+**Wer zahlt:** Du als Betreiber hast KI-Coach und Essens-Foto immer freigeschaltet. Die API-Kosten deiner eigenen Nutzung zahlst trotzdem du an Anthropic (siehe Tabelle, unter 1 $ im Monat). Für andere Nutzer sind die Funktionen aus, bis du sie freischaltest oder sie später im Store kaufen.
 
 ## Oura-Bedingungen in drei Sätzen
 

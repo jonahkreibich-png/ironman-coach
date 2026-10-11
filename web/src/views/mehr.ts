@@ -3,7 +3,7 @@ import { esc } from '../util';
 import { t } from '../../../shared/i18n';
 import { sec, li, ic, pill } from '../kit';
 import { D } from '../data';
-import { isSyncOn, statusText } from '../sync';
+import { isSyncOn, statusText, entitled } from '../sync';
 import { reauthHints } from './verbindungen';
 import { backupDue } from './daten';
 import { FEATURES } from '../config';
@@ -21,7 +21,7 @@ export function renderMehr(): string {
     ${row('verbindungen', 'link', 'var(--run)', '', reauth ? pill(t('conn.reauth'), 'warn') : '')}
     ${row('einstellungen', 'sliders', 'var(--ink-2)')}
     ${row('daten', 'cloud', 'var(--swim)', isSyncOn() ? statusText() : '', backupDue() ? pill(t('mehr.backupDue'), 'warn') : '')}</div>`);
-  const extra = [FEATURES.generator ? row('generator', 'wand', 'var(--bike)') : '', row('onboarding', 'doc', 'var(--strength)')].join('');
+  const extra = [(FEATURES.generator || entitled('generator')) ? row('generator', 'wand', 'var(--bike)') : '', row('onboarding', 'doc', 'var(--strength)')].join('');
   h += sec(t('mehr.plan'), `<div class="list">${extra}</div>`);
   return h;
 }

@@ -7,7 +7,8 @@ import * as X from './connect';
 import { runEngineFor, loadState, engineCtx } from './coach';
 import { aiChat, aiStatus, aiFoodEstimate, decideProposal, aiRephrase } from './ai';
 import { putRecords } from './store';
-import { isMinor } from '../../shared/profile';
+import { isMinor, ageOf } from '../../shared/profile';
+import { needsParentConsent } from '../../shared/features';
 
 const PROVIDER = /^\/api\/connect\/(dropbox|oura|whoop|polar|withings|fitbit)\/(start|callback|sync|disconnect|folder)$/;
 
@@ -64,7 +65,7 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
   if (p === '/api/coach/ai/status' && M === 'GET') {
     const s = await getRecord(env, a.uid, 'settings', 'main');
     const prof = await getRecord(env, a.uid, 'profile', 'main');
-    return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {}, prof ? isMinor(prof.data, berlinParts().date) : false);
+    return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {}, prof ? needsParentConsent(ageOf(prof.data, berlinParts().date)) : false);
   }
   if (p === '/api/coach/chat' && M === 'POST') {
     const body = await readJson(req);
@@ -82,7 +83,7 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     const body = await readJson(req);
     const s = await getRecord(env, a.uid, 'settings', 'main');
     const prof = await getRecord(env, a.uid, 'profile', 'main');
-    return aiFoodEstimate(env, a.uid, (s && s.data && s.data.settings) || {}, String(body.image || ''), String(body.mediaType || ''), String(body.question || ''), prof ? isMinor(prof.data, berlinParts().date) : false);
+    return aiFoodEstimate(env, a.uid, (s && s.data && s.data.settings) || {}, String(body.image || ''), String(body.mediaType || ''), String(body.question || ''), prof ? isMinor(prof.data, berlinParts().date) : false, prof ? needsParentConsent(ageOf(prof.data, berlinParts().date)) : false);
   }
   if (p === '/api/coach/run' && M === 'POST') {
     const body = await readJson(req);
@@ -112,7 +113,7 @@ export async function onRecordsChanged(env: Env, uid: number, changes: Change[],
   try {
     const L = await loadState(env, uid);
     const ctx0 = engineCtx(L);
-    const st = await aiStatus(env, uid, L.state.settings, isMinor(ctx0.profile, ctx0.today));
+    const st = await aiStatus(env, uid, L.state.settings, needsParentConsent(ageOf(ctx0.profile, ctx0.today)));
     const rephrase = st.active ? (m: any) => aiRephrase(env, uid, engineCtx(L), m) : undefined;
     for (const ev of evs) await runEngineFor(env, uid, ev, { L, rephrase });
   } catch (e) { /* die Engine darf den Sync nie stören */ }

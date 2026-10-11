@@ -1,3 +1,4 @@
+import { entitlements, FEATURE_KEYS } from '../../shared/features';
 /* Server: Geräte-Login, Datensatz-Sync, Backup, Datenabruf, Coach, Mitteilungen.
    Mehrere Nutzer, aber keine offene Registrierung: neue Nutzer nur mit Einladungscode.
    Geheimnisse nur über env (Cloudflare-Secrets). */
@@ -80,7 +81,8 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
 
   if (p === '/api/me' && M === 'GET') {
     const u = await env.DB.prepare('SELECT name, role, features FROM users WHERE id = ?').bind(uid).first();
-    return { deviceId: a.deviceId, name: a.deviceName, userId: uid, role: a.role, features: JSON.parse((u && u.features) || '{}'), time: Date.now() };
+    const features = JSON.parse((u && u.features) || '{}');
+    return { deviceId: a.deviceId, name: a.deviceName, userId: uid, role: a.role, features, entitlements: entitlements(a.role, features), time: Date.now() };
   }
   // Fehlerprotokoll der App (ohne Gesundheitsdaten)
   if (p === '/api/log' && M === 'POST') {
@@ -94,6 +96,21 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   if (p === '/api/pair/create' && M === 'POST') return await createPairCode(env, a);
   if (p === '/api/invites' && M === 'POST') return await createInvite(env, a, (await readJson(req)).note);
   if (p === '/api/invites' && M === 'GET') return await listInvites(env, a);
+  // Admin: Nutzer und ihre Freischaltungen (Tester kostenlos freischalten; später ersetzt ein Kauf das)
+  if (p.startsWith('/api/admin/')) {
+    if (a.role !== 'admin') throw new HttpError(403, 'Nur der Betreiber darf das.');
+    if (p === '/api/admin/users' && M === 'GET') {
+      const rows = await env.DB.prepare('SELECT id, name, role, features, created_at FROM users ORDER BY id').all();
+      return { users: (rows.results || []).map((r: any) => { const f = JSON.parse(r.features || '{}'); return { id: r.id, name: r.name, role: r.role, features: f, entitlements: entitlements(r.role, f), createdAt: r.created_at, self: r.id === uid }; }) };
+    }
+    const fm = /^\/api\/admin\/users\/(\d+)\/features$/.exec(p);
+    if (fm && M === 'POST') {
+      const body = await readJson(req); const next: Record<string, boolean> = {};
+      for (const k of FEATURE_KEYS) if (body.features && body.features[k] === true) next[k] = true;
+      await env.DB.prepare('UPDATE users SET features = ? WHERE id = ?').bind(JSON.stringify(next), +fm[1]).run();
+      return { ok: true, features: next };
+    }
+  }
 
   if (p === '/api/devices' && M === 'GET') {
     const rows = await env.DB.prepare('SELECT id, name, created_at, last_seen FROM devices WHERE user_id = ? ORDER BY created_at').bind(uid).all();

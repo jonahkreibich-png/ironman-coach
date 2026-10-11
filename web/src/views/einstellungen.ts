@@ -7,6 +7,7 @@ import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refres
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
 import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
 import { invalidate, D } from '../data';
+import { needsParentConsent } from '../../../shared/features';
 import { STORAGE, APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -111,9 +112,10 @@ on('push-test', async () => { try { const r = await apiCall('POST', '/api/push/t
 /* ---------- KI-Coach ---------- */
 function aiCard(): string {
   const A = aiState(); const S = STATE.settings.ai || {};
-  const minor = D().minor;
+  const minor = D().minor; const parent = needsParentConsent(D().age);
   let status: string;
   if (!isSyncOn()) status = t('ai.needSync');
+  else if (A.entitled === false) status = t('ai.notEntitled');
   else if (!A.keyPresent) status = t('ai.noKey');
   else if (!S.consentAt) status = t('ai.noConsent');
   else if (!S.enabled) status = t('ai.off');
@@ -123,11 +125,11 @@ function aiCard(): string {
     ${S.consentAt ? toggle('ai-on', t('ai.switch'), !!S.enabled, 'data-ch="ai-on"') : `<button class="btn ghost" data-act="ai-consent">${ic('lock')} ${esc(t('ai.consentOpen'))}</button>`}
     ${A.keyPresent ? `<div class="kv"><span class="muted">${esc(t('ai.costMonth'))}</span><b class="num">${num(A.monthUsd, 2)} $ / ${num(A.budgetUsd, 0)} $</b></div><div class="kv"><span class="muted">${esc(t('ai.today'))}</span><b class="num">${A.todayMessages} / ${A.maxPerDay}</b></div>
       <div class="fgrid">${select('ai-budget', t('ai.budget'), String(S.budgetUsd || A.budgetUsd || 5), [['2', '2 $'], ['5', '5 $'], ['10', '10 $'], ['20', '20 $']], 'data-ch="ai-set" data-k="budgetUsd"')}${select('ai-max', t('ai.maxDay'), String(S.maxPerDay || A.maxPerDay || 30), [['10', '10'], ['30', '30'], ['60', '60']], 'data-ch="ai-set" data-k="maxPerDay"')}</div>` : ''}
-    ${minor ? `<div class="hint">${esc(t('ai.minorHint'))}</div>` : ''}
+    ${parent ? `<div class="hint">${esc(t('ai.parentHint'))}</div>` : minor ? `<div class="hint">${esc(t('ai.minorHint'))}</div>` : ''}
     ${S.consentAt ? `<button class="link" data-act="ai-revoke">${esc(t('ai.revoke'))}</button>` : ''}</div>`;
 }
 function consentSheet(): string {
-  const minor = D().minor;
+  const minor = needsParentConsent(D().age);
   return `<div class="stack"><div class="hint">${esc(t('ai.consentIntro'))}</div>
     <ul class="small" style="padding-left:18px;margin:0">${[1, 2, 3, 4, 5, 6].map(i => `<li>${esc(t('ai.c' + i))}</li>`).join('')}</ul>
     ${toggle('ai-c-read', t('ai.cAgree'), false)}
@@ -137,8 +139,8 @@ function consentSheet(): string {
 on('ai-consent', () => openSheet(t('ai.consentTitle'), consentSheet));
 on('ai-consent-ok', () => {
   const ok = (id: string) => !!(document.getElementById(id) as HTMLInputElement | null)?.checked;
-  if (!ok('ai-c-read') || (D().minor && !ok('ai-c-parent'))) { toast(t('ai.cMissing')); return; }
-  STATE.settings.ai = { ...(STATE.settings.ai || {}), consentAt: new Date().toISOString(), parentConsent: D().minor ? true : undefined, enabled: true };
+  if (!ok('ai-c-read') || (needsParentConsent(D().age) && !ok('ai-c-parent'))) { toast(t('ai.cMissing')); return; }
+  STATE.settings.ai = { ...(STATE.settings.ai || {}), consentAt: new Date().toISOString(), parentConsent: needsParentConsent(D().age) ? true : undefined, enabled: true };
   saveState(); closeSheet(); setTimeout(() => loadAiState().then(() => nav.rerender()), 1800); nav.rerender(); toast(t('ai.consentSaved'));
 });
 on('ai-revoke', el => {

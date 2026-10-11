@@ -234,7 +234,7 @@ async function pairWith(code) {
   if (!planChanged) rebaseline();
 }
 function disconnect(silent?) {
-  AUTH = null; try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
+  AUTH = null; ME = null; try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem('ec_me'); } catch (e) {}
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
   if (!silent) toast(t('sync.stopped'));
 }
@@ -277,9 +277,16 @@ export async function pair(code: string) { await pairWith(code); }
 export function stopSync() { disconnect(false); }
 
 /* KI-Status (der KI-Coach ist im Testbetrieb abgeschaltet, solange kein Schlüssel hinterlegt ist) */
-let AI = { active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30 };
+let AI = { entitled: false, food: false, active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30 };
 export function aiState() { return AI; }
 export async function loadAiState() { if (!AUTH) return AI; try { AI = await api('GET', '/api/coach/ai/status'); } catch (e) {} return AI; }
+
+/* Eigenes Konto: Rolle und Freischaltungen (Admin hat immer alles) */
+let ME = readJson('ec_me', null);
+export function me() { return ME || { role: null, entitlements: {} }; }
+export function isAdmin() { return !!ME && ME.role === 'admin'; }
+export function entitled(k: string) { return !!(ME && ME.entitlements && ME.entitlements[k]); }
+export async function loadMe() { if (!AUTH) return me(); try { ME = await api('GET', '/api/me'); writeJson('ec_me', ME); } catch (e) {} return me(); }
 
 /* Mitteilungen (Web Push) */
 export function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
@@ -353,4 +360,4 @@ export function syncStatusLine() {
 export function syncStatusBadge() { return AUTH ? `<span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>` : ''; }
 
 onSave(() => syncNotify());
-if (AUTH) setTimeout(() => { syncNow(); loadAiState(); }, 300);
+if (AUTH) setTimeout(() => { syncNow(); loadAiState(); loadMe(); }, 300);

@@ -30,9 +30,12 @@ Mit Capacitor bleiben `web/`, `shared/` und der Server unverändert. Neu wären 
 - **Keine Heilversprechen:** kein Medizinprodukt; Texte zu Krankheit und Schmerz verweisen an Ärzte (umgesetzt).
 - **Anmeldung:** Heute nur Codes (Einrichtung, Kopplung, Einladung) – zulässig. Kommen Logins über andere Anbieter dazu, verlangt Apple meist auch „Mit Apple anmelden“.
 
-## 4. Funktionen pro Nutzer schaltbar (vorbereitet)
+## 4. Freischaltungen pro Nutzer (umgesetzt)
 
-Die Tabelle `users` hat ein Feld `features` (JSON), `/api/me` liefert es an die App. Damit lassen sich neue Funktionen erst für einzelne Tester freischalten, z. B. `{"ai": true, "generator": true}`, bevor sie im Store für alle kommen.
+- Der Betreiber (Admin) hat immer alle Funktionen: KI-Coach, Essen per Foto, Plan-Generator.
+- Andere Nutzer bekommen sie einzeln. Heute schaltet der Betreiber sie unter **Mehr → Daten und Geräte → Nutzer und Freischaltungen** frei (z. B. für Tester kostenlos).
+- Später: ein Kauf im Store (Google Play Billing / Apple In-App-Kauf) setzt dieselbe Freischaltung. Dafür braucht es nur einen Server-Endpunkt, der den Kaufbeleg bei Google/Apple prüft und dann `features` setzt. Google und Apple behalten 15 % (kleine Entwickler) des Preises.
+- Preis sollte die KI-Kosten decken (ca. 1 $ pro aktivem Nutzer und Monat, SPAETER.md).
 
 ## 5. Reihenfolge, falls es so weit ist
 

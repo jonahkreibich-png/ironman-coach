@@ -88,11 +88,11 @@ function editSheet(): string {
 let PHOTO: { b64: string; type: string; est: any; question: string } | null = null;
 function photoSheet(): string {
   const ai = aiState();
-  if (!PHOTO) return `<div class="stack"><div class="hint">${esc(ai.active ? t('food.photoHintAi') : t('food.photoHintShare'))}</div>
+  if (!PHOTO) return `<div class="stack"><div class="hint">${esc((ai.active && ai.food !== false) ? t('food.photoHintAi') : t('food.photoHintShare'))}</div>
     <label class="btn block" for="food-file">${ic('camera')} ${esc(t('food.takePhoto'))}</label><input type="file" id="food-file" accept="image/*" capture="environment" hidden data-ch="food-file">
     <div class="fld"><label for="food-q">${esc(t('food.question'))}</label><input class="inp" id="food-q" data-ch="food-q" placeholder="${esc(t('food.questionPh'))}"></div></div>`;
   if (!PHOTO.est) return `<div class="stack"><img src="data:${PHOTO.type};base64,${PHOTO.b64}" alt="" style="width:100%;border-radius:16px">
-    ${ai.active ? `<button class="btn block" data-act="food-estimate">${esc(t('food.estimate'))}</button>` : `<button class="btn block" data-act="food-share">${ic('share')} ${esc(t('food.shareClaude'))}</button>`}
+    ${(ai.active && ai.food !== false) ? `<button class="btn block" data-act="food-estimate">${esc(t('food.estimate'))}</button>` : `<button class="btn block" data-act="food-share">${ic('share')} ${esc(t('food.shareClaude'))}</button>`}
     <button class="btn ghost block" data-act="food-reset">${esc(t('food.otherPhoto'))}</button></div>`;
   const e = PHOTO.est;
   return `<div class="stack"><div class="hint">${esc(e.items.join(', '))}</div><div class="hint">${esc(e.note)}</div>

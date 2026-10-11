@@ -8,6 +8,7 @@ import { t, setLang } from '../../shared/i18n';
 import { GOALS } from '../../shared/goals';
 import { QUICK } from '../../shared/coach/quick';
 import { NUTRI_TYPES } from '../../shared/nutrition';
+import { FEATURE_KEYS } from '../../shared/features';
 
 function sources(): string[] {
   const out: string[] = [];
@@ -51,7 +52,7 @@ describe('Texte (i18n)', () => {
       ...['dropbox', 'oura', 'whoop', 'polar', 'withings', 'fitbit', 'intervals', 'shortcut', 'suunto', 'coros', 'wahoo', 'garmin', 'trainingpeaks'].map(k => 'conn.desc.' + k),
       ...['workouts', 'sleep', 'hrv', 'restingHR', 'temp', 'spo2', 'breath', 'load', 'weight'].map(k => 'group.' + k),
       ...['ready', 'easy', 'rest', 'novalues', 'sick', 'return'].map(k => 'heute.st.' + k), ...[0, 1, 2, 3].map(i => 'return.s' + i),
-      ...['neu', 'ersetzt', 'gleich'].map(k => 'coach.st.' + k)
+      ...['neu', 'ersetzt', 'gleich'].map(k => 'coach.st.' + k), ...FEATURE_KEYS.map(k => 'feature.' + k)
     ];
     expect(need.filter(k => !(k in de))).toEqual([]);
   });

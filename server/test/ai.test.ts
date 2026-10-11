@@ -58,7 +58,35 @@ describe('Zugang', () => {
     const r = await chat(env, T, 'Hallo');
     expect(r.status).toBe(403); expect(r.data.error).toMatch(/Einwilligung/); expect(requests).toHaveLength(0);
   });
-test('Unter 18 ohne Einwilligung der Eltern: kein KI-Aufruf', async () => {    mock([text('Antwort')]);    const { env, T } = await user({ parent: false });    const r = await chat(env, T, 'Hallo');    expect(r.status).toBe(403); expect(r.data.error).toMatch(/Einwilligung/); expect(requests).toHaveLength(0);    expect((await call(env, 'GET', '/api/coach/ai/status', null, T)).data.consent).toBe(false);  });
+  test('Unter 16 ohne Einwilligung der Eltern: kein KI-Aufruf', async () => {
+    mock([text('Antwort')]);
+    const { env, T } = await user({ parent: false, birthYear: 2011 });
+    const r = await chat(env, T, 'Hallo');
+    expect(r.status).toBe(403); expect(r.data.error).toMatch(/Einwilligung/); expect(requests).toHaveLength(0);
+    expect((await call(env, 'GET', '/api/coach/ai/status', null, T)).data.consent).toBe(false);
+  });
+  test('Ab 16 reicht die eigene Einwilligung', async () => {
+    mock([text('Klar, gern.')]);
+    const { env, T } = await user({ parent: false, birthYear: 2010 });
+    const r = await chat(env, T, 'Hallo');
+    expect(r.status).toBe(200); expect(requests).toHaveLength(1);
+  });
+  test('Betreiber hat immer alles, eingeladene Nutzer nur mit Freischaltung', async () => {
+    mock([text('Antwort für B')]);
+    const { env, T } = await user();
+    expect((await call(env, 'GET', '/api/me', null, T)).data.entitlements).toEqual({ ai: true, foodPhoto: true, generator: true });
+    const inv = (await call(env, 'POST', '/api/invites', { note: 'Tester' }, T)).data;
+    const B = (await call(env, 'POST', '/api/setup', { name: 'Pixel', invite: inv.code, userName: 'Bea' })).data;
+    await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'settings', key: 'main', data: { settings: { ai: { enabled: true, consentAt: 1 } } }, updatedAt: 1 }] }, B.token);
+    const r1 = await chat(env, B.token, 'Hallo');
+    expect(r1.status).toBe(403); expect(r1.data.error).toMatch(/freigeschaltet/); expect(requests).toHaveLength(0);
+    expect((await call(env, 'POST', `/api/admin/users/${B.userId}/features`, { features: { ai: true } }, B.token)).status).toBe(403);
+    expect((await call(env, 'POST', `/api/admin/users/${B.userId}/features`, { features: { ai: true, foo: true } }, T)).data.features).toEqual({ ai: true });
+    const users = (await call(env, 'GET', '/api/admin/users', null, T)).data.users;
+    expect(users.find((u: any) => u.id === B.userId).entitlements).toEqual({ ai: true, foodPhoto: false, generator: false });
+    const r2 = await chat(env, B.token, 'Hallo');
+    expect(r2.status).toBe(200); expect(requests).toHaveLength(1);
+  });
   test('Budget aufgebraucht: 403', async () => {
     mock([text('Antwort')]);
     const { env, T } = await user({ budget: 0.001 });

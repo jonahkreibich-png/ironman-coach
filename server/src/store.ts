@@ -1,3 +1,4 @@
+import { entitlements, type Entitlements } from '../../shared/features';
 /* Datenbank-Hilfen (D1). Alles ist pro Nutzer (user_id) getrennt. */
 
 export interface Env {
@@ -85,6 +86,11 @@ export async function activeUsers(env: Env): Promise<number[]> {
   return (rows.results || []).map((r: any) => r.user_id);
 }
 
+export async function userEntitlements(env: Env, uid: number): Promise<Entitlements> {
+  const r = await env.DB.prepare('SELECT role, features FROM users WHERE id = ?').bind(uid).first();
+  let f: any = {}; try { f = r ? JSON.parse(r.features || '{}') : {}; } catch (e) {}
+  return entitlements(r ? r.role : null, f);
+}
 export async function userFeatures(env: Env, uid: number): Promise<Record<string, any>> {
   const r = await env.DB.prepare('SELECT features FROM users WHERE id = ?').bind(uid).first();
   try { return r ? JSON.parse(r.features || '{}') : {}; } catch (e) { return {}; }
