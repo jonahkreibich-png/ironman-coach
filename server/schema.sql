@@ -70,3 +70,13 @@ CREATE TABLE IF NOT EXISTS push_queue (
   payload TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+-- Schlankes Fehlerprotokoll (App und Server). Nur Meldung, Stelle, Version, Ansicht. Keine Gesundheitsdaten.
+CREATE TABLE IF NOT EXISTS error_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  msg TEXT NOT NULL,
+  place TEXT,
+  version TEXT,
+  view TEXT
+);

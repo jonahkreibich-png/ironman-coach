@@ -1,29 +1,8 @@
-/* Offline-Cache für Ironman Coach. Bei jeder neuen Version ändert sich VERSION. */
-const VERSION = '2026-10-10-33280284';
-const CACHE = 'ironman-coach-' + VERSION;
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./pwa.js",
-  "./sync.js",
-  "./core.js",
-  "./manifest.webmanifest",
-  "./icons/apple-touch-icon.png",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/favicon-64.png",
-  "./fonts/barlow-latin-400-normal.woff2",
-  "./fonts/barlow-latin-500-normal.woff2",
-  "./fonts/barlow-latin-600-normal.woff2",
-  "./fonts/barlow-latin-700-normal.woff2",
-  "./fonts/barlow-condensed-latin-500-normal.woff2",
-  "./fonts/barlow-condensed-latin-600-normal.woff2",
-  "./fonts/barlow-condensed-latin-700-normal.woff2"
-];
-
-self.addEventListener('install', event => {
+/* Offline-Cache. Wird beim Build aus web/sw-template.js erzeugt, VERSION ändert sich bei jedem Build. */
+const VERSION = '__VERSION__';
+const PREFIX = '__CACHE_PREFIX__';
+const CACHE = PREFIX + VERSION;
+const ASSETS = __ASSETS__;
   event.waitUntil(
     caches.open(CACHE).then(cache => Promise.all(
       ASSETS.map(url => fetch(new Request(url, { cache: 'reload' })).then(res => {
@@ -37,7 +16,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k.startsWith('ironman-coach-') && k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -50,7 +29,7 @@ self.addEventListener('message', event => {
 self.addEventListener('push', event => {
   let d = {};
   try { d = event.data ? event.data.json() : {}; } catch (e) { d = { body: event.data ? event.data.text() : '' }; }
-  const tasks = [self.registration.showNotification(d.title || 'Ironman Coach', {
+  const tasks = [self.registration.showNotification(d.title || '__APP_NAME__', {
     body: d.body || '', tag: d.tag || undefined, icon: './icons/icon-192.png', badge: './icons/icon-192.png',
     data: { url: d.url || './' }
   })];

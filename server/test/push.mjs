@@ -68,6 +68,7 @@ ok((await msgs()).length === 4, 'Danach ist Schluss für heute');
 await reset();
 const tomorrow = add(today, 1), tdow = (dow + 1) % 7;
 await call('POST', '/api/test/tick', { date: tomorrow, hour: 22, minute: 25, dow: tdow }, T);
+await reset(); // was um 22:25 noch rausging (z. B. eine gestern zurückgehaltene Warnung), zählt hier nicht
 r = await call('POST', '/api/test/tick', { date: tomorrow, hour: 22, minute: 45, dow: tdow }, T);
 ok(r.data.quiet === true && (await msgs()).length === 0, 'Ruhezeit ab 22:30: nichts');
 

@@ -1,8 +1,9 @@
+// @ts-nocheck – aus den alten JS-Testskripten übernommen
+import { test, expect } from 'vitest';
+import * as C from '../../shared/core';
+function ok(cond: any, msg: string) { expect(!!cond, msg).toBe(true); }
+test('Tagesampel (Phase 3)', () => {
 // Tests der gemeinsamen Coach-Logik (core.js) mit erfundenen Werten.
-import '../../core.js';
-const C = globalThis.CoachCore;
-let failed = 0;
-function ok(cond, msg) { if (cond) console.log('  ✓ ' + msg); else { failed++; console.log('  ✗ ' + msg); } }
 const T = '2026-10-10';
 const FB = { rhrMax: 56, hrvMin: 65, tempMax: 0.5 };
 // 28 ruhige Tage: HFV um 70 (leicht schwankend), Ruhepuls 50, 8,5 h Schlaf
@@ -57,5 +58,4 @@ console.log('Verlauf');
 const h = C.readinessHistory(withToday(base(28), { hrv: 70, restingHR: 50 }), [], T, 14, FB);
 ok(h.length === 14 && h[13].date === T && h.every(x => x.level != null), '14 Tage Verlauf');
 
-console.log(failed ? `\n${failed} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
-process.exit(failed ? 1 : 0);
+});

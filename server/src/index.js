@@ -5,6 +5,7 @@ import { runImport } from './intervals.js';
 import { runDaily, runWeekly, loadState } from './coach.js';
 import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliver } from './notify.js';
 import { vapidPublicKey } from './webpush.js';
+import { logError, recentErrors } from './errlog.js';
 
 const KINDS = new Set(['session', 'trend', 'nutrition', 'custom', 'illness', 'milestone', 'weekNote', 'settings', 'plan', 'adjust']);
 const PAIR_TTL_MS = 10 * 60 * 1000;
@@ -149,6 +150,15 @@ async function route(req, env, url) {
   // Ab hier nur mit Geräte-Schlüssel
   const dev = await authDevice(req, env);
 
+  // Fehlerprotokoll der App (ohne Gesundheitsdaten)
+  if (p === '/api/log' && M === 'POST') {
+    const body = await readJson(req);
+    const list = Array.isArray(body.errors) ? body.errors.slice(0, 10) : [];
+    for (const e of list) await logError(env, 'app', e && e.msg, e && e.where, { version: e && e.version, view: e && e.view });
+    return { ok: true, logged: list.length };
+  }
+  if (p === '/api/log' && M === 'GET') return { errors: await recentErrors(env, 50) };
+
   if (p === '/api/me' && M === 'GET') return { deviceId: dev.id, name: dev.name, time: Date.now() };
 
   if (p === '/api/pair/create' && M === 'POST') {
@@ -287,7 +297,7 @@ export default {
     } catch (e) {
       const status = e instanceof HttpError ? e.status : 500;
       // Keine Datensätze oder Schlüssel loggen, nur die Meldung
-      if (status === 500) console.error('Fehler:', e && e.message);
+      if (status === 500) { console.error('Fehler:', e && e.message); await logError(env, 'server', e && e.message, req.method + ' ' + url.pathname); }
       return json({ error: status === 500 ? 'Serverfehler' : e.message }, status, cors);
     }
   },

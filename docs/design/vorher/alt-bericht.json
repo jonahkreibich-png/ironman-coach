@@ -1,0 +1,65 @@
+{
+  "screens": {
+    "heute": {
+      "height": 2062,
+      "panels": 4,
+      "buttons": 19,
+      "inputs": 20,
+      "words": 194
+    },
+    "plan": {
+      "height": 1746,
+      "panels": 1,
+      "buttons": 48,
+      "inputs": 21,
+      "words": 156
+    },
+    "werte": {
+      "height": 3511,
+      "panels": 7,
+      "buttons": 1,
+      "inputs": 17,
+      "words": 468
+    },
+    "fortschritt": {
+      "height": 2616,
+      "panels": 8,
+      "buttons": 23,
+      "inputs": 2,
+      "words": 276
+    },
+    "essen": {
+      "height": 3423,
+      "panels": 6,
+      "buttons": 14,
+      "inputs": 11,
+      "words": 710
+    },
+    "einstellungen": {
+      "height": 3230,
+      "words": 388
+    }
+  },
+  "taps": {
+    "wieGehtEsMir": {
+      "taps": 0,
+      "note": "Ampel oben auf Heute sichtbar"
+    },
+    "morgen": {
+      "taps": 1,
+      "note": "Wochenstreifen → Plan, Tag geöffnet"
+    },
+    "korrigieren": {
+      "taps": 4,
+      "note": "Plan → Tag öffnen → Daten aufklappen → Feld"
+    },
+    "bericht": {
+      "taps": 3,
+      "note": "Export → Wochenbericht → Kopieren, dann in Claude einfügen (+ App-Wechsel)"
+    },
+    "schwimmen": {
+      "taps": 1,
+      "note": "Fortschritt (Schwimmen ist vorausgewählt), dann scrollen"
+    }
+  }
+}

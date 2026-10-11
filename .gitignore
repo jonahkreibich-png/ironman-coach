@@ -5,3 +5,12 @@ node_modules/
 .dev.vars
 *.local.*
 .claude/
+AUFTRAG-2.md
+AUFTRAG-2_1.md
+AUFTRAG-3.md
+# Lokale Kopien der Datenbank und Testergebnisse
+*.sqlite
+data-export/
+test-results/
+playwright-report/
+dist/

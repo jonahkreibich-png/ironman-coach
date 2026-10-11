@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Ironman Coach</title>
-<meta name="description" content="Trainingsplan, Morgenwerte, Fortschritt und Ernährung auf dem Weg zum Ironman.">
+<title>%APP_NAME%</title>
+<meta name="description" content="%APP_DESCRIPTION%">
 <meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Ironman">
+<meta name="apple-mobile-web-app-title" content="%APP_SHORT%">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c1117" media="(prefers-color-scheme: dark)">
@@ -38,9 +38,7 @@
 <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="splash/dark-750x1334.png">
 <link rel="preload" href="fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css">
 <script>
-window.__BUILD = 'pwa'; window.__SYNC_API = 'https://ironman-coach-api.ironman-coach-server.workers.dev'; window.__APP_VERSION = '2026-10-10-33280284';
 try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
 </script>
 </head>
@@ -75,10 +73,7 @@ try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElem
   <div class="sheet" role="dialog" aria-modal="true" id="sheetPanel"></div>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
-<noscript><p style="padding:16px">Ironman Coach braucht JavaScript.</p></noscript>
-<script src="core.js"></script>
-<script src="sync.js"></script>
-<script src="app.js"></script>
-<script src="pwa.js"></script>
+<noscript><p style="padding:16px">%APP_NAME% braucht JavaScript.</p></noscript>
+<script type="module" src="/src/main.ts"></script>
 </body>
 </html>

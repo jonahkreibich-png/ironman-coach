@@ -1,8 +1,9 @@
+// @ts-nocheck – aus den alten JS-Testskripten übernommen
+import { test, expect } from 'vitest';
+import * as C from '../../shared/core';
+function ok(cond: any, msg: string) { expect(!!cond, msg).toBe(true); }
+test('Belastung und Anpassungen (Phase 4)', () => {
 // Tests für Phase 4 (Belastung, tägliche und wöchentliche Anpassungen) mit erfundenen Daten.
-import '../../core.js';
-const C = globalThis.CoachCore;
-let failed = 0;
-function ok(cond, msg) { if (cond) console.log('  ✓ ' + msg); else { failed++; console.log('  ✗ ' + msg); } }
 const A = C.addDays;
 
 // Woche 1: Mo 05.10. – So 11.10., Woche 2: Mo 12.10. – So 18.10. (2026)
@@ -117,5 +118,4 @@ ok(W.adjustments.find(a => a.sessionId === 'w2-so' && a.id.includes('-vol-')).se
 W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note' } } }), plan(), '2026-10-11', { now: 1 });
 ok(W.adjustments.length === 0, 'Nur einmal pro Woche');
 
-console.log(failed ? `\n${failed} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
-process.exit(failed ? 1 : 0);
+});

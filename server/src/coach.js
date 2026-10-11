@@ -1,10 +1,9 @@
 /* Phase 4 auf dem Server: tägliche und wöchentliche Plan-Anpassungen.
    Die Regeln stehen in core.js (gemeinsam mit der App). Der Plan des Coachs bleibt unverändert,
    Anpassungen sind eigene Datensätze (kind "adjust") mit Rückgängig. */
-import '../../core.js';
+import * as C from '../../shared/core';
 import { berlinParts, getRecord, getRecords, putRecords, getMeta, setMeta } from './store.js';
 
-const C = globalThis.CoachCore;
 
 export async function loadState(env) {
   const [planRec, settingsRec, sessions, customs, trend, illness, weekNotes, adjustments, nutrition] = await Promise.all([

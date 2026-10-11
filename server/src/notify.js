@@ -1,11 +1,10 @@
 /* Phase 5: Push-Mitteilungen. Zeiten in Europe/Berlin, Ruhezeit 22:30-6:00, höchstens 4 pro Tag.
    Läuft alle 5 Minuten. Geplante Mitteilungen werden fällig, wenn ihre Uhrzeit seit dem letzten Lauf erreicht wurde. */
-import '../../core.js';
+import * as C from '../../shared/core';
 import { berlinParts, addDaysStr, getMeta, setMeta } from './store.js';
 import { loadState } from './coach.js';
 import { sendPush } from './webpush.js';
 
-const C = globalThis.CoachCore;
 
 export const DEFAULT_PREFS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
