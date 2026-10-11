@@ -287,3 +287,11 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
   Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach((w: any) => { if (!w.activityId) add(w.id, d, w.sport, w.metrics || { min: w.plannedMinutes, km: w.plannedKm }, w.title, w); }));
   return out;
 }
+
+/* Geschätzte Schwellen zu einem Stichtag (für Prognose und Plan) */
+export interface Estimates { runThrSpeed: number | null; runEff: number | null; bikeThrKmh: number | null; ftp: number | null; swimCss: number | null; nRun: number; nBike: number; nSwim: number }
+export function estimatesAt(inp: ScoreInput, end: string): Estimates {
+  const req = requirementFor(inp.goal, inp.profile);
+  const r: any = runParts(inp, req, end), b: any = bikeParts(inp, req, end), s: any = swimParts(inp, req, end);
+  return { runThrSpeed: r.thrSpeed, runEff: r.eff, bikeThrKmh: b.thrKmh, ftp: b.ftp, swimCss: s.css, nRun: r.n, nBike: b.n, nSwim: s.n };
+}
