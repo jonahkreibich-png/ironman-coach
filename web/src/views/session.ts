@@ -5,7 +5,7 @@ import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { duration, dist, num, pace, swimPace, speed, mmss } from '../../../shared/i18n';
-import { on, onChange, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, sportLabel, more, field, ic, pill } from '../kit';
+import { on, onChange, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
 import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
@@ -82,7 +82,9 @@ function sessionSheet(id: string): string {
   if (st.skipped) h += field('f-skipReason', t('sess.skipReason'), st.skipReason || '', { data: `data-sf="skipReason" data-sid="${esc(id)}"`, wide: true });
   if (st.completed || status === 'missed' || status === 'open') {
     h += `<div class="card flat tight"><div class="spread"><div class="lbl">${esc(t('sess.data'))} ${st.source ? srcBadge(st.source) : ''}</div>${Object.keys(man).length && Object.keys(auto).length ? `<button class="link" data-act="sess-reset" data-sid="${esc(id)}">${esc(t('common.resetOriginal'))}</button>` : ''}</div>
-      <div class="fgrid">${fields.map(([k, lk, ph]) => `<div class="fld"><label for="sm-${k}">${esc(t(lk))} ${man[k] ? srcBadge('manual') : ''}</label><input class="inp" id="sm-${k}" ${ph ? 'type="text"' : 'type="text" inputmode="decimal"'} data-sm="${k}" data-sid="${esc(id)}" value="${esc((st.metrics || {})[k] ?? '')}" placeholder="${esc(ph || (auto[k] ?? ''))}"></div>`).join('')}</div>
+      <div class="fgrid">${fields.map(([k, lk, ph]) => ph
+        ? timeField('sm-' + k, t(lk) + (man[k] ? ' ✎' : ''), paceSecOf((st.metrics || {})[k]), 'ms', `data-sm="${k}" data-sid="${esc(id)}"`)
+        : `<div class="fld"><label for="sm-${k}">${esc(t(lk))} ${man[k] ? srcBadge('manual') : ''}</label><input class="inp" id="sm-${k}" type="text" inputmode="decimal" data-sm="${k}" data-sid="${esc(id)}" value="${esc((st.metrics || {})[k] ?? '')}" placeholder="${esc(auto[k] ?? '')}"></div>`).join('')}</div>
       ${!st.source ? `<div class="hint">${esc(t('sess.dataHint'))}</div>` : ''}</div>`;
   }
   if (act) h += activityDetails(act);
@@ -142,9 +144,13 @@ on('sess-reset', el => {
   STATE.sessions[id] = resetSessionMetrics(sessState(id));
   saveState(); refreshSheet(); nav.rerender(); toast(t('common.resetDone'));
 });
+/* "5:30" oder Zahl → Sekunden (für die Min/Sek-Felder) */
+function paceSecOf(v: any): number | null { if (v == null || v === '') return null; const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v).trim()); return m ? +m[1] * 60 + +m[2] : null; }
 onChange('sess-metric', el => {
   const id = el.dataset.sid!; const k = el.dataset.sm!;
-  STATE.sessions[id] = setSessionMetricManual(ensureSess(id), k, (el as HTMLInputElement).value.trim());
+  let val = (el as HTMLInputElement).value.trim();
+  if (el.dataset.tf) { const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } val = sec ? secToMmss(sec) : ''; }
+  STATE.sessions[id] = setSessionMetricManual(ensureSess(id), k, val);
   saveSoon(); nav.rerender();
 });
 onChange('sess-field', el => {

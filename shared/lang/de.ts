@@ -178,7 +178,7 @@ export const de: Record<string, string> = {
   'prof.redoOnboarding': 'Fragebogen erneut ausfüllen', 'prof.oneSport': 'Mindestens eine Sportart bleibt ausgewählt.',
   'goal.type': 'Art', 'goal.name': 'Name', 'goal.namePh': 'z. B. Stadtlauf', 'goal.date': 'Datum', 'goal.priority': 'Priorität',
   'goal.prioA': 'A – Hauptziel', 'goal.prioB': 'B – wichtig', 'goal.prioC': 'C – Trainingsrennen', 'goal.outcome': 'Ziel', 'goal.finish': 'Gesund ankommen',
-  'goal.time': 'Zielzeit', 'goal.place': 'Platzierung', 'goal.target': 'Wunschzeit (h:mm)', 'goal.why': 'Warum dieses Ziel?', 'goal.result': 'Ergebnis',
+  'goal.time': 'Zielzeit', 'goal.place': 'Platzierung', 'goal.target': 'Wunschzeit', 'goal.why': 'Warum dieses Ziel?', 'goal.result': 'Ergebnis',
   'goal.resultTime': 'Zeit (h:mm:ss)', 'goal.resultPlace': 'Platz', 'goal.delete': 'Ziel löschen', 'goal.nameMissing': 'Bitte gib dem Ziel einen Namen.',
   'goal.timeFormat': 'Bitte als h:mm oder h:mm:ss eintragen, z. B. 1:45 oder 0:52:30.',
   'goal.planHint': 'Ein neues Hauptziel ändert den Plan nicht automatisch. Den Plan dazu erstellst du über den Fragebogen.',

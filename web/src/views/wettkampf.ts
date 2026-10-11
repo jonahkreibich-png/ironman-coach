@@ -3,7 +3,7 @@
 import { STATE, saveState, saveSoon } from '../store';
 import { esc, fmtDate, dowShort, addDays } from '../util';
 import { t, hhmm, num } from '../../../shared/i18n';
-import { on, onChange, sec, ic, pill, field, more, empty } from '../kit';
+import { on, onChange, sec, ic, pill, field, more, empty, timeField, readTime } from '../kit';
 import { D, invalidate } from '../data';
 import { briefing, taperPlan, pacingPlan, packingList, recoveryPlan, raceReview, raceFuel, daysUntil } from '../../../shared/race';
 import { fmtDuration } from '../../../shared/prognosis';
@@ -53,7 +53,7 @@ function after(g: Goal): string {
   const raceSec = res.timeSec || null;
   const day = daysUntil(g.date!, d.today);
   let h = `<div class="card stack"><div class="lbl">${esc(g.name)} · ${fmtDate(g.date!)}</div>
-    <div class="fgrid">${field('rr-time', t('race.yourTime'), res.timeSec ? hhmm(res.timeSec) : '', { placeholder: '1:23:45', data: 'data-ch="rr" data-k="time"' })}${field('rr-place', t('race.place'), res.place || '', { data: 'data-ch="rr" data-k="place"' })}</div>
+    <div class="fgrid">${timeField('rr-time', t('race.yourTime'), res.timeSec, 'hms', 'data-ch="rr" data-k="time"')}${field('rr-place', t('race.place'), res.place || '', { data: 'data-ch="rr" data-k="place"' })}</div>
     <div class="fld"><label for="rr-note">${esc(t('race.howWasIt'))}</label><textarea class="inp" id="rr-note" rows="2" data-ch="rr" data-k="note">${esc(res.note || '')}</textarea></div>
     <div class="banner info">${esc(raceReview(g, { timeSec: raceSec, note: res.note }, prog))}</div></div>`;
   h += sec(t('race.recovery'), `<div class="list">${recoveryPlan(g, raceSec).map(r => `<div class="li ${r.day === day ? 'on' : ''}"><span class="v num" style="min-width:64px">${esc(t('race.dayN', { n: r.day }))}</span><span class="grow small">${esc(r.text)}</span>${r.day === day ? pill(t('race.now'), 'accent') : ''}</div>`).join('')}</div>`, `${fmtDate(addDays(g.date!, 1))} …`);
@@ -72,7 +72,7 @@ onChange('rr', el => {
   const k = el.dataset.k!; const v = (el as HTMLInputElement).value.trim();
   const goal = { ...(STATE.goals[g.id] || g) };
   const r = { ...(goal.result || {}) };
-  if (k === 'time') { const s = parseHm(v); if (v && s == null) { toast(t('goal.timeFormat')); return; } r.timeSec = s; }
+  if (k === 'time') { const s = el.dataset.tf ? readTime(el) : parseHm(v); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } r.timeSec = s; }
   else r[k] = v;
   goal.result = r;
   STATE.goals = { ...STATE.goals, [g.id]: goal };

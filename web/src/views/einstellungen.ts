@@ -3,7 +3,7 @@
 import { STATE, UI, saveState, saveUi, profile, saveProfile } from '../store';
 import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr, addDays } from '../util';
 import { t, num } from '../../../shared/i18n';
-import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel } from '../kit';
+import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel, timeField, readTime } from '../kit';
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
 import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
 import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
@@ -61,9 +61,9 @@ function zonesCard(): string {
   const hasRun = p.sports.includes('run'), hasBike = p.sports.includes('bike'), hasSwim = p.sports.includes('swim');
   const est = (k: ThresholdKey) => isEstimated(p, k) ? ' ' + t('set.estShort') : '';
   return `<div class="card stack">${estimatedNote(p)}<div class="fgrid">
-    ${hasRun ? field('z-lr', t('set.lthrRun') + est('lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + field('z-tp', t('set.paceRun') + est('thresholdPaceRunSec'), secToPace(th.thresholdPaceRunSec), { inputmode: 'decimal', placeholder: '5:00', data: 'data-ch="thr" data-k="thresholdPaceRunSec"' }) : ''}
+    ${hasRun ? field('z-lr', t('set.lthrRun') + est('lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + timeField('z-tp', t('set.paceRun') + est('thresholdPaceRunSec'), th.thresholdPaceRunSec, 'ms', 'data-ch="thr" data-k="thresholdPaceRunSec"') : ''}
     ${hasBike ? field('z-lb', t('set.lthrBike') + est('lthrBike'), th.lthrBike, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrBike"' }) + field('z-ftp', t('set.ftp'), th.ftp ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="ftp"' }) + field('z-ts', t('set.speedBike') + est('thresholdSpeedBikeKmh'), th.thresholdSpeedBikeKmh, { inputmode: 'decimal', data: 'data-ch="thr" data-k="thresholdSpeedBikeKmh"' }) : ''}
-    ${hasSwim ? field('z-css', t('set.css') + est('cssSec'), th.cssSec ? secToPace(th.cssSec) : '', { inputmode: 'decimal', placeholder: '1:55', data: 'data-ch="thr" data-k="cssSec"' }) : ''}
+    ${hasSwim ? timeField('z-css', t('set.css') + est('cssSec'), th.cssSec, 'ms', 'data-ch="thr" data-k="cssSec"') : ''}
     ${field('z-max', t('set.maxHr') + est('maxHr'), th.maxHr ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="maxHr"' })}</div>
     ${hasRun ? `<div class="lbl">${esc(sportLabel('run'))}</div>` + tbl(run.map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${paceRange(i)}/km</td></tr>`)) : ''}
     ${hasBike ? `<div class="lbl">${esc(sportLabel('bike'))}</div>` + tbl(bike.map((z, i) => { const pw = th.ftp ? powerZonesFor(th.ftp)[i] : null; return `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${pw ? `${pw.lo}${pw.hi ? '–' + pw.hi : '+'} W` : ''}</td></tr>`; })) : ''}
@@ -80,12 +80,14 @@ function estimatedNote(p: any): string {
 }
 onChange('thr', el => {
   const p = profile(); const k = el.dataset.k!; const raw = (el as HTMLInputElement).value.trim();
-  let v: number | null = (k === 'thresholdPaceRunSec' || k === 'cssSec') ? paceToSec(raw) : parseNum(raw);
-  if (raw === '' && (k === 'ftp' || k === 'cssSec' || k === 'maxHr')) v = null;
+  let v: number | null = el.dataset.tf ? readTime(el) : (k === 'thresholdPaceRunSec' || k === 'cssSec') ? paceToSec(raw) : parseNum(raw);
+  if (el.dataset.tf && v == null && k !== 'cssSec') return; // Feld wird gerade geleert
+  if (v != null && isNaN(v)) { toast(t('time.invalid')); return; }
+  if ((raw === '' || v == null) && (k === 'ftp' || k === 'cssSec' || k === 'maxHr')) v = null;
   else if (v == null || v <= 0) { toast(t('common.invalidNumber')); return; }
   const lim: Record<string, [number, number]> = { lthrRun: [100, 215], lthrBike: [100, 215], maxHr: [120, 230], ftp: [50, 600], thresholdSpeedBikeKmh: [10, 60], thresholdPaceRunSec: [150, 600], cssSec: [50, 240] };
   if (v != null && lim[k] && (v < lim[k][0] || v > lim[k][1])) { toast(t('set.outOfRange')); return; }
-  saveProfile(setThreshold(p, k as ThresholdKey, v)); invalidate(); nav.rerender(); toast(t('common.saved'));
+  saveProfile(setThreshold(p, k as ThresholdKey, v)); invalidate(); if (!el.dataset.tf) nav.rerender(); toast(t('common.saved'));
 });
 
 /* ---------- Mitteilungen ---------- */

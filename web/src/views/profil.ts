@@ -2,7 +2,8 @@
 import { STATE, saveState, profile, goals, saveProfile } from '../store';
 import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr } from '../util';
 import { t, hhmm } from '../../../shared/i18n';
-import { on, onChange, sec, ic, pill, openSheet, closeSheet, refreshSheet, field, select, toggle, armed, more, sportLabel } from '../kit';
+import { on, onChange, sec, ic, pill, openSheet, closeSheet, refreshSheet, field, select, toggle, armed, more, sportLabel, timeField, readTime } from '../kit';
+import { realism } from '../../../shared/goalcheck';
 import { GOALS, mainGoal, type Goal, type GoalType } from '../../../shared/goals';
 import { ageOf, isMinor, type Profile, type SportKey } from '../../../shared/profile';
 import { goalAllowed } from '../../../shared/rules';
@@ -77,10 +78,11 @@ function goalSheet(): string {
     ${field('g-date', t('goal.date'), G.date || '', { type: 'date', data: 'data-ch="g" data-k="date"' })}
     ${select('g-prio', t('goal.priority'), G.priority, [['A', t('goal.prioA')], ['B', t('goal.prioB')], ['C', t('goal.prioC')]], 'data-ch="g" data-k="priority"')}
     ${select('g-out', t('goal.outcome'), G.outcome || 'finish', [['finish', t('goal.finish')], ['time', t('goal.time')], ['place', t('goal.place')]], 'data-ch="g" data-k="outcome"')}
-    ${G.outcome === 'time' ? field('g-target', t('goal.target'), G.targetTimeSec ? hhmm(G.targetTimeSec) : '', { placeholder: '5:30', data: 'data-ch="g" data-k="targetTimeSec"' }) : ''}</div>
+    ${G.outcome === 'time' ? timeField('g-target', t('goal.target'), G.targetTimeSec, 'hms', 'data-ch="g" data-k="targetTimeSec"', { wide: true }) : ''}</div>
+    ${G.date && G.type !== 'fitness' ? (() => { const r = realism(G!, profile(), todayStr()); return r ? `<div class="banner ${r.ok === false ? 'warn' : 'info'}" data-goal-realism>${esc(r.text)}</div>` : ''; })() : ''}
     ${!allowed.ok ? `<div class="banner warn">${esc(allowed.msg || '')}</div>` : ''}
     <div class="fld wide"><label for="g-why">${esc(t('goal.why'))}</label><input class="inp" id="g-why" data-ch="g" data-k="why" value="${esc(G.why || '')}"></div>
-    ${past || G.result ? `<div class="card flat tight"><div class="lbl">${esc(t('goal.result'))}</div><div class="fgrid">${field('g-res', t('goal.resultTime'), G.result && G.result.timeSec ? hhmm(G.result.timeSec) : '', { placeholder: '5:12', data: 'data-ch="g" data-k="resultTime"' })}${field('g-place', t('goal.resultPlace'), (G.result && G.result.place) || '', { data: 'data-ch="g" data-k="resultPlace"' })}</div></div>` : ''}
+    ${past || G.result ? `<div class="card flat tight"><div class="lbl">${esc(t('goal.result'))}</div><div class="fgrid">${timeField('g-res', t('goal.resultTime'), G.result && G.result.timeSec, 'hms', 'data-ch="g" data-k="resultTime"')}${field('g-place', t('goal.resultPlace'), (G.result && G.result.place) || '', { data: 'data-ch="g" data-k="resultPlace"' })}</div></div>` : ''}
     <button class="btn block" data-act="goal-save">${esc(t('common.save'))}</button>
     ${G_NEW ? '' : `<button class="btn danger" data-act="goal-del">${esc(t('goal.delete'))}</button>`}
     <div class="hint">${esc(t('goal.planHint'))}</div></div>`;
@@ -91,8 +93,8 @@ on('goal-open', el => { const g = (STATE.goals || {})[el.dataset.id!]; if (!g) r
 onChange('g', el => {
   if (!G) return; const k = el.dataset.k!; const v = (el as HTMLInputElement).value;
   if (k === 'type') { const wasDefault = !G.name || TYPES.some(x => goalLabel(x) === G!.name); G.type = v as GoalType; if (wasDefault) G.name = goalLabel(v); refreshSheet(); return; }
-  if (k === 'targetTimeSec') { G.targetTimeSec = parseHm(v); if (v && G.targetTimeSec == null) toast(t('goal.timeFormat')); return; }
-  if (k === 'resultTime') { const s = parseHm(v); if (v && s == null) { toast(t('goal.timeFormat')); return; } G.result = { ...(G.result || {}), timeSec: s }; return; }
+  if (k === 'targetTimeSec') { const s = el.dataset.tf ? readTime(el) : parseHm(v); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } G.targetTimeSec = s; const box = document.querySelector('[data-goal-realism]'); const r = G.date ? realism(G, profile(), todayStr()) : null; if (box && r) { box.textContent = r.text; box.className = `banner ${r.ok === false ? 'warn' : 'info'}`; } return; }
+  if (k === 'resultTime') { const s = el.dataset.tf ? readTime(el) : parseHm(v); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } G.result = { ...(G.result || {}), timeSec: s }; return; }
   if (k === 'resultPlace') { G.result = { ...(G.result || {}), place: v }; return; }
   (G as any)[k] = v || (k === 'date' ? null : v);
   if (k === 'outcome' || k === 'date') refreshSheet();
