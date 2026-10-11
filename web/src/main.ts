@@ -21,9 +21,11 @@ import { renderEinstellungen, applyTheme } from './views/einstellungen';
 import { renderDaten, resetDatenCache } from './views/daten';
 import { renderGenerator } from './views/generator';
 import { renderWettkampf } from './views/wettkampf';
+import { renderBeruecksichtigungen } from './views/beruecksichtigungen';
 import { renderOnboarding, renderWelcome } from './views/onboarding';
 import './views/session';
 import './views/custom';
+import './views/planedit';
 import { checkForUpdate, startPwa } from './pwa';
 import { initErrorLog } from './errlog';
 import { nav } from './nav';
@@ -44,7 +46,7 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
 ];
 const SUBS: Record<string, () => string> = {
   werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
-  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, generator: () => canGenerate() ? renderGenerator() : renderMehr()
+  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, generator: () => canGenerate() ? renderGenerator() : renderMehr()
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
 const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen']);

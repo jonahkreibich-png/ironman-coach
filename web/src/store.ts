@@ -135,6 +135,16 @@ export function rebuildPlanIndex(): void {
   DAYS.forEach(d => d.sessions.forEach(s => { const x = { ...s, date: d.date }; SESS.push(x); SESS_BY_ID[s.id] = x; }));
 }
 rebuildPlanIndex();
+/* Neuen Plan übernehmen, ohne die Seite neu zu laden (alle Module behalten ihre Referenzen) */
+export function replacePlanInPlace(next: any): void {
+  try { localStorage.setItem(PLAN_KEY, JSON.stringify(next)); } catch (e) {}
+  Object.keys(PLAN).forEach(k => { delete PLAN[k]; });
+  Object.assign(PLAN, clone(next));
+  if (!Array.isArray(PLAN.zonePercents) || !PLAN.zonePercents.length) PLAN.zonePercents = DEFAULT_ZONES;
+  if (!Array.isArray(PLAN.keyDates)) PLAN.keyDates = [];
+  BASE_WEEKS.length = 0; clone(next.weeks || []).forEach((w: any) => BASE_WEEKS.push(w));
+  rebuildPlanIndex();
+}
 export function findDay(date: string): any { return DAY_BY_DATE[date] || null; }
 export function currentWeekIdx(): number {
   if (!PLAN.weeks.length) return 0;

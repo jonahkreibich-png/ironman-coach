@@ -139,7 +139,7 @@ export function freqOf(p: Profile, sport: SportKey): [number, number] {
   return [0, 0];
 }
 
-function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, today: string): W.PaceCtx {
+export function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, today: string): W.PaceCtx {
   const th = p.thresholds; const age = ageOf(p, today) ?? 35;
   return { runThrSec: th.thresholdPaceRunSec || null, lthrRun: th.lthrRun || null, lthrBike: th.lthrBike || null, bikeKmh: th.thresholdSpeedBikeKmh || null, ftp: p.powerMeter ? th.ftp || null : null, css: th.cssSec || null, breast100: 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0), indoor, bikeName };
 }
@@ -224,6 +224,7 @@ export function generatePlan(inp: GenInput): GenResult {
 
   const weeks: any[] = [];
   const dropped: string[] = [];
+  const idp = 'g' + today.replace(/-/g, '').slice(2) + 'w';
   let prevSundayHard = false;
   phases.forEach((ph, wi) => {
     const mon = addDays(start, wi * 7);
@@ -411,8 +412,9 @@ export function generatePlan(inp: GenInput): GenResult {
     // 4) Tage zusammenbauen
     let id = 0;
     const days = slots.map(sl => {
-      const list = sl.items.map(x => ({ id: `g${wi + 1}-${DOW[sl.dow].toLowerCase()}-${++id}`, ...x.s, ...(x.fixed && x.s.sport === 'football' ? { fixed: true } : {}) }));
-      return { date: sl.date, dow: DOW[sl.dow], sessions: list.length ? list : [{ id: `g${wi + 1}-${DOW[sl.dow].toLowerCase()}-rest`, sport: 'rest', title: 'Ruhetag' }] };
+      // IDs eindeutig je Erstellung (Datum), damit ein neuer Plan nie Zustände alter Einheiten erbt
+      const list = sl.items.map(x => ({ id: `${idp}${wi + 1}-${DOW[sl.dow].toLowerCase()}-${++id}`, ...x.s, ...(x.fixed && x.s.sport === 'football' ? { fixed: true } : {}) }));
+      return { date: sl.date, dow: DOW[sl.dow], sessions: list.length ? list : [{ id: `${idp}${wi + 1}-${DOW[sl.dow].toLowerCase()}-rest`, sport: 'rest', title: 'Ruhetag' }] };
     });
     prevSundayHard = isHardDay(6);
     const races = slots.filter(sl => sl.race).map(sl => ({ goalId: sl.race!.id, name: sl.race!.name, date: sl.date, priority: sl.race!.priority }));

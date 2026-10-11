@@ -3,7 +3,9 @@ import { STATE, PLAN, UI, saveState, rebuildPlanIndex, currentWeekIdx, findDay, 
 import { esc, fmtDate, dowShort, dowLong, addDays, todayStr } from '../util';
 import { t, num, hours } from '../../../shared/i18n';
 import { on, sec, ic, pill, empty, more } from '../kit';
-import { sessionRow } from './session';
+import { sessionRow, metaLine } from './session';
+import { editBar, editing } from './planedit';
+import { sportIc } from '../kit';
 import { dayStats, sessState } from '../domain';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -29,15 +31,18 @@ export function renderPlan(): string {
   const w = PLAN.weeks[UI.planWeek];
   let done = 0, total = 0;
   w.days.forEach((d: any) => { const s = dayStats(d); done += s.done; total += s.total; });
-  let h = `<div class="chips" role="tablist">${PLAN.weeks.map((x: any, i: number) => `<button class="chip ${i === UI.planWeek ? 'on' : ''}" data-act="plan-week" data-i="${i}" role="tab" aria-selected="${i === UI.planWeek}">${esc(t('plan.weekShort', { n: x.weekNumber }))}${i === cw ? ' ●' : ''}</button>`).join('')}</div>
-    <div class="card" style="margin-top:var(--s3)"><div class="spread"><div><div class="lbl">${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div><div class="t" style="font-weight:600">${esc(w.focus || '')}</div></div>
+  const explain: string[] = (PLAN.meta && PLAN.meta.explain) || [];
+  let h = explain.length ? `<div class="card plan-explain" style="margin-bottom:var(--s3)">${more(t('plan.explain'), explain.map(s => `<p class="small">${esc(s)}</p>`).join(''), false)}</div>` : '';
+  h += `<div class="chips" role="tablist">${PLAN.weeks.map((x: any, i: number) => `<button class="chip ${i === UI.planWeek ? 'on' : ''}" data-act="plan-week" data-i="${i}" role="tab" aria-selected="${i === UI.planWeek}">${esc(t('plan.weekShort', { n: x.weekNumber }))}${i === cw ? ' ●' : ''}</button>`).join('')}</div>
+    <div class="card" style="margin-top:var(--s3)"><div class="spread"><div><div class="lbl">${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div>${w.headline ? `<div class="week-head" data-week-head>${esc(w.headline)}</div>` : ''}<div class="t" style="font-weight:${w.headline ? 400 : 600}">${esc(w.focus || '')}</div>${w.important ? `<div class="hint" style="margin-top:4px"><b>${esc(t('plan.thisWeek'))}:</b> ${esc(w.important)}</div>` : ''}</div>
       <div style="text-align:right"><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(weekMinutes(w) / 60))}</div></div></div></div>`;
+  h += editBar(w);
   for (const d of w.days) {
     const isToday = d.date === today;
     const list = d.sessions.map((s: any) => ({ ...s, date: d.date }));
     const customs = (STATE.customWorkouts || {})[d.date] || [];
     h += `<div class="day-h ${isToday ? 'today' : ''}" id="day-${d.date}"><b>${esc(dowLong(d.date))}</b><span>${fmtDate(d.date)}${isToday ? ' · ' + esc(t('common.today')) : ''}</span></div>
-      <div class="list">${list.filter((s: any) => s.sport !== 'rest').map((s: any) => sessionRow(s)).join('') || `<div class="li"><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="t muted">${esc(t('heute.restDay'))}</span></div>`}
+      <div class="list">${list.filter((s: any) => s.sport !== 'rest' && !s.removed).map((s: any) => editing() && d.date >= today && !s.race ? editRow(s) : sessionRow(s)).join('') || `<div class="li"><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="t muted">${esc(t('heute.restDay'))}</span></div>`}
       ${(d.moved || []).map((m: any) => `<div class="li"><span class="s">${esc(t('plan.movedTo', { t: m.title, d: `${dowShort(m.to)} ${fmtDate(m.to)}` }))}</span></div>`).join('')}
       ${customs.map((c: any) => `<button class="li" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}"><span class="grow"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')}<br><span class="s">${esc([c.metrics && c.metrics.min ? c.metrics.min + ' min' : c.plannedMinutes ? c.plannedMinutes + ' min' : '', c.metrics && c.metrics.km ? c.metrics.km + ' km' : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`;
   }
@@ -46,6 +51,9 @@ export function renderPlan(): string {
   return h;
 }
 
+function editRow(s: any): string {
+  return `<button class="li ${s.locked ? 'locked' : ''}" data-act="sess-edit" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="grow"><span class="t">${esc(s.title)}</span><br><span class="s">${esc(metaLine(s))}</span></span><span class="pill">${esc(t('edit.short'))}</span></button>`;
+}
 function adjustmentsList(): string {
   const from = addDays(todayStr(), -30);
   const groups = adjustmentGroups().filter((g: any) => !g.date || g.date >= from);

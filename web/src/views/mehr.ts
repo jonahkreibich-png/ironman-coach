@@ -18,6 +18,7 @@ export function renderMehr(): string {
   h += sec(t('mehr.daily'), `<div class="list">${row('werte', 'pulse', 'var(--info)')}${row('essen', 'food', 'var(--good)')}</div>`);
   const reauth = reauthHints().length;
   h += sec(t('mehr.setup'), `<div class="list">${row('profil', 'user', 'var(--accent)', d.goal ? t('mehr.profilGoal', { name: d.goal.name }) : '')}
+    ${row('beruecksichtigungen', 'info', 'var(--warn)')}
     ${row('verbindungen', 'link', 'var(--run)', '', reauth ? pill(t('conn.reauth'), 'warn') : '')}
     ${row('einstellungen', 'sliders', 'var(--ink-2)')}
     ${row('daten', 'cloud', 'var(--swim)', isSyncOn() ? statusText() : '', backupDue() ? pill(t('mehr.backupDue'), 'warn') : '')}</div>`);
