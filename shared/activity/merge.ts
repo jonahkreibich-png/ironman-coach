@@ -240,3 +240,19 @@ export function resetSessionMetrics(st: any): any {
   const out = { ...st, metrics: { ...(st.metrics || {}), ...(st.metricsAuto || {}) }, metricsManual: {} };
   return out;
 }
+
+/* Werte einer Quelle aus Tageswerten entfernen (z. B. Oura-Daten dürfen nicht an eine KI, siehe SPAETER.md) */
+export function withoutSource(trend: any[], source: string): any[] {
+  return (trend || []).map(p0 => {
+    if (!p0) return p0;
+    const p = upgradeLegacyPoint({ ...p0 });
+    const out: any = { ...p, _auto: {}, _src: { ...(p._src || {}) } };
+    for (const [f, by] of Object.entries(p._auto || {}) as [string, any][]) {
+      const rest = { ...by }; delete rest[source];
+      out._auto[f] = rest;
+      if ((p._src || {})[f] === source) { const keys = Object.keys(rest); out[f] = keys.length ? rest[keys[0]] : null; if (keys.length) out._src[f] = keys[0]; else delete out._src[f]; }
+    }
+    return out;
+  });
+}
+export function hasSource(p: any, source: string): boolean { return !!p && !!p._src && Object.values(p._src).includes(source); }

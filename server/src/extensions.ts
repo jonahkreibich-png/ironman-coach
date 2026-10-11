@@ -1,13 +1,117 @@
 /* Erweiterungen: Verbindungen (OAuth, Webhooks, Kurzbefehl), Datei-Import, Coach-Engine und KI-Coach.
    index.ts ruft diese Haken auf, damit der Kern übersichtlich bleibt. */
-import type { Env, Change } from './store';
+import { type Env, type Change, berlinParts, getRecord } from './store';
 import type { Auth } from './auth';
+import { HttpError, readJson } from './http';
+import * as X from './connect';
+import { runEngineFor, loadState, engineCtx } from './coach';
+import { aiChat, aiStatus, aiFoodEstimate, decideProposal, aiRephrase } from './ai';
+import { putRecords } from './store';
+import { isMinor } from '../../shared/profile';
+
+const PROVIDER = /^\/api\/connect\/(dropbox|oura|whoop|polar|withings|fitbit)\/(start|callback|sync|disconnect|folder)$/;
 
 /* Routen ohne Geräte-Login (eigene Prüfung je Route). undefined = nicht zuständig. */
-export async function publicRoutes(_req: Request, _env: Env, _url: URL, _p: string, _ctx: any): Promise<any> { return undefined; }
+export async function publicRoutes(req: Request, env: Env, url: URL, p: string, ctx: any): Promise<any> {
+  const m = PROVIDER.exec(p);
+  if (m && m[2] === 'callback' && req.method === 'GET') return X.oauthCallback(env, m[1] as X.ProviderId, url);
+  if (p === '/api/hooks/dropbox') return X.dropboxWebhook(env, req, url, ctx);
+  if (p === '/api/hooks/whoop' && req.method === 'POST') return X.whoopWebhook(env, req, ctx);
+  // Kurzbefehl: eigener, widerrufbarer Schlüssel statt Geräte-Login
+  if (p === '/api/ingest/shortcut' && req.method === 'POST') {
+    const uid = await X.authIngest(req, env, url);
+    return X.shortcutIngest(env, uid, await readJson(req));
+  }
+  if (p === '/api/import/file' && req.method === 'POST' && (req.headers.get('X-Ingest-Key') || url.searchParams.get('key'))) {
+    const uid = await X.authIngest(req, env, url);
+    return X.importFiles(env, uid, req, url, url.searchParams.get('source') === 'healthfit' ? 'healthfit' : 'file');
+  }
+  return undefined;
+}
+
 /* Routen mit Geräte-Login */
-export async function extraRoutes(_req: Request, _env: Env, _url: URL, _p: string, _a: Auth, _ctx: any): Promise<any> { return undefined; }
-/* Zusätzliche Zeitpläne (z. B. Abruf der Dienste alle 15 min) */
-export async function scheduledExtras(_env: Env, _b: any, _users: number[]): Promise<void> {}
-/* Neue Datensätze: Coach-Engine anstoßen */
-export async function onRecordsChanged(_env: Env, _uid: number, _changes: Change[], _source: string): Promise<void> {}
+export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a: Auth, _ctx: any): Promise<any> {
+  const M = req.method;
+  if (p === '/api/connections' && M === 'GET') return { connections: await X.connectionsStatus(env, a.uid), callbackBase: String(env.PUBLIC_URL || '') + '/api/connect/' };
+  const m = PROVIDER.exec(p);
+  if (m && M === 'POST') {
+    const prov = m[1] as X.ProviderId;
+    if (m[2] === 'start') return X.startOAuth(env, a, prov, (await readJson(req)).returnTo);
+    if (m[2] === 'sync') return { ok: true, stats: await X.syncProvider(env, a.uid, prov, { initial: false }) };
+    if (m[2] === 'disconnect') return { ok: true, ...(await X.disconnect(env, a.uid, prov, !!(await readJson(req)).deleteData)) };
+    if (m[2] === 'folder' && prov === 'dropbox') {
+      const folder = String((await readJson(req)).folder || '').trim();
+      if (!/^\/[^\u0000-\u001f]{0,200}$/.test(folder)) throw new HttpError(400, 'Ordner muss mit / beginnen, z. B. /Apps/HealthFit');
+      const c = await X.getConn(env, a.uid, 'dropbox');
+      const stats = c && c.stats ? JSON.parse(c.stats) : {};
+      await env.DB.prepare("UPDATE connections SET stats = ?, cursor = NULL WHERE user_id = ? AND provider = 'dropbox'").bind(JSON.stringify({ ...stats, folder }), a.uid).run();
+      return { ok: true };
+    }
+  }
+  if (p === '/api/connect/intervals' && M === 'POST') return X.connectIntervals(env, a.uid, await readJson(req));
+  if (p === '/api/connect/intervals/disconnect' && M === 'POST') return { ok: true, ...(await X.disconnect(env, a.uid, 'intervals', !!(await readJson(req)).deleteData)) };
+  if (p === '/api/ingest/keys' && M === 'POST') return X.createIngestKey(env, a.uid, (await readJson(req)).label);
+  const rk = /^\/api\/ingest\/keys\/([\w-]+)$/.exec(p);
+  if (rk && M === 'DELETE') return X.revokeIngestKey(env, a.uid, rk[1]);
+  if (p === '/api/import/file' && M === 'POST') return X.importFiles(env, a.uid, req, url, 'file');
+  const st = /^\/api\/activity\/([\w.:-]+)\/streams$/.exec(p);
+  if (st && M === 'GET') {
+    const row = await env.DB.prepare('SELECT data FROM blobs WHERE user_id = ? AND id = ?').bind(a.uid, st[1]).first();
+    if (!row) throw new HttpError(404, 'Für diese Einheit gibt es keinen Verlauf.');
+    return { streams: JSON.parse(row.data) };
+  }
+  // Coach
+  if (p === '/api/coach/ai/status' && M === 'GET') {
+    const s = await getRecord(env, a.uid, 'settings', 'main');
+    return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {});
+  }
+  if (p === '/api/coach/chat' && M === 'POST') {
+    const body = await readJson(req);
+    if (!String(body.text || '').trim()) throw new HttpError(400, 'Leere Nachricht.');
+    const L = await loadState(env, a.uid);
+    const r = await aiChat(env, a.uid, engineCtx(L), String(body.text));
+    const t = Date.now();
+    const changes: Change[] = [...r.changes.map((c, i) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })), ...r.messages.map((mm, i) => ({ kind: 'coachMsg', key: mm.id, data: mm, updatedAt: t + 100 + i }))];
+    await putRecords(env, a.uid, changes);
+    return { messages: r.messages, applied: r.changes.length, status: r.status, blocked: r.blocked || null };
+  }
+  const pr = /^\/api\/coach\/proposal\/([\w.-]+)$/.exec(p);
+  if (pr && M === 'POST') return decideProposal(env, a.uid, pr[1], !!(await readJson(req)).accept);
+  if (p === '/api/coach/food' && M === 'POST') {
+    const body = await readJson(req);
+    const s = await getRecord(env, a.uid, 'settings', 'main');
+    const prof = await getRecord(env, a.uid, 'profile', 'main');
+    return aiFoodEstimate(env, a.uid, (s && s.data && s.data.settings) || {}, String(body.image || ''), String(body.mediaType || ''), String(body.question || ''), prof ? isMinor(prof.data, berlinParts().date) : false);
+  }
+  if (p === '/api/coach/run' && M === 'POST') {
+    const body = await readJson(req);
+    const ev = ['daily', 'weekly', 'activity', 'nutrition', 'illness'].includes(body.type) ? { type: body.type } : null;
+    if (!ev) throw new HttpError(400, 'Unbekanntes Ereignis.');
+    return runEngineFor(env, a.uid, ev as any);
+  }
+  return undefined;
+}
+
+/* Zusätzliche Zeitpläne (Abruf der Dienste) */
+export async function scheduledExtras(env: Env, _b: any, users: number[]): Promise<void> {
+  await X.scheduledSync(env, users);
+}
+
+/* Neue Datensätze aus der App: Coach-Engine anstoßen (Einheit, Nachtwerte, Krankheit, Essen) */
+export async function onRecordsChanged(env: Env, uid: number, changes: Change[], _source: string): Promise<void> {
+  const today = berlinParts().date;
+  const kinds = new Set(changes.map(c => c.kind));
+  const evs: any[] = [];
+  if (kinds.has('session') || kinds.has('custom') || kinds.has('activity')) evs.push({ type: 'activity' });
+  const trendDates = changes.filter(c => c.kind === 'trend' && c.key >= today).map(c => c.key);
+  if (trendDates.length) evs.push({ type: 'trend', dates: trendDates });
+  if (kinds.has('illness')) evs.push({ type: 'illness' });
+  if (kinds.has('nutrition') || kinds.has('meal')) evs.push({ type: 'nutrition' });
+  if (!evs.length) return;
+  try {
+    const L = await loadState(env, uid);
+    const st = await aiStatus(env, uid, L.state.settings);
+    const rephrase = st.active ? (m: any) => aiRephrase(env, uid, engineCtx(L), m) : undefined;
+    for (const ev of evs) await runEngineFor(env, uid, ev, { L, rephrase });
+  } catch (e) { /* die Engine darf den Sync nie stören */ }
+}

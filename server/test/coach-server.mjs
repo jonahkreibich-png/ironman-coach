@@ -17,7 +17,7 @@ changes.push({ kind: 'trend', key: today, data: { date: today, hrv: 46, restingH
 await call('POST', '/api/sync', { since: 0, changes }, T);
 
 let r = await call('POST', '/api/coach/daily', null, T);
-ok(r.status === 200 && r.data.created === 1, 'Rote Ampel → eine Anpassung angelegt' + (r.data && r.data.skipped ? ' (' + r.data.skipped + ')' : ''));
+ok(r.status === 200 && (r.data.created === 1 || r.data.created === 0), 'Rote Ampel → Anpassung (schon beim Sync der Morgenwerte oder jetzt) angelegt' + (r.data && r.data.skipped ? ' (' + r.data.skipped + ')' : ''));
 r = await call('POST', '/api/sync', { since: 0, changes: [] }, T);
 const a = r.data.records.find(x => x.kind === 'adjust');
 ok(a && a.data.sessionId === 's0' && a.data.set.plannedMinutes === 25, 'Anpassung kommt per Sync in der App an');

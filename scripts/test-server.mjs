@@ -10,7 +10,7 @@ import { D1Shim } from '../server/test/d1-shim.mjs';
 const port = +(process.argv[2] || 4180);
 const root = path.resolve('dist');
 const out = path.resolve('node_modules/.cache/worker-test.mjs');
-await build({ entryPoints: ['server/src/index.ts'], bundle: true, format: 'esm', platform: 'neutral', outfile: out, logLevel: 'error', mainFields: ['module', 'main'] });
+await build({ entryPoints: ['server/src/index.ts'], bundle: true, format: 'esm', platform: 'neutral', outfile: out, logLevel: 'error', mainFields: ['module', 'main'], external: ['node:*'], conditions: ['workerd', 'worker', 'import'] });
 const worker = (await import('file://' + out.replace(/\\/g, '/') + '?t=' + Date.now())).default;
 
 function freshDb() {
