@@ -33,6 +33,8 @@ export async function authDevice(req: Request, env: Env): Promise<Auth> {
   return { uid: dev.user_id, deviceId: dev.id, deviceName: dev.name, role: dev.role };
 }
 
+/* Vergleich über Hashes, damit die Laufzeit nichts über den Code verrät */
+async function sameSecret(a: string, b: string): Promise<boolean> { return (await sha256('s:' + a)) === (await sha256('s:' + b)); }
 async function guardAttempts(env: Env) {
   const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM pair_attempts WHERE ts > ?').bind(Date.now() - PAIR_TTL_MS).first();
   if (recent && recent.n >= 20) throw new HttpError(429, 'Zu viele Versuche. Warte 10 Minuten.');
@@ -43,9 +45,19 @@ async function failedAttempt(env: Env) { await env.DB.prepare('INSERT INTO pair_
    Mit Einladungscode: ein neuer Nutzer. Eine offene Registrierung gibt es nicht. */
 export async function setup(env: Env, body: any) {
   const inviteCode = normCode(body.invite);
+  // Einrichtungscode (Secret SETUP_CODE): verbindet ein Gerät mit Nutzer 1, auch wenn schon Geräte da sind (Admin-Zugang).
+  if (body.setupCode != null && String(body.setupCode).trim()) {
+    await guardAttempts(env);
+    const want = String(env.SETUP_CODE || '').trim();
+    if (!want || !(await sameSecret(String(body.setupCode).trim(), want))) { await failedAttempt(env); throw new HttpError(403, 'Der Einrichtungscode stimmt nicht.'); }
+    await env.DB.prepare("INSERT OR IGNORE INTO users (id, name, role, features, created_at) VALUES (1, '', 'admin', '{}', ?)").bind(Date.now()).run();
+    const d = await createDevice(env, 1, body.name);
+    return { deviceId: d.id, token: d.token, userId: 1, time: Date.now() };
+  }
   if (!inviteCode) {
     const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM devices').first();
     if (n && n.n > 0) throw new HttpError(409, 'Der Server ist schon eingerichtet. Kopple dieses Gerät mit einem Code oder nutze eine Einladung.');
+    if (env.SETUP_CODE) throw new HttpError(403, 'Für die erste Einrichtung braucht dieser Server den Einrichtungscode.');
     await env.DB.prepare("INSERT OR IGNORE INTO users (id, name, role, features, created_at) VALUES (1, '', 'admin', '{}', ?)").bind(Date.now()).run();
     const d = await createDevice(env, 1, body.name);
     return { deviceId: d.id, token: d.token, userId: 1, time: Date.now() };

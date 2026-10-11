@@ -93,3 +93,16 @@ describe('Mehrere Nutzer', () => {
     expect((await call(env, 'GET', '/api/backups', null, B.token)).data.backups).toHaveLength(0);
   });
 });
+
+describe('Einrichtungscode', () => {
+  test('ohne Code keine Erst-Einrichtung, mit Code Zugang als Nutzer 1', async () => {
+    const env = makeEnv({ SETUP_CODE: 'geheim-1234-abcd' });
+    expect((await call(env, 'POST', '/api/setup', { name: 'Fremd' })).status).toBe(403);
+    expect((await call(env, 'POST', '/api/setup', { name: 'Fremd', setupCode: 'falsch' })).status).toBe(403);
+    const a = await call(env, 'POST', '/api/setup', { name: 'iPhone', setupCode: 'geheim-1234-abcd' });
+    expect(a.data.userId).toBe(1);
+    const b = await call(env, 'POST', '/api/setup', { name: 'PC', setupCode: 'geheim-1234-abcd' });
+    expect(b.data.userId).toBe(1);
+    expect((await call(env, 'GET', '/api/devices', null, a.data.token)).data.devices).toHaveLength(2);
+  });
+});
