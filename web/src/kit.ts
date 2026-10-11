@@ -56,6 +56,28 @@ export function more(summary: string, body: string, open = false): string {
 export function field(id: string, label: string, value: any, o: { type?: string; step?: string; placeholder?: string; wide?: boolean; inputmode?: string; data?: string; min?: string; max?: string } = {}): string {
   return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${o.inputmode ? `inputmode="${o.inputmode}"` : ''} ${o.min ? `min="${o.min}"` : ''} ${o.max ? `max="${o.max}"` : ''} ${o.data || ''} value="${esc(value ?? '')}" placeholder="${esc(o.placeholder || '')}"></div>`;
 }
+/* Zeit- und Pace-Felder (Auftrag 4 A7): getrennte Zahlenfelder statt „5:30“, weil die iPhone-Zahlentastatur keinen Doppelpunkt hat.
+   kind 'ms': Min + Sek (Pace, CSS, kurze Zeiten), 'hms': Std + Min + Sek (Bestzeiten, Wunschzeiten).
+   Jedes Teilfeld trägt dieselben data-Attribute (data), dazu data-tf; readTime(el) liefert die Sekunden der ganzen Gruppe. */
+export function timeField(id: string, label: string, sec: number | null | undefined, kind: 'ms' | 'hms', data = '', o: { wide?: boolean; hint?: string } = {}): string {
+  const s = sec != null && isFinite(sec) && sec > 0 ? Math.round(sec) : null;
+  const parts: [string, string, number | null, number][] = kind === 'hms'
+    ? [['h', t('time.h'), s == null ? null : Math.floor(s / 3600), 99], ['m', t('time.m'), s == null ? null : Math.floor(s % 3600 / 60), 59], ['s', t('time.s'), s == null ? null : s % 60, 59]]
+    : [['m', t('time.m'), s == null ? null : Math.floor(s / 60), 99], ['s', t('time.s'), s == null ? null : s % 60, 59]];
+  return `<div class="fld ${o.wide ? 'wide' : ''}"><span class="lab" id="${id}-l">${esc(label)}</span><div class="tf" role="group" aria-labelledby="${id}-l" data-tfkind="${kind}">${parts.map(([k, l, v, max]) =>
+    `<label class="tfp"><input class="inp" id="${id}-${k}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" data-tf="${k}" data-max="${max}" ${data} value="${v == null ? '' : k === 'h' ? v : String(v).padStart(2, '0')}" placeholder="${k === 'h' ? '0' : '00'}" aria-label="${esc(l)}"><span>${esc(l)}</span></label>`).join('')}</div>${o.hint ? `<div class="hint">${esc(o.hint)}</div>` : ''}</div>`;
+}
+/* Sekunden aus einer Zeitgruppe (null = leer, NaN = ungültig) */
+export function readTime(el: HTMLElement): number | null {
+  const g = el.closest('.tf'); if (!g) return null;
+  const v = (k: string) => { const i = g.querySelector(`[data-tf="${k}"]`) as HTMLInputElement | null; if (!i) return 0; const raw = i.value.trim(); if (raw === '') return null; const n = +raw.replace(/\D/g, ''); return n; };
+  const h = v('h'), m = v('m'), s = v('s');
+  if (h == null && m == null && s == null) return null;
+  if ((m ?? 0) > 59 && g.getAttribute('data-tfkind') === 'hms') return NaN;
+  if ((s ?? 0) > 59) return NaN;
+  return (h ?? 0) * 3600 + (m ?? 0) * 60 + (s ?? 0);
+}
+export const secToMmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 export function select(id: string, label: string, value: string, options: [string, string][], data = ''): string {
   return `<div class="fld"><label for="${id}">${esc(label)}</label><select class="inp" id="${id}" ${data}>${options.map(([v, l]) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
 }

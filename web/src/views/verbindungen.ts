@@ -1,10 +1,12 @@
 /* Verbindungen: Dienste verbinden (OAuth), intervals.icu-Schlüssel, Apple-Health-Kurzbefehl, Datei-Import,
-   Quellen-Reihenfolge je Messwert. Hinweise, wenn eine Verbindung neu angemeldet werden muss. */
+   Quellen-Reihenfolge je Messwert. Hinweise, wenn eine Verbindung neu angemeldet werden muss.
+   Auftrag 4 A2/A3: Jeder Knopf verbindet oder sagt klar, was fehlt und was man stattdessen tun kann.
+   Garmin, COROS, Suunto, Wahoo: geführter Weg über intervals.icu. Aus dem Fragebogen geht es nach dem Verbinden dorthin zurück. */
 import { STATE, saveState } from '../store';
 import { esc, fmtDate, ymd } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, openSheet, refreshSheet, closeSheet, armed, field, more, empty } from '../kit';
-import { apiCall, isSyncOn, syncNow, uploadFiles, ago } from '../sync';
+import { apiCall, isSyncOn, syncNow, uploadFiles, ago, isAdmin } from '../sync';
 import { DEFAULT_PRIORITY, SOURCE_LABEL, priorityOf } from '../../../shared/activity/merge';
 import { API_BASE } from '../config';
 import { nav } from '../nav';
@@ -14,6 +16,8 @@ let CONN: any[] | null = null;
 let LOADING = false;
 let ERR = '';
 let NEW_KEY: { id: string; key: string } | null = null;
+/* Von wo aus verbunden wird: nach dem Erlaubnis-Bildschirm geht es dorthin zurück */
+let RETURN_TO: 'verbindungen' | 'onboarding' = 'verbindungen';
 
 export async function loadConnections(force = false) {
   if (!isSyncOn() || LOADING || (CONN && !force)) return;
@@ -26,8 +30,8 @@ export function reauthHints(): string[] {
   return (CONN || []).filter(c => c.status === 'reauth').map(c => t('conn.reauthHint', { name: c.label }));
 }
 
-const stateText = (c: any) => c.status === 'connected' ? t('conn.connected') : c.status === 'reauth' ? t('conn.reauth') : t('conn.notConnected');
-const stateKind = (c: any) => c.status === 'connected' ? 'good' : c.status === 'reauth' ? 'warn' : '';
+const stateText = (c: any) => c.status === 'connected' ? t('conn.connected') : c.status === 'via' ? t('conn.viaIcu') : c.status === 'reauth' ? t('conn.reauth') : t('conn.notConnected');
+const stateKind = (c: any) => c.status === 'connected' || c.status === 'via' ? 'good' : c.status === 'reauth' ? 'warn' : '';
 function lastLine(c: any) {
   const parts: string[] = [];
   if (c.lastOkAt) parts.push(t('conn.lastOk', { ago: ago(c.lastOkAt) }));
@@ -35,27 +39,50 @@ function lastLine(c: any) {
   if (c.stats && c.stats.folder) parts.push(t('conn.folder', { f: c.stats.folder }));
   return parts.join(' · ');
 }
-
-function row(c: any): string {
-  const sub = c.availability === 'partner' ? t('conn.partner') : c.availability === 'prepared' ? t('conn.prepared') : !c.configured ? t('conn.notConfigured') : lastLine(c) || t('conn.desc.' + c.id);
-  return `<button class="li" data-act="conn-open" data-id="${esc(c.id)}"><span class="ic" style="--c:${c.status === 'reauth' ? 'var(--warn)' : c.status === 'connected' ? 'var(--good)' : 'var(--ink-3)'}">${ic(c.status === 'connected' ? 'check' : 'link')}</span>
-    <span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s">${esc(sub)}</span></span>${c.availability === 'ready' && c.configured ? pill(stateText(c), stateKind(c)) : ''}<span class="chev">${ic('right')}</span></button>`;
+function subLine(c: any): string {
+  if (c.availability === 'partner') return c.status === 'via' ? t('conn.viaIcuShort') : t('conn.partnerShort');
+  if (c.availability === 'prepared') return t('conn.prepared');
+  if (!c.configured) return t('conn.notConfiguredShort');
+  return lastLine(c) || t('conn.desc.' + c.id);
 }
+function row(c: any): string {
+  return `<button class="li" data-act="conn-open" data-id="${esc(c.id)}"><span class="ic" style="--c:${c.status === 'reauth' ? 'var(--warn)' : c.status === 'connected' || c.status === 'via' ? 'var(--good)' : 'var(--ink-3)'}">${ic(c.status === 'connected' || c.status === 'via' ? 'check' : 'link')}</span>
+    <span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s">${esc(subLine(c))}</span></span>${pill(c.availability !== 'partner' && !c.configured && c.kind === 'oauth' ? t('conn.notReady') : stateText(c), stateKind(c))}<span class="chev">${ic('right')}</span></button>`;
+}
+const ORDER = ['shortcut', 'intervals', 'garmin', 'coros', 'suunto', 'wahoo', 'dropbox', 'oura', 'whoop', 'polar', 'withings', 'trainingpeaks', 'fitbit'];
+const sorted = (list: any[]) => [...list].sort((a, b) => (ORDER.indexOf(a.id) + 99) % 99 - (ORDER.indexOf(b.id) + 99) % 99);
 
 export function renderVerbindungen(): string {
-  if (!isSyncOn()) return `<div class="card"><div class="hint">${esc(t('conn.needSync'))}</div><button class="btn" data-act="go-sub" data-sub="daten">${esc(t('conn.toSync'))}</button></div>` + importSection();
+  RETURN_TO = 'verbindungen';
+  if (!isSyncOn()) return noSyncCard() + importSection();
   if (!CONN) { loadConnections(); return `<div class="card">${empty(ERR || t('common.loading'))}</div>`; }
-  const ORDER = ['shortcut', 'dropbox', 'intervals', 'oura', 'whoop', 'polar', 'withings'];
-  const ready = CONN.filter(c => c.availability === 'ready').sort((a, b) => (ORDER.indexOf(a.id) + 99) % 99 - (ORDER.indexOf(b.id) + 99) % 99);
-  const later = CONN.filter(c => c.availability !== 'ready');
+  const main = sorted(CONN.filter(c => c.availability === 'ready' || c.availability === 'partner'));
+  const later = CONN.filter(c => c.availability === 'prepared');
   const reauth = CONN.filter(c => c.status === 'reauth');
   let h = reauth.length ? `<div class="banner warn">${esc(reauthHints().join(' '))}</div>` : '';
   h += `<div class="hint" style="margin:0 2px var(--s3)">${esc(t('conn.intro'))}</div>`;
-  h += sec(t('conn.sources'), `<div class="list">${ready.map(row).join('')}</div>`);
+  h += sec(t('conn.sources'), `<div class="list">${main.map(row).join('')}</div>`);
   h += importSection();
   h += sec(t('conn.priority'), priorityList(), t('conn.priorityAside'));
-  h += sec(t('conn.later'), `<div class="list">${later.map(row).join('')}</div>`, t('conn.laterAside'));
+  if (later.length) h += sec(t('conn.later'), `<div class="list">${later.map(row).join('')}</div>`, t('conn.laterAside'));
+  if (isAdmin()) h += sec(t('conn.serverKeys'), serverKeysCard(), t('conn.serverKeysAside'));
   return h;
+}
+/* Kurzliste für den Fragebogen (A3): dieselben Abläufe, Rückkehr in den Fragebogen */
+export function connectList(ctx: 'onboarding' | 'verbindungen'): string {
+  RETURN_TO = ctx;
+  if (!isSyncOn()) return `<div class="hint">${esc(t('conn.obNoSync'))}</div>${more(t('conn.partnerHow'), partnerGuide(), false)}`;
+  if (!CONN) { loadConnections(); return `<div class="hint">${esc(ERR || t('common.loading'))}</div>`; }
+  const list = sorted(CONN.filter(c => ['shortcut', 'intervals', 'garmin', 'coros', 'suunto', 'wahoo', 'dropbox', 'oura', 'whoop', 'polar', 'withings'].includes(c.id)));
+  return `<div class="list" data-connect-list>${list.map(row).join('')}</div><div class="hint">${esc(t('conn.obLater'))}</div>`;
+}
+function noSyncCard(): string {
+  return `<div class="card stack"><div class="hint">${esc(t('conn.needSync'))}</div><button class="btn" data-act="go-sub" data-sub="daten">${esc(t('conn.toSync'))}</button>${more(t('conn.partnerHow'), partnerGuide())}</div>`;
+}
+/* Server-Schlüssel (nur Betreiber): welche Secrets gesetzt sind */
+function serverKeysCard(): string {
+  const oauth = (CONN || []).filter(c => c.kind === 'oauth' && c.availability === 'ready');
+  return `<div class="card stack"><div class="hint">${esc(t('conn.serverKeysHint'))}</div><div class="list">${oauth.map(c => `<div class="li" data-key-status="${esc(c.id)}"><span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s"><code>${(c.secrets || []).map((s: any) => esc(s.name)).join(', ')}</code></span></span>${pill(c.configured ? t('conn.keySet') : t('conn.keyMissing'), c.configured ? 'good' : 'warn')}</div>`).join('')}</div></div>`;
 }
 
 function importSection(): string {
@@ -88,18 +115,39 @@ on('prio-up', el => {
 });
 on('prio-reset', () => { const sp = { ...(STATE.settings.sourcePriority || {}) }; delete sp[PRIO_G]; STATE.settings.sourcePriority = sp; saveState(); refreshSheet(); nav.rerender(); });
 
+/* ---------- Geführter Weg über intervals.icu (Garmin, COROS, Suunto, Wahoo) ---------- */
+function partnerGuide(name = 'Garmin'): string {
+  return `<ol class="small stack" style="padding-left:18px;margin:0" data-guide>
+    <li>${esc(t('conn.g1'))} <a href="https://intervals.icu" target="_blank" rel="noopener">intervals.icu</a></li>
+    <li>${esc(t('conn.g2', { name }))}</li>
+    <li>${esc(t('conn.g3'))}</li></ol><div class="hint">${esc(t('conn.gAfter'))}</div>
+    <div class="hint">${esc(t('conn.gApple'))}</div>`;
+}
+
 /* ---------- Detail je Dienst ---------- */
 let CUR = '';
 const cur = () => (CONN || []).find(c => c.id === CUR);
+const ALT: Record<string, string> = { oura: 'conn.alt.oura', whoop: 'conn.alt.whoop', polar: 'conn.alt.polar', withings: 'conn.alt.withings', dropbox: 'conn.alt.dropbox', fitbit: 'conn.alt.whoop' };
 function connSheet(): string {
   const c = cur(); if (!c) return '';
   let h = `<div class="stack"><div class="hint">${esc(t('conn.desc.' + c.id))}</div>`;
-  if (c.availability === 'partner' || c.availability === 'prepared') return h + `<div class="banner info">${esc(t(c.availability === 'partner' ? 'conn.partnerLong' : 'conn.preparedLong'))}</div></div>`;
+  if (c.availability === 'partner') {
+    h += `<div class="banner info">${esc(t('conn.partnerWhy', { name: c.label }))}</div>${partnerGuide(c.label)}`;
+    const icu = (CONN || []).find(x => x.id === 'intervals');
+    h += icu && icu.status === 'connected' ? `<div class="banner good">${esc(t('conn.viaIcuDone', { name: c.label }))}</div>` : `<button class="btn block" data-act="conn-open" data-id="intervals">${esc(t('conn.icuNow'))}</button>`;
+    h += `<button class="btn ghost block" data-act="conn-open" data-id="shortcut">${esc(t('conn.appleInstead'))}</button>`;
+    return h + '</div>';
+  }
+  if (c.availability === 'prepared') return h + `<div class="banner info">${esc(t('conn.preparedLong'))}</div>${ALT[c.id] ? `<div class="hint">${esc(t(ALT[c.id]))}</div>` : ''}</div>`;
   if (c.id === 'oura') h += `<div class="banner info">${esc(t('conn.ouraTerms'))}</div>`;
   if (c.id === 'shortcut') return h + shortcutBody(c) + '</div>';
   if (c.id === 'intervals') {
-    if (c.status !== 'connected') return h + `<div class="fgrid">${field('icu-id', t('conn.icuId'), '', { placeholder: 'i123456' })}${field('icu-key', t('conn.icuKey'), '', { type: 'password' })}</div><div class="hint">${esc(t('conn.icuHow'))}</div><button class="btn block" data-act="icu-connect">${esc(t('conn.connect'))}</button></div>`;
-  } else if (!c.configured) return h + `<div class="banner warn">${esc(t('conn.notConfiguredLong'))}</div></div>`;
+    if (c.status !== 'connected') return h + `<div class="fgrid">${field('icu-id', t('conn.icuId'), '', { placeholder: 'i123456' })}${field('icu-key', t('conn.icuKey'), '', { type: 'password' })}</div><div class="hint">${esc(t('conn.icuHow'))}</div><button class="btn block" data-act="icu-connect">${esc(t('conn.connect'))}</button>${more(t('conn.partnerHow'), partnerGuide())}</div>`;
+  } else if (!c.configured) {
+    return h + `<div class="banner warn" data-not-configured>${esc(t('conn.notConfiguredLong', { name: c.label }))}</div>${ALT[c.id] ? `<div class="hint"><b>${esc(t('conn.instead'))}</b> ${esc(t(ALT[c.id]))}</div>` : ''}
+      ${isAdmin() ? `<div class="hint">${esc(t('conn.adminKeys', { keys: (c.secrets || []).map((s: any) => s.name).join(', ') }))}</div>` : ''}
+      <button class="btn ghost block" data-act="conn-open" data-id="shortcut">${esc(t('conn.appleInstead'))}</button></div>`;
+  }
   if (c.status === 'connected' || c.status === 'reauth') {
     h += `<div class="kv"><span class="muted">${esc(t('conn.state'))}</span><b>${esc(stateText(c))}</b></div>`;
     if (c.lastOkAt) h += `<div class="kv"><span class="muted">${esc(t('conn.lastSync'))}</span><b>${esc(ago(c.lastOkAt))}</b></div>`;
@@ -108,7 +156,7 @@ function connSheet(): string {
     if (c.status === 'reauth') h += `<button class="btn block" data-act="conn-start">${esc(t('conn.reconnect'))}</button>`;
     else if (c.id !== 'intervals') h += `<button class="btn ghost block" data-act="conn-sync">${ic('sync')} ${esc(t('conn.syncNow'))}</button>`;
     h += more(t('conn.disconnect'), `<div class="hint">${esc(t('conn.disconnectHint'))}</div><label class="switch"><input type="checkbox" id="conn-del" ${c.id === 'oura' ? 'checked' : ''}><span>${esc(t('conn.deleteData'))}</span></label><button class="btn danger" data-act="conn-disconnect">${esc(t('conn.disconnect'))}</button>`);
-  } else h += `<button class="btn block" data-act="conn-start">${esc(t('conn.connect'))}</button>`;
+  } else h += `<div class="hint">${esc(t('conn.willOpen', { name: c.label }))}</div><button class="btn block" data-act="conn-start">${esc(t('conn.connect'))}</button>`;
   return h + '</div>';
 }
 function shortcutBody(c: any): string {
@@ -119,15 +167,21 @@ function shortcutBody(c: any): string {
   h += `<div class="list">${(c.keys || []).map((k: any) => `<div class="li"><span class="grow"><span class="t">${esc(k.label)}</span><br><span class="s">${esc(t('conn.keyMade', { d: fmtDate(ymd(new Date(k.createdAt))) }))}${k.lastUsed ? ' · ' + esc(t('conn.keyUsed', { ago: ago(k.lastUsed) })) : ''}</span></span><button class="btn danger sm" data-act="key-revoke" data-id="${esc(k.id)}">${esc(t('conn.revoke'))}</button></div>`).join('') || `<div class="li"><span class="muted">${esc(t('conn.noKeys'))}</span></div>`}</div>`;
   h += `<button class="btn block" data-act="key-new">${ic('plus')} ${esc(t('conn.keyNew'))}</button>`;
   h += more(t('conn.shortcutHow'), `<ol class="small" style="padding-left:18px;margin:0">${[1, 2, 3, 4, 5, 6].map(i => `<li>${esc(t('conn.sc' + i))}</li>`).join('')}</ol><div class="hint">${esc(t('conn.scFields'))}</div>`);
+  h += more(t('conn.healthfitHow'), `<div class="hint">${esc(t('conn.healthfitText'))}</div>`);
   return h;
 }
-on('conn-open', el => { CUR = el.dataset.id!; NEW_KEY = null; const c = cur(); openSheet(c ? c.label : '', connSheet); });
+on('conn-open', el => {
+  if (!isSyncOn()) { toast(t('conn.needSync')); return; }
+  CUR = el.dataset.id!; NEW_KEY = null; const c = cur();
+  if (!c) { toast(t('common.loading')); loadConnections(true); return; }
+  openSheet(c.label, connSheet);
+});
 async function busy(el: HTMLElement, fn: () => Promise<void>) {
   (el as HTMLButtonElement).disabled = true;
   try { await fn(); } catch (e: any) { toast(e.message); } finally { if (el.isConnected) (el as HTMLButtonElement).disabled = false; }
 }
 on('conn-start', el => busy(el, async () => {
-  const r = await apiCall('POST', `/api/connect/${CUR}/start`, { returnTo: 'verbindungen' });
+  const r = await apiCall('POST', `/api/connect/${CUR}/start`, { returnTo: RETURN_TO });
   location.href = r.url;
 }));
 on('conn-sync', el => busy(el, async () => {
@@ -147,6 +201,7 @@ on('icu-connect', el => busy(el, async () => {
   const v = (id: string) => (document.getElementById(id) as HTMLInputElement).value.trim();
   await apiCall('POST', '/api/connect/intervals', { athleteId: v('icu-id'), apiKey: v('icu-key') });
   await loadConnections(true); refreshSheet(); toast(t('conn.connectedToast', { name: 'intervals.icu' }));
+  try { await apiCall('POST', '/api/intervals/import'); await syncNow(); } catch (e) { /* Status zeigt es */ }
 }));
 on('dbx-folder', el => busy(el, async () => {
   await apiCall('POST', '/api/connect/dropbox/folder', { folder: (document.getElementById('dbx-folder') as HTMLInputElement).value });

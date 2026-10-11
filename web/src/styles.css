@@ -298,3 +298,22 @@ label.li input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--a
 .welcome h1 { font: 700 var(--t-xxl, 30px)/1.1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; }
 .pair-code { font: 700 32px/1.2 var(--f-display); letter-spacing: .12em; text-align: center; padding: var(--s2) 0; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+
+/* Auftrag 4: Zeitfelder (Min/Sek getrennt), Tage-Raster, Häufigkeit, Plan-Kopf, Bearbeiten */
+.fld .tf { display: flex; gap: 8px; align-items: center; }
+.fld .tfp { display: flex; align-items: center; gap: 4px; font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); margin: 0; }
+.fld .tfp .inp { width: 3.4em; text-align: center; padding: 10px 6px; }
+.dl-grid { display: grid; grid-template-columns: 30px 1fr; gap: 6px 8px; align-items: center; }
+.dl-grid .seg button { padding: 8px 4px; font-size: var(--t-xs); }
+.daychips { display: flex; gap: 6px; flex-wrap: wrap; }
+.daychips .chip { min-width: 44px; padding: 8px 10px; }
+.freq-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.freq-row:first-child { border-top: 0; }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper b { min-width: 3.2em; text-align: center; font-variant-numeric: tabular-nums; }
+.plan-explain p { margin: 0 0 6px; }
+.week-head { font-weight: 600; }
+.edit-bar { display: flex; gap: var(--s2); flex-wrap: wrap; margin: var(--s2) 0; }
+.li.locked .t::after { content: ' 🔒'; }
+.understood .li { align-items: flex-start; }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

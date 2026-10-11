@@ -50,7 +50,7 @@ export async function startOAuth(env: Env, a: Auth, p: ProviderId, returnTo?: st
   if (!def) throw new HttpError(404, 'Unbekannter Dienst.');
   if (def.status !== 'ready') throw new HttpError(409, `${def.label} braucht noch eine Freischaltung durch den Anbieter.`);
   const clientId = env[def.idEnv];
-  if (!clientId || !env[def.secretEnv]) throw new HttpError(503, `${def.label} ist auf dem Server noch nicht eingerichtet (App-Schlüssel fehlt).`);
+  if (!clientId || !env[def.secretEnv]) throw new HttpError(503, `${def.label} ist auf dem Server noch nicht eingerichtet: Der Betreiber muss einmal den App-Schlüssel des Anbieters hinterlegen. Bis dahin klappt es über Apple Health (Kurzbefehl) oder intervals.icu.`);
   const state = randomToken(24);
   const verifier = randomToken(32);
   await env.DB.prepare('INSERT INTO oauth_states (state, user_id, provider, verifier, return_to, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(state, a.uid, p, verifier, (returnTo || '').slice(0, 200), Date.now()).run();
@@ -79,9 +79,12 @@ async function tokenRequest(env: Env, p: ProviderId, params: Record<string, stri
 /* Rückkehr vom Erlaubnis-Bildschirm des Dienstes */
 export async function oauthCallback(env: Env, p: ProviderId, url: URL): Promise<Response> {
   const app = String(env.PUBLIC_URL || '').replace(/\/$/, '') + '/';
-  const back = (q: string) => Response.redirect(`${app}?go=mehr&open=verbindungen&${q}`, 302);
+  // Zurück an die Stelle, von der aus verbunden wurde (Verbindungen oder Fragebogen)
+  let rt = 'verbindungen';
+  const back = (q: string) => Response.redirect(`${app}?go=mehr&open=${rt}&${q}`, 302);
   const state = url.searchParams.get('state') || '';
   const row = await env.DB.prepare('SELECT * FROM oauth_states WHERE state = ? AND provider = ?').bind(state, p).first();
+  if (row && row.return_to === 'onboarding') rt = 'onboarding';
   if (!row || Date.now() - row.created_at > 15 * 60000) return back('fehler=' + encodeURIComponent('Anmeldung abgelaufen, bitte nochmal verbinden.'));
   await env.DB.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
   if (url.searchParams.get('error')) return back('fehler=' + encodeURIComponent('Verbindung abgebrochen.'));
@@ -326,14 +329,16 @@ export async function connectionsStatus(env: Env, uid: number): Promise<any[]> {
   const by: Record<string, Conn> = {}; (rows.results || []).forEach((r: Conn) => { by[r.provider] = r; });
   const keys = await env.DB.prepare('SELECT id, label, created_at, last_used, revoked FROM ingest_keys WHERE user_id = ? AND revoked = 0').bind(uid).all();
   const list: any[] = [];
-  const pub = (p: string, label: string, kind: string, status: string, configured: boolean) => {
+  const pub = (p: string, label: string, kind: string, status: string, configured: boolean, secrets?: { name: string; set: boolean }[]) => {
     const c = by[p];
-    list.push({ id: p, label, kind, availability: status, configured, status: c ? c.status : 'none', lastSyncAt: c ? c.last_sync_at : null, lastOkAt: c ? c.last_ok_at : null, error: c ? c.last_error : null, stats: c && c.stats ? JSON.parse(c.stats) : null });
+    list.push({ id: p, label, kind, availability: status, configured, secrets, status: c ? c.status : 'none', lastSyncAt: c ? c.last_sync_at : null, lastOkAt: c ? c.last_ok_at : null, error: c ? c.last_error : null, stats: c && c.stats ? JSON.parse(c.stats) : null });
   };
-  for (const [p, d] of Object.entries(OAUTH) as [ProviderId, OAuthDef][]) pub(p, d.label, 'oauth', d.status, !!(env[d.idEnv] && env[d.secretEnv]));
+  for (const [p, d] of Object.entries(OAUTH) as [ProviderId, OAuthDef][]) pub(p, d.label, 'oauth', d.status, !!(env[d.idEnv] && env[d.secretEnv]), [{ name: d.idEnv, set: !!env[d.idEnv] }, { name: d.secretEnv, set: !!env[d.secretEnv] }]);
   pub('intervals', 'intervals.icu', 'apikey', 'ready', true);
   list.push({ id: 'shortcut', label: 'Apple Health (Kurzbefehl)', kind: 'key', availability: 'ready', configured: true, status: (keys.results || []).length ? 'connected' : 'none', keys: (keys.results || []).map((k: any) => ({ id: k.id, label: k.label, createdAt: k.created_at, lastUsed: k.last_used })) });
-  for (const [p, l] of [['suunto', 'Suunto'], ['coros', 'COROS'], ['wahoo', 'Wahoo'], ['garmin', 'Garmin'], ['trainingpeaks', 'TrainingPeaks']]) list.push({ id: p, label: l, kind: 'partner', availability: 'partner', configured: false, status: 'none' });
+  // Partner nötig: geführter Weg über intervals.icu (kostenlos, offizielle Verbindungen zu diesen Diensten)
+  const icu = by.intervals && by.intervals.status === 'connected';
+  for (const [p, l] of [['garmin', 'Garmin'], ['coros', 'COROS'], ['suunto', 'Suunto'], ['wahoo', 'Wahoo'], ['trainingpeaks', 'TrainingPeaks']]) list.push({ id: p, label: l, kind: 'partner', availability: 'partner', via: 'intervals', configured: true, status: icu ? 'via' : 'none' });
   return list;
 }
 

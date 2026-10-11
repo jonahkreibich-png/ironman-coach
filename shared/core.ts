@@ -1,6 +1,7 @@
 /* Gemeinsame Coach-Logik für App und Server (keine Abhängigkeiten, keine DOM-Zugriffe). */
 // Bewusst locker typisiert: Datensätze kommen aus Sync und Backups und sind nicht immer vollständig.
 import { GENERIC_LTHR } from './profile';
+import * as W from './workouts';
 /* ---------- Datum ---------- */
 function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
@@ -217,21 +218,29 @@ function applyAdjustments(weeks, adjustments) {
   const dayByDate = {}; const where = {};
   out.forEach(w => (w.days || []).forEach(d => { dayByDate[d.date] = d; (d.sessions || []).forEach(s => { where[s.id] = d; }); }));
   for (const a of activeAdjustments(adjustments)) {
+    // Neue Einheit (vom Nutzer hinzugefügt)
+    if (a.type === 'add') {
+      const to = dayByDate[a.to]; if (!to || !a.session || where[a.session.id]) continue;
+      to.sessions = to.sessions.filter(x => x.sport !== 'rest');
+      to.sessions.push(Object.assign({}, a.session, { _adj: [a.id], added: true })); where[a.session.id] = to; continue;
+    }
     const d = where[a.sessionId]; if (!d) continue;
     const s = d.sessions.find(x => x.id === a.sessionId); if (!s) continue;
     if (!s._orig) { s._orig = {}; ADJ_FIELDS.forEach(k => { s._orig[k] = s[k] == null ? null : s[k]; }); s._orig.date = d.date; }
     s._adj = (s._adj || []).concat(a.id);
     if (a.type === 'modify') Object.assign(s, a.set || {});
-    else if (a.type === 'cancel') { s.cancelled = true; s.cancelReason = a.reason; }
+    else if (a.type === 'cancel') { s.cancelled = true; s.cancelReason = a.reason; if (a.removed) s.removed = true; }
     else if (a.type === 'move') {
       const to = dayByDate[a.to]; if (!to || to === d) continue;
       d.sessions = d.sessions.filter(x => x !== s);
       (d.moved = d.moved || []).push({ id: s.id, title: s.title, sport: s.sport, to: a.to });
-      s.movedFrom = d.date; to.sessions.push(s); where[s.id] = to;
+      s.movedFrom = d.date; to.sessions = to.sessions.filter(x => x.sport !== 'rest'); to.sessions.push(s); where[s.id] = to;
     }
   }
   return out;
 }
+/* Vom Nutzer als „fest“ markiert: die Engine ändert diese Einheit nicht mehr (Auftrag 4 C5) */
+function isLocked(weeks, id) { const s = planDays(weeks).flatMap(d => d.sessions).find(x => x.id === id); return !!(s && s.locked); }
 function planDays(weeks) { const out = []; (weeks || []).forEach((w, wi) => (w.days || []).forEach(d => out.push(Object.assign({}, d, { weekIdx: wi })))); return out; }
 
 /* ---------- Tagesbelastung und eigene CTL/ATL ---------- */
@@ -347,7 +356,7 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   let weeks = applyAdjustments(baseWeeks, Object.assign({}, existing));
   const dayOf = d => planDays(weeks).find(x => x.date === d) || null;
   const live = d => { const x = dayOf(d); return x ? x.sessions.filter(s => s.sport !== 'rest' && !s.cancelled) : []; };
-  const push = a => { if (has(a.id)) return false; a.createdAt = now + res.length; a.date = date; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
+  const push = a => { if (has(a.id)) return false; if (a.sessionId && isLocked(weeks, a.sessionId)) return false; a.createdAt = now + res.length; a.date = date; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
   const pain = painFlag(state, weeks, date);
 
   // 1) Schutzregeln für heute: Lauf-Intervalle ohne Freigabe oder bei Leistenschmerz
@@ -404,6 +413,43 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   return res;
 }
 
+/* Lernstufe geschafft? Erledigt und (Dauer mindestens 90 % des Plans oder RPE höchstens 7 oder Uhr zeigt die Strecke am Stück).
+   Sehr hart (RPE 9-10) oder „abgebrochen“ in der Notiz: Stufe wiederholen. Ohne Daten: wiederholen. */
+function stageVerdict(s, st, act): { ok: boolean; why: string } {
+  st = st || {}; const m = st.metrics || {};
+  const rpe = toNum(st.rpe), min = toNum(m.min);
+  if (/abgebrochen|nicht geschafft|zu schwer/i.test(st.notes || '')) return { ok: false, why: 'laut Notiz zu schwer' };
+  if (rpe != null && rpe >= 9) return { ok: false, why: 'RPE ' + rpe + ' (sehr hart)' };
+  const longest = act && act.swim && act.swim.longestContinuousM;
+  if (s.stage.ladder !== 'runwalk' && longest) {
+    const need = Math.max(...((s.spec && s.spec.steps) || []).filter(x => x.mode === 'crawl').map(x => x.m || 0), 0);
+    if (need && longest >= need) return { ok: true, why: longest + ' m am Stück gemessen' };
+  }
+  if (min != null && s.plannedMinutes && min >= s.plannedMinutes * 0.9) return { ok: true, why: Math.round(min) + ' von ' + s.plannedMinutes + ' min geschafft' };
+  if (rpe != null && rpe <= 7) return { ok: true, why: 'RPE ' + rpe };
+  if (min == null && rpe == null) return { ok: false, why: 'keine Messdaten und keine RPE' };
+  return { ok: false, why: 'noch nicht ganz geschafft' };
+}
+function stageSession(s, n) {
+  const ctx = (s.spec && s.spec.ctx) || {};
+  const why = s.spec && s.spec.why; const tip = s.spec && s.spec.tip;
+  let spec;
+  if (s.stage.ladder === 'runwalk') {
+    if (n >= W.RUNWALK_LADDER.length) { spec = W.runEasy(ctx, 30); spec.why = 'Du kannst jetzt 30 min am Stück laufen: ab hier normale lockere Läufe.'; }
+    else { spec = W.runWalk(ctx, n, why); }
+  } else {
+    const L = s.stage.ladder === 'swimBreast' ? W.SWIM_BREAST_LADDER : W.SWIM_LADDER;
+    if (n >= L.length) {
+      // Brust-Weg fertig → Kraul-Weg ab Stufe 2, Kraul-Weg fertig → normales Schwimmen
+      if (s.stage.ladder === 'swimBreast') spec = W.swimLearn(ctx, { ladder: 'swim', n: 2 }, why);
+      else spec = W.swimSession(ctx, 'endurance', [{ part: 'main', reps: 3, m: 400, zone: 2, mode: 'crawl', restSec: 30 }]);
+    } else spec = W.swimLearn(ctx, { ladder: s.stage.ladder, n }, why);
+  }
+  if (tip && !spec.tip) spec.tip = tip;
+  const b = W.build(spec);
+  return { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, stage: b.stage || null, zone: b.zone };
+}
+
 /* ---------- Wöchentlich (Sonntag 18 Uhr) für die nächste Woche ---------- */
 function weekRange(date) { const dow = new Date(date + 'T12:00:00Z').getUTCDay(); const mon = addDays(date, -((dow + 6) % 7)); return [mon, addDays(mon, 6)]; }
 function weekSummary(state, baseWeeks, date) {
@@ -450,7 +496,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   const pain = painFlag(state, weeks, date);
   const group = 'week-' + next.weekNumber;
   if (existing[group + '-summary']) return { adjustments: res, summary: S };
-  const push = a => { if (existing[a.id] || res.some(x => x.id === a.id)) return; a.createdAt = now + res.length; a.date = date; a.group = group; res.push(a); };
+  const push = a => { if (existing[a.id] || res.some(x => x.id === a.id)) return; if (a.sessionId && isLocked(weeks, a.sessionId)) return; a.createdAt = now + res.length; a.date = date; a.group = group; res.push(a); };
 
   // Umfang
   let pct = 0, why;
@@ -473,9 +519,11 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   if (pct !== 0) {
     nextSessions.forEach(s => {
       if (!['swim', 'bike', 'run'].includes(s.sport) || s.cancelled || isTestOrRace(s) || !s.plannedMinutes) return;
+      if (s.stage || s.race || s.fixed) return;
       const f = 1 + pct / 100;
+      const rb = W.rebuildScaled(s, f);
       push({ id: `${group}-vol-${s.id}`, type: 'modify', sessionId: s.id,
-        set: { plannedMinutes: round5(s.plannedMinutes * f), plannedKm: s.plannedKm ? r1(s.plannedKm * f) : s.plannedKm == null ? null : s.plannedKm },
+        set: rb || { plannedMinutes: round5(s.plannedMinutes * f), plannedKm: s.plannedKm ? r1(s.plannedKm * f) : s.plannedKm == null ? null : s.plannedKm },
         what: `${s.title}: ${s.plannedMinutes} → ${round5(s.plannedMinutes * f)} min`, reason: `Umfang ${pct > 0 ? '+' : ''}${pct} %` });
     });
   }
@@ -508,6 +556,21 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     }
   }
 
+  // Lernstufen (Kraul lernen, Lauf-Geh-Wechsel): eine Stufe weiter nur, wenn die letzte laut Daten geklappt hat (Auftrag 4 C1)
+  const stageWhy: string[] = [];
+  for (const ladder of ['swim', 'swimBreast', 'runwalk']) {
+    const done = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -21)).flatMap(d => d.sessions.filter(s => s.stage && s.stage.ladder === ladder && sessDone(state, s)).map(s => ({ s, date: d.date })))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const last = done[done.length - 1]; if (!last) continue;
+    const v = stageVerdict(last.s, state.sessions[last.s.id], (state.activities || {})[(state.sessions[last.s.id] || {}).activityId]);
+    const target = v.ok ? last.s.stage.n + 1 : last.s.stage.n;
+    nextSessions.filter(s => s.stage && s.stage.ladder === ladder && !s.cancelled && s.stage.n !== target).forEach(s => {
+      const built = stageSession(s, target); if (!built) return;
+      push({ id: `${group}-stage-${s.id}`, type: 'modify', sessionId: s.id, set: built, what: `${s.title} → ${built.title}`, reason: (v.ok ? 'Letzte Stufe hat geklappt (' : 'Stufe wiederholen (') + v.why + ')' });
+    });
+    stageWhy.push((v.ok ? 'nächste Stufe: ' : 'Stufe bleibt: ') + v.why);
+  }
+
   // Schutzregeln für die nächste Woche
   nextSessions.forEach(s => {
     if (s.sport === 'run' && isIntervals(s) && (!meta.runIntervalsAllowed || pain)) {
@@ -518,7 +581,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   });
 
   push({ id: group + '-summary', type: 'note',
-    what: `Woche ${next.weekNumber}: Umfang ${pct > 0 ? '+' + pct : pct} %`, reason: why + (ladderWhy ? '. Rad-Leiter: ' + ladderWhy : ''),
+    what: `Woche ${next.weekNumber}: Umfang ${pct > 0 ? '+' + pct : pct} %`, reason: why + (ladderWhy ? '. Rad-Leiter: ' + ladderWhy : '') + (stageWhy.length ? '. Lernstufen: ' + stageWhy.join('; ') : ''),
     stats: { ratio: S.ratio, red: S.red, green: S.green, withValues: S.withValues, sick: S.sick, loadRatio: S.loadRatio, pct } });
   return { adjustments: res, summary: S };
 }
@@ -606,5 +669,6 @@ export {
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
-  dailyLoads, ownLoadSeries, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive
+  dailyLoads, ownLoadSeries, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
+  isLocked, stageVerdict, stageSession
 };
