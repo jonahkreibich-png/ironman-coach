@@ -290,6 +290,33 @@ function ladderIndex(title) {
   const m = STEP_RE.exec(title || ''); if (!m) return -1;
   return LADDER.findIndex(([a, b]) => a === +m[1] && b === +m[2]);
 }
+/* Bewertung der letzten Sweet-Spot-Einheit aus Messdaten (Runden der Uhr):
+   alle Intervalle geschafft, Puls im Zielbereich, Puls- oder Tempoabfall erstes → letztes Intervall unter 5 %, Erholung in den Pausen.
+   Ohne Rundendaten zählt die RPE, falls eingetragen, sonst bleibt die Stufe gleich. */
+function ladderVerdict(s, st, act, lthrBike): { result: 'up' | 'stay' | 'fail'; why: string } {
+  const m = STEP_RE.exec((s && s.title) || '');
+  const plannedReps = m ? +m[1] : null;
+  const iv = act && act.intervals;
+  if (iv && iv.count >= 2) {
+    const reps = iv.count;
+    const hrOk = iv.avgHrWork == null || iv.avgHrWork <= 0.97 * lthrBike;
+    const drift = Math.max(iv.hrDriftPct ?? 0, iv.dropPct ?? 0);
+    const rec = iv.recoveryHrDrop;
+    if (plannedReps && reps < plannedReps) return { result: 'fail', why: `nur ${reps} von ${plannedReps} Intervallen` };
+    if (drift >= 8) return { result: 'fail', why: `Puls/Leistung im letzten Intervall ${Math.round(drift)} % schlechter als im ersten` };
+    if (!hrOk) return { result: 'stay', why: `Puls in den Intervallen ${iv.avgHrWork} über dem Zielbereich` };
+    if (drift >= 5) return { result: 'stay', why: `Abfall vom ersten zum letzten Intervall ${Math.round(drift)} %` };
+    if (rec != null && rec < 12) return { result: 'stay', why: `Puls fiel in den Pausen nur um ${rec} Schläge` };
+    return { result: 'up', why: `${reps} Intervalle, Puls im Zielbereich, Abfall unter 5 %${rec != null ? ', Erholung ' + rec + ' Schläge' : ''}` };
+  }
+  const rpe = toNum(st && st.rpe);
+  if (rpe != null) {
+    if (rpe <= 7) return { result: 'up', why: `keine Rundendaten, RPE ${rpe}` };
+    if (rpe >= 9) return { result: 'fail', why: `keine Rundendaten, RPE ${rpe} (sehr hart)` };
+    return { result: 'stay', why: `keine Rundendaten, RPE ${rpe}` };
+  }
+  return { result: 'stay', why: 'keine Messdaten und keine RPE' };
+}
 function isSweetSpot(s) { return !!s && s.sport === 'bike' && !/^(Zone 2|Locker) statt/.test(s.title || '') && /sweet/i.test((s.title || '') + ' ' + (s.zone || '')); }
 const round5 = x => Math.max(5, Math.round(x / 5) * 5);
 const r1 = x => Math.round(x * 10) / 10;
@@ -455,13 +482,14 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   if (last) {
     const cur = ladderIndex(last.s.title);
     if (cur >= 0) {
-      const rpe = toNum(last.st.rpe), q = last.st.quality || 'ok';
+      const lthrBike = (thrOf(state).lthrBike) || LTHR_DEFAULT.bike;
+      const verdict = ladderVerdict(last.s, last.st, (state.activities || {})[last.st.activityId], lthrBike);
       const prev = doneSS[doneSS.length - 2];
+      const prevVerdict = prev ? ladderVerdict(prev.s, prev.st, (state.activities || {})[prev.st.activityId], lthrBike) : null;
       let target = cur;
-      if (q === 'bad' && prev && (prev.st.quality === 'bad')) { target = Math.max(0, cur - 1); ladderWhy = 'zweimal „Schlecht“: eine Stufe zurück'; }
-      else if ((rpe != null && rpe >= 9) || q === 'bad') { ladderWhy = 'letzte Einheit war sehr hart: Stufe wiederholen'; }
-      else if (rpe != null && rpe <= 7 && (q === 'good' || q === 'ok')) { target = Math.min(LADDER.length - 1, cur + 1); ladderWhy = target > cur ? `letzte Einheit lief gut (RPE ${rpe}): eine Stufe weiter` : 'höchste Stufe erreicht'; }
-      else { ladderWhy = rpe == null ? 'keine RPE eingetragen: Stufe wiederholen' : `RPE ${rpe}: Stufe wiederholen`; }
+      if (verdict.result === 'fail' && prevVerdict && prevVerdict.result === 'fail') { target = Math.max(0, cur - 1); ladderWhy = 'zweimal nicht geschafft: eine Stufe zurück (' + verdict.why + ')'; }
+      else if (verdict.result === 'up') { target = Math.min(LADDER.length - 1, cur + 1); ladderWhy = target > cur ? 'letzte Einheit lief laut Messdaten gut (' + verdict.why + '): eine Stufe weiter' : 'höchste Stufe erreicht'; }
+      else ladderWhy = verdict.why + ': Stufe wiederholen';
       const [a, b] = LADDER[target];
       nextSessions.filter(s => isSweetSpot(s) && !s.cancelled).forEach(s => {
         const curTitle = s.title;
