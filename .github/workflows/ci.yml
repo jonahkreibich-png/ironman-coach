@@ -1,5 +1,6 @@
 # Bei jedem Push: Typen, Unit-Tests, Server-Tests, Build und E2E (iPhone-Breite).
 # Deploy nur aus main und nur, wenn alles grün ist (und das Cloudflare-Token als Secret hinterlegt ist).
+# Datenbank-Migrationen laufen hier bewusst nicht: die echte Datenbank wird nur nach scripts/release.md umgestellt.
 name: Tests und Deploy
 
 on:
@@ -48,7 +49,7 @@ jobs:
         run: npm ci && npm ci --prefix server
       - name: Server (Worker) deployen
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npx --prefix server wrangler deploy --config server/wrangler.toml --env production
+        run: npx --prefix server wrangler deploy --config server/wrangler.toml
       - name: App bauen und auf Cloudflare Pages deployen
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npm run build && npx --prefix server wrangler pages deploy dist --project-name "${{ vars.PAGES_PROJECT || 'app' }}" --branch main
+        run: npm run build && npx --prefix server wrangler pages deploy dist --project-name "${{ vars.PAGES_PROJECT || 'stamio' }}" --branch main

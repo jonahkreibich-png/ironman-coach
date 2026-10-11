@@ -63,7 +63,8 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
   // Coach
   if (p === '/api/coach/ai/status' && M === 'GET') {
     const s = await getRecord(env, a.uid, 'settings', 'main');
-    return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {});
+    const prof = await getRecord(env, a.uid, 'profile', 'main');
+    return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {}, prof ? isMinor(prof.data, berlinParts().date) : false);
   }
   if (p === '/api/coach/chat' && M === 'POST') {
     const body = await readJson(req);
@@ -110,7 +111,8 @@ export async function onRecordsChanged(env: Env, uid: number, changes: Change[],
   if (!evs.length) return;
   try {
     const L = await loadState(env, uid);
-    const st = await aiStatus(env, uid, L.state.settings);
+    const ctx0 = engineCtx(L);
+    const st = await aiStatus(env, uid, L.state.settings, isMinor(ctx0.profile, ctx0.today));
     const rephrase = st.active ? (m: any) => aiRephrase(env, uid, engineCtx(L), m) : undefined;
     for (const ev of evs) await runEngineFor(env, uid, ev, { L, rephrase });
   } catch (e) { /* die Engine darf den Sync nie stören */ }

@@ -48,9 +48,9 @@ async function saveConn(env: Env, uid: number, p: string, fields: Partial<Conn> 
 export async function startOAuth(env: Env, a: Auth, p: ProviderId, returnTo?: string): Promise<{ url: string }> {
   const def = OAUTH[p];
   if (!def) throw new HttpError(404, 'Unbekannter Dienst.');
-  if (def.status !== 'ready') throw new HttpError(409, `${def.label} braucht noch eine Freischaltung durch den Anbieter. Details in VERBINDUNGEN.md.`);
+  if (def.status !== 'ready') throw new HttpError(409, `${def.label} braucht noch eine Freischaltung durch den Anbieter.`);
   const clientId = env[def.idEnv];
-  if (!clientId || !env[def.secretEnv]) throw new HttpError(503, `${def.label} ist auf dem Server noch nicht eingerichtet (App-Schlüssel fehlt, siehe FUER-JONAH.md).`);
+  if (!clientId || !env[def.secretEnv]) throw new HttpError(503, `${def.label} ist auf dem Server noch nicht eingerichtet (App-Schlüssel fehlt).`);
   const state = randomToken(24);
   const verifier = randomToken(32);
   await env.DB.prepare('INSERT INTO oauth_states (state, user_id, provider, verifier, return_to, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(state, a.uid, p, verifier, (returnTo || '').slice(0, 200), Date.now()).run();

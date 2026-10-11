@@ -35,13 +35,13 @@ const text = (t: string) => () => ({ stop_reason: 'end_turn', content: [{ type: 
 const tool = (name: string, input: any) => () => ({ stop_reason: 'tool_use', content: [{ type: 'text', text: 'Moment.' }, { type: 'tool_use', id: 'tu' + Math.random(), name, input }], usage: { input_tokens: 2500, output_tokens: 120 } });
 afterEach(() => setCreateOverride(null));
 
-async function user(o: { consent?: boolean; enabled?: boolean; birthYear?: number; oura?: boolean; budget?: number } = {}) {
+async function user(o: { consent?: boolean; enabled?: boolean; birthYear?: number; oura?: boolean; budget?: number; parent?: boolean } = {}) {
   const env = makeEnv({ AI_MONTHLY_BUDGET_USD: String(o.budget ?? 5) });
   const T = (await call(env, 'POST', '/api/setup', { name: 'iPhone' })).data.token;
   const trendRec = { date: today, hrv: 58, restingHR: 51, sleepHours: 7.6, _src: { hrv: o.oura ? 'oura' : 'shortcut', restingHR: 'shortcut', sleepHours: o.oura ? 'oura' : 'shortcut' }, _auto: { hrv: { [o.oura ? 'oura' : 'shortcut']: 58 }, sleepHours: { [o.oura ? 'oura' : 'shortcut']: 7.6 }, restingHR: { shortcut: 51 } }, _manual: {} };
   await call(env, 'POST', '/api/sync', { since: 0, changes: [
     { kind: 'plan', key: 'main', data: plan(), updatedAt: 1 },
-    { kind: 'settings', key: 'main', data: { settings: { lthrRun: 172, lthrBike: 165, ai: { enabled: o.enabled !== false, ...(o.consent === false ? {} : { consentAt: 1 }) } }, nutritionProfile: { age: 17, heightCm: 180, weightKg: 70, pal: 1.4 } }, updatedAt: 1 },
+    { kind: 'settings', key: 'main', data: { settings: { lthrRun: 172, lthrBike: 165, ai: { enabled: o.enabled !== false, ...(o.consent === false ? {} : { consentAt: 1, ...(o.parent === false ? {} : { parentConsent: true }) }) } }, nutritionProfile: { age: 17, heightCm: 180, weightKg: 70, pal: 1.4 } }, updatedAt: 1 },
     { kind: 'profile', key: 'main', data: { name: 'Test', birthYear: o.birthYear ?? 2009, sports: ['swim', 'bike', 'run'], thresholds: { lthrRun: 172, lthrBike: 165, thresholdPaceRunSec: 330, thresholdSpeedBikeKmh: 29 }, weeklyHours: 8 }, updatedAt: 1 },
     { kind: 'trend', key: today, data: trendRec, updatedAt: 1 }
   ] }, T);
@@ -58,6 +58,7 @@ describe('Zugang', () => {
     const r = await chat(env, T, 'Hallo');
     expect(r.status).toBe(403); expect(r.data.error).toMatch(/Einwilligung/); expect(requests).toHaveLength(0);
   });
+test('Unter 18 ohne Einwilligung der Eltern: kein KI-Aufruf', async () => {    mock([text('Antwort')]);    const { env, T } = await user({ parent: false });    const r = await chat(env, T, 'Hallo');    expect(r.status).toBe(403); expect(r.data.error).toMatch(/Einwilligung/); expect(requests).toHaveLength(0);    expect((await call(env, 'GET', '/api/coach/ai/status', null, T)).data.consent).toBe(false);  });
   test('Budget aufgebraucht: 403', async () => {
     mock([text('Antwort')]);
     const { env, T } = await user({ budget: 0.001 });

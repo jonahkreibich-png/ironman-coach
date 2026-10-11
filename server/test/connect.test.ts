@@ -215,7 +215,7 @@ describe('WHOOP, Withings, Polar', () => {
     const { env, token } = await setupUser({ OURA_CLIENT_ID: '' });
     expect((await call(env, 'POST', '/api/connect/fitbit/start', {}, token)).status).toBe(409);
     const r = await call(env, 'POST', '/api/connect/oura/start', {}, token);
-    expect(r.status).toBe(503); expect(r.data.error).toMatch(/FUER-JONAH/);
+    expect(r.status).toBe(503); expect(r.data.error).toMatch(/App-Schlüssel fehlt/);
     const list = (await call(env, 'GET', '/api/connections', null, token)).data.connections;
     expect(list.find((c: any) => c.id === 'garmin').availability).toBe('partner');
   });
