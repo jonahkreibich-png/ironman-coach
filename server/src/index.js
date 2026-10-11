@@ -1,4 +1,4 @@
-/* Ironman Coach Server: Geräte-Login, Datensatz-Sync, tägliches Backup, intervals.icu-Abruf.
+/* Server: Geräte-Login, Datensatz-Sync, tägliches Backup, Datenabruf, Coach, Mitteilungen.
    Ein Nutzer, kein Registrierungssystem. Geheimnisse nur über env (Cloudflare-Secrets). */
 import { berlinDate, berlinParts, putRecords, getMeta } from './store.js';
 import { runImport } from './intervals.js';
@@ -6,6 +6,7 @@ import { runDaily, runWeekly, loadState } from './coach.js';
 import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliver } from './notify.js';
 import { vapidPublicKey } from './webpush.js';
 import { logError, recentErrors } from './errlog.js';
+import { BRAND } from '../../shared/brand';
 
 const KINDS = new Set(['session', 'trend', 'nutrition', 'custom', 'illness', 'milestone', 'weekNote', 'settings', 'plan', 'adjust']);
 const PAIR_TTL_MS = 10 * 60 * 1000;
@@ -241,7 +242,7 @@ async function route(req, env, url) {
   }
   if (p === '/api/push/test' && M === 'POST') {
     if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind auf dem Server noch nicht eingerichtet.');
-    const n = await deliver(env, { title: 'Ironman Coach', body: 'Mitteilungen funktionieren. 💪', url: './?go=heute', tag: 'test' });
+    const n = await deliver(env, { title: BRAND.name, body: 'Mitteilungen funktionieren. 💪', url: './?go=heute', tag: 'test' });
     return { delivered: n };
   }
 

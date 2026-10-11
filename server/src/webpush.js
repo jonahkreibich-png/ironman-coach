@@ -37,7 +37,7 @@ async function vapidHeader(env, endpoint) {
   const header = b64urlEncode(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
   const claims = b64urlEncode(enc.encode(JSON.stringify({
     aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-    sub: env.VAPID_SUBJECT || 'https://jonahkreibich-png.github.io/ironman-coach/'
+    sub: env.VAPID_SUBJECT || env.PUBLIC_URL || 'https://jonahkreibich-png.github.io/'
   })));
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(header + '.' + claims));
   return `vapid t=${header}.${claims}.${b64urlEncode(sig)}, k=${vapidPublicKey(env)}`;

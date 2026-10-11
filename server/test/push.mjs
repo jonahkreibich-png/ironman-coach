@@ -22,7 +22,7 @@ r = await call('POST', '/api/push/subscribe', { subscription: sub }, T);
 ok(r.status === 200, 'Abo gespeichert');
 r = await call('POST', '/api/push/test', null, T);
 let m = await msgs();
-ok(r.data.delivered === 1 && m.length === 1 && m[0].title === 'Ironman Coach' && !m[0].error, 'Test-Mitteilung: VAPID gültig, Inhalt entschlüsselt' + (m[0] && m[0].error ? ' (' + m[0].error + ')' : ''));
+ok(r.data.delivered === 1 && m.length === 1 && m[0].title === 'Stamio' && !m[0].error, 'Test-Mitteilung: VAPID gültig, Inhalt entschlüsselt' + (m[0] && m[0].error ? ' (' + m[0].error + ')' : ''));
 
 // Plan: heute Rad 17:30 (Text), morgen früher Lauf, Trend mit Morgenwerten
 const days = [
