@@ -1,7 +1,8 @@
 /* Abruf von intervals.icu: Wellness → trend, Aktivitäten → erledigte Einheiten bzw. Extra-Einheiten.
    Regel: Manuell eingegebene Werte werden nie überschrieben, nur leere Felder werden gefüllt.
    Werte, die früher automatisch kamen, merkt sich der Datensatz in _icu. Nur die dürfen aktualisiert werden. */
-import { berlinDate, addDaysStr, getRecord, getRecords, putRecords, getMeta, setMeta } from './store.js';
+import { decryptJson } from './http';
+import { type Env, berlinDate, addDaysStr, getRecord, getRecords, putRecords, getMeta, setMeta } from './store';
 
 const SPORT_MAP = {
   run: ['Run', 'TrailRun', 'VirtualRun', 'Treadmill'],
@@ -21,8 +22,8 @@ const empty = v => v == null || v === '';
 function secToPace(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
 
 /* Verrät nie den Schlüssel selbst, nur Länge und Format, damit Tippfehler beim Einfügen auffallen. */
-export function accessHint(env, status) {
-  const key = String(env.INTERVALS_API_KEY || ''), id = String(env.INTERVALS_ATHLETE_ID || '').trim();
+export function accessHint(creds: Creds, status: number) {
+  const key = String(creds.key || ''), id = String(creds.id || '').trim();
   const idOk = /^i\d+$/.test(id);
   const keyInfo = `Schlüssel hat ${key.length} Zeichen${key.length < 15 ? ' (zu kurz, wahrscheinlich nicht richtig eingefügt)' : ''}${/\s/.test(key) ? ', enthält Leerzeichen' : ''}`;
   const idInfo = idOk ? 'Athleten-ID-Format ok' : `Athleten-ID-Format falsch (soll wie i123456 aussehen, hat ${id.length} Zeichen)`;
@@ -30,14 +31,23 @@ export function accessHint(env, status) {
   return `intervals.icu ${what} (Fehler ${status}). ${keyInfo}, ${idInfo}.`;
 }
 
-async function icuGet(env, path) {
+async function icuGet(env: Env, creds: Creds, path: string) {
   const base = env.INTERVALS_BASE || 'https://intervals.icu';
   const res = await fetch(base + path, {
-    headers: { Authorization: 'Basic ' + btoa('API_KEY:' + String(env.INTERVALS_API_KEY).trim()), Accept: 'application/json' }
+    headers: { Authorization: 'Basic ' + btoa('API_KEY:' + String(creds.key).trim()), Accept: 'application/json' }
   });
-  if (res.status === 401 || res.status === 403 || res.status === 404) throw new Error(accessHint(env, res.status));
+  if (res.status === 401 || res.status === 403 || res.status === 404) throw new Error(accessHint(creds, res.status));
   if (!res.ok) throw new Error('intervals.icu antwortet mit Fehler ' + res.status);
   return res.json();
+}
+
+/* Zugangsdaten: pro Nutzer als verschlüsselte Verbindung, für Nutzer 1 auch die alten Secrets. */
+export interface Creds { key: string; id: string }
+export async function intervalsCreds(env: Env, uid: number): Promise<Creds | null> {
+  const row = await env.DB.prepare("SELECT token_enc FROM connections WHERE user_id = ? AND provider = 'intervals' AND status <> 'disconnected'").bind(uid).first();
+  if (row && row.token_enc) { const tk = await decryptJson(env, row.token_enc); if (tk && tk.apiKey && tk.athleteId) return { key: tk.apiKey, id: tk.athleteId }; }
+  if (uid === 1 && env.INTERVALS_API_KEY && env.INTERVALS_ATHLETE_ID) return { key: env.INTERVALS_API_KEY, id: env.INTERVALS_ATHLETE_ID };
+  return null;
 }
 
 /* ---------- Wellness → trend ---------- */
@@ -45,7 +55,7 @@ const STANDARD_WELLNESS = new Set(['id', 'ctl', 'atl', 'rampRate', 'ctlLoad', 'a
 const ICU_SLEEP_QUALITY = { 1: 9, 2: 7, 3: 5, 4: 3 }; // intervals: 1 = super … 4 = schlecht → App: /10
 
 export function mapWellness(w) {
-  const o = {};
+  const o: any = {};
   if (isNum(w.ctl)) o.ctl = r1(w.ctl);
   if (isNum(w.atl)) o.atl = r1(w.atl);
   if (isNum(w.ctl) && isNum(w.atl)) o.tsb = r1(w.ctl - w.atl);
@@ -58,7 +68,7 @@ export function mapWellness(w) {
   else if (ICU_SLEEP_QUALITY[w.sleepQuality]) o.sleepQuality = ICU_SLEEP_QUALITY[w.sleepQuality];
   if (isNum(w.vo2max) && w.vo2max > 0) o.vo2max = r1(w.vo2max);
   // Zusatzfelder (z. B. von Oura), Namen sind je nach Konto verschieden
-  const custom = [];
+  const custom: any[] = [];
   for (const [k, v] of Object.entries(w)) {
     if (STANDARD_WELLNESS.has(k) || !isNum(v)) continue;
     custom.push(k);
@@ -90,7 +100,7 @@ export function mergeAuto(existing, incoming) {
 
 /* ---------- Aktivitäten → Sessions ---------- */
 export function activityMetrics(a, sport) {
-  const m = {};
+  const m: any = {};
   const min = isNum(a.moving_time) && a.moving_time > 0 ? a.moving_time / 60 : (isNum(a.elapsed_time) ? a.elapsed_time / 60 : null);
   const dist = isNum(a.distance) && a.distance > 0 ? a.distance : (isNum(a.icu_distance) && a.icu_distance > 0 ? a.icu_distance : null);
   if (min) m.min = Math.round(min);
@@ -106,7 +116,7 @@ export function activityMetrics(a, sport) {
   return m;
 }
 function planSessionsByDate(plan) {
-  const map = {};
+  const map: any = {};
   ((plan && plan.weeks) || []).forEach(w => (w.days || []).forEach(d => (d.sessions || []).forEach(s => {
     (map[d.date] = map[d.date] || []).push(Object.assign({}, s, { date: d.date }));
   })));
@@ -119,21 +129,22 @@ function fillEmpty(target, src) {
 }
 
 /* ---------- Hauptlauf ---------- */
-export async function runImport(env, opts) {
+export async function runImport(env: Env, uid: number, opts?: any): Promise<any> {
   opts = opts || {};
-  const status = { at: Date.now(), ok: false, wellnessDays: 0, matched: 0, extras: 0, custom: [] };
+  const status: any = { at: Date.now(), ok: false, wellnessDays: 0, matched: 0, extras: 0, custom: [] };
   try {
-    if (!env.INTERVALS_API_KEY || !env.INTERVALS_ATHLETE_ID) throw new Error('Noch kein intervals.icu-Schlüssel hinterlegt.');
-    const last = await getMeta(env, 'intervals_last');
+    const creds = await intervalsCreds(env, uid);
+    if (!creds) throw new Error('Noch kein intervals.icu-Schlüssel hinterlegt.');
+    const last = await getMeta(env, uid, 'intervals_last');
     const today = berlinDate();
     const oldest = addDaysStr(today, last && last.ok ? -(opts.days || 7) : -42);
-    const athlete = encodeURIComponent(String(env.INTERVALS_ATHLETE_ID).trim());
-    const changes = [];
+    const athlete = encodeURIComponent(String(creds.id).trim());
+    const changes: any[] = [];
     const t = Date.now();
 
     // Wellness
-    const wellness = await icuGet(env, `/api/v1/athlete/${athlete}/wellness?oldest=${oldest}&newest=${today}`);
-    const existingTrend = await getRecords(env, 'trend', (wellness || []).map(w => w.id));
+    const wellness = await icuGet(env, creds, `/api/v1/athlete/${athlete}/wellness?oldest=${oldest}&newest=${today}`);
+    const existingTrend = await getRecords(env, uid, 'trend', (wellness || []).map(w => w.id));
     const customSeen = new Set();
     for (const w of wellness || []) {
       if (!w || !/^\d{4}-\d{2}-\d{2}$/.test(w.id)) continue;
@@ -148,14 +159,14 @@ export async function runImport(env, opts) {
     status.custom = [...customSeen];
 
     // Aktivitäten
-    const linked = (await getMeta(env, 'icu_links')) || {};
+    const linked = (await getMeta(env, uid, 'icu_links')) || {};
     // Solange noch nie eine Aktivität übernommen wurde, 6 Wochen zurück schauen
     const actOldest = Object.keys(linked).length ? oldest : addDaysStr(today, -42);
-    const acts = await icuGet(env, `/api/v1/athlete/${athlete}/activities?oldest=${actOldest}&newest=${today}`);
-    const planRec = await getRecord(env, 'plan', 'main');
+    const acts = await icuGet(env, creds, `/api/v1/athlete/${athlete}/activities?oldest=${actOldest}&newest=${today}`);
+    const planRec = await getRecord(env, uid, 'plan', 'main');
     const byDate = planSessionsByDate(planRec && planRec.data);
     const sessIds = Object.values(byDate).flat().map(s => s.id);
-    const sessRecs = await getRecords(env, 'session', sessIds);
+    const sessRecs = await getRecords(env, uid, 'session', sessIds);
     const usedThisRun = new Set(Object.values(linked).filter(l => l.kind === 'session').map(l => l.key));
     const usedCustom = new Set(Object.values(linked).filter(l => l.kind === 'custom').map(l => l.key));
     let customsByKey = null, manual = null;
@@ -174,7 +185,7 @@ export async function runImport(env, opts) {
       if (!sport) { const t = String(a.type || 'ohne Sportart'); A.ignored[t] = (A.ignored[t] || 0) + 1; continue; }
       const date = a.start_date_local.slice(0, 10);
       const metrics = activityMetrics(a, sport);
-      const extra = { icuId: id };
+      const extra: any = { icuId: id };
       if (isNum(a.icu_training_load)) extra.icuLoad = Math.round(a.icu_training_load);
       // Passende geplante Einheit: gleicher Tag, gleicher Sport, nicht ausgefallen, noch nicht verknüpft
       const cand = (byDate[date] || []).find(s => s.sport === sport && !usedThisRun.has(s.id) && !((sessRecs[s.id] || {}).skipped));
@@ -189,7 +200,7 @@ export async function runImport(env, opts) {
         changes.push({ kind: 'session', key: cand.id, data: st, updatedAt: t });
         linked[id] = { kind: 'session', key: cand.id, date };
         status.matched++;
-      } else if ((customsByKey = customsByKey || await getRecords(env, 'custom')) &&
+      } else if ((customsByKey = customsByKey || await getRecords(env, uid, 'custom')) &&
                  (manual = Object.values(customsByKey).find(c => c && c.date === date && c.sport === sport && !c.icuId && !usedCustom.has(c.id)))) {
         // Selbst eingetragene Extra-Einheit desselben Tages und Sports: nur ergänzen, nicht doppelt anlegen
         const c = Object.assign({}, manual);
@@ -214,15 +225,15 @@ export async function runImport(env, opts) {
       }
     }
 
-    if (changes.length) await putRecords(env, changes);
+    if (changes.length) await putRecords(env, uid, changes);
     // Verknüpfungen nur so lange merken, wie sie abgerufen werden könnten
     const keepFrom = addDaysStr(today, -60);
     Object.keys(linked).forEach(k => { if (linked[k].date < keepFrom) delete linked[k]; });
-    await setMeta(env, 'icu_links', linked);
+    await setMeta(env, uid, 'icu_links', linked);
     status.ok = true;
   } catch (e) {
     status.error = e.message;
   }
-  await setMeta(env, 'intervals_last', status);
+  await setMeta(env, uid, 'intervals_last', status);
   return status;
 }

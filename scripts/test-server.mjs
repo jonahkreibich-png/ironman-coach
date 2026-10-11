@@ -10,12 +10,12 @@ import { D1Shim } from '../server/test/d1-shim.mjs';
 const port = +(process.argv[2] || 4180);
 const root = path.resolve('dist');
 const out = path.resolve('node_modules/.cache/worker-test.mjs');
-await build({ entryPoints: ['server/src/index.js'], bundle: true, format: 'esm', platform: 'neutral', outfile: out, logLevel: 'error', mainFields: ['module', 'main'] });
+await build({ entryPoints: ['server/src/index.ts'], bundle: true, format: 'esm', platform: 'neutral', outfile: out, logLevel: 'error', mainFields: ['module', 'main'] });
 const worker = (await import('file://' + out.replace(/\\/g, '/') + '?t=' + Date.now())).default;
 
 function freshDb() {
   const db = new D1Shim(process.env.DB_FILE || ':memory:');
-  for (const f of ['server/schema.sql', ...fs.readdirSync('server/migrations').filter(f => f.endsWith('.sql')).sort().map(f => 'server/migrations/' + f)]) {
+  for (const f of [...fs.readdirSync('server/migrations').filter(f => f.endsWith('.sql')).sort().map(f => 'server/migrations/' + f)]) {
     if (fs.existsSync(f)) db.execFile(f);
   }
   return db;

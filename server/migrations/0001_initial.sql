@@ -1,4 +1,4 @@
--- Datenbank für Ironman Coach. Kann mehrfach ausgeführt werden.
+-- Ausgangsschema (Stand vor AUFTRAG-2). Kann mehrfach ausgeführt werden.
 
 -- Geräte: nur der SHA-256-Hash des Geräte-Schlüssels wird gespeichert
 CREATE TABLE IF NOT EXISTS devices (

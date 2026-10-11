@@ -1,9 +1,9 @@
 /* Phase 5: Push-Mitteilungen. Zeiten in Europe/Berlin, Ruhezeit 22:30-6:00, höchstens 4 pro Tag.
    Läuft alle 5 Minuten. Geplante Mitteilungen werden fällig, wenn ihre Uhrzeit seit dem letzten Lauf erreicht wurde. */
 import * as C from '../../shared/core';
-import { berlinParts, addDaysStr, getMeta, setMeta } from './store.js';
-import { loadState } from './coach.js';
-import { sendPush } from './webpush.js';
+import { type Env, berlinParts, addDaysStr, getMeta, setMeta } from './store';
+import { loadState } from './coach';
+import { sendPush } from './webpush';
 
 
 export const DEFAULT_PREFS = {
@@ -31,24 +31,24 @@ const LEVEL_TXT = ['Intervalle möglich', 'heute nur locker', 'heute Ruhe'];
 const SNACKS = ['jetzt noch Toast mit Banane', 'jetzt noch 2 Reiswaffeln mit Marmelade', 'jetzt noch eine Banane und etwas Wasser', 'jetzt noch ein Brot mit Honig'];
 
 /* ---------- Datenbank ---------- */
-async function subscriptions(env) {
-  const rows = await env.DB.prepare('SELECT id, device_id, endpoint, p256dh, auth FROM push_subs').all();
+async function subscriptions(env: Env, uid: number) {
+  const rows = await env.DB.prepare('SELECT id, device_id, endpoint, p256dh, auth FROM push_subs WHERE user_id = ?').bind(uid).all();
   return rows.results || [];
 }
-async function sentToday(env, day) {
-  const rows = await env.DB.prepare('SELECT key, type FROM push_log WHERE day = ?').bind(day).all();
+async function sentToday(env: Env, uid: number, day: string) {
+  const rows = await env.DB.prepare('SELECT key, type FROM push_log WHERE user_id = ? AND day = ?').bind(uid, day).all();
   return rows.results || [];
 }
-async function logSent(env, day, key, type) {
-  await env.DB.prepare('INSERT OR IGNORE INTO push_log (key, day, type, sent_at) VALUES (?, ?, ?, ?)').bind(key, day, type, Date.now()).run();
+async function logSent(env: Env, uid: number, day: string, key: string, type: string) {
+  await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at) VALUES (?, ?, ?, ?, ?)').bind(uid, key, day, type, Date.now()).run();
 }
-export async function queueWarning(env, key, msg) {
-  await env.DB.prepare('INSERT OR IGNORE INTO push_queue (key, type, payload, created_at) VALUES (?, ?, ?, ?)').bind(key, 'warnings', JSON.stringify(msg), Date.now()).run();
+export async function queueWarning(env: Env, uid: number, key: string, msg: any) {
+  await env.DB.prepare('INSERT OR IGNORE INTO push_queue (user_id, key, type, payload, created_at) VALUES (?, ?, ?, ?, ?)').bind(uid, key, 'warnings', JSON.stringify(msg), Date.now()).run();
 }
 
 /* ---------- Verschicken an alle Geräte ---------- */
-export async function deliver(env, msg) {
-  const subs = await subscriptions(env);
+export async function deliver(env: Env, uid: number, msg: any): Promise<number> {
+  const subs = await subscriptions(env, uid);
   let ok = 0;
   for (const s of subs) {
     try {
@@ -77,7 +77,7 @@ function sessLine(s, L) {
 }
 
 export function buildJobs(L, b, prefs, prevMin) {
-  const jobs = [];
+  const jobs: any[] = [];
   const date = b.date, min = b.hour * 60 + b.minute;
   const due = hhmm => { const t = toMin(hhmm); return t != null && t > prevMin && t <= min; };
   const T = prefs.types, X = prefs.times;
@@ -148,13 +148,13 @@ export function weeklyJob(L, b) {
 }
 
 /* Bestwerte nach dem Abruf prüfen */
-export async function checkAchievements(env, L, date) {
+export async function checkAchievements(env: Env, uid: number, L: any, date: string): Promise<any[]> {
   const weeks = C.applyAdjustments(L.baseWeeks, L.state.adjustments);
   const now = C.bests(C.perfEntries(L.state, weeks));
-  const prev = await getMeta(env, 'bests');
-  await setMeta(env, 'bests', now);
+  const prev = await getMeta(env, uid, 'bests');
+  await setMeta(env, uid, 'bests', now);
   if (!prev) return []; // erster Lauf: nur merken
-  const out = [];
+  const out: any[] = [];
   const recent = d => d >= addDaysStr(date, -2);
   const fmtPace = s => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
   if (now.swimPace && recent(now.swimPace.date) && (!prev.swimPace || now.swimPace.v < prev.swimPace.v - 0.5)) out.push({ key: 'best-swim-' + now.swimPace.id, title: 'Neuer Bestwert 🎉', body: `Schwimm-Pace ${fmtPace(now.swimPace.v)} pro 100 m. Stark!`, url: './?go=fortschritt' });
@@ -164,29 +164,29 @@ export async function checkAchievements(env, L, date) {
 }
 
 /* ---------- Hauptlauf alle 5 Minuten ---------- */
-export async function notifyTick(env, ctx) {
+export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any> {
   ctx = ctx || {};
   if (!env.VAPID_PRIVATE_JWK) return { skipped: 'kein VAPID-Schlüssel' };
   const b = ctx.berlin || berlinParts();
   const min = b.hour * 60 + b.minute;
-  const tick = (await getMeta(env, 'notify_tick')) || {};
+  const tick = (await getMeta(env, uid, 'notify_tick')) || {};
   // Nur begrenzt zurückschauen (35 min, reicht auch bei 30-Minuten-Läufen), damit nach einer Pause keine alten Mitteilungen nachkommen
   const prevMin = Math.max(tick.date === b.date ? tick.min : -1, min - 35);
-  await setMeta(env, 'notify_tick', { date: b.date, min });
-  const subs = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs').first();
+  await setMeta(env, uid, 'notify_tick', { date: b.date, min });
+  const subs = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?').bind(uid).first();
   if (!subs || !subs.n) return { skipped: 'keine Geräte angemeldet' };
 
-  const L = ctx.state || await loadState(env);
+  const L = ctx.state || await loadState(env, uid);
   if (!L.plan) return { skipped: 'kein Plan' };
   const settingsRec = L.state.settings || {};
   const prefs = prefsOf(settingsRec);
   const quiet = inQuiet(prefs, min);
-  const sent = await sentToday(env, b.date);
+  const sent = await sentToday(env, uid, b.date);
   const sentKeys = new Set(sent.map(r => r.key));
   let count = sent.length;
   const warnSent = sent.some(r => WARNING_TYPES.has(r.type));
   const max = prefs.maxPerDay || 4;
-  const out = [];
+  const out: any[] = [];
 
   const trySend = async (job, isWarning) => {
     if (sentKeys.has(job.key)) return false;
@@ -196,20 +196,20 @@ export async function notifyTick(env, ctx) {
     const limit = isWarning ? max : (warnSent ? max : max - 1);
     if (count >= limit) return false;
     const payload = { title: job.title, body: job.body, url: job.url || './', tag: job.key, badge: openCount(L, b.date), urgent: !!isWarning };
-    await deliver(env, payload);
-    await logSent(env, b.date, job.key, isWarning ? 'warnings' : job.type);
+    await deliver(env, uid, payload);
+    await logSent(env, uid, b.date, job.key, isWarning ? 'warnings' : job.type);
     sentKeys.add(job.key); count++; out.push(job.key);
     return true;
   };
 
   // 1) Warteschlange (Warnungen, Erfolge) – außerhalb der Ruhezeit
   if (!quiet) {
-    const q = await env.DB.prepare('SELECT key, type, payload, created_at FROM push_queue ORDER BY created_at').all();
+    const q = await env.DB.prepare('SELECT key, type, payload, created_at FROM push_queue WHERE user_id = ? ORDER BY created_at').bind(uid).all();
     for (const row of q.results || []) {
-      if (Date.now() - row.created_at > 24 * 3600 * 1000) { await env.DB.prepare('DELETE FROM push_queue WHERE key = ?').bind(row.key).run(); continue; }
+      if (Date.now() - row.created_at > 24 * 3600 * 1000) { await env.DB.prepare('DELETE FROM push_queue WHERE user_id = ? AND key = ?').bind(uid, row.key).run(); continue; }
       const job = Object.assign(JSON.parse(row.payload), { key: row.key, type: row.type });
       const isWarn = row.type === 'warnings';
-      if (await trySend(job, isWarn) || sentKeys.has(row.key) || (!isWarn && prefs.types[row.type] === false)) await env.DB.prepare('DELETE FROM push_queue WHERE key = ?').bind(row.key).run();
+      if (await trySend(job, isWarn) || sentKeys.has(row.key) || (!isWarn && prefs.types[row.type] === false)) await env.DB.prepare('DELETE FROM push_queue WHERE user_id = ? AND key = ?').bind(uid, row.key).run();
     }
   }
   // 2) Geplante Mitteilungen (in der Ruhezeit verfallen sie)
@@ -218,18 +218,18 @@ export async function notifyTick(env, ctx) {
 }
 
 /* Warnungen nach dem Abruf bzw. nach Plan-Anpassungen in die Warteschlange legen */
-export async function queueAfterImport(env, L, date) {
+export async function queueAfterImport(env: Env, uid: number, L: any, date: string) {
   const R = C.readinessFor(L.state.trend, L.state.illnessPeriods, date, L.state.settings.readiness);
   const p = L.state.trend.find(x => x.date === date);
   if (C.illnessAt(L.state.illnessPeriods, date) || !C.hasRecovery(p)) return;
-  if (p && p.bodyTemp != null && p.bodyTemp >= 0.5) await queueWarning(env, 'warn-temp-' + date, { title: 'Temperatur erhöht', body: `Temperatur +${String(p.bodyTemp).replace('.', ',')} °C. Wirst du krank? Heute kein hartes Training.`, url: './?go=heute' });
-  else if (R.level === 2) await queueWarning(env, 'warn-red-' + date, { title: '🔴 Ampel rot', body: (R.reasons.join(', ') || 'Deine Werte sind deutlich schlechter als normal') + '. Heute Ruhe oder ganz locker.', url: './?go=heute' });
+  if (p && p.bodyTemp != null && p.bodyTemp >= 0.5) await queueWarning(env, uid, 'warn-temp-' + date, { title: 'Temperatur erhöht', body: `Temperatur +${String(p.bodyTemp).replace('.', ',')} °C. Wirst du krank? Heute kein hartes Training.`, url: './?go=heute' });
+  else if (R.level === 2) await queueWarning(env, uid, 'warn-red-' + date, { title: '🔴 Ampel rot', body: (R.reasons.join(', ') || 'Deine Werte sind deutlich schlechter als normal') + '. Heute Ruhe oder ganz locker.', url: './?go=heute' });
 }
-export async function queueAdjustments(env, list, date) {
+export async function queueAdjustments(env: Env, uid: number, list: any[], date: string) {
   const changes = (list || []).filter(a => a.type !== 'note');
   if (!changes.length) return;
-  await queueWarning(env, 'warn-adj-' + date + '-' + changes[0].id, { title: 'Plan angepasst', body: changes.map(a => a.what).join('; ') + (changes[0].reason ? ' – ' + changes[0].reason : ''), url: './?go=plan' });
+  await queueWarning(env, uid, 'warn-adj-' + date + '-' + changes[0].id, { title: 'Plan angepasst', body: changes.map(a => a.what).join('; ') + (changes[0].reason ? ' – ' + changes[0].reason : ''), url: './?go=plan' });
 }
-export async function queueAchievements(env, list) {
-  for (const a of list) await env.DB.prepare('INSERT OR IGNORE INTO push_queue (key, type, payload, created_at) VALUES (?, ?, ?, ?)').bind(a.key, 'achievements', JSON.stringify(a), Date.now()).run();
+export async function queueAchievements(env: Env, uid: number, list: any[]) {
+  for (const a of list) await env.DB.prepare('INSERT OR IGNORE INTO push_queue (user_id, key, type, payload, created_at) VALUES (?, ?, ?, ?, ?)').bind(uid, a.key, 'achievements', JSON.stringify(a), Date.now()).run();
 }

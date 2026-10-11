@@ -1,7 +1,9 @@
-# Cloudflare Worker für Ironman Coach.
-# Hier stehen keine Geheimnisse. Schlüssel liegen nur als Cloudflare-Secrets vor (wrangler secret put …).
+# Cloudflare Worker (Server der App). Hier stehen keine Geheimnisse: Schlüssel liegen nur als Cloudflare-Secrets vor.
+#
+# Oben: die echte App (noch mit altem Namen, wird erst beim „Freigeben“ umbenannt, siehe scripts/release.md).
+# [env.test]: die Test-Umgebung mit eigener Datenbank. Deploy: npx wrangler deploy --env test
 name = "ironman-coach-api"
-main = "src/index.js"
+main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
 [[d1_databases]]
@@ -15,3 +17,23 @@ crons = ["0 2 * * *", "*/5 * * * *"]
 
 [vars]
 ALLOWED_ORIGINS = "https://jonahkreibich-png.github.io,http://localhost:8765"
+
+# ---------------- Test-Umgebung ----------------
+[env.test]
+name = "stamio-api-test"
+workers_dev = false
+preview_urls = false
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "stamio-test"
+database_id = "f5a7a245-1fcf-49bd-b29d-4587c69a35cf"
+migrations_dir = "migrations"
+
+[env.test.triggers]
+crons = ["0 2 * * *", "*/5 * * * *"]
+
+[env.test.vars]
+ALLOWED_ORIGINS = "https://stamio-test.pages.dev"
+PUBLIC_URL = "https://stamio-test.pages.dev"
+ENVIRONMENT = "test"
