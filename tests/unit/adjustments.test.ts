@@ -66,7 +66,7 @@ adj = C.dailyAdjustments(s, plan({ runIntervals: true }), '2026-10-16', { now: 1
 ok(adj.length === 0, 'Mit Freigabe des Coachs bleiben Lauf-Intervalle');
 const groinState = Object.assign({}, s, { sessions: { 'w2-mi': { completed: true, notes: 'Leiste zieht, Schmerz 3/10' } } });
 adj = C.dailyAdjustments(groinState, plan({ runIntervals: true }), '2026-10-16', { now: 1, planMeta: { runIntervalsAllowed: true } });
-ok(adj.length === 1 && /Leistenschmerz/.test(adj[0].reason), 'Leistenschmerz 3/10 → keine Lauf-Intensität, auch mit Freigabe');
+ok(adj.length === 1 && /Schmerz \(Leiste\)/.test(adj[0].reason), 'Leistenschmerz 3/10 → keine Lauf-Intensität, auch mit Freigabe');
 ok(!C.groinFlag({ sessions: { x: { notes: 'Leiste 2/10' } } }, [{ days: [{ date: '2026-10-15', sessions: [{ id: 'x' }] }] }], '2026-10-16'), 'Leiste 2/10 ist noch okay');
 
 console.log('Verpasste Schlüsseleinheit');
@@ -112,7 +112,7 @@ W = C.weeklyAdjustments(Object.assign({}, s, { sessions: Object.assign({}, doneA
 ok(!W.adjustments.some(a => a.id.includes('ladder')), 'RPE 9 → Stufe wiederholen (keine Änderung)');
 const groinW = Object.assign({}, s, { sessions: Object.assign({}, doneAll, { 'w1-fr': { completed: true, notes: 'Leiste 4/10' } }) });
 W = C.weeklyAdjustments(groinW, plan(), '2026-10-11', { now: 1 });
-ok(!W.adjustments.some(a => a.id.includes('-vol-')) && /Leistenschmerz/.test(W.adjustments.find(a => a.type === 'note').reason), 'Leistenschmerz → eine Woche keine Steigerung');
+ok(!W.adjustments.some(a => a.id.includes('-vol-')) && /Schmerz \(Leiste\)/.test(W.adjustments.find(a => a.type === 'note').reason), 'Leistenschmerz → eine Woche keine Steigerung');
 W = C.weeklyAdjustments(Object.assign({}, s, { illnessPeriods: [{ start: '2026-10-07', end: '2026-10-08' }] }), plan(), '2026-10-11', { now: 1 });
 ok(W.adjustments.find(a => a.sessionId === 'w2-so' && a.id.includes('-vol-')).set.plannedMinutes === 120, 'Krankheit in der Woche → −20 %');
 W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note' } } }), plan(), '2026-10-11', { now: 1 });

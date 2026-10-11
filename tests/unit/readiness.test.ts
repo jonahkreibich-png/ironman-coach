@@ -5,7 +5,7 @@ function ok(cond: any, msg: string) { expect(!!cond, msg).toBe(true); }
 test('Tagesampel (Phase 3)', () => {
 // Tests der gemeinsamen Coach-Logik (core.js) mit erfundenen Werten.
 const T = '2026-10-10';
-const FB = { rhrMax: 56, hrvMin: 65, tempMax: 0.5 };
+const FB = { rhrMax: 56, hrvMin: 65, tempMax: 0.5, sleepNeed: [8.5, 9] };
 // 28 ruhige Tage: HFV um 70 (leicht schwankend), Ruhepuls 50, 8,5 h Schlaf
 function base(days, extra) {
   const out = [];

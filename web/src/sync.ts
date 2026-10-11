@@ -11,6 +11,8 @@ import { applyBackup } from './backup';
 import { renderSheet, closeSheet, isIOS, isStandalone } from './views/sheets';
 
 const AUTH_KEY = STORAGE.syncAuth;
+/* Datensatz-Arten, die als Wörterbuch im Zustand liegen: kind → Feld */
+export const DICT_KINDS: Record<string, string> = { goal: 'goals', activity: 'activities', coachMsg: 'coachMsgs', coachNote: 'coachNotes', raceResult: 'raceResults', meal: 'meals' };
 const META_KEY = STORAGE.syncMeta;
 const API = API_BASE;
 
@@ -42,6 +44,8 @@ function collect() {
   Object.entries(STATE.weekNotes || {}).forEach(([w, t]) => put('weekNote', w, t));
   Object.entries(STATE.adjustments || {}).forEach(([id, a]) => put('adjust', id, a));
   put('settings', 'main', { settings: STATE.settings, nutritionProfile: STATE.nutritionProfile, scoreAdjust: STATE.scoreAdjust, scoreCalibVersion: STATE.scoreCalibVersion ?? null });
+  Object.entries(DICT_KINDS).forEach(([kind, field]) => Object.entries(STATE[field] || {}).forEach(([k, v]) => put(kind, k, v)));
+  if (STATE.profile) put('profile', 'main', STATE.profile);
   if (HAS_PLAN) { const raw = rawPlan(); if (raw) m.set('plan|main', { kind: 'plan', key: 'main', data: null, raw }); }
   return m;
 }
@@ -75,13 +79,16 @@ function rebaseline() {
 }
 
 /* ---------- Datensätze vom Server übernehmen ---------- */
-let planChanged = false, adjustChanged = false;
+let planChanged = false, adjustChanged = false, dictChanged = false;
 function applyRecord(rec) {
   const k = rec.kind + '|' + rec.key;
   const p = META.pending[k];
   if (p && p.updatedAt > rec.updatedAt) return false; // lokale Änderung ist neuer und wird noch hochgeladen
   const d = rec.data, del = rec.deleted;
-  switch (rec.kind) {
+  const field = DICT_KINDS[rec.kind];
+  if (field) { STATE[field] = STATE[field] || {}; if (del) delete STATE[field][rec.key]; else STATE[field][rec.key] = d; dictChanged = true; }
+  else switch (rec.kind) {
+    case 'profile': if (!del && d) STATE.profile = d; dictChanged = true; break;
     case 'session': if (del) delete STATE.sessions[rec.key]; else STATE.sessions[rec.key] = d; break;
     case 'trend': {
       STATE.trend = STATE.trend.filter(x => x.date !== rec.key);

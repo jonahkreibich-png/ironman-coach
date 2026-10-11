@@ -4,13 +4,13 @@
 function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
 const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
-const fmt = (v, d) => { const s = d != null ? Number(v).toFixed(d) : String(Math.round(v * 10) / 10); return s.replace('.', ','); };
+const fmt = (v, d?) => { const s = d != null ? Number(v).toFixed(d) : String(Math.round(v * 10) / 10); return s.replace('.', ','); };
 const sign = (v, d) => (v > 0 ? '+' : v < 0 ? '−' : '±') + fmt(Math.abs(v), d);
 
 /* ---------- Phase 3: Tagesampel ---------- */
 const BASE_DAYS = 28;      // gleitende Grundlage
 const MIN_DAYS = 7;        // darunter gelten feste Rückfall-Grenzwerte
-const SLEEP_NEED = [8.5, 9];
+const DEFAULT_SLEEP_NEED = [7.5, 9];
 
 function stats(vals) {
   if (!vals.length) return null;
@@ -105,15 +105,17 @@ function readinessFor(trend, illness, date, fallback) {
       if (st === 'bad') bump(2, 'Temperatur erhöht. Wirst du krank?', 4);
       else if (st === 'warn') bump(1, 'Temperatur leicht erhöht', 2);
     }
-    // Schlaf: Bedarf 8,5-9 h (Wachstum)
+    // Schlaf: Bedarf aus dem Profil (Jugendliche brauchen mehr)
+      const SLEEP_NEED = (fallback.sleepNeed && fallback.sleepNeed.length === 2) ? fallback.sleepNeed : DEFAULT_SLEEP_NEED;
+      const needTxt = fmt(SLEEP_NEED[0]) + '-' + fmt(SLEEP_NEED[1]) + ' h';
     if (num(p.sleepHours) != null || num(p.sleepQuality) != null) {
       const h = num(p.sleepHours), q = num(p.sleepQuality);
       const short = h != null && h < 7, poor = q != null && q < 5;
       const st = (short || poor) ? 'warn' : ((h != null && h < SLEEP_NEED[0]) ? 'mid' : 'ok');
-      crits.push({ k: 'Schlaf', v: h != null ? fmt(h, 1) + ' h' : fmt(q, 0) + '/10', t: (h != null && q != null ? 'Qualität ' + fmt(q, 0) + ' · ' : '') + 'Bedarf 8,5-9 h', st: st === 'mid' ? 'ok' : st });
+      crits.push({ k: 'Schlaf', v: h != null ? fmt(h, 1) + ' h' : fmt(q, 0) + '/10', t: (h != null && q != null ? 'Qualität ' + fmt(q, 0) + ' · ' : '') + 'Bedarf ' + needTxt, st: st === 'mid' ? 'ok' : st });
       if (h != null && h < SLEEP_NEED[0]) score -= (SLEEP_NEED[0] - h) * 8;
       if (q != null && q < 7) score -= (7 - q) * 3;
-      if (short) bump(1, `Nur ${fmt(h, 1)} h geschlafen (du brauchst 8,5-9 h)`, 2);
+      if (short) bump(1, `Nur ${fmt(h, 1)} h geschlafen (du brauchst ${needTxt})`, 2);
       else if (poor) bump(1, 'Schlecht geschlafen', 1);
     }
   }
@@ -148,7 +150,9 @@ function readinessHistory(trend, illness, date, n, fallback) {
 }
 
 /* ================= Phase 4: Belastung ================= */
-const LTHR = { bike: 162, run: 170 };
+/* Schwellenpuls aus Profil oder Einstellungen, sonst allgemeine Startwerte */
+const LTHR_DEFAULT = { bike: 162, run: 170 };
+function thrOf(state) { return (state && state.profile && state.profile.thresholds) || (state && state.settings) || {}; }
 const toNum = v => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 const clone = o => JSON.parse(JSON.stringify(o));
 const HARD_RE = /sweet|schwelle|intervall|vo2|zone\s*[45]|\bz[45]\b|tempo|\d\s*[×x]\s*\d/i;
@@ -167,14 +171,14 @@ function defaultMinutes(s) { if (s.plannedMinutes) return s.plannedMinutes; if (
 
 /* Belastung einer erledigten Einheit (TSS-ähnlich).
    intervals-Last > hrTSS mit Puls > RPE-Schätzung. Schwimmen und Kraft immer über RPE. */
-function sessionLoad(s, st) {
+function sessionLoad(s, st, thr?) {
   st = st || {}; const m = st.metrics || {};
   if (toNum(st.icuLoad) != null) return Math.round(toNum(st.icuLoad));
   const min = toNum(m.min) != null ? toNum(m.min) : defaultMinutes(s);
   if (!min) return 0;
   const h = min / 60, hr = toNum(m.hr);
   if (hr && hr > 60 && s.sport !== 'swim' && s.sport !== 'strength') {
-    const lthr = s.sport === 'bike' ? LTHR.bike : LTHR.run;
+    const lthr = s.sport === 'bike' ? ((thr && thr.lthrBike) || LTHR_DEFAULT.bike) : ((thr && thr.lthrRun) || LTHR_DEFAULT.run);
     return Math.round(h * Math.pow(hr / lthr, 2) * 100);
   }
   const rpe = toNum(st.rpe);
@@ -230,10 +234,10 @@ function dailyLoads(state, weeks) {
   const add = (d, v) => { if (v > 0) loads[d] = (loads[d] || 0) + v; };
   planDays(weeks).forEach(d => d.sessions.forEach(s => {
     const st = (state.sessions || {})[s.id];
-    if (st && st.completed && s.sport !== 'rest') add(d.date, sessionLoad(s, st));
+    if (st && st.completed && s.sport !== 'rest') add(d.date, sessionLoad(s, st, thrOf(state)));
   }));
   Object.entries(state.customWorkouts || {}).forEach(([d, list]) => (list || []).forEach(w => {
-    add(d, sessionLoad({ sport: w.sport, title: w.title, plannedMinutes: w.plannedMinutes }, w));
+    add(d, sessionLoad({ sport: w.sport, title: w.title, plannedMinutes: w.plannedMinutes }, w, thrOf(state)));
   }));
   return loads;
 }
@@ -262,18 +266,24 @@ function returnStageActive(illness, date) {
   const day = Math.round((+new Date(date + 'T12:00:00Z') - +new Date(ended.end + 'T12:00:00Z')) / 86400000);
   return day <= 5; // Stufen 0-2 des Wiedereinstiegs
 }
-/* Leistenschmerz über 2/10 in Notizen der letzten 7 Tage */
-function groinFlag(state, weeks, date) {
+/* Schmerz über 2/10 in Notizen der letzten 7 Tage (z. B. "Leiste zieht, 3/10", "Knie 4/10"). Liefert den Körperteil oder null. */
+const PAIN_RE = /(leist|knie|achill|schienbein|hüft|hueft|rücken|ruecken|fuß|fuss|wade|oberschenkel|schulter|sprunggelenk|schmerz)\w*[^0-9\n]{0,25}(\d+(?:[.,]\d)?)\s*(?:\/|von)\s*10/gi;
+const PAIN_NAMES: Record<string, string> = { leist: 'Leiste', knie: 'Knie', achill: 'Achillessehne', schienbein: 'Schienbein', hüft: 'Hüfte', hueft: 'Hüfte', rücken: 'Rücken', ruecken: 'Rücken', fuß: 'Fuß', fuss: 'Fuß', wade: 'Wade', oberschenkel: 'Oberschenkel', schulter: 'Schulter', sprunggelenk: 'Sprunggelenk', schmerz: '' };
+function painFlag(state, weeks, date) {
   const from = addDays(date, -6);
   const texts = [];
   planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); }); });
   Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.description) texts.push(w.description); }); });
   (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
   Object.values(state.weekNotes || {}).forEach(t => { if (t) texts.push(String(t)); });
-  const re = /leist\w*[^0-9\n]{0,25}(\d+(?:[.,]\d)?)\s*(?:\/|von)\s*10/gi;
-  for (const t of texts) { let m; re.lastIndex = 0; while ((m = re.exec(t))) { if (parseFloat(m[1].replace(',', '.')) > 2) return true; } }
-  return false;
+  for (const t of texts) {
+    let m; PAIN_RE.lastIndex = 0;
+    while ((m = PAIN_RE.exec(t))) { if (parseFloat(m[2].replace(',', '.')) > 2) { const k = m[1].toLowerCase(); return PAIN_NAMES[k] || 'Schmerz'; } }
+  }
+  return null;
 }
+const painLabel = p => p && p !== 'Schmerz' ? `Schmerz (${p})` : 'Schmerz';
+const groinFlag = (state, weeks, date) => !!painFlag(state, weeks, date);
 const LADDER = [[3, 6], [3, 8], [3, 10], [2, 15], [2, 20]];
 const STEP_RE = /(\d)\s*[×x]\s*(\d{1,2})(?!\d)/;
 function ladderIndex(title) {
@@ -305,14 +315,14 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   const dayOf = d => planDays(weeks).find(x => x.date === d) || null;
   const live = d => { const x = dayOf(d); return x ? x.sessions.filter(s => s.sport !== 'rest' && !s.cancelled) : []; };
   const push = a => { if (has(a.id)) return false; a.createdAt = now + res.length; a.date = date; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
-  const groin = groinFlag(state, weeks, date);
+  const pain = painFlag(state, weeks, date);
 
   // 1) Schutzregeln für heute: Lauf-Intervalle ohne Freigabe oder bei Leistenschmerz
   live(date).forEach(s => {
-    if (s.sport === 'run' && isIntervals(s) && !sessDone(state, s) && (!meta.runIntervalsAllowed || groin)) {
+    if (s.sport === 'run' && isIntervals(s) && !sessDone(state, s) && (!meta.runIntervalsAllowed || pain)) {
       push({ id: 'guard-' + s.id, type: 'modify', sessionId: s.id, group: 'daily-' + date,
-        set: { title: 'Zone 2 statt: ' + s.title, zone: 'Zone 2', description: 'Lauf-Intervalle sind ' + (groin ? 'wegen Leistenschmerz über 2/10 ' : '') + 'gerade nicht freigegeben. Locker in Zone 2 laufen.' },
-        what: `${s.title} → lockerer Lauf in Zone 2`, reason: groin ? 'Leistenschmerz über 2/10 in deinen Notizen' : 'Lauf-Intervalle hat der Coach noch nicht freigegeben' });
+        set: { title: 'Zone 2 statt: ' + s.title, zone: 'Zone 2', description: 'Lauf-Intervalle sind ' + (pain ? 'wegen ' + painLabel(pain) + ' über 2/10 ' : '') + 'gerade nicht freigegeben. Locker in Zone 2 laufen.' },
+        what: `${s.title} → lockerer Lauf in Zone 2`, reason: pain ? painLabel(pain) + ' über 2/10 in deinen Notizen' : 'Lauf-Intervalle hat der Coach noch nicht freigegeben' });
     }
   });
 
@@ -372,11 +382,11 @@ function weekSummary(state, baseWeeks, date) {
     if (s.sport === 'rest' || s.cancelled) return;
     const pl = plannedLoad(s); planned += pl; nPlanned++;
     const st = (state.sessions || {})[s.id];
-    if (st && st.completed) { done += sessionLoad(s, st); nDone++; }
+    if (st && st.completed) { done += sessionLoad(s, st, thrOf(state)); nDone++; }
     else if (isKey(s) && d.date <= date && !(st && st.skipped)) missedKey.push(s.title);
   }));
   let extra = 0;
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= mon && d <= sun) (l || []).forEach(w => { extra += sessionLoad({ sport: w.sport, title: w.title, plannedMinutes: w.plannedMinutes }, w); }); });
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= mon && d <= sun) (l || []).forEach(w => { extra += sessionLoad({ sport: w.sport, title: w.title, plannedMinutes: w.plannedMinutes }, w, thrOf(state)); }); });
   const illness = state.illnessPeriods || [];
   const end = sun > date ? date : sun;
   const nDays = Math.round((+new Date(end + 'T12:00:00Z') - +new Date(mon + 'T12:00:00Z')) / 86400000) + 1;
@@ -404,7 +414,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   if (!next) return { adjustments: res, summary: null };
   const S = weekSummary(state, baseWeeks, date);
   const illness = state.illnessPeriods || [];
-  const groin = groinFlag(state, weeks, date);
+  const pain = painFlag(state, weeks, date);
   const group = 'week-' + next.weekNumber;
   if (existing[group + '-summary']) return { adjustments: res, summary: S };
   const push = a => { if (existing[a.id] || res.some(x => x.id === a.id)) return; a.createdAt = now + res.length; a.date = date; a.group = group; res.push(a); };
@@ -421,7 +431,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   } else {
     why = S.ratio != null && S.ratio >= 0.7 ? `${ratioTxt}: Umfang bleibt gleich` : 'Zu wenig Daten für eine Änderung';
   }
-  if (pct > 0 && groin) { pct = 0; why = 'Leistenschmerz über 2/10: diese Woche keine Steigerung'; }
+  if (pct > 0 && pain) { pct = 0; why = painLabel(pain) + ' über 2/10: diese Woche keine Steigerung'; }
   if (pct > 0 && (returnStageActive(illness, addDays(date, 1)))) { pct = 0; why = 'Nach Krankheit gilt der Stufenplan'; }
   if (next.isRecoveryWeek) { pct = 0; why = 'Erholungswoche aus dem Plan bleibt bestehen'; }
   pct = Math.max(-20, Math.min(10, pct));
@@ -466,10 +476,10 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
 
   // Schutzregeln für die nächste Woche
   nextSessions.forEach(s => {
-    if (s.sport === 'run' && isIntervals(s) && (!meta.runIntervalsAllowed || groin)) {
+    if (s.sport === 'run' && isIntervals(s) && (!meta.runIntervalsAllowed || pain)) {
       push({ id: 'guard-' + s.id, type: 'modify', sessionId: s.id,
-        set: { title: 'Zone 2 statt: ' + s.title, zone: 'Zone 2', description: 'Lauf-Intervalle sind ' + (groin ? 'wegen Leistenschmerz über 2/10 ' : '') + 'gerade nicht freigegeben. Locker in Zone 2 laufen.' },
-        what: `${s.title} → lockerer Lauf in Zone 2`, reason: groin ? 'Leistenschmerz über 2/10 in deinen Notizen' : 'Lauf-Intervalle hat der Coach noch nicht freigegeben' });
+        set: { title: 'Zone 2 statt: ' + s.title, zone: 'Zone 2', description: 'Lauf-Intervalle sind ' + (pain ? 'wegen ' + painLabel(pain) + ' über 2/10 ' : '') + 'gerade nicht freigegeben. Locker in Zone 2 laufen.' },
+        what: `${s.title} → lockerer Lauf in Zone 2`, reason: pain ? painLabel(pain) + ' über 2/10 in deinen Notizen' : 'Lauf-Intervalle hat der Coach noch nicht freigegeben' });
     }
   });
 
@@ -511,7 +521,8 @@ const MET = s => {
   return ({ run: intense ? 11 : 9, bike: intense ? 9.5 : 7, swim: 6, strength: 4, football: 7.5 })[s.sport] || 0;
 };
 function nutritionKcalLow(state, weeks, date, profile) {
-  const p = Object.assign({ age: 17, heightCm: 184, weightKg: 73, pal: 1.4 }, profile || {});
+  // Ohne Angaben: allgemeine Erwachsenen-Werte (das Profil liefert die echten)
+  const p = Object.assign({ age: 30, heightCm: 175, weightKg: 70, pal: 1.4 }, profile || {});
   const ws = Object.entries(state.nutrition || {}).filter(([d, v]) => v && v.weight != null && d <= date).sort((a, b) => a[0].localeCompare(b[0])).slice(-7).map(x => x[1].weight);
   const w = ws.length ? ws.reduce((a, b) => a + b, 0) / ws.length : p.weightKg;
   const daily = (10 * w + 6.25 * p.heightCm - 5 * p.age + 5) * p.pal;
@@ -561,5 +572,5 @@ export {
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
-  dailyLoads, ownLoadSeries, groinFlag, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive
+  dailyLoads, ownLoadSeries, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive
 };

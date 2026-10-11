@@ -3,6 +3,9 @@ import * as CoachCore from '../../shared/core';
 import { clone, todayStr } from './util';
 import { toast } from './toast';
 import { STORAGE } from './config';
+import { type Profile, profileFromLegacy, mergeProfile } from '../../shared/profile';
+import { type Goal, goalFromPlanMeta } from '../../shared/goals';
+import { setLang, setUnits } from '../../shared/i18n';
 
 export const PLAN_KEY = STORAGE.plan;
 export const LS_KEY = STORAGE.state;
@@ -40,6 +43,7 @@ export function defaultState(): any {
     nutritionProfile: { age: 17, heightCm: 184, weightKg: 73, pal: 1.4 },
     illnessPeriods: clone(PLAN.seedIllness || []),
     adjustments: {},
+    profile: null, goals: {}, activities: {}, coachMsgs: {}, coachNotes: {}, raceResults: {}, meals: {},
     lastBackupAt: null
   };
 }
@@ -61,6 +65,7 @@ export function mergeIntoDefaults(partial: any): any {
   if (!out.nutritionProfile) out.nutritionProfile = base.nutritionProfile;
   if (!Array.isArray(out.illnessPeriods)) out.illnessPeriods = clone(PLAN.seedIllness || []);
   if (!out.adjustments || typeof out.adjustments !== 'object') out.adjustments = {};
+  ['goals', 'activities', 'coachMsgs', 'coachNotes', 'raceResults', 'meals'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
   out.trend.sort((a, b) => a.date.localeCompare(b.date));
   return out;
 }
@@ -137,3 +142,32 @@ export function mergePlan(cur: any, upd: any): any {
   ['keyDates', 'zonePercents', 'seedMetrics'].forEach(k => { if (Array.isArray(upd[k])) out[k] = upd[k]; });
   return out;
 }
+
+/* ---------- Profil und Ziele ---------- */
+/* Profil: gespeichert, sonst aus den alten Einstellungen abgeleitet (einmalig übernommen und gespeichert). */
+export function profile(): Profile {
+  const fb = profileFromLegacy({ ...STATE, planWeeks: BASE_WEEKS }, todayStr());
+  return mergeProfile(STATE.profile, fb);
+}
+export function goals(): Goal[] { return Object.values(STATE.goals || {}).filter(Boolean) as Goal[]; }
+export function ensureProfileAndGoals(): boolean {
+  let changed = false;
+  if (HAS_PLAN && !STATE.profile) { STATE.profile = { ...profile(), updatedAt: Date.now() }; changed = true; }
+  if (HAS_PLAN && !Object.keys(STATE.goals || {}).length) {
+    const g = goalFromPlanMeta(PLAN.meta);
+    if (g) { STATE.goals = { [g.id]: { ...g, createdAt: Date.now() } }; changed = true; }
+  }
+  const p = profile();
+  setLang(p.lang); setUnits(p.units);
+  return changed;
+}
+/* Profil-Schwellen spiegeln in die alten settings-Felder, die Teile der App und der Server noch lesen */
+export function saveProfile(p: Profile): void {
+  STATE.profile = { ...p, updatedAt: Date.now() };
+  Object.assign(STATE.settings, { lthrRun: p.thresholds.lthrRun, lthrBike: p.thresholds.lthrBike, thresholdPaceRunSec: p.thresholds.thresholdPaceRunSec, thresholdSpeedBikeKmh: p.thresholds.thresholdSpeedBikeKmh });
+  const age = p.birthYear ? +todayStr().slice(0, 4) - p.birthYear : null;
+  STATE.nutritionProfile = { ...STATE.nutritionProfile, ...(age ? { age } : {}), ...(p.heightCm ? { heightCm: p.heightCm } : {}), ...(p.weightKg ? { weightKg: p.weightKg } : {}), pal: p.pal };
+  setLang(p.lang); setUnits(p.units);
+  saveState();
+}
+if (ensureProfileAndGoals()) saveState();
