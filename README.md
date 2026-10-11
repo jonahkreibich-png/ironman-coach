@@ -1,22 +1,32 @@
-# Ironman Coach
+# Stamio
 
-Eine Web-App für Training, Morgenwerte, Fortschritt und Ernährung. Du installierst sie auf dem iPhone über „Zum Home-Bildschirm“. Sie funktioniert offline und speichert alle Daten nur auf dem Gerät.
+Trainingsbegleiter für Ausdauersport (Triathlon, Laufen, Rad, Schwimmen): Plan, Morgenwerte, Fortschritt, Ernährung und ein Coach, der sich nach gemessenen Werten richtet. Web-App (PWA) fürs iPhone, Server auf Cloudflare Workers mit D1.
 
-## Veröffentlichen (GitHub Pages)
+> Testphase: nur mit Einladung. Die echte App läuft bis zum Freigeben unverändert aus `main`.
 
-Der Ordner ist fertig gebaut. Lade ihn unverändert als öffentliches Repository hoch und aktiviere GitHub Pages für den Branch `main`, Ordner `/` (Root). Die Datei `.nojekyll` muss mit hochgeladen werden.
+## Aufbau
+| Ordner | Inhalt |
+|---|---|
+| `web/` | App (Vite + TypeScript), Einstieg `web/src/main.ts`, Bildschirme in `web/src/views/` |
+| `shared/` | Logik für App und Server: Bereitschaft, Regeln, Plan-Generator, Scores, Prognose, Coach-Engine, FIT/GPX/TCX, Texte (`shared/lang/`) |
+| `server/` | Cloudflare Worker, Migrationen, Server-Tests |
+| `pages/` | Pages Function, leitet `/api` an den Worker |
+| `tests/` | Unit-Tests (Vitest) und E2E (Playwright, 390 px, Chromium + WebKit) |
+| `scripts/` | Testserver, Deploy (nur Test), Screenshots, Kopie echte Daten → Test, Release-Anleitung |
 
-## Auf dem iPhone installieren
+## Befehle
+```bash
+npm install
+npm run dev          # Entwicklung
+npm run typecheck
+npm test             # Unit- und Server-Tests
+npm run build
+npm run e2e          # E2E (startet den lokalen Testserver)
+node scripts/deploy.mjs test   # nur Testumgebung
+```
 
-1. Öffne die Pages-Adresse in **Safari**.
-2. Tippe unten rechts auf die **drei Punkte (•••)** und dann auf **Teilen**. Bei älteren iOS-Versionen liegt **Teilen** direkt unten in der Leiste.
-3. Wähle **Zum Home-Bildschirm**, lass **Als Web-App öffnen** eingeschaltet und tippe auf **Hinzufügen**.
-4. Öffne die App über das neue Icon und lade dort dein Backup.
+## Dokumente
+DESIGN.md · ENTSCHEIDUNGEN.md · VERBINDUNGEN.md · PLAN-FORMAT.md · SPAETER.md · STORE-PLAN.md · NAMEN.md · FUER-JONAH.md · ERGEBNIS.md · scripts/release.md
 
 ## Datenschutz
-
-Im Code stehen keine persönlichen Daten. Trainingsplan und Werte kommen nur über das Backup in die App. Sie bleiben im Speicher des Handys und werden nirgendwohin gesendet.
-
-## Updates
-
-Ersetze die Dateien durch die neue Version und lade sie hoch. Die App zeigt dann beim nächsten Öffnen „Neue Version der App ist da“.
+Keine persönlichen Daten und keine Schlüssel im Code. Schlüssel liegen als Cloudflare-Secrets, Zugangs-Tokens der Dienste verschlüsselt in der Datenbank. Oura-Daten gehen nie an eine KI.
