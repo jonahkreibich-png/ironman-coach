@@ -78,18 +78,16 @@ test.describe('Grundfunktionen', () => {
     await expect(page.locator('.status-word')).not.toHaveText('Krank');
   });
 
-  test('Mit Claude besprechen: Zusammenfassung ohne Oura-Daten', async ({ page }) => {
+  test('Kein „Mit Claude besprechen“ mehr: der Coach ist in der App', async ({ page }) => {
     await tab(page, 'coach').click();
-    await page.locator('[data-act="claude-open"]').click();
-    await expect(page.locator('#sheetPanel')).toContainText('Zusammenfassung');
-    const preview = await page.locator('#sheetPanel pre').textContent();
-    expect(preview && preview.length).toBeGreaterThan(200);
-    expect(preview).not.toMatch(/oura/i);
+    await expect(page.locator('[data-act="claude-open"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('Claude');
+    await expect(page.locator('#coach-in')).toBeVisible();
   });
 
   test('Schnellfrage beantwortet der kostenlose Coach', async ({ page }) => {
     await tab(page, 'coach').click();
-    await page.locator('[data-act="quick"]').first().click();
+    await page.locator('[data-act="chat-say"]').first().click();
     await expect(page.locator('.msg')).toHaveCount(2);
   });
 
@@ -118,38 +116,7 @@ test.describe('Grundfunktionen', () => {
   });
 });
 
-test('Start ohne Daten: Fragebogen bis zum Plan', async ({ page }) => {
-  await seed(page, { noPlan: true });
-  await open(page);
-  await expect(page.locator('.welcome')).toBeVisible();
-  await page.locator('[data-act="ob-start"]').click();
-  // Block 1: Ziel
-  await page.locator('[data-act="ob-goal-add"]').click();
-  await page.selectOption('#og-type-0', 'tri_sprint');
-  await page.fill('#og-date-0', '2027-06-20'); await page.locator('#og-date-0').blur();
-  await page.locator('[data-act="ob-next"]').click();
-  // Block 2: Person
-  await page.fill('#q-birthYear', '1995'); await page.locator('#q-birthYear').blur();
-  await page.fill('#q-injuries', 'keine'); await page.locator('#q-injuries').blur();
-  await page.locator('[data-act="ob-next"]').click();
-  // Block 3: Hintergrund
-  for (const s of ['swim', 'bike', 'run']) await page.locator(`[data-act="ob-multi"][data-q="sports"][data-v="${s}"]`).click();
-  await page.fill('#q-weeklyHoursNow', '5'); await page.locator('#q-weeklyHoursNow').blur();
-  await page.locator('[data-act="ob-next"]').click();
-  // Block 4: Zeit
-  for (const d of ['2', '4', '6']) await page.locator(`[data-act="ob-win-add"][data-d="${d}"]`).click();
-  await page.fill('#q-weeklyHours', '7'); await page.locator('#q-weeklyHours').blur();
-  await page.fill('#q-maxDayHours', '2.5'); await page.locator('#q-maxDayHours').blur();
-  // Rest überspringen
-  for (let i = 0; i < 5; i++) await page.locator('[data-act="ob-skip"]').click();
-  await expect(page.locator('h2', { hasText: 'Dein Plan' })).toBeVisible();
-  await expect(page.locator('.card', { hasText: 'In 5 Sätzen' }).locator('p')).toHaveCount(5);
-  await page.locator('[data-act="ob-apply"]').click();
-  await page.waitForURL(/\/$|go=heute/);
-  await expect(tab(page, 'heute')).toBeVisible();
-  const plan = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_plan') || 'null'));
-  expect(plan.weeks.length).toBeGreaterThan(4);
-});
+/* Der Fragebogen-Durchlauf steht seit Auftrag 4 in auftrag4.spec.ts (Test-Person „Vater“). */
 
 test('Sync einrichten, Verbindungen und Kurzbefehl-Schlüssel', async ({ page, request }) => {
   await request.post('/__reset');

@@ -109,7 +109,9 @@ export function buildJobs(L, b, prefs, prevMin) {
   if (T.eveEarly && due(X.eveEarly)) {
     const tomorrow = addDaysStr(date, 1);
     const day = C.planDays(weeks).find(d => d.date === tomorrow);
-    const early = day ? day.sessions.filter(s => s.sport !== 'rest' && !s.cancelled && C.isEarly(s, L.state.sessions[s.id])) : [];
+    // Wer morgens trainiert (Fragebogen), bekommt die Erinnerung am Vorabend für jede Einheit
+    const morningPerson = !!(L.profile && L.profile.timeOfDay === 'morning');
+    const early = day ? day.sessions.filter(s => s.sport !== 'rest' && !s.cancelled && !s.fixed && (morningPerson || C.isEarly(s, L.state.sessions[s.id]))) : [];
     if (early.length && !C.illnessAt(L.state.illnessPeriods, tomorrow)) {
       const s = early[0]; const t = C.sessionTime(s, L.state.sessions[s.id]);
       jobs.push({ type: 'eveEarly', key: 'eve-' + s.id, title: `Morgen ${t ? t + ' ' : 'früh '}${s.title}`, body: 'Sachen bereitlegen, um 22:30 ins Bett.', url: './?go=plan' });
