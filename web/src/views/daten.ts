@@ -73,10 +73,28 @@ function invitesCard(): string {
 /* Nutzer und Freischaltungen (nur Admin). Der Admin selbst hat immer alles. */
 function usersCard(): string {
   if (!USERS) return `<div class="card">${empty(t('common.loading'))}</div>`;
-  return `<div class="card stack"><div class="hint">${esc(t('data.usersHint'))}</div><div class="list">${USERS.map(u => `<div class="li" style="display:block">
-    <div class="spread"><span class="t">${esc(u.name || t('data.userN', { n: u.id }))}${u.self ? ' ' + pill(t('data.you')) : ''}</span>${u.role === 'admin' ? pill(t('data.admin'), 'accent') : ''}</div>
-    <div class="chips" style="margin-top:6px">${FEATURE_KEYS.map(k => { const onK = !!u.entitlements[k]; return `<button class="chip ${onK ? 'on' : ''}" aria-pressed="${onK}" data-act="feat-toggle" data-uid="${u.id}" data-k="${k}" ${u.role === 'admin' ? 'disabled' : ''}>${esc(t('feature.' + k))}</button>`; }).join('')}</div></div>`).join('')}</div></div>`;
+  return `<div class="card stack"><div class="hint">${esc(t('data.usersHint'))}</div>
+    ${NEW_TEST ? `<div class="banner good" data-test-invite><b>${esc(t('data.testCode'))}</b><div class="pair-code num">${esc(NEW_TEST)}</div>${esc(t('data.testCodeHint'))}</div>` : ''}
+    <div class="row">${field('tu-name', t('data.testName'), '', { placeholder: t('data.testNamePh'), wide: true })}<button class="btn" data-act="tu-create" style="align-self:flex-end">${esc(t('data.testCreate'))}</button></div>
+    <div class="list">${USERS.map(u => `<div class="li" style="display:block" data-user="${u.id}">
+    <div class="spread"><span class="t">${esc(u.name || t('data.userN', { n: u.id }))}${u.self ? ' ' + pill(t('data.you')) : ''}${u.test ? ' ' + pill(t('data.test')) : ''}</span>${u.role === 'admin' ? pill(t('data.admin'), 'accent') : ''}</div>
+    ${u.role !== 'admin' ? `<div class="xs muted">${esc(t('data.userStats', { d: u.devices ?? 0, r: u.records ?? 0 }))}</div>` : ''}
+    <div class="chips" style="margin-top:6px">${FEATURE_KEYS.map(k => { const onK = !!u.entitlements[k]; return `<button class="chip ${onK ? 'on' : ''}" aria-pressed="${onK}" data-act="feat-toggle" data-uid="${u.id}" data-k="${k}" ${u.role === 'admin' ? 'disabled' : ''}>${esc(t('feature.' + k))}</button>`; }).join('')}</div>
+    ${u.role !== 'admin' ? `<div class="row" style="margin-top:6px"><button class="btn ghost sm" data-act="tu-reset" data-uid="${u.id}">${esc(t('data.reset'))}</button><button class="btn danger sm" data-act="tu-del" data-uid="${u.id}">${esc(t('data.delUser'))}</button></div>` : ''}</div>`).join('')}</div></div>`;
 }
+let NEW_TEST: string | null = null;
+on('tu-create', el => busy(el, async () => {
+  const r = await apiCall('POST', '/api/admin/testusers', { note: 'Test: ' + (val('tu-name') || t('data.testDefault')) });
+  NEW_TEST = r.code; USERS = (await apiCall('GET', '/api/admin/users')).users; INVITES = (await apiCall('GET', '/api/invites')).invites; nav.rerender();
+}));
+on('tu-reset', el => {
+  if (!armed(el, t('data.resetSure'))) return;
+  return busy(el, async () => { const r = await apiCall('POST', `/api/admin/users/${el.dataset.uid}/reset`); USERS = (await apiCall('GET', '/api/admin/users')).users; nav.rerender(); toast(t('data.resetDone', { n: r.removed })); });
+});
+on('tu-del', el => {
+  if (!armed(el, t('data.delUserSure'))) return;
+  return busy(el, async () => { await apiCall('DELETE', `/api/admin/users/${el.dataset.uid}`); USERS = (await apiCall('GET', '/api/admin/users')).users; nav.rerender(); toast(t('data.delUserDone')); });
+});
 on('feat-toggle', el => busy(el, async () => {
   const u = (USERS || []).find(x => String(x.id) === el.dataset.uid); if (!u || u.role === 'admin') return;
   const next = { ...(u.features || {}) }; const k = el.dataset.k!;

@@ -36,7 +36,8 @@ export function renderWelcome(): string {
     ${isSyncOn() ? `<div class="banner info"><b>${esc(t('welcome.connectedNoData'))}</b><br>${esc(t(isAdmin() ? 'welcome.connectedNoDataHint' : 'welcome.connectedNoDataUser'))}</div><button class="btn ghost" data-act="sync-recheck">${ic('sync')} ${esc(t('welcome.recheck'))}</button>` : `<div class="card stack"><div class="lbl">${esc(t('welcome.haveTitle'))}</div>${connectPanel()}</div>`}
     <div class="card">${more(t('welcome.backupTitle'), `<div class="hint">${esc(t('welcome.backupHint'))}</div><textarea class="inp" id="bk-in" rows="3" placeholder="${esc(t('data.restorePh'))}" style="font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
       <div class="row"><button class="btn" data-act="welcome-load">${esc(t('welcome.load'))}</button><label class="btn ghost" for="bk-file">${esc(t('data.pickFile'))}</label><input type="file" id="bk-file" data-ch="bk-file" accept="application/json,.json,.txt,text/plain" hidden></div>`)}</div>
-    <div class="hint" style="text-align:center">${esc(t('welcome.privacy'))}</div></div>`;
+    <div class="hint" style="text-align:center">${esc(t('welcome.privacy'))}</div>
+    <button class="link" data-act="go-sub" data-sub="feedback" style="align-self:center">${esc(t('sub.feedback'))}</button></div>`;
 }
 on('welcome-load', () => {
   const raw = ((document.getElementById('bk-in') as HTMLTextAreaElement)?.value || '').trim();

@@ -22,6 +22,7 @@ import { renderDaten, resetDatenCache } from './views/daten';
 import { renderGenerator } from './views/generator';
 import { renderWettkampf } from './views/wettkampf';
 import { renderBeruecksichtigungen } from './views/beruecksichtigungen';
+import { renderFeedback } from './views/feedback';
 import { renderOnboarding, renderWelcome } from './views/onboarding';
 import './views/session';
 import './views/custom';
@@ -46,10 +47,10 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
 ];
 const SUBS: Record<string, () => string> = {
   werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
-  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, generator: () => canGenerate() ? renderGenerator() : renderMehr()
+  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback, generator: () => canGenerate() ? renderGenerator() : renderMehr()
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
-const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen']);
+const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen', 'feedback']);
 
 /* Alter UI-Zustand: view = heute|plan|werte|fortschritt|essen */
 if (!UI.tab) {
@@ -90,6 +91,9 @@ function render() {
   else html = TABS.find(x => x.id === UI.tab)!.render();
   byId('app').innerHTML = `<div class="view" data-view="${esc(UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab)}">${html}</div>`;
   if (HAS_PLAN && UI.tab === 'coach') { UI.coachSeenAt = Date.now(); saveUi(); }
+  // Letzte Bildschirme (für „Fehler melden“)
+  const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');
+  const trail: string[] = UI.trail || []; if (trail[trail.length - 1] !== here && here !== 'feedback') { UI.trail = [...trail, here].slice(-6); saveUi(); }
   renderTop(); renderTabs(); updateBadge();
 }
 function go(target: string, scroll?: string | null) {

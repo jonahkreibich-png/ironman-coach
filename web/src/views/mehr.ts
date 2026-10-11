@@ -24,6 +24,7 @@ export function renderMehr(): string {
     ${row('daten', 'cloud', 'var(--swim)', isSyncOn() ? statusText() : '', backupDue() ? pill(t('mehr.backupDue'), 'warn') : '')}</div>`);
   const extra = [(FEATURES.generator || entitled('generator')) ? row('generator', 'wand', 'var(--bike)') : '', row('onboarding', 'doc', 'var(--strength)')].join('');
   h += sec(t('mehr.plan'), `<div class="list">${extra}</div>`);
+  h += `<div class="list" style="margin-top:var(--s3)">${row('feedback', 'chat', 'var(--info)')}</div>`;
   return h;
 }
 void esc;
