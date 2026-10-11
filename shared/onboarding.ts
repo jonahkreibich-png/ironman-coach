@@ -1,24 +1,28 @@
 /* Onboarding für neue Nutzer: Fragen in Blöcken, mit Fortschritt, überspringbar, später unter „Profil“ ergänzbar.
-   Was verbundene Dienste schon wissen (Trainings der letzten 3 Monate, Ruhepuls, Schlaf), wird nicht gefragt,
-   sondern vorgeschlagen und nur bestätigt. Pflicht (*) sind nur Fragen, ohne die kein sicherer Plan möglich ist. */
-import { defaultProfile, type Profile, type SportKey, type DayWindow } from './profile';
+   Was verbundene Dienste schon wissen (Trainings der letzten 3 Monate, Schlaf), wird nicht gefragt, sondern vorgeschlagen.
+   Pflicht (*) sind nur Fragen, ohne die kein sicherer Plan möglich ist.
+   Auftrag 4: Zeit pro Tag statt Uhrzeiten (B1), Häufigkeit je Sportart (B2), Teamsport (B3), Wunschzeit je Ziel (B4),
+   Können und Berücksichtigungen (B5), Fahrrad-Typen (B6), Zusammenfassung „Das habe ich verstanden“ (F2). */
+import { defaultProfile, withEstimates, type Profile, type SportKey, type DayWindow, type DayLoad } from './profile';
 import { GOALS, type Goal, type GoalType } from './goals';
 import { generatePlan, type GenResult } from './plangen';
 import { addDays } from './core';
 
-export type QType = 'goals' | 'select' | 'multi' | 'number' | 'text' | 'yesno' | 'windows' | 'fixed' | 'connect' | 'info';
+export type QType = 'goals' | 'select' | 'multi' | 'number' | 'text' | 'notes' | 'yesno' | 'dayload' | 'freq' | 'days' | 'date' | 'bests' | 'windows' | 'fixed' | 'connect' | 'info';
 export interface Question { id: string; label: string; type: QType; required?: boolean; options?: [string, string][]; unit?: string; hint?: string; min?: number; max?: number; show?: (a: Answers) => boolean }
 export interface Block { id: string; title: string; intro: string; questions: Question[] }
 export type Answers = Record<string, any>;
 
-const SPORTS: [string, string][] = [['swim', 'Schwimmen'], ['bike', 'Rad'], ['run', 'Laufen'], ['strength', 'Kraft'], ['football', 'Teamsport']];
+export const SPORT_OPTIONS: [string, string][] = [['swim', 'Schwimmen'], ['bike', 'Rad'], ['run', 'Laufen'], ['strength', 'Kraft']];
+export const BIKE_OPTIONS: [string, string][] = [['road', 'Rennrad'], ['gravel', 'Gravelbike'], ['mtb', 'Mountainbike'], ['tt', 'Triathlon-/Zeitfahrrad'], ['trekking', 'Trekking-/Stadtrad'], ['ebike', 'E-Bike'], ['trainer', 'Rollentrainer/Smarttrainer'], ['spin', 'Indoor-Bike/Spinning']];
+export const DAYLOAD_OPTIONS: [DayLoad, string][] = [[0, 'kein Training'], [1, 'kurz (bis 45 min)'], [2, 'mittel (bis 90 min)'], [3, 'lang (mehr als 90 min)']];
+const has = (a: Answers, s: string) => (a.sports || []).includes(s);
+const teamOn = (a: Answers) => a.teamYes === true;
+
 export const BLOCKS: Block[] = [
-  { id: 'goal', title: 'Ziel und Motivation', intro: 'Worauf trainierst du hin?', questions: [
-    { id: 'goals', label: 'Dein Ziel', type: 'goals', required: true, hint: 'Art, Datum und Priorität. Mehrere Ziele sind möglich.' },
-    { id: 'outcome', label: 'Was willst du erreichen?', type: 'select', options: [['finish', 'Gesund ankommen'], ['time', 'Persönliche Bestzeit'], ['place', 'Platzierung']] },
-    { id: 'targetTime', label: 'Wunschzeit (h:mm)', type: 'text', show: a => a.outcome === 'time' },
-    { id: 'why', label: 'Warum dieses Ziel? Was wäre ein Erfolg?', type: 'text', hint: 'Hilft dem Coach, dich zu motivieren.' },
-    { id: 'testRaces', label: 'Gibt es Wettkämpfe davor, die als Test dienen könnten?', type: 'text' }
+  { id: 'goal', title: 'Ziele und Wunschzeiten', intro: 'Worauf trainierst du hin? Mehrere Ziele sind möglich.', questions: [
+    { id: 'goals', label: 'Deine Ziele', type: 'goals', required: true, hint: 'Pro Ziel: Art, Datum, Priorität (A = Hauptziel, B = wichtig, C = Training) und, wenn du willst, eine Wunschzeit für genau dieses Ziel.' },
+    { id: 'why', label: 'Warum diese Ziele? Was wäre ein Erfolg?', type: 'text', hint: 'Hilft dem Coach, dich zu motivieren.' }
   ] },
   { id: 'person', title: 'Person und Gesundheit', intro: 'Damit der Plan sicher ist.', questions: [
     { id: 'birthYear', label: 'Geburtsjahr', type: 'number', required: true, min: 1930, max: 2020 },
@@ -26,71 +30,75 @@ export const BLOCKS: Block[] = [
     { id: 'heightCm', label: 'Größe (optional)', type: 'number', unit: 'cm', min: 120, max: 230 },
     { id: 'weightKg', label: 'Gewicht (optional)', type: 'number', unit: 'kg', min: 30, max: 200 },
     { id: 'injuries', label: 'Aktuelle Verletzungen oder Beschwerden', type: 'text', required: true, hint: '„keine“ ist auch eine Antwort.' },
-    { id: 'pastInjuries', label: 'Frühere Verletzungen, die öfter wiederkommen', type: 'text' },
-    { id: 'medical', label: 'Gibt es gesundheitliche Einschränkungen (Herz, Asthma, Diabetes, Schwangerschaft …)?', type: 'yesno', hint: 'Bei Ja: bitte vor dem Start ärztlich abklären. Der Plan startet dann besonders vorsichtig.' },
-    { id: 'cycle', label: 'Zyklus berücksichtigen?', type: 'yesno', show: a => a.sex === 'f' }
+    { id: 'medical', label: 'Gibt es gesundheitliche Einschränkungen (Herz, Asthma, Diabetes, Schwangerschaft …)?', type: 'yesno', hint: 'Bei Ja: bitte vor dem Start ärztlich abklären. Der Plan startet dann besonders vorsichtig.' }
   ] },
-  { id: 'background', title: 'Sport-Hintergrund', intro: 'Wo stehst du gerade?', questions: [
+  { id: 'background', title: 'Sportarten und Erfahrung', intro: 'Wo stehst du gerade?', questions: [
+    { id: 'sports', label: 'Welche Sportarten willst du trainieren?', type: 'multi', options: SPORT_OPTIONS, required: true, hint: 'Teamsport kommt gleich extra.' },
     { id: 'experienceYears', label: 'Wie lange machst du schon Ausdauersport?', type: 'number', unit: 'Jahre', min: 0, max: 60 },
-    { id: 'sports', label: 'Welche Sportarten machst du?', type: 'multi', options: SPORTS, required: true },
-    { id: 'teamSportName', label: 'Welcher Teamsport?', type: 'text', show: a => (a.sports || []).includes('football') },
     { id: 'weeklyHoursNow', label: 'Stunden pro Woche in den letzten 4-8 Wochen (alle Sportarten)', type: 'number', unit: 'h', required: true, min: 0, max: 40 },
-    { id: 'longest', label: 'Längste Einheit zuletzt', type: 'text', hint: 'z. B. „Lauf 75 min, Rad 2 h“' },
-    { id: 'tests', label: 'Bekannte Werte (Schwellenpuls, FTP, CSS, 5-km-Zeit …)', type: 'text' },
-    { id: 'swimStrokes', label: 'Schwimmen: welche Lagen?', type: 'multi', options: [['free', 'Kraul'], ['breast', 'Brust'], ['back', 'Rücken'], ['fly', 'Delfin']], show: a => (a.sports || []).includes('swim') },
-    { id: 'swimContinuous', label: 'Wie viele Meter Kraul am Stück?', type: 'number', unit: 'm', show: a => (a.sports || []).includes('swim') },
-    { id: 'openWater', label: 'Freiwasser-Erfahrung?', type: 'yesno', show: a => (a.sports || []).includes('swim') },
-    { id: 'bikeSetup', label: 'Rad: was hast du?', type: 'multi', options: [['road', 'Rennrad'], ['tt', 'Zeitfahrrad'], ['trainer', 'Rollentrainer'], ['power', 'Wattmessung'], ['clip', 'Klickpedale'], ['group', 'fahre in Gruppen']], show: a => (a.sports || []).includes('bike') },
-    { id: 'runSurface', label: 'Laufen: Untergrund, Schuhe, typische Beschwerden', type: 'text', show: a => (a.sports || []).includes('run') }
+    { id: 'bests', label: 'Bestzeiten (optional, macht die Zonen genauer)', type: 'bests', show: a => has(a, 'run') || has(a, 'swim') }
+  ] },
+  { id: 'skills', title: 'Können und Ausrüstung', intro: 'Damit der Plan nichts verlangt, was du (noch) nicht kannst.', questions: [
+    { id: 'swimCrawl', label: 'Schwimmen: Kannst du kraulen?', type: 'select', options: [['yes', 'ja'], ['some', 'ein bisschen'], ['no', 'nein']], show: a => has(a, 'swim') },
+    { id: 'swimCrawlM', label: 'Wie weit kraulst du am Stück?', type: 'number', unit: 'm', min: 0, max: 5000, show: a => has(a, 'swim') && (a.swimCrawl === 'yes' || a.swimCrawl === 'some') },
+    { id: 'swimBreast', label: 'Kannst du Brust schwimmen?', type: 'yesno', show: a => has(a, 'swim') && a.swimCrawl !== 'yes' },
+    { id: 'runContinuousMin', label: 'Laufen: Wie lange kannst du am Stück locker laufen?', type: 'number', unit: 'min', min: 0, max: 400, show: a => has(a, 'run') },
+    { id: 'bikeLongestMin', label: 'Rad: Längste Fahrt in letzter Zeit?', type: 'number', unit: 'min', min: 0, max: 900, show: a => has(a, 'bike') },
+    { id: 'bikes', label: 'Welche Räder hast du?', type: 'multi', options: BIKE_OPTIONS, show: a => has(a, 'bike') },
+    { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', show: a => has(a, 'bike') }
+  ] },
+  { id: 'team', title: 'Teamsport', intro: 'Fußball, Handball, Basketball …: zählt im Plan als Belastung.', questions: [
+    { id: 'teamYes', label: 'Machst du Teamsport?', type: 'yesno' },
+    { id: 'teamName', label: 'Welche Sportart?', type: 'text', show: teamOn },
+    { id: 'teamTrainingDays', label: 'An welchen Tagen ist Training?', type: 'days', show: teamOn },
+    { id: 'teamTrainingMinutes', label: 'Wie lange dauert ein Training?', type: 'number', unit: 'min', min: 15, max: 240, show: teamOn },
+    { id: 'teamGameDays', label: 'An welchen Tagen sind meist Spiele?', type: 'days', show: teamOn },
+    { id: 'teamGameMinutes', label: 'Wie lange dauert ein Spiel?', type: 'number', unit: 'min', min: 15, max: 240, show: teamOn },
+    { id: 'teamSeasonFrom', label: 'Saison von (optional)', type: 'date', show: teamOn },
+    { id: 'teamSeasonTo', label: 'Saison bis (optional)', type: 'date', show: teamOn, hint: 'Leer lassen, wenn das ganze Jahr gespielt wird.' }
   ] },
   { id: 'time', title: 'Zeit und Alltag', intro: 'Der Plan passt sich deinem Leben an, nicht umgekehrt.', questions: [
-    { id: 'windows', label: 'Wann kannst du trainieren?', type: 'windows', required: true, hint: 'z. B. Di 6:15-6:55 vor der Schule' },
+    { id: 'dayLoad', label: 'Wie viel Zeit hast du an welchem Tag?', type: 'dayload', required: true, hint: 'Ein Tipp pro Tag genügt. Teamsport-Training musst du hier nicht einrechnen.' },
+    { id: 'timeOfDay', label: 'Ich trainiere eher …', type: 'select', options: [['', 'egal'], ['morning', 'morgens'], ['evening', 'abends']], hint: 'Nur für die Uhrzeit der Mitteilungen.' },
     { id: 'weeklyHours', label: 'Höchstens so viele Stunden pro Woche', type: 'number', unit: 'h', required: true, min: 1, max: 30 },
-    { id: 'maxDayHours', label: 'Höchstens so lange an einem Wochenendtag', type: 'number', unit: 'h', required: true, min: 0.5, max: 10 },
-    { id: 'fixed', label: 'Feste Termine (Teamsport-Training, Spiele, Schule, Arbeit …)', type: 'fixed' },
-    { id: 'busy', label: 'Bekannte Engpässe (Prüfungen, Urlaub, Reisen)', type: 'text' },
-    { id: 'facilities', label: 'Zugang zu', type: 'multi', options: [['pool', 'Schwimmbad'], ['track', 'Laufbahn'], ['gym', 'Fitnessstudio']] },
-    { id: 'poolDays', label: 'Schwimmbad an welchen Tagen?', type: 'text', show: a => (a.facilities || []).includes('pool') },
-    { id: 'timeOfDay', label: 'Lieber morgens oder abends?', type: 'select', options: [['', 'egal'], ['morning', 'morgens'], ['evening', 'abends']] },
-    { id: 'social', label: 'Lieber allein oder in der Gruppe?', type: 'select', options: [['', 'egal'], ['alone', 'allein'], ['group', 'Gruppe']] }
+    { id: 'maxDayHours', label: 'Höchstens so lange an einem langen Tag', type: 'number', unit: 'h', min: 1, max: 10 },
+    { id: 'freq', label: 'Wie oft pro Woche willst oder kannst du …?', type: 'freq', hint: 'Der Plan hält sich daran.' }
   ] },
-  { id: 'recovery', title: 'Erholung und Lebensstil', intro: 'Erholung ist Teil des Trainings.', questions: [
+  { id: 'notes', title: 'Berücksichtigungen', intro: 'Was soll der Plan noch wissen?', questions: [
+    { id: 'notes', label: 'Was soll der Plan noch berücksichtigen?', type: 'notes', hint: 'Eine Sache pro Zeile, z. B. „Knie zwickt beim Bergablaufen“, „Schwimmbad nur samstags“, „kein Schwimmbad im Winter“.' },
     { id: 'sleep', label: 'Übliche Schlafdauer', type: 'number', unit: 'h', min: 3, max: 12 },
-    { id: 'bedtime', label: 'Übliche Schlafenszeit', type: 'text' },
-    { id: 'stress', label: 'Stress (Schule, Job)', type: 'select', options: [['low', 'wenig'], ['mid', 'mittel'], ['high', 'viel']] },
     { id: 'diet', label: 'Ernährung', type: 'select', options: [['', 'alles'], ['vegetarian', 'vegetarisch'], ['vegan', 'vegan']] },
-    { id: 'allergies', label: 'Allergien oder Unverträglichkeiten', type: 'text' },
-    { id: 'trackCalories', label: 'Kalorien tracken?', type: 'yesno' }
-  ] },
-  { id: 'prefs', title: 'Vorlieben für den Plan', intro: 'Wie soll dein Coach planen?', questions: [
-    { id: 'planStyle', label: 'Plan genau vorgeben oder flexibel?', type: 'select', options: [['flexible', 'flexibel mit Vorschlägen'], ['strict', 'genau vorgeben']] },
-    { id: 'likes', label: 'Was magst du lieber?', type: 'select', options: [['balanced', 'ausgewogen'], ['intensity', 'harte Einheiten'], ['volume', 'lieber Umfang']] },
-    { id: 'strength', label: 'Krafttraining?', type: 'select', options: [['1', '1× pro Woche'], ['2', '2× pro Woche'], ['0', 'nein']] },
-    { id: 'notify', label: 'Mitteilungen vom Coach', type: 'select', options: [['normal', 'morgens und bei Änderungen'], ['few', 'nur wichtige'], ['none', 'keine']] }
+    { id: 'planStyle', label: 'Plan genau vorgeben oder flexibel?', type: 'select', options: [['flexible', 'flexibel mit Vorschlägen'], ['strict', 'genau vorgeben']] }
   ] },
   { id: 'devices', title: 'Geräte und Verbindungen', intro: 'Verbinde deine Uhr oder deinen Ring, dann musst du weniger eintragen.', questions: [
-    { id: 'devices', label: 'Was nutzt du?', type: 'multi', options: [['applewatch', 'Apple Watch'], ['oura', 'Oura'], ['garmin', 'Garmin'], ['polar', 'Polar'], ['whoop', 'WHOOP'], ['withings', 'Withings'], ['other', 'andere']] },
+    { id: 'devices', label: 'Was nutzt du?', type: 'multi', options: [['applewatch', 'Apple Watch'], ['garmin', 'Garmin'], ['coros', 'COROS'], ['suunto', 'Suunto'], ['wahoo', 'Wahoo'], ['polar', 'Polar'], ['oura', 'Oura'], ['whoop', 'WHOOP'], ['withings', 'Withings'], ['other', 'andere']] },
     { id: 'connect', label: 'Jetzt verbinden', type: 'connect' }
   ] },
   { id: 'test', title: 'Einstiegstest', intro: 'Optional, aber empfohlen.', questions: [
-    { id: 'wantTests', label: 'Fehlende Schwellenwerte in den ersten 2 Wochen mit kurzen Tests bestimmen?', type: 'yesno', hint: '30-min-Lauftest, 20-min-Radtest, 400/200-m-Schwimmtest. Danach stellt die App Zonen und Plan neu ein.' }
+    { id: 'wantTests', label: 'Fehlende Werte in den ersten 2 Wochen mit kurzen Tests bestimmen?', type: 'yesno', hint: '30-min-Lauftest, 20-min-Radtest, 400/200-m-Schwimmtest (nur wenn du schon kraulen kannst). Danach stellt die App Zonen und Plan neu ein.' }
   ] }
 ];
 
 export function visibleQuestions(b: Block, a: Answers): Question[] { return b.questions.filter(q => !q.show || q.show(a)); }
+function isEmpty(q: Question, v: any): boolean {
+  if (v == null || v === '' || (Array.isArray(v) && !v.length)) return true;
+  if (q.type === 'dayload') return !Object.values(v || {}).some((x: any) => +x > 0);
+  if (q.type === 'windows') return !Object.keys(v || {}).length;
+  return false;
+}
 export function missingRequired(a: Answers): { block: string; q: Question }[] {
   const out: { block: string; q: Question }[] = [];
   for (const b of BLOCKS) for (const q of visibleQuestions(b, a)) {
     if (!q.required) continue;
-    const v = a[q.id];
-    const empty = v == null || v === '' || (Array.isArray(v) && !v.length) || (q.type === 'windows' && !Object.keys(v || {}).length);
-    if (empty) out.push({ block: b.id, q });
+    // alte Antworten mit Zeitfenstern gelten auch
+    if (q.type === 'dayload' && a.windows && Object.keys(a.windows).length) continue;
+    if (isEmpty(q, a[q.id])) out.push({ block: b.id, q });
   }
   return out;
 }
 export function progress(a: Answers): number {
   let n = 0, done = 0;
-  for (const b of BLOCKS) for (const q of visibleQuestions(b, a)) { if (q.type === 'info' || q.type === 'connect') continue; n++; const v = a[q.id]; if (!(v == null || v === '' || (Array.isArray(v) && !v.length))) done++; }
+  for (const b of BLOCKS) for (const q of visibleQuestions(b, a)) { if (q.type === 'info' || q.type === 'connect') continue; n++; if (!isEmpty(q, a[q.id])) done++; }
   return n ? Math.round(done / n * 100) : 0;
 }
 
@@ -102,55 +110,147 @@ export function prefillFromData(acts: any[], trend: any[], today: string): Answe
   if (recent.length) {
     const last8 = recent.filter(a => a.date >= addDays(today, -56));
     out.weeklyHoursNow = Math.round(last8.reduce((s, a) => s + (a.min || 0), 0) / 60 / 8 * 10) / 10;
-    const sp = new Set(recent.map(a => a.sport === 'walk' ? 'run' : a.sport).filter(s => ['swim', 'bike', 'run', 'strength', 'football'].includes(s)));
+    const sp = new Set(recent.map(a => a.sport === 'walk' ? 'run' : a.sport).filter(s => ['swim', 'bike', 'run', 'strength'].includes(s)));
     out.sports = [...sp];
     const longest = (s: string) => Math.max(0, ...recent.filter(a => a.sport === s).map(a => a.min || 0));
-    out.longest = [['run', 'Lauf'], ['bike', 'Rad'], ['swim', 'Schwimmen']].filter(([s]) => longest(s)).map(([s, l]) => `${l} ${longest(s)} min`).join(', ');
+    if (longest('run')) out.runContinuousMin = Math.round(longest('run'));
+    if (longest('bike')) out.bikeLongestMin = Math.round(longest('bike'));
     const sw = recent.filter(a => a.swim && a.swim.longestContinuousM).map(a => a.swim.longestContinuousM);
-    if (sw.length) out.swimContinuous = Math.max(...sw);
+    if (sw.length) { out.swimCrawlM = Math.max(...sw); out.swimCrawl = 'yes'; }
+    if (recent.some(a => a.sport === 'football')) out.teamYes = true;
   }
   const sl = (trend || []).filter(p => p && p.date >= addDays(today, -28) && p.sleepHours).map(p => p.sleepHours);
   if (sl.length) out.sleep = Math.round(sl.reduce((a, b) => a + b, 0) / sl.length * 10) / 10;
   return out;
 }
 
-function parseHm(s: string): number | null { const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(String(s || '').trim()); return m ? +m[1] * 3600 + (+(m[2] || 0)) * 60 : null; }
+/* Dauer aus Sekunden (Zahl) oder Text: drei Teile h:mm:ss, zwei Teile je nach Art m:ss oder h:mm */
+export function parseDur(s: any, two: 'ms' | 'hm'): number | null {
+  if (typeof s === 'number') return s > 0 ? s : null;
+  const m = /^(\d{1,3})(?::(\d{1,2}))?(?::(\d{1,2}))?$/.exec(String(s || '').trim());
+  if (!m) return null;
+  if (m[3] != null) return +m[1] * 3600 + +m[2] * 60 + +m[3];
+  if (m[2] != null) return two === 'ms' ? +m[1] * 60 + +m[2] : +m[1] * 3600 + +m[2] * 60;
+  return two === 'ms' ? +m[1] * 60 : +m[1] * 3600;
+}
+export function parseHm(s: any): number | null {
+  if (typeof s === 'number') return s > 0 ? s : null;
+  const m = /^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/.exec(String(s || '').trim());
+  if (!m) return null;
+  return m[3] != null ? +m[1] * 3600 + +m[2] * 60 + +m[3] : +m[1] * 3600 + (+(m[2] || 0)) * 60;
+}
+/* Verfügbare Tage für eine Sportart (Schwimmbad-Tage aus den Berücksichtigungen werden im Plan beachtet) */
+export function availableDays(a: Answers): number {
+  const dl = a.dayLoad || {};
+  return Object.values(dl).filter((x: any) => +x > 0).length;
+}
+const num = (v: any) => (v == null || v === '' ? null : +v);
+/* Wunschzeit eines Ziels: gesamt oder Summe der Disziplinen (+ Wechsel) */
+export function goalTarget(g: any): number | null {
+  if (g.timeMode === 'split' && g.splits && Object.values(g.splits).some((x: any) => x > 0)) {
+    const sum = Object.values(g.splits).reduce((s: number, x: any) => s + (+x || 0), 0) as number;
+    return sum ? sum + (GOALS[g.type as GoalType] && GOALS[g.type as GoalType].group === 'tri' ? 240 : 0) : null;
+  }
+  return g.targetTime != null ? parseHm(g.targetTime) : null;
+}
 
 /* Antworten → Profil, Ziele, Plan */
-export function applyOnboarding(a: Answers, today: string, base?: Profile): { profile: Profile; goals: Goal[]; gen: GenResult | null; warnings: string[] } {
+export function profileFromAnswers(a: Answers, today: string, base?: Profile): { profile: Profile; goals: Goal[]; warnings: string[] } {
   const p: Profile = { ...defaultProfile(), ...(base || {}) };
   const warnings: string[] = [];
   if (a.birthYear) p.birthYear = +a.birthYear;
-  if (a.sex) p.sex = a.sex;
+  if (a.sex !== undefined) p.sex = a.sex || null;
   if (a.heightCm) p.heightCm = +a.heightCm;
   if (a.weightKg) p.weightKg = +a.weightKg;
-  p.injuries = [a.injuries, a.pastInjuries ? 'früher: ' + a.pastInjuries : ''].filter(x => x && !/^keine?$/i.test(String(x).trim())).join('; ');
+  p.injuries = [a.injuries, a.pastInjuries ? 'früher: ' + a.pastInjuries : ''].filter(x => x && !/^keine?\.?$/i.test(String(x).trim())).join('; ');
   p.medicalCaution = !!a.medical;
   if (a.medical) warnings.push('Bitte lass vor dem Start ärztlich abklären, ob du trainieren darfst. Der Plan startet besonders vorsichtig.');
-  if (a.experienceYears != null) p.experienceYears = +a.experienceYears;
-  if (Array.isArray(a.sports) && a.sports.length) p.sports = a.sports as SportKey[];
+  if (a.experienceYears != null && a.experienceYears !== '') p.experienceYears = +a.experienceYears;
+  if (Array.isArray(a.sports) && a.sports.length) p.sports = a.sports.filter((s: string) => s !== 'football') as SportKey[];
+  // alte Frage „Krafttraining?“
   if (a.strength === '0') p.sports = p.sports.filter(s => s !== 'strength');
   else if (a.strength && !p.sports.includes('strength')) p.sports = [...p.sports, 'strength'];
-  if (a.teamSportName) p.teamSportName = String(a.teamSportName);
+  // Teamsport
+  if (a.teamYes) {
+    p.teamSport = { name: String(a.teamName || a.teamSportName || 'Teamsport').trim() || 'Teamsport', trainingDays: (a.teamTrainingDays || []).map(Number), trainingMinutes: num(a.teamTrainingMinutes) || 90, gameDays: (a.teamGameDays || []).map(Number), gameMinutes: num(a.teamGameMinutes) || 90, seasonFrom: a.teamSeasonFrom || null, seasonTo: a.teamSeasonTo || null };
+    p.teamSportName = p.teamSport.name;
+    if (!p.sports.includes('football')) p.sports = [...p.sports, 'football'];
+  } else if (a.teamYes === false) { p.teamSport = null; p.sports = p.sports.filter(s => s !== 'football'); p.teamSportName = ''; }
+  else if (Array.isArray(a.sports) && a.sports.includes('football')) { p.sports = [...p.sports, 'football']; p.teamSportName = String(a.teamSportName || 'Teamsport'); }
   if (a.weeklyHours) p.weeklyHours = +a.weeklyHours;
   if (a.maxDayHours) p.maxDayHours = +a.maxDayHours;
+  if (a.dayLoad && typeof a.dayLoad === 'object') { const dl: Record<number, DayLoad> = {}; Object.entries(a.dayLoad).forEach(([k, v]) => { dl[+k] = Math.max(0, Math.min(3, +(v as any) || 0)) as DayLoad; }); p.dayLoad = dl; }
   if (a.windows && typeof a.windows === 'object') p.availability = a.windows as Record<number, DayWindow[]>;
   if (Array.isArray(a.fixed)) p.fixed = a.fixed;
+  p.timeOfDay = a.timeOfDay === 'morning' || a.timeOfDay === 'evening' ? a.timeOfDay : '';
+  if (a.freq && typeof a.freq === 'object') { const f: any = {}; Object.entries(a.freq).forEach(([k, v]: any) => { if (Array.isArray(v) && v.length === 2) f[k] = [Math.max(0, +v[0] || 0), Math.max(+v[0] || 0, +v[1] || 0)]; }); p.freq = f; if (f.strength && f.strength[1] > 0 && !p.sports.includes('strength')) p.sports = [...p.sports, 'strength']; }
+  p.skills = {
+    swimCrawl: a.swimCrawl || null, swimCrawlM: num(a.swimCrawlM), swimBreast: a.swimBreast === true ? true : a.swimBreast === false ? false : undefined,
+    runContinuousMin: num(a.runContinuousMin), bikeLongestMin: num(a.bikeLongestMin)
+  };
+  if (Array.isArray(a.bikes)) p.bikes = a.bikes;
+  if (Array.isArray(a.bikeSetup)) { p.bikes = [...new Set([...(p.bikes || []), ...a.bikeSetup.filter((x: string) => x !== 'power' && x !== 'clip' && x !== 'group')])]; if (a.bikeSetup.includes('power')) p.powerMeter = true; }
+  if (a.powerMeter != null) p.powerMeter = !!a.powerMeter;
+  if (a.bests && typeof a.bests === 'object') { const b: any = {}; Object.entries(a.bests).forEach(([k, v]) => { const s = parseDur(v, k === 'runHalf' || k === 'runMarathon' ? 'hm' : 'ms'); if (s) b[k] = s; }); p.bests = b; }
+  const notes = Array.isArray(a.notes) ? a.notes : String(a.notes || '').split(/\n+/);
+  p.notes = notes.map((x: string) => String(x).trim()).filter(Boolean);
+  if (a.poolDays) p.notes.push('Schwimmbad nur ' + a.poolDays);
   if (a.diet === 'vegetarian' || a.diet === 'vegan') p.vegetarian = true;
   p.trackCalories = !!a.trackCalories;
   p.planStyle = a.planStyle === 'strict' ? 'strict' : 'flexible';
   p.likesIntensity = a.likes === 'intensity' ? 'intensity' : a.likes === 'volume' ? 'volume' : 'balanced';
   p.answers = { ...a };
-  const goals: Goal[] = (Array.isArray(a.goals) ? a.goals : []).filter((g: any) => g && GOALS[g.type as GoalType]).map((g: any, i: number) => ({
-    id: g.id || `goal-${i + 1}`, type: g.type, name: g.name || g.type, date: g.date || null, priority: g.priority || (i === 0 ? 'A' : 'B'),
-    outcome: a.outcome || 'finish', targetTimeSec: i === 0 && a.outcome === 'time' ? parseHm(a.targetTime) : null, why: a.why || undefined
-  }));
-  const main = goals.find(g => g.priority === 'A') || goals[0];
+  const goals: Goal[] = (Array.isArray(a.goals) ? a.goals : []).filter((g: any) => g && GOALS[g.type as GoalType]).map((g: any, i: number) => {
+    const target = goalTarget(g) ?? (i === 0 && a.outcome === 'time' ? parseHm(a.targetTime) : null);
+    return {
+      id: g.id || `goal-${i + 1}`, type: g.type, name: g.name || GOAL_NAMES[g.type as GoalType] || g.type, date: g.date || null, priority: g.priority || (i === 0 ? 'A' : 'B'),
+      outcome: target ? 'time' : (a.outcome || 'finish'), targetTimeSec: target, splits: g.timeMode === 'split' ? g.splits || null : null, why: a.why || undefined
+    } as Goal;
+  });
+  if (goals.length && !goals.some(g => g.priority === 'A')) goals[0].priority = 'A';
+  return { profile: withEstimates(p, today), goals, warnings };
+}
+export const GOAL_NAMES: Record<GoalType, string> = {
+  run_5k: '5 km', run_10k: '10 km', run_half: 'Halbmarathon', run_marathon: 'Marathon', tri_supersprint: 'Supersprint-Triathlon', tri_sprint: 'Sprint-Triathlon',
+  tri_olympic: 'Olympischer Triathlon', tri_middle: 'Mitteldistanz', tri_long: 'Langdistanz', duathlon: 'Duathlon', aquathlon: 'Aquathlon', bike_event: 'Radmarathon', swim_goal: 'Schwimm-Ziel', fitness: 'Fitness'
+};
+
+export function applyOnboarding(a: Answers, today: string, base?: Profile, o: { stages?: any } = {}): { profile: Profile; goals: Goal[]; gen: GenResult | null; warnings: string[] } {
+  const { profile: p, goals, warnings } = profileFromAnswers(a, today, base);
   let gen: GenResult | null = null;
-  if (main) {
+  if (goals.length) {
     const need = a.wantTests ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined;
-    gen = generatePlan({ profile: p, goal: { ...main, date: main.date || addDays(today, 84) }, today, currentWeeklyHours: a.weeklyHoursNow != null ? +a.weeklyHoursNow : null, needTests: need });
+    const dated = goals.map(g => ({ ...g, date: g.date || addDays(today, 84) }));
+    gen = generatePlan({ profile: p, goals: dated, today, currentWeeklyHours: a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? +a.weeklyHoursNow : null, needTests: need, stages: o.stages });
     gen.violations.filter(v => v.rule === 'age').forEach(v => warnings.push(v.msg));
   }
   return { profile: p, goals, gen, warnings };
+}
+
+/* „Das habe ich verstanden“ (F2): alle wichtigen Angaben in Sätzen, je mit Sprung zum Block */
+export interface Understood { block: string; label: string; text: string }
+const DOWS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const fmtT = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}${x ? ':' + String(x).padStart(2, '0') : ''} h` : `${m}:${String(x).padStart(2, '0')} min`; };
+export function understood(a: Answers, today: string): Understood[] {
+  const { profile: p, goals } = profileFromAnswers(a, today);
+  const out: Understood[] = [];
+  const PR: Record<string, string> = { A: 'Hauptziel', B: 'wichtig', C: 'Training' };
+  out.push({ block: 'goal', label: 'Ziele', text: goals.length ? goals.map(g => `${g.name}${g.date ? ' am ' + g.date.split('-').reverse().join('.') : ''} (${g.priority}: ${PR[g.priority]})${g.targetTimeSec ? `, Wunschzeit ${fmtT(g.targetTimeSec)}` : ', ohne Wunschzeit'}`).join('; ') : 'noch kein Ziel' });
+  const SD: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft' };
+  const fr = (s: string) => { const f = (p.freq || {})[s as SportKey]; return f ? (f[0] === f[1] ? `${f[0]}×` : `${f[0]}-${f[1]}×`) : 'nach Plan'; };
+  out.push({ block: 'time', label: 'Sportarten und Häufigkeit', text: p.sports.filter(s => s !== 'football').map(s => `${SD[s]} ${fr(s)}`).join(', ') + ' pro Woche' });
+  const dl = p.dayLoad || {};
+  const LBL = ['–', 'kurz', 'mittel', 'lang'];
+  out.push({ block: 'time', label: 'Tage', text: [1, 2, 3, 4, 5, 6, 0].map(d => `${DOWS[d]} ${LBL[(dl as any)[d] || 0]}`).join(', ') + `, höchstens ${p.weeklyHours} h pro Woche` });
+  out.push({ block: 'team', label: 'Teamsport', text: p.teamSport ? `${p.teamSport.name}: Training ${p.teamSport.trainingDays.map(d => DOWS[d]).join(', ') || '–'} (${p.teamSport.trainingMinutes} min), Spiele ${p.teamSport.gameDays.map(d => DOWS[d]).join(', ') || '–'}` + (p.teamSport.seasonFrom || p.teamSport.seasonTo ? `, Saison ${p.teamSport.seasonFrom || '…'} bis ${p.teamSport.seasonTo || '…'}` : '') : 'kein Teamsport' });
+  const sk = p.skills || {};
+  const can: string[] = [];
+  if (p.sports.includes('swim')) can.push(sk.swimCrawl === 'yes' ? `Kraul${sk.swimCrawlM ? ` ${sk.swimCrawlM} m am Stück` : ''}` : sk.swimCrawl === 'some' ? `ein bisschen Kraul${sk.swimCrawlM ? ` (${sk.swimCrawlM} m)` : ''}` : sk.swimBreast ? 'nur Brust, kein Kraul' : 'kann noch nicht kraulen');
+  if (p.sports.includes('run') && sk.runContinuousMin != null) can.push(`${sk.runContinuousMin} min am Stück laufen`);
+  if (p.sports.includes('bike') && sk.bikeLongestMin != null) can.push(`längste Radfahrt ${sk.bikeLongestMin} min`);
+  if ((p.bikes || []).length) can.push('Räder: ' + p.bikes.map(b => (BIKE_OPTIONS.find(x => x[0] === b) || [b, b])[1]).join(', ') + (p.powerMeter ? ', mit Wattmessung' : ''));
+  out.push({ block: 'skills', label: 'Können', text: can.join('; ') || 'keine Angaben' });
+  out.push({ block: 'notes', label: 'Einschränkungen', text: [p.injuries, ...(p.notes || [])].filter(Boolean).join('; ') || 'keine' });
+  out.push({ block: 'time', label: 'Kraft', text: p.sports.includes('strength') ? `ja, ${fr('strength')} pro Woche` : 'nein' });
+  return out;
 }

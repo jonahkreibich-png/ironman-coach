@@ -28,7 +28,7 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
   // Umfang: gegen die letzte normale Woche (nach einer Erholungswoche zählt die Woche davor)
   for (let i = Math.max(1, firstNew); i < all.length; i++) {
     const w = all[i];
-    let j = i - 1; while (j > 0 && all[j].isRecoveryWeek) j--;
+    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced)) j--;
     const ref = all[j];
     const refMin = weekMinutes(ref), cur = weekMinutes(w);
     if (refMin >= 60 && cur > refMin * maxInc + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
@@ -38,10 +38,12 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
   // Harte Tage
   const days = all.flatMap(w => (w.days || []).map((d: any) => ({ ...d, weekNumber: w.weekNumber }))).sort((a: any, b: any) => a.date.localeCompare(b.date));
   const hard = new Set(days.filter((d: any) => (d.sessions || []).some((s: any) => isIntense(s))).map((d: any) => d.date));
+  // feste Termine (Spiel, Wettkampf) liegen nicht in der Hand des Plans: zwei feste harte Tage hintereinander sind kein Planungsfehler
+  const onlyFixed = (date: string) => { const d = days.find((x: any) => x.date === date); return !!d && (d.sessions || []).filter((s: any) => isIntense(s)).every((s: any) => s.fixed || s.race); };
   const newDates = new Set(weeks.flatMap(w => (w.days || []).map((d: any) => d.date)));
   for (const d of days) {
     if (!newDates.has(d.date) || !hard.has(d.date)) continue;
-    if (hard.has(addDays(d.date, 1))) out.push({ rule: 'hardDays', date: d.date, msg: `${fmt(d.date)} und ${fmt(addDays(d.date, 1))} sind beide hart. Zwischen zwei harten Tagen braucht es einen lockeren Tag.` });
+    if (hard.has(addDays(d.date, 1)) && !(onlyFixed(d.date) && onlyFixed(addDays(d.date, 1)))) out.push({ rule: 'hardDays', date: d.date, msg: `${fmt(d.date)} und ${fmt(addDays(d.date, 1))} sind beide hart. Zwischen zwei harten Tagen braucht es einen lockeren Tag.` });
   }
   // Krankheit und Wiedereinstieg: keine Intensität
   if (ctx.illness && ctx.illness.length) {

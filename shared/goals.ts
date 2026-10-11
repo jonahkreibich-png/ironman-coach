@@ -45,6 +45,8 @@ export interface Goal {
   /** gewünschtes Ergebnis */
   outcome?: 'finish' | 'time' | 'place';
   targetTimeSec?: number | null;
+  /** Triathlon: Wunschzeit je Disziplin (Sekunden) statt gesamt */
+  splits?: Partial<Record<'swim' | 'bike' | 'run', number>> | null;
   /** eigene Strecken (z. B. Rad-Event mit 150 km) */
   legs?: Leg[];
   why?: string;
