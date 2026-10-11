@@ -1,90 +1,173 @@
-/* Heute-Bildschirm */
-import * as CoachCore from '../../../shared/core';
-import { STATE, PLAN, SESS, UI, HAS_PLAN, BASE_WEEKS, findDay, currentWeekIdx } from '../store';
-import { $, esc, de, todayStr, addDays, daysBetween, fmtDate, dowShort, dowLong, secToPace, parseNum, round5, round50, rng } from '../util';
-import { SPORTS, icon, uiIcon } from '../icons';
-import * as D from '../domain';
-import { sessState, effStatus, illnessAt, activeIllness, returnPhase, RETURN_STAGES, trendAt, latestTrend, latestWithKey, hasRecovery, rollingAvg, arrow, computeReadiness, readinessHistoryHtml, computeScore, tierLabel, perfEntries, forgottenSessions, computeZones, computePaceZones, computeSpeedZones } from '../domain';
-import { sessionCard, dayCard, dayBadge, weekStrip, weekProgress, checkinFields } from '../components';
-import { lineChart, illnessShades } from '../charts';
-import { VS } from '../viewstate';
-import { APP } from '../config';
+/* Heute: das Zentrum der App. Oben die Antwort des Tages (Ampel + Einheit + ein Satz vom Coach), darunter Morgen,
+   Zuletzt, Woche. Details erst beim Antippen. Zwei Entwürfe: A „Antwort“ (Standard) und B „Feed“ (siehe DESIGN.md). */
+import * as C from '../../../shared/core';
+import { STATE, UI, PLAN, findDay } from '../store';
+import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
+import { t, tn, num, duration } from '../../../shared/i18n';
+import { D, RETURN_STAGES } from '../data';
+import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed } from '../kit';
+import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '../domain';
+import { saveState } from '../store';
+import { toast } from '../toast';
+import { sessionRow, metaLine, doneLine } from './session';
+import { openCheckin } from './werte';
+import { nav } from '../nav';
+import { SPORT_COLOR, sportIcon } from '../icons';
+import { nutritionToday } from './essen';
+import { daysUntil } from '../../../shared/race';
 import { syncStatusLine } from '../sync';
-import { backupReminder } from './sheets';
-import { nutritionMini } from '../nutrition';
 
-export function renderHeute() {
-  const t = todayStr();
-  const R = computeReadiness();
-  const day = findDay(t);
-  const ill = R.ill, ret = R.ret;
-  const todayPoint = trendAt(t);
-  const haveToday = hasRecovery(todayPoint);
-  const lightIcon = R.level === 0 ? uiIcon('bolt') : R.level === 1 ? uiIcon('walk') : uiIcon('pause');
-  let h = `<h1 class="view-title">${dowLong(t)}<small>${fmtDate(t)} · ${day ? PLAN.weeks[day.weekIdx].label + ' · ' + esc(PLAN.weeks[day.weekIdx].focus) : 'außerhalb des aktuellen Blocks'}</small></h1>`;
-  h += syncStatusLine();
+const STATUS_KEY = ['heute.st.ready', 'heute.st.easy', 'heute.st.rest', 'heute.st.novalues'];
 
-  h += `<div class="ready l${R.level}">
-    <div class="ready-head"><div class="light">${lightIcon}</div><div style="flex:1;min-width:0"><div class="ready-t">${esc(R.title)}</div><div class="ready-s">${esc(R.sub)}</div></div>${R.score != null && !ill ? `<div class="ready-score num" aria-label="Bereitschaft ${R.score} von 100"><b>${R.score}</b><span>/100</span></div>` : ''}</div>
-    ${R.reasons.length && !ill ? `<ul class="ready-why">${R.reasons.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-    ${R.crits.length ? `<div class="crits">${R.crits.map(c => `<span class="crit ${c.st}"><i></i>${c.k} <b>${c.v}</b>${c.t ? `<span class="t">${c.t}</span>` : ''}</span>`).join('')}</div>` : ''}
-    ${readinessHistoryHtml(R.history)}
-    ${R.point && !R.personal ? `<div class="hint">Noch weniger als ${CoachCore.MIN_DAYS} Tage Werte: Die Ampel nutzt feste Grenzwerte, bis dein persönlicher Normalbereich steht.</div>` : ''}
-    <div class="ready-foot"><span class="hint">${R.stale ? `Werte vom ${fmtDate(R.point.date)}. Heute noch nichts eingetragen.` : (haveToday ? 'Morgenwerte von heute.' : '')}</span>
-      ${ill ? '' : `<button class="btn ghost small" data-act="ill-start">Ich bin krank</button>`}</div>
-  </div>`;
-
-  if (ill) {
-    const n = daysBetween(ill.start, t) + 1;
-    const yest = addDays(t, -1);
-    h += `<div class="sec"><div class="sec-h"><h2>Krankheit</h2><span class="aside">seit ${dowShort(ill.start)} ${fmtDate(ill.start)} · Tag ${n}</span></div>
-      <div class="panel">
-        <div class="hint">Geplante Einheiten in dieser Zeit zählen nicht als verpasst und kosten keine Score-Punkte. CTL und ATL fallen rechnerisch, weil du nicht trainierst. Das ist kein echter Fitnessverlust: ein paar Tage Pause holst du in ein bis zwei Wochen wieder auf.</div>
-        ${todayPoint && todayPoint.illness ? `<div class="kv"><span class="muted">Heute notiert</span><span>${esc(todayPoint.illness)}</span></div>` : ''}
-        <div class="banner info"><strong>Zum Arzt</strong> bei Fieber über 39 °C oder länger als 2-3 Tage, Atemnot, Brustschmerzen oder wenn du kaum trinken kannst.</div>
-        <div class="hr"></div>
-        <div class="fgrid"><div class="fld" style="grid-column: span 2"><label for="ill-end">Letzter Tag mit Symptomen</label><input class="inp" type="date" id="ill-end" value="${yest >= ill.start ? yest : t}" min="${ill.start}" max="${t}"></div></div>
-        <button class="btn block" data-act="ill-end">Wieder gesund, Pause beenden</button>
-      </div></div>`;
-  } else if (ret) {
-    h += `<div class="sec"><div class="sec-h"><h2>Wiedereinstieg</h2><span class="aside">Tag ${ret.day} ohne Symptome</span></div>
-      <div class="panel"><div class="steps">${RETURN_STAGES.slice(1).map((s, i) => `<div class="step ${ret.stage === i + 1 ? 'now' : (ret.stage > i + 1 ? 'past' : '')}"><div class="n">${s.n}</div><div class="d">${s.d}</div></div>`).join('')}</div>
-      <div class="hint">${ret.stage === 0 ? 'Heute noch abwarten. ' : ''}Der Plan unten gilt erst wieder voll ab Stufe 3. Bis dahin ersetzt die Stufe die geplanten Intervalle.</div>
-      <button class="btn ghost small" data-act="ill-reopen">Doch noch krank</button></div></div>`;
-  }
-
-  h += backupReminder();
-  h += `<div class="sec" id="checkin"><div class="panel"><details class="fold" ${haveToday ? '' : 'open'}>
-      <summary><span><span class="sec-h"><h2>Morgenwerte</h2></span><span class="hint">${haveToday ? 'Für heute eingetragen. Tippen zum Ändern.' : 'Für heute noch nicht eingetragen.'}</span></span><span class="chev">${uiIcon('chev', 20)}</span></summary>
-      <div class="fold-body">${checkinFields('h', t)}<button class="btn block" data-act="checkin-save" data-prefix="h">Werte speichern</button></div>
-    </details></div></div>`;
-
-  if (day) {
-    const week = PLAN.weeks[day.weekIdx];
-    h += `<div class="sec"><div class="sec-h"><h2>Training heute</h2><span class="aside">${dayBadge(day)}</span></div>${dayCard(day, { open: true, noHead: true })}</div>`;
-    const wp = weekProgress(week);
-    h += `<div class="sec"><div class="sec-h"><h2>${esc(week.label)}</h2><span class="aside num">${wp.done} von ${wp.total} erledigt${wp.sick ? ` · ${wp.sick} krank` : ''}</span></div>${wp.html}${weekStrip(week, false)}</div>`;
-  } else {
-    h += `<div class="sec"><div class="panel empty">Heute liegt außerhalb des aktuellen Plans. Der nächste Block kommt nach dem Schwellentest.</div></div>`;
-  }
-
-  const forgot = forgottenSessions();
-  if (forgot.length) {
-    const shown = VS.SHOW_ALL_MISSED ? forgot : forgot.slice(-5);
-    h += `<div class="sec"><div class="sec-h"><h2>Noch offen</h2><span class="aside">${forgot.length} ${forgot.length === 1 ? 'Einheit' : 'Einheiten'} ohne Haken</span></div>
-      <div class="panel"><div class="hint">Abhaken, wenn du sie gemacht hast, sonst als ausgefallen markieren. Details trägst du im Plan nach.</div>
-      ${[...shown].reverse().map(s => `<div class="miss" data-sid="${esc(s.id)}" style="--sc:${(SPORTS[s.sport] || SPORTS.rest).color}">
-        <span class="miss-ic">${icon(s.sport)}</span><div class="miss-t"><div class="lbl">${dowShort(s.date)} ${fmtDate(s.date)}</div><div>${esc(s.title)}</div></div>
-        <div class="wo-btns"><button class="rbtn skip" data-act="sess-skip" aria-label="Als ausgefallen markieren" title="Ausgefallen">${uiIcon('skip')}</button><button class="rbtn check" data-act="sess-toggle" aria-label="Erledigt" title="Erledigt">${uiIcon('check')}</button></div></div>`).join('')}
-      <div class="row" style="justify-content:space-between">${forgot.length > 5 ? `<button class="link" data-act="missed-all">${VS.SHOW_ALL_MISSED ? 'Weniger zeigen' : `Alle ${forgot.length} zeigen`}</button>` : '<span></span>'}<button class="btn ghost small" data-act="missed-skip-all">Alle als ausgefallen</button></div></div></div>`;
-  }
-
-  h += `<div class="sec"><div class="sec-h"><h2>Essen heute</h2></div>${nutritionMini()}</div>`;
-
-  if (STATE.milestones.length) {
-    const last = [...STATE.milestones].sort((a, b) => b.date.localeCompare(a.date))[0];
-    h += `<div class="sec"><div class="sec-h"><h2>Letzter Meilenstein</h2></div><div class="panel"><div class="ms"><div class="when">${fmtDate(last.date)}</div><div class="txt">${esc(last.text)}</div></div></div></div>`;
-  }
-  h += `<div class="sec"><button class="btn block" data-act="export-open">Heute für den Chat exportieren</button></div>`;
-  $('#app').innerHTML = h;
+export function todayStatus() {
+  const d = D(); const R = d.readiness;
+  if (d.ill) return { level: 2, word: t('heute.st.sick'), line: t('heute.sickLine') };
+  if (d.ret && d.ret.stage < 3) return { level: 1, word: t('heute.st.return'), line: t(RETURN_STAGES[d.ret.stage]) };
+  const own = (STATE.trend || []).find((p: any) => p.date === d.today);
+  const level = R.level;
+  const brief = (STATE.coachMsgs || {})['msg-brief-' + d.today];
+  let line = '';
+  if (brief && C.hasRecovery(own)) line = brief.text.replace(/^[^.!?]*[!?.,]\s*/, '').split(/(?<=[.!?])\s+/).slice(0, 2).join(' ');
+  if (!line) line = level === 3 ? t('heute.noValuesLine') : !C.hasRecovery(own) ? t('heute.staleLine') : level === 0 ? t('heute.greenLine') : (R.reasons.join(', ') || t('heute.yellowLine')) + '.';
+  return { level, word: t(STATUS_KEY[level] || STATUS_KEY[3]), line };
 }
+
+function critTiles(): string {
+  const d = D(); const p = d.readiness.point || {};
+  const st = (k: string) => { const c = d.readiness.crits.find((x: any) => x.k === k); return c ? c.st : ''; };
+  const tile = (k: string, label: string, v: string, field: string, note = '') => `<button class="crit ${st(k)}" data-act="go-sub" data-sub="werte"><div class="k"><i></i>${esc(label)} ${srcBadge((p._src || {})[field])}</div><div class="v">${v}</div><div class="n">${esc(note)}</div></button>`;
+  const crit = (k: string) => d.readiness.crits.find((x: any) => x.k === k);
+  return `<div class="crit-grid">
+    ${tile('HFV', t('v.hrv'), p.hrv != null ? `${p.hrv}<small class="xs"> ms</small>` : '–', 'hrv', crit('HFV') ? crit('HFV').t.replace(/ · z.*$/, '') : '')}
+    ${tile('Ruhepuls', t('v.rhr'), p.restingHR != null ? String(p.restingHR) : '–', 'restingHR', crit('Ruhepuls') ? crit('Ruhepuls').t.replace(/ · .*$/, '') : '')}
+    ${tile('Schlaf', t('v.sleep'), p.sleepHours != null ? `${num(p.sleepHours, 1)}<small class="xs"> h</small>` : '–', 'sleepHours', t('v.need', { h: d.fallback.sleepNeed.map((x: number) => num(x, x % 1 ? 1 : 0)).join('-') }))}
+  </div>`;
+}
+
+function historyBars(): string {
+  const h = D().history;
+  if (!h.some((x: any) => x.level != null)) return '';
+  const col = (l: number | null) => l === 0 ? 'var(--good)' : l === 1 ? 'var(--warn)' : l === 2 ? 'var(--bad)' : 'var(--line)';
+  return `<div><div class="row" style="align-items:flex-end;gap:3px;height:30px" role="img" aria-label="${esc(t('heute.history'))}">${h.map((x: any) => `<i style="flex:1;border-radius:3px;height:${x.score != null ? Math.max(15, x.score) : 15}%;background:${x.ill ? 'var(--rest)' : col(x.level)}${x.level == null ? ';opacity:.4' : ''}" title="${dowShort(x.date)} ${fmtDate(x.date)}${x.score != null ? ': ' + x.score : ''}"></i>`).join('')}</div>
+    <div class="spread xs muted"><span>${esc(t('heute.14ago'))}</span><span>${esc(t('common.today'))}</span></div></div>`;
+}
+
+function answerCard(): string {
+  const d = D(); const s = todayStatus();
+  const day = findDay(d.today);
+  const list = day ? day.sessions.filter((x: any) => x.sport !== 'rest').map((x: any) => ({ ...x, date: d.today })) : [];
+  const own = (STATE.trend || []).find((p: any) => p.date === d.today);
+  const noValues = !C.hasRecovery(own);
+  const sessions = list.length ? list.map((x: any) => {
+    const st = sessState(x.id); const status = effStatus(x);
+    return `<div class="session-hero ${st.completed ? 'done' : ''}" style="--c:${SPORT_COLOR[x.sport]}">
+      <button class="row grow" data-act="sess-open" data-sid="${esc(x.id)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px"><span class="ic">${sportIcon(x.sport)}</span>
+      <span class="grow"><span class="t">${esc(x.title)}</span>${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
+      ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}</div>`;
+  }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t('heute.restDay'))}</span><br><span class="m">${esc(t('heute.restLine'))}</span></span></div>`;
+  return `<div class="answer l${s.level}">
+    <div class="answer-top">${ring(d.ill ? null : d.readiness.score, s.level, t('heute.readiness'))}
+      <div class="grow"><div class="status-word">${esc(s.word)}</div><div class="coach-line">${esc(s.line)}</div></div></div>
+    <div class="stack" style="margin-top:var(--s4)">${sessions}</div>
+    ${noValues && !d.ill ? `<button class="btn soft block" data-act="checkin-open" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('heute.enterValues'))}</button>` : ''}
+    <details class="more" style="margin-top:var(--s3)"><summary>${esc(t('heute.why'))}<span class="chev">${ic('down')}</span></summary><div class="body">${critTiles()}${historyBars()}
+      ${d.readiness.point && !d.readiness.personal ? `<div class="hint">${esc(t('heute.fixedLimits', { n: C.MIN_DAYS }))}</div>` : ''}
+      <div class="row wrap">${d.ill ? '' : `<button class="btn ghost sm" data-act="ill-start">${ic('sick')} ${esc(t('heute.imSick'))}</button>`}<button class="btn ghost sm" data-act="checkin-open">${ic('edit')} ${esc(t('heute.editValues'))}</button></div></div></details>
+  </div>`;
+}
+
+function illnessBlock(): string {
+  const d = D();
+  if (d.ill) {
+    const n = daysBetween(d.ill.start, d.today) + 1;
+    return `<div class="card" style="margin-top:var(--s3)"><div class="spread"><b>${esc(t('heute.sickSince', { d: `${dowShort(d.ill.start)} ${fmtDate(d.ill.start)}`, n }))}</b></div>
+      <div class="hint">${esc(t('heute.sickHint'))}</div><div class="banner info">${esc(t('heute.doctor'))}</div>
+      <button class="btn block" data-act="ill-end">${esc(t('heute.healthy'))}</button></div>`;
+  }
+  if (d.ret) return `<div class="card" style="margin-top:var(--s3)"><b>${esc(t('heute.returnDay', { n: d.ret.day }))}</b><div class="hint">${esc(t(RETURN_STAGES[d.ret.stage]))}</div><button class="link" data-act="ill-reopen">${esc(t('heute.stillSick'))}</button></div>`;
+  return '';
+}
+
+function weekStrip(): string {
+  const d = D(); const day = findDay(d.today);
+  if (!day) return '';
+  const week = PLAN.weeks[day.weekIdx];
+  return `<div class="week">${week.days.map((x: any) => {
+    const stt = dayStats({ ...x });
+    const real = x.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled);
+    const dots = real.map((s: any) => `<i class="${sessState(s.id).completed ? 'done' : ''}" style="--c:${SPORT_COLOR[s.sport]}"></i>`).join('');
+    const cls = [x.date === d.today ? 'today' : '', stt.sick ? 'sick' : '', stt.missed ? 'missed' : ''].join(' ');
+    return `<button class="wd ${cls}" data-act="plan-day" data-date="${x.date}" aria-label="${esc(dowLong(x.date))} ${fmtDate(x.date)}"><span class="d">${dowShort(x.date)}</span><span class="n">${x.date.slice(8)}</span><span class="dots">${dots}</span></button>`;
+  }).join('')}</div>`;
+}
+
+function nextRows(): string {
+  const d = D(); const rows: string[] = [];
+  const tm = addDays(d.today, 1);
+  const tday = findDay(tm);
+  const tl = tday ? tday.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled) : [];
+  rows.push(li({ act: 'plan-day', data: { date: tm }, icon: tl.length ? sportIcon(tl[0].sport) : ic('moon'), color: tl.length ? SPORT_COLOR[tl[0].sport] : 'var(--rest)', title: t('heute.tomorrow') + ': ' + (tl.length ? tl.map((s: any) => s.title).join(', ') : t('heute.restDay')), sub: tl.length ? tl.map((s: any) => metaLine({ ...s, date: tm })).join(' · ') : '' }));
+  // Zuletzt erledigt
+  const last = d.activities.filter(a => a.date <= d.today).sort((a, b) => b.startMs - a.startMs)[0];
+  const lastSess = [...(PLAN.weeks || [])].flatMap((w: any) => w.days.flatMap((x: any) => x.sessions.map((s: any) => ({ ...s, date: x.date })))).filter((s: any) => s.date <= d.today && sessState(s.id).completed).sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
+  if (lastSess) rows.push(li({ act: 'sess-open', data: { sid: lastSess.id }, icon: sportIcon(lastSess.sport), color: SPORT_COLOR[lastSess.sport], title: `${t('heute.last')}: ${lastSess.title}`, sub: `${dowShort(lastSess.date)} ${fmtDate(lastSess.date)} · ${doneLine(lastSess) || metaLine(lastSess)}`, value: srcBadge(sessState(lastSess.id).source) }));
+  void last;
+  const forgot = forgottenSessions();
+  if (forgot.length) rows.push(li({ act: 'missed-open', icon: ic('info'), color: 'var(--warn)', title: tn('heute.open', forgot.length), sub: t('heute.openSub') }));
+  return `<div class="list" style="margin-top:var(--s3)">${rows.join('')}</div>`;
+}
+
+function raceBanner(): string {
+  const d = D();
+  if (d.raceGoal) { const n = daysUntil(d.today, d.raceGoal.date!); return `<button class="banner good" data-act="go-sub" data-sub="wettkampf" style="width:100%;text-align:left;margin-top:var(--s3)">${ic('flag')} <b>${esc(n === 0 ? t('race.today', { name: d.raceGoal.name }) : t('race.inDays', { name: d.raceGoal.name, n }))}</b> · ${esc(t('race.open'))}</button>`; }
+  if (d.recentRace && !d.recentRace.result) return `<button class="banner info" data-act="go-sub" data-sub="wettkampf" style="width:100%;text-align:left;margin-top:var(--s3)">${ic('trophy')} ${esc(t('race.enterResult', { name: d.recentRace.name }))}</button>`;
+  return '';
+}
+
+function coachPreview(): string {
+  const msgs = Object.values(STATE.coachMsgs || {}).filter((m: any) => m && m.from !== 'user' && m.kind !== 'briefing').sort((a: any, b: any) => b.at - a.at);
+  const m: any = msgs[0];
+  if (!m || Date.now() - m.at > 3 * 86400000) return '';
+  return sec(t('heute.coach'), `<button class="card" data-act="go-tab" data-tab="coach"><div class="lbl">${esc(m.title || t('coach.title'))}</div><div class="small" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(m.text)}</div></button>`);
+}
+
+function foodMini(): string {
+  const n = nutritionToday();
+  if (!n) return '';
+  return sec(t('heute.food'), `<button class="card" data-act="go-sub" data-sub="essen"><div class="spread"><b>${esc(n.typeLabel)}</b><span class="small muted num">${n.eaten != null ? `${n.eaten} / ` : ''}${n.low}-${n.high} kcal</span></div>${n.eaten != null ? bar(n.eaten / n.high * 100, n.eaten < n.low ? 'var(--warn)' : 'var(--good)') : `<div class="hint">${esc(t('heute.foodNone'))}</div>`}</button>`);
+}
+
+/* Entwurf B: Coach-Feed mit Zeitleiste */
+function feedVariant(): string {
+  const d = D(); const s = todayStatus();
+  const day = findDay(d.today);
+  const list = day ? day.sessions.filter((x: any) => x.sport !== 'rest').map((x: any) => ({ ...x, date: d.today })) : [];
+  return `<div class="msg coach" style="max-width:100%"><div class="h">${ring(d.readiness.score, s.level, '', true)} <span style="color:${['var(--good)', 'var(--warn)', 'var(--bad)', 'var(--ink-2)'][s.level]}">${esc(s.word)}</span></div>${esc(s.line)}</div>
+    ${sec(t('heute.timeline'), `<div class="list">${list.length ? list.map(x => sessionRow(x)).join('') : li({ icon: ic('moon'), title: t('heute.restDay') })}${nextRows().replace('<div class="list" style="margin-top:var(--s3)">', '').replace(/<\/div>$/, '')}</div>`)}
+    ${sec(t('heute.values'), critTiles())}`;
+}
+
+export function renderHeute(): string {
+  const d = D();
+  const head = `<div class="spread" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill accent">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
+  if (UI.heuteVariant === 'feed') return head + feedVariant() + illnessBlock() + raceBanner() + sec(t('heute.week'), weekStrip()) + foodMini();
+  return head + answerCard() + illnessBlock() + raceBanner() + nextRows() + sec(t('heute.week'), weekStrip()) + coachPreview() + foodMini();
+}
+
+on('plan-day', el => { UI.planDate = el.dataset.date; nav.go('plan'); });
+on('checkin-open', () => openCheckin(D().today));
+void duration;
+
+/* Offene (vergessene) Einheiten: einzeln abhaken/öffnen oder alle als ausgefallen markieren */
+function missedSheet(): string {
+  const list = forgottenSessions();
+  if (!list.length) return `<div class="empty">${esc(t('heute.missedNone'))}</div>`;
+  return `<div class="stack"><div class="hint">${esc(t('heute.missedHint'))}</div><div class="list">${list.map((s: any) => sessionRow(s)).join('')}</div>
+    <button class="btn ghost" data-act="missed-skip-all">${esc(t('heute.missedSkipAll'))}</button></div>`;
+}
+on('missed-open', () => openSheet(t('heute.missedTitle'), missedSheet));
+on('missed-skip-all', el => {
+  if (!armed(el, t('common.sure'))) return;
+  const list = forgottenSessions(); list.forEach((s: any) => { const st = ensureSess(s.id); st.skipped = true; st.completed = false; });
+  saveState(); closeSheet(); nav.rerender(); toast(t('heute.missedSkipped', { n: list.length }));
+});

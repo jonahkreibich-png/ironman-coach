@@ -20,3 +20,13 @@ export const STORAGE = {
 
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string) ?? '';
 export const APP_VERSION: string = (import.meta.env.VITE_APP_VERSION as string) || 'dev';
+
+/* Umgebung: Testumgebung (eigene Adresse), lokal oder echte App. Neue Funktionen, die erst nach „Freigeben“
+   für alle gelten sollen, hängen an FEATURES. */
+const host = typeof location !== 'undefined' ? location.hostname : '';
+export const APP_ENV: 'test' | 'dev' | 'production' = ((import.meta.env.VITE_APP_ENV as string) as any)
+  || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(host) ? 'dev' : /-test\.|^test\./.test(host) ? 'test' : 'production');
+export const FEATURES = {
+  /* Plan-Generator: nur in der Testumgebung sichtbar */
+  generator: APP_ENV !== 'production'
+};

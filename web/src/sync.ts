@@ -1,14 +1,14 @@
 /* Sync mit dem eigenen Server (Cloudflare Worker).
-   Datensatz-Ebene: jede Session, jeder Trend-Tag usw. hat einen eigenen updatedAt.
-   Konflikte: die neueste Änderung pro Datensatz gewinnt. Offline bleibt alles in der Warteschlange. */
-import { STATE, HAS_PLAN, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, saveState } from './store';
-import { $, esc, fmtDate, ymd, todayStr, dowShort } from './util';
-import { toast, armed } from './toast';
-import { STORAGE, API_BASE, APP } from './config';
+   Datensatz-Ebene: jede Einheit, jeder Trend-Tag usw. hat einen eigenen updatedAt.
+   Konflikte: die neueste Änderung pro Datensatz gewinnt. Offline bleibt alles in der Warteschlange.
+   Dazu: Einrichtung (Einrichtungscode, Kopplung, Einladung), allgemeiner Server-Aufruf, KI-Status, Mitteilungen. */
+// @ts-nocheck
+import { STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave } from './store';
+import { esc, fmtDate, ymd } from './util';
+import { toast } from './toast';
+import { STORAGE, API_BASE } from './config';
 import { nav } from './nav';
-import { VS } from './viewstate';
-import { applyBackup } from './backup';
-import { renderSheet, closeSheet, isIOS, isStandalone } from './views/sheets';
+import { t } from '../../shared/i18n';
 
 const AUTH_KEY = STORAGE.syncAuth;
 /* Datensatz-Arten, die als Wörterbuch im Zustand liegen: kind → Feld */
@@ -46,7 +46,7 @@ function collect() {
   put('settings', 'main', { settings: STATE.settings, nutritionProfile: STATE.nutritionProfile, scoreAdjust: STATE.scoreAdjust, scoreCalibVersion: STATE.scoreCalibVersion ?? null });
   Object.entries(DICT_KINDS).forEach(([kind, field]) => Object.entries(STATE[field] || {}).forEach(([k, v]) => put(kind, k, v)));
   if (STATE.profile) put('profile', 'main', STATE.profile);
-  if (HAS_PLAN) { const raw = rawPlan(); if (raw) m.set('plan|main', { kind: 'plan', key: 'main', data: null, raw }); }
+  { const raw = rawPlan(); if (raw) m.set('plan|main', { kind: 'plan', key: 'main', data: null, raw }); }
   return m;
 }
 function recHash(r) { return hash(r.raw != null ? r.raw : JSON.stringify(r.data)); }
@@ -177,7 +177,7 @@ export async function syncNow(opts?) {
     }
     META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok';
   } catch (e) {
-    if (e.status === 401) { disconnect(true); toast('Dieses Gerät wurde vom Sync entfernt.'); }
+    if (e.status === 401) { disconnect(true); toast(t('sync.removed')); }
     STATUS = (e.status && e.status !== 0) ? 'error' : 'offline';
     META.lastError = e.message;
   } finally {
@@ -189,7 +189,7 @@ export async function syncNow(opts?) {
 }
 function afterRemoteApply() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
-  if (planChanged) { planChanged = false; toast('Neuer Stand vom Server. App lädt neu …'); setTimeout(() => location.reload(), 900); return; }
+  if (planChanged) { planChanged = false; toast(t('sync.reloading')); setTimeout(() => location.reload(), 900); return; }
   if (adjustChanged) { adjustChanged = false; if (true) rebuildPlanIndex(); }
   safeRerender();
 }
@@ -197,7 +197,6 @@ let rerenderPending = false;
 function safeRerender() {
   const a = document.activeElement;
   if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { rerenderPending = true; return; }
-  if (!HAS_PLAN) return;
   if (true) nav.rerender();
 }
 document.addEventListener('focusout', () => { if (rerenderPending) setTimeout(() => { if (!rerenderPending) return; const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; rerenderPending = false; nav.rerender(); }, 300); });
@@ -226,12 +225,7 @@ function connected(res, first) {
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
   // Einmalige Migration: der vorhandene Stand dieses Geräts wird hochgeladen.
   // Das erste Gerät gewinnt mit "jetzt", ein gekoppeltes Gerät füllt nur Lücken (Zeitstempel 1).
-  if (HAS_PLAN) detect(first ? now() : 1);
-}
-async function setupFirst() {
-  const res = await api('POST', '/api/setup', { name: deviceName() }, true);
-  connected(res, true);
-  await syncNow(); rebaseline();
+  detect(first ? now() : 1);
 }
 async function pairWith(code) {
   const res = await api('POST', '/api/pair/redeem', { code, name: deviceName() }, true);
@@ -242,180 +236,79 @@ async function pairWith(code) {
 function disconnect(silent?) {
   AUTH = null; try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
-  if (!silent) toast('Sync auf diesem Gerät beendet. Die Daten bleiben hier gespeichert.');
+  if (!silent) toast(t('sync.stopped'));
 }
 
-/* ---------- Anzeige ---------- */
-function ago(ts) {
-  const m = Math.floor((Date.now() - ts) / 60000);
-  if (m < 1) return 'gerade eben'; if (m === 1) return 'vor 1 min'; if (m < 60) return `vor ${m} min`;
-  const h = Math.floor(m / 60); if (h < 24) return `vor ${h} h`;
-  return `am ${fmtDate(ymd(new Date(ts)))}`;
-}
-function statusText() {
-  if (!AUTH) return '';
-  const pend = Object.keys(META.pending).length;
-  if (STATUS === 'syncing') return 'Wird synchronisiert …';
-  if (STATUS === 'offline' || (pend && !navigator.onLine)) return 'Offline, wird nachgeholt';
-  if (STATUS === 'error') return 'Sync gerade gestört, wird nachgeholt';
-  if (pend) return 'Änderungen werden gleich hochgeladen';
-  if (META.lastSyncAt) return 'Synchronisiert ' + ago(META.lastSyncAt);
-  return 'Noch nicht synchronisiert';
-}
-function statusClass() { return STATUS === 'offline' || STATUS === 'error' ? 'warn' : 'ok'; }
-function updateStatusEls() {
-  document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = statusText(); el.className = 'sync-st ' + statusClass(); });
-}
+/* ---------- Für die Bildschirme ---------- */
 export const isSyncOn = () => !!AUTH;
-function icuText() {
-  const I = META.intervals;
-  if (!I || !I.configured) return '';
-  const L = I.last;
-  if (!L) return 'intervals.icu: noch kein Abruf';
-  const d = new Date(L.at);
-  const when = (ymd(d) === todayStr() ? 'heute ' : fmtDate(ymd(d)) + ' ') + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  return L.ok ? `intervals.icu: ${when}` : `intervals.icu: Fehler (${when})`;
+export { deviceName };
+export function syncInfo() { return { status: STATUS, lastSyncAt: META.lastSyncAt, pending: Object.keys(META.pending).length, lastError: META.lastError, deviceId: AUTH && AUTH.deviceId, intervals: META.intervals || null }; }
+/* Allgemeiner Server-Aufruf mit Geräte-Schlüssel. Fehlermeldungen kommen schon deutsch vom Server. */
+export async function apiCall(method: string, path: string, body?: any): Promise<any> {
+  if (!AUTH) throw Object.assign(new Error(t('sync.notConnected')), { status: 0 });
+  try { return await api(method, path, body); }
+  catch (e) { if (e instanceof TypeError) throw Object.assign(new Error(t('sync.offline')), { status: 0 }); throw e; }
 }
-export function syncStatusLine() {
-  if (!AUTH) return '';
-  const icu = icuText();
-  return `<div class="sync-line"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>${icu ? `<span class="sync-icu">${esc(icu)}</span><button class="link" data-act="sync-icu-import">Jetzt abrufen</button>` : ''}</div>`;
+export async function publicCall(method: string, path: string, body?: any): Promise<any> { return api(method, path, body, true); }
+/* Datei-Import (.fit/.gpx/.tcx) */
+export async function uploadFiles(files: File[]): Promise<any> {
+  if (!AUTH) throw new Error(t('sync.notConnected'));
+  const fd = new FormData(); files.forEach(f => fd.append('file', f, f.name));
+  const res = await fetch(API + '/api/import/file', { method: 'POST', headers: { Authorization: 'Bearer ' + AUTH.token }, body: fd });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error((data && data.error) || 'Fehler ' + res.status);
+  await syncNow();
+  return data;
 }
-function icuPanel() {
-  const I = META.intervals;
-  if (!I) return '';
-  if (!I.configured) return `<div class="lbl">intervals.icu</div><div class="hint">Noch nicht verbunden. Der API-Schlüssel kommt als Geheimnis auf den Server (nicht in die App).</div><div class="hr"></div>`;
-  const L = I.last;
-  const detail = !L ? 'Noch kein Abruf.' : L.ok
-    ? `Letzte Übernahme: ${esc(icuText().replace('intervals.icu: ', ''))}. ${L.wellnessDays} Tage Werte, ${L.matched} Einheiten abgehakt, ${L.extras} Extra-Einheiten.`
-    : `Letzter Abruf fehlgeschlagen: ${esc(L.error || 'unbekannt')}`;
-  return `<div class="lbl">intervals.icu</div><div class="hint">${detail} Automatisch alle 30 Minuten zwischen 6 und 23 Uhr. Von Hand eingetragene Werte werden nie überschrieben.</div>
-    <button class="btn ghost small" data-act="sync-icu-import">Jetzt abrufen</button><div class="hr"></div>`;
+/* Erstes Gerät (mit Einrichtungscode) oder neuer Nutzer (mit Einladung) */
+export async function setupFirst(setupCode?: string) {
+  const res = await api('POST', '/api/setup', { name: deviceName(), ...(setupCode ? { setupCode: setupCode.trim() } : {}) }, true);
+  connected(res, true);
+  await syncNow(); if (!planChanged) rebaseline();
+  return res;
 }
+export async function setupWithInvite(invite: string, userName: string) {
+  const res = await api('POST', '/api/setup', { name: deviceName(), invite, userName }, true);
+  connected(res, true);
+  await syncNow(); rebaseline();
+  return res;
+}
+export async function pair(code: string) { await pairWith(code); }
+export function stopSync() { disconnect(false); }
 
-let PAIR = null; // { code, expiresAt }
-let DEVICES = null, BACKUPS = null;
-export function syncSection() {
+/* KI-Status (der KI-Coach ist im Testbetrieb abgeschaltet, solange kein Schlüssel hinterlegt ist) */
+let AI = { active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30 };
+export function aiState() { return AI; }
+export async function loadAiState() { if (!AUTH) return AI; try { AI = await api('GET', '/api/coach/ai/status'); } catch (e) {} return AI; }
 
-  if (!AUTH) {
-    return `<div class="sec"><div class="sec-h"><h2>Sync</h2></div><div class="panel">
-      <div class="hint">Mit Sync landen deine Daten zusätzlich sicher auf deinem eigenen Server und sind auf allen Geräten gleich. Ohne Internet speichert die App weiter hier und gleicht später ab.</div>
-      <button class="btn small" data-act="sync-setup">Dieses Gerät als erstes einrichten</button>
-      <div class="hint">Nur einmal und nur auf dem Gerät mit deinen Daten (dem iPhone). Die Daten von hier werden dabei hochgeladen.</div>
-      <div class="hr"></div>
-      <div class="fld"><label for="sync-code">Schon eingerichtet? Kopplungscode vom anderen Gerät</label><input class="inp" id="sync-code" type="text" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH"></div>
-      <button class="btn ghost small" data-act="sync-pair">Koppeln</button></div></div>`;
-  }
-  const pairHtml = PAIR && PAIR.expiresAt > Date.now()
-    ? `<div class="pair-code num">${esc(PAIR.code)}</div><div class="hint">Gib diesen Code auf dem neuen Gerät unter Einstellungen → Sync ein. Gültig bis ${new Date(PAIR.expiresAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.</div>`
-    : `<button class="btn ghost small" data-act="sync-pair-create">Gerät hinzufügen</button>`;
-  const devHtml = DEVICES == null ? '<div class="hint">Geräte werden geladen …</div>' : DEVICES.map(d =>
-    `<div class="kv" data-dev="${esc(d.id)}"><span>${esc(d.name)}${d.self ? ' <span class="muted">(dieses Gerät)</span>' : ''}<br><span class="muted">zuletzt ${d.lastSeen ? ago(d.lastSeen) : '–'}</span></span>${d.self ? '' : '<button class="btn danger small" data-act="sync-dev-del">Entfernen</button>'}</div>`).join('');
-  const bkHtml = BACKUPS == null ? '' : (BACKUPS.length ? `<div class="hint">Automatische Server-Backups (die letzten 30 Tage):</div>${BACKUPS.slice(0, 7).map(b =>
-    `<div class="kv" data-bk="${esc(b.day)}"><span>${dowShort(b.day)} ${fmtDate(b.day)}</span><button class="btn ghost small" data-act="sync-bk-restore">Wiederherstellen</button></div>`).join('')}` : '<div class="hint">Das erste automatische Server-Backup entsteht heute Nacht.</div>');
-  return `<div class="sec"><div class="sec-h"><h2>Sync</h2></div><div class="panel">
-    <div class="row" style="justify-content:space-between"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span><button class="btn ghost small" data-act="sync-now">Jetzt abgleichen</button></div>
-    <div class="hr"></div>
-    ${icuPanel()}
-    <div class="lbl">Geräte</div>${devHtml}
-    ${pairHtml}
-    <div class="hr"></div>
-    ${bkHtml}
-    <button class="link" data-act="sync-off" style="align-self:flex-start">Sync auf diesem Gerät beenden</button></div></div>`;
-}
-export function syncWelcomePanel() {
-
-  return `<div class="panel"><div class="sec-h"><h2>Schon auf einem anderen Gerät?</h2></div>
-    <div class="hint">Erzeuge dort unter Einstellungen → Sync → <b>Gerät hinzufügen</b> einen Code und gib ihn hier ein. Plan und Daten kommen dann automatisch.</div>
-    <div class="row"><input class="inp" id="sync-code" type="text" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" style="flex:1;min-width:140px"><button class="btn" data-act="sync-pair">Koppeln</button></div></div>`;
-}
-/* ---------- Mitteilungen (Phase 5) ---------- */
-const NOTIFY_DEFAULTS = {
-  types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
-  times: { morningSchool: '06:45', morningWeekend: '09:00', eveEarly: '21:00', evening: '20:30', adductors: '19:00', food: '18:00', weekly: '18:00' },
-  quietStart: '22:30', quietEnd: '06:00', holidays: false
-}
-const NOTIFY_ROWS: any[] = [
-  ['morning', 'Morgens: Ampel und Einheit des Tages', [['morningSchool', 'Schultage'], ['morningWeekend', 'Wochenende']]],
-  ['preSession', '1 h vor Nachmittagseinheiten (Puls, Snack)', []],
-  ['eveEarly', 'Vorabend früher Einheiten', [['eveEarly', 'Uhrzeit']]],
-  ['evening', 'Abends: „Wie war\'s?“', [['evening', 'Uhrzeit']]],
-  ['warnings', 'Warnungen sofort (Rot, Temperatur, Plan angepasst)', []],
-  ['adductors', 'Adduktoren-Übungen Mo/Mi/Fr', [['adductors', 'Uhrzeit']]],
-  ['food', 'Essens-Hinweis an Trainingstagen', [['food', 'Uhrzeit']]],
-  ['weekly', 'Sonntag: Wochenrückblick und Vorschau', [['weekly', 'Uhrzeit']]],
-  ['achievements', 'Erfolge: neue Bestwerte', []]
-];
-function notifyPrefs() {
-  const p = (STATE.settings && STATE.settings.notify) || {};
-  return Object.assign({}, NOTIFY_DEFAULTS, p, { types: Object.assign({}, NOTIFY_DEFAULTS.types, p.types || {}), times: Object.assign({}, NOTIFY_DEFAULTS.times, p.times || {}) });
-}
-let PUSH = null; // { configured, thisDevice, devices }
-function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+/* Mitteilungen (Web Push) */
+export function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 function b64ToBytes(s) { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); }
-export function notifySection() {
-  if (!AUTH) return "";
-  const P = notifyPrefs();
-  const iosNotInstalled = (typeof isIOS === 'function' && isIOS()) && !(typeof isStandalone === 'function' && isStandalone());
-  let head;
-  if (!pushSupported() || iosNotInstalled) head = `<div class="hint">Mitteilungen gehen auf dem iPhone nur in der <b>installierten App</b> (Home-Bildschirm, ab iOS 16.4). Öffne die App über das Icon und komm hierher zurück.</div>`;
-  else if (PUSH && PUSH.configured === false) head = '<div class="hint">Auf dem Server sind Mitteilungen noch nicht eingerichtet.</div>';
-  else if (Notification.permission === 'denied') head = `<div class="hint">Mitteilungen sind für diese App blockiert. Erlauben kannst du sie in den iPhone-Einstellungen → Mitteilungen → ${esc(APP.shortName)}.</div>`;
-  else if (PUSH && PUSH.thisDevice && Notification.permission === 'granted') head = `<div class="row" style="justify-content:space-between"><span class="sync-st ok">Mitteilungen sind an</span><button class="btn ghost small" data-act="sync-notify-test">Test senden</button></div>`;
-  else head = `<div class="hint">Damit dich die App erinnern kann, musst du Mitteilungen einmal erlauben.</div><button class="btn small" data-act="sync-notify-allow">Mitteilungen erlauben</button>`;
-  const rows = NOTIFY_ROWS.map(([k, label, times]) => `<div class="nrow-set">
-    <label class="switch"><input type="checkbox" data-np="types.${k}" ${P.types[k] ? 'checked' : ''}><span>${esc(label)}</span></label>
-    ${times.length ? `<div class="ntimes">${times.map(([tk, tl]) => `<label>${esc(tl)} <input class="inp sm" type="time" data-np="times.${tk}" value="${esc(P.times[tk])}"></label>`).join('')}</div>` : ''}</div>`).join('');
-  return `<div class="sec"><div class="sec-h"><h2>Mitteilungen</h2></div><div class="panel">${head}
-    <div class="hr"></div>${rows}
-    <label class="switch"><input type="checkbox" data-np="holidays" ${P.holidays ? 'checked' : ''}><span>Ferien: auch an Schultagen die Wochenend-Zeit</span></label>
-    <div class="ntimes"><label>Ruhezeit von <input class="inp sm" type="time" data-np="quietStart" value="${esc(P.quietStart)}"></label><label>bis <input class="inp sm" type="time" data-np="quietEnd" value="${esc(P.quietEnd)}"></label></div>
-    <div class="hint">Höchstens 4 Mitteilungen pro Tag. Ein Tipp auf die Mitteilung öffnet die passende Stelle in der App. Für die Erinnerung vor einer Einheit trägst du ihre Uhrzeit in der Einheit ein (oder sie steht im Plan).</div>
-    ${PUSH && PUSH.thisDevice ? '<button class="link" data-act="sync-notify-off" style="align-self:flex-start">Mitteilungen auf diesem Gerät ausschalten</button>' : ''}</div></div>`;
-}
-document.addEventListener('change', e => {
-  const el = e.target as any; const path = el.dataset && el.dataset.np; if (!path) return;
-  STATE.settings.notify = notifyPrefs();
-  const val = el.type === 'checkbox' ? el.checked : el.value;
-  const parts = path.split('.');
-  if (parts.length === 2) STATE.settings.notify[parts[0]][parts[1]] = val; else STATE.settings.notify[path] = val;
-  saveState(); toast("Gespeichert");
-});
-async function loadPushStatus() {
-  try { PUSH = await api('GET', '/api/push/status'); } catch (e) { PUSH = null; }
-}
-async function enablePush() {
+export async function pushStatus() { try { return await api('GET', '/api/push/status'); } catch (e) { return null; } }
+export async function enablePush(prefs?: any) {
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') throw Object.assign(new Error('Ohne Erlaubnis kann die App keine Mitteilungen schicken.'), { status: 1 });
+  if (perm !== 'granted') throw new Error(t('push.denied'));
   const reg = await navigator.serviceWorker.ready;
   const { key } = await api('GET', '/api/push/key', null, true);
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
-  await api('POST', '/api/push/subscribe', { subscription: sub.toJSON() });
-  await loadPushStatus();
+  await api('POST', '/api/push/subscribe', { subscription: sub.toJSON(), ...(prefs ? { prefs } : {}) });
 }
-async function disablePush() {
+export async function disablePush() {
   try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
   await api('POST', '/api/push/unsubscribe');
-  await loadPushStatus();
 }
 
-async function loadLists() {
-  if (!AUTH) return;
-  try { DEVICES = (await api('GET', '/api/devices')).devices; } catch (e) { DEVICES = []; }
-  try { BACKUPS = (await api('GET', '/api/backups')).backups; } catch (e) { BACKUPS = []; }
-  await loadPushStatus();
-  if (VS.SHEET && VS.SHEET.kind === 'settings') { const P = $('#sheetPanel'); const y = P.scrollTop; renderSheet(); P.scrollTop = y; }
-}
-export function syncOnSettingsOpen() { DEVICES = null; BACKUPS = null; loadLists(); }
-
-function backupFromRecords(records) {
+/* Server-Sicherung (Tagesstand) → Sicherungs-Objekt wie aus der Datei */
+export function backupFromRecords(records) {
   const base = mergeIntoDefaults(null);
   base.sessions = {}; base.trend = []; base.nutrition = {}; base.customWorkouts = {}; base.illnessPeriods = []; base.milestones = []; base.weekNotes = {}; base.adjustments = {};
   let plan = null;
   records.forEach(r => {
-    const d = r.data;
-    if (r.kind === 'session') base.sessions[r.key] = d;
+    const d = r.data; const field = DICT_KINDS[r.kind];
+    if (field) (base[field] = base[field] || {})[r.key] = d;
+    else if (r.kind === 'profile') base.profile = d;
+    else if (r.kind === 'session') base.sessions[r.key] = d;
     else if (r.kind === 'trend') base.trend.push(d);
     else if (r.kind === 'nutrition') base.nutrition[r.key] = d;
     else if (r.kind === 'custom' && d && d.date) (base.customWorkouts[d.date] = base.customWorkouts[d.date] || []).push(d);
@@ -426,70 +319,38 @@ function backupFromRecords(records) {
     else if (r.kind === 'settings' && d) { Object.assign(base, { settings: d.settings || base.settings, nutritionProfile: d.nutritionProfile || base.nutritionProfile, scoreAdjust: d.scoreAdjust || base.scoreAdjust }); if (d.scoreCalibVersion != null) base.scoreCalibVersion = d.scoreCalibVersion; }
     else if (r.kind === 'plan') plan = d;
   });
+  base.trend.sort((a, b) => a.date.localeCompare(b.date));
   if (plan) base.plan = plan;
   return base;
 }
 
-/* ---------- Klicks ---------- */
-document.addEventListener('click', async e => {
-  const b = (e.target as any).closest('[data-act^="sync-"]');
-  if (!b) return;
-  const act = b.dataset.act;
-  const busy = on => { b.disabled = on; };
-  try {
-    if (act === 'sync-setup') {
-      if (!HAS_PLAN) { toast('Lade zuerst deine Daten, dann richte den Sync ein.'); return; }
-      if (!armed(b, 'Wirklich einrichten? Nochmal tippen')) return;
-      busy(true); await setupFirst(); toast('Sync eingerichtet. Deine Daten sind jetzt auf dem Server.');
-      syncOnSettingsOpen(); renderSheet(); nav.rerender();
-    } else if (act === 'sync-pair') {
-      const code = ($('#sync-code') || {}).value || '';
-      if (code.replace(/[^A-Za-z0-9]/g, '').length !== 8) { toast('Der Code hat 8 Zeichen, z. B. ABCD-EFGH.'); return; }
-      busy(true); await pairWith(code);
-      if (planChanged) { planChanged = false; toast('Gekoppelt. Daten sind da, App lädt neu …'); setTimeout(() => location.reload(), 900); return; }
-      toast('Gekoppelt. Daten sind abgeglichen.'); syncOnSettingsOpen(); if (VS.SHEET) renderSheet(); nav.render();
-    } else if (act === 'sync-now') {
-      busy(true); await syncNow(); toast(STATUS === 'ok' ? 'Abgeglichen' : statusText()); busy(false);
-    } else if (act === 'sync-icu-import') {
-      busy(true); b.textContent = 'Wird abgerufen …';
-      const st = await api('POST', '/api/intervals/import');
-      await syncNow();
-      if (!st.ok) toast(st.error || 'Abruf fehlgeschlagen');
-      else toast(st.wellnessDays || st.matched || st.extras ? `Übernommen: ${st.wellnessDays} Tage Werte, ${st.matched} Einheiten, ${st.extras} Extra` : 'Nichts Neues bei intervals.icu');
-      if (VS.SHEET && VS.SHEET.kind === 'settings') renderSheet(); nav.rerender();
-    } else if (act === 'sync-notify-allow') {
-      busy(true); await enablePush(); toast('Mitteilungen sind an'); renderSheet();
-    } else if (act === 'sync-notify-test') {
-      busy(true); const r = await api('POST', '/api/push/test'); toast(r.delivered ? 'Test-Mitteilung ist unterwegs' : 'Kein Gerät hat die Mitteilung angenommen'); busy(false);
-    } else if (act === 'sync-notify-off') {
-      if (!armed(b, 'Wirklich ausschalten?')) return;
-      busy(true); await disablePush(); toast('Mitteilungen auf diesem Gerät aus'); renderSheet();
-    } else if (act === 'sync-pair-create') {
-      busy(true); PAIR = await api('POST', '/api/pair/create'); renderSheet();
-      setTimeout(() => { if (VS.SHEET && VS.SHEET.kind === 'settings') renderSheet(); }, PAIR.expiresAt - Date.now() + 500);
-    } else if (act === 'sync-dev-del') {
-      if (!armed(b, 'Wirklich entfernen?')) return;
-      const id = b.closest('[data-dev]').dataset.dev;
-      busy(true); await api('DELETE', '/api/devices/' + encodeURIComponent(id)); toast('Gerät entfernt'); loadLists();
-    } else if (act === 'sync-bk-restore') {
-      if (!armed(b, 'Alles ersetzen? Nochmal tippen')) return;
-      const day = b.closest('[data-bk]').dataset.bk;
-      busy(true);
-      const res = await api('GET', '/api/backups/' + day);
-      const data = backupFromRecords(res.records || []);
-      if (applyBackup(data)) return;
-      closeSheet(); nav.render(); toast('Server-Backup vom ' + fmtDate(day) + ' geladen'); syncNotify();
-    } else if (act === 'sync-off') {
-      if (!armed(b, 'Sync hier beenden? Nochmal tippen')) return;
-      disconnect(false); renderSheet(); nav.rerender();
-    }
-  } catch (err) {
-    busy(false);
-    toast(err.status === 0 || err instanceof TypeError ? 'Keine Verbindung zum Server. Bist du online?' : err.message);
-  }
-});
-
-/* ---------- Start ---------- */
-if (AUTH) setTimeout(() => syncNow(), 300);
+/* ---------- Anzeige ---------- */
+export function ago(ts: number) {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return t('sync.justNow'); if (m < 60) return t('sync.minAgo', { n: m });
+  const h = Math.floor(m / 60); if (h < 24) return t('sync.hAgo', { n: h });
+  return fmtDate(ymd(new Date(ts)));
+}
+export function statusText() {
+  if (!AUTH) return '';
+  const pend = Object.keys(META.pending).length;
+  if (STATUS === 'syncing') return t('sync.syncing');
+  if (STATUS === 'offline' || (pend && !navigator.onLine)) return t('sync.offlineQueued');
+  if (STATUS === 'error') return t('sync.error');
+  if (pend) return t('sync.pending');
+  if (META.lastSyncAt) return t('sync.ok', { ago: ago(META.lastSyncAt) });
+  return t('sync.never');
+}
+function statusClass() { return STATUS === 'offline' || STATUS === 'error' ? 'warn' : 'ok'; }
+function updateStatusEls() {
+  document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = statusText(); el.className = 'sync-st ' + statusClass(); });
+}
+/* Nur sichtbar, wenn etwas nicht stimmt (offline, Fehler, Warteschlange) */
+export function syncStatusLine() {
+  if (!AUTH || (STATUS !== 'offline' && STATUS !== 'error' && !Object.keys(META.pending).length)) return '';
+  return `<div class="sync-line"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span></div>`;
+}
+export function syncStatusBadge() { return AUTH ? `<span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>` : ''; }
 
 onSave(() => syncNotify());
+if (AUTH) setTimeout(() => { syncNow(); loadAiState(); }, 300);

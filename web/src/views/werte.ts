@@ -1,92 +1,98 @@
-/* Werte-Bildschirm */
-import * as CoachCore from '../../../shared/core';
-import { STATE, PLAN, SESS, UI, HAS_PLAN, BASE_WEEKS, findDay, currentWeekIdx } from '../store';
-import { $, esc, de, todayStr, addDays, daysBetween, fmtDate, dowShort, dowLong, secToPace, parseNum, round5, round50, rng } from '../util';
-import { SPORTS, icon, uiIcon } from '../icons';
-import * as D from '../domain';
-import { sessState, effStatus, illnessAt, activeIllness, returnPhase, RETURN_STAGES, trendAt, latestTrend, latestWithKey, hasRecovery, rollingAvg, arrow, computeReadiness, readinessHistoryHtml, computeScore, tierLabel, perfEntries, forgottenSessions, computeZones, computePaceZones, computeSpeedZones } from '../domain';
-import { sessionCard, dayCard, dayBadge, weekStrip, weekProgress, checkinFields } from '../components';
+/* Werte & Erholung: Morgenwerte mit Quelle, Verläufe, Belastung. Eingabe nur noch unter „Bearbeiten“,
+   weil die Werte im Alltag automatisch kommen. Von Hand korrigierte Werte gelten, bis man sie zurücksetzt. */
+import * as C from '../../../shared/core';
+import { STATE, PLAN, saveState } from '../store';
+import { esc, fmtDate, dowShort, todayStr, parseNum } from '../util';
+import { t, num, temp } from '../../../shared/i18n';
+import { D } from '../data';
+import { on, onChange, sec, srcBadge, openSheet, refreshSheet, sparkline, ic, more } from '../kit';
 import { lineChart, illnessShades } from '../charts';
-import { VS } from '../viewstate';
-import { APP } from '../config';
+import { setManual, resetToOriginal, hasOriginal, bestAuto, SOURCE_LABEL } from '../../../shared/activity/merge';
+import { nav } from '../nav';
+import { toast } from '../toast';
 
+const FIELDS: [string, string, number][] = [
+  ['sleepHours', 'v.sleepH', 1], ['sleepQuality', 'v.sleepQ', 0], ['hrv', 'v.hrvMs', 0], ['restingHR', 'v.rhr', 0], ['bodyTemp', 'v.temp', 2],
+  ['breathingRate', 'v.breath', 1], ['spo2', 'v.spo2', 1], ['remSleep', 'v.rem', 0], ['deepSleep', 'v.deep', 0], ['sleepLatency', 'v.latency', 0]
+];
+const pointOf = (date: string) => (STATE.trend || []).find((p: any) => p.date === date) || null;
 
-
-export function renderWerte() {
-  const t = todayStr();
-  if (!VS.WERTE_DATE) VS.WERTE_DATE = t;
-  const lt = latestTrend() || {};
-  const cardio = latestWithKey('cardioRecovery');
-  const vo2 = latestWithKey('vo2max');
-  const ill = activeIllness();
-  const tsbCls = v => v == null ? '' : (v >= -10 ? 'good' : v >= -20 ? 'warn' : 'bad');
-  let h = `<h1 class="view-title">Werte<small>Belastung, Form und Erholung${lt.date ? ' · Stand ' + fmtDate(lt.date) : ''}</small></h1>`;
-  h += `<div class="tiles">
-    <div class="tile"><div class="k">CTL</div><div class="v">${de(lt.ctl)} ${arrow('ctl')}</div><div class="s">Fitness</div></div>
-    <div class="tile"><div class="k">ATL</div><div class="v">${de(lt.atl)} ${arrow('atl')}</div><div class="s">Ermüdung</div></div>
-    <div class="tile ${tsbCls(lt.tsb)}"><div class="k">TSB</div><div class="v">${de(lt.tsb)} ${arrow('tsb')}</div><div class="s">Form</div></div>
-    <div class="tile"><div class="k">VO2max</div><div class="v">${de(vo2 && vo2.vo2max)} ${arrow('vo2max')}</div><div class="s">Garmin</div></div>
-    <div class="tile"><div class="k">Cardio-Erh.</div><div class="v">${de(cardio && cardio.cardioRecovery)} ${arrow('cardioRecovery')}</div><div class="s">bpm</div></div>
-  </div>`;
-  const own = CoachCore.ownLoadSeries(STATE, PLAN.weeks, t);
-  const ol = own.length ? own[own.length - 1] : null;
-  if (ol) h += `<div class="lbl" style="margin-top:12px">Eigene Berechnung aus deinen Einheiten</div><div class="tiles">
-    <div class="tile"><div class="k">CTL</div><div class="v">${de(ol.ctl, 0)}</div><div class="s">eigen</div></div>
-    <div class="tile"><div class="k">ATL</div><div class="v">${de(ol.atl, 0)}</div><div class="s">eigen</div></div>
-    <div class="tile ${tsbCls(ol.tsb)}"><div class="k">TSB</div><div class="v">${de(ol.tsb, 0)}</div><div class="s">eigen</div></div>
-    <div class="tile"><div class="k">Heute</div><div class="v">${de(ol.load, 0)}</div><div class="s">Belastung</div></div></div>`;
-  if (ill) h += `<div class="banner info" style="margin-top:10px">Du bist gerade krank. CTL und ATL sinken, weil keine Trainingslast dazukommt, und TSB steigt. Das zeigt keine echte Erholung und keinen echten Fitnessverlust.</div>`;
-
-  const withBoth = STATE.trend.filter(p => p.ctl != null && p.atl != null && p.ctl > 0);
-  let gauge = '<div class="empty">Noch keine CTL/ATL-Werte.</div>';
-  if (withBoth.length) {
-    const L = withBoth[withBoth.length - 1]; const ratio = L.atl / L.ctl;
-    const [lab, col] = ratio < 0.8 ? ['Unterbelastet', 'var(--info)'] : ratio <= 1.3 ? ['Im grünen Bereich', 'var(--good)'] : ratio <= 1.5 ? ['Erhöht', 'var(--warn)'] : ['Hohes Risiko', 'var(--bad)'];
-    gauge = `<div class="row" style="align-items:baseline"><span style="font:700 34px/1 var(--f-display);color:${col}" class="num">${de(ratio, 2)}</span><span style="color:${col};font-weight:600">${lab}</span></div>
-      <div class="gauge-w"><div class="gauge"><i style="width:40%;background:var(--info);opacity:.55"></i><i style="width:25%;background:var(--good);opacity:.7"></i><i style="width:10%;background:var(--warn);opacity:.7"></i><i style="width:25%;background:var(--bad);opacity:.6"></i></div>
-      <div class="gauge-m" style="left:${Math.min(100, ratio / 2 * 100)}%"></div></div>
-      <div class="gauge-l">${[[0, '0'], [40, '0,8'], [65, '1,3'], [75, '1,5'], [100, '2+']].map(([l, t]) => `<span style="left:${l}%">${t}</span>`).join('')}</div>
-      <div class="hint">ATL geteilt durch CTL. Unter 0,8 trainierst du unter deiner Kapazität, 0,8 bis 1,3 ist der gute Bereich, über 1,5 steigt das Verletzungsrisiko.${ill ? ' Während der Krankheit ist der Wert nicht aussagekräftig.' : ''}</div>`;
-  }
-  h += `<div class="sec"><div class="sec-h"><h2>Belastungsverhältnis</h2></div><div class="panel">${gauge}</div></div>`;
-
-  const tpMap = {};
-  STATE.trend.filter(p => p.ctl != null || p.atl != null || p.tsb != null).forEach(p => { tpMap[p.date] = { date: p.date, ctl: p.ctl, atl: p.atl, tsb: p.tsb, note: p.illness || '' }; });
-  const firstTp = Object.keys(tpMap).sort()[0];
-  own.filter(o => !firstTp || o.date >= firstTp).forEach(o => { tpMap[o.date] = Object.assign(tpMap[o.date] || { date: o.date }, { octl: o.ctl }); });
-  const tp = Object.values(tpMap).sort((a, b) => a.date.localeCompare(b.date));
-  h += `<div class="sec"><div class="sec-h"><h2>Fitness, Ermüdung, Form</h2></div><div class="panel">${lineChart(tp, [
-    { key: 'ctl', name: 'CTL', color: 'var(--info)', area: true }, { key: 'atl', name: 'ATL', color: 'var(--run)' }, { key: 'tsb', name: 'TSB', color: 'var(--good)' },
-    ...(own.length ? [{ key: 'octl', name: 'CTL eigen', color: 'var(--info)', dashed: true }] : [])
-  ], { h: 200, legend: true, legendExtra: '<span><i class="box" style="--c:var(--bad)"></i>krank</span>', shade: illnessShades(), lines: [{ v: 0, label: '' }], label: 'CTL ATL TSB Verlauf' })}
-    <div class="hint">CTL ist deine Fitness (Belastung der letzten 6 Wochen), ATL die Ermüdung der letzten Woche, TSB die Differenz. TSB unter -20 heißt: Erholung einplanen.${own.length ? ' Die gestrichelte Linie rechnet die App selbst aus deinen Einheiten: mit Puls als hrTSS (LTHR Rad 162, Laufen 170), ohne Puls über die RPE. Liefert intervals.icu eine Trainingslast, zählt diese.' : ''}</div></div></div>`;
-
-  const R = STATE.settings.readiness;
-  const bH = CoachCore.baselineOf(STATE.trend, STATE.illnessPeriods, addDays(t, 1), 'hrv', Math.log);
-  const bR = CoachCore.baselineOf(STATE.trend, STATE.illnessPeriods, addDays(t, 1), 'restingHR');
-  const hrvLine = bH && bH.n >= CoachCore.MIN_DAYS ? { v: Math.round(Math.exp(bH.mean)), label: `dein Normalwert ${Math.round(Math.exp(bH.mean))}`, color: 'var(--good)' } : { v: R.hrvMin, label: `Ziel ≥${R.hrvMin}`, color: 'var(--good)' };
-  const rhrLine = bR && bR.n >= CoachCore.MIN_DAYS ? { v: Math.round(bR.mean), label: `dein Normalwert ${Math.round(bR.mean)}`, color: 'var(--good)' } : { v: R.rhrMax, label: `Ziel ≤${R.rhrMax}`, color: 'var(--good)' };
-  const hp = STATE.trend.filter(p => p.hrv != null).map((p, i, arr) => ({ date: p.date, hrv: p.hrv, avg: rollingAvg(arr, 'hrv', i, 7), note: p.illness || '' }));
-  const rp = STATE.trend.filter(p => p.restingHR != null).map(p => ({ date: p.date, rhr: p.restingHR, note: p.illness || '' }));
-  const tpts = STATE.trend.filter(p => p.bodyTemp != null).map(p => ({ date: p.date, temp: p.bodyTemp, note: p.illness || '' }));
-  h += `<div class="sec"><div class="sec-h"><h2>Erholung</h2><span class="aside">Rot hinterlegt: krank</span></div>
-    <div class="panel"><div class="lbl">HFV (ms) mit 7-Tage-Schnitt</div>${lineChart(hp, [{ key: 'hrv', name: 'HFV', color: 'var(--info)', area: true }, { key: 'avg', name: 'Ø 7 Tage', color: 'var(--ink-2)', dashed: true }], { legend: true, shade: illnessShades(), lines: [hrvLine], label: 'HFV Verlauf' })}</div>
-    <div class="panel"><div class="lbl">Ruhepuls (bpm)</div>${lineChart(rp, [{ key: 'rhr', name: 'Ruhepuls', color: 'var(--run)', area: true }], { shade: illnessShades(), lines: [rhrLine], label: 'Ruhepuls Verlauf' })}
-      <div class="hint">Die Ampel wird gelb, wenn der Ruhepuls 3 Schläge über deinem Normalwert liegt, und rot ab 5 Schlägen. Bei der HFV zählt der 3-Tage-Schnitt im Vergleich zu deinen letzten 28 Tagen.</div></div>
-    <div class="panel"><div class="lbl">Temperatur-Abweichung (°C)</div>${lineChart(tpts, [{ key: 'temp', name: 'Temp.', color: 'var(--warn)', fmt: v => (v > 0 ? '+' : '') + de(v, 1) }], { h: 140, shade: illnessShades(), lines: [{ v: 0.3, label: 'Gelb +0,3', color: 'var(--warn)' }, { v: 0.5, label: 'Rot +0,5', color: 'var(--bad)' }], label: 'Temperatur Verlauf' })}</div>
-  </div>`;
-
-  const rows = STATE.trend.filter(p => hasRecovery(p) || p.illness).slice(-10).reverse();
-  const all = STATE.trend;
-  h += `<div class="sec"><div class="sec-h"><h2>Schlaf-Tabelle</h2><span class="aside">letzte ${rows.length} Nächte</span></div><div class="panel">${rows.length ? `<div class="scroll-x"><table class="tbl"><thead><tr><th>Datum</th><th>Schlaf</th><th>Qual.</th><th>Ruhep.</th><th>HFV</th><th>Ø7</th><th>Temp.</th><th>Atem</th><th>REM</th><th>Tief</th><th>Lat.</th><th>SpO2</th></tr></thead><tbody>
-    ${rows.map(r => { const idx = all.indexOf(r); const a7 = rollingAvg(all, 'hrv', idx, 7); let fl = '';
-      if (r.hrv != null && a7) { const d = (r.hrv - a7) / a7 * 100; fl = d <= -10 ? ' <span class="flag-low" title="mehr als 10 % unter Schnitt">▼</span>' : d >= 10 ? ' <span class="flag-high" title="mehr als 10 % über Schnitt">▲</span>' : ''; }
-      return `<tr class="${illnessAt(r.date) ? 'sick' : ''}"><td>${dowShort(r.date)} ${fmtDate(r.date)}</td><td>${de(r.sleepHours)}</td><td>${de(r.sleepQuality)}</td><td>${de(r.restingHR)}</td><td>${de(r.hrv)}${fl}</td><td>${a7 != null ? de(a7, 0) : '–'}</td><td>${r.bodyTemp != null ? (r.bodyTemp > 0 ? '+' : '') + de(r.bodyTemp) : '–'}</td><td>${de(r.breathingRate)}</td><td>${de(r.remSleep)}</td><td>${de(r.deepSleep)}</td><td>${de(r.sleepLatency)}</td><td>${de(r.spo2)}</td></tr>`; }).join('')}
-    </tbody></table></div><div class="hint">▼ HFV mehr als 10 % unter deinem 7-Tage-Schnitt, ▲ deutlich darüber. Rote Datumsangaben: krank.</div>` : '<div class="empty">Noch keine Einträge.</div>'}</div></div>`;
-
-  h += `<div class="sec" id="werte-form"><div class="sec-h"><h2>Werte eintragen</h2><span class="aside">auch für andere Tage</span></div><div class="panel">
-    <div class="fgrid"><div class="fld" style="grid-column: span 2"><label for="w-date">Datum</label><input class="inp" type="date" id="w-date" value="${VS.WERTE_DATE}" max="${t}"></div></div>
-    ${checkinFields('w', VS.WERTE_DATE)}
-    <button class="btn block" data-act="checkin-save" data-prefix="w">Werte speichern</button></div></div>`;
-  $('#app').innerHTML = h;
+function tile(field: string, label: string, unit: string, dec: number): string {
+  const series = (STATE.trend || []).filter((p: any) => p[field] != null).slice(-21);
+  const last = series[series.length - 1];
+  const prev = series.length > 7 ? series.slice(-8, -1).reduce((a: number, p: any) => a + p[field], 0) / 7 : null;
+  const v = last ? last[field] : null;
+  const delta = v != null && prev != null ? v - prev : null;
+  return `<button class="crit" data-act="checkin-open" data-date="${last ? last.date : todayStr()}"><div class="k">${esc(label)} ${last ? srcBadge((last._src || {})[field]) : ''}</div>
+    <div class="v">${v != null ? (field === 'bodyTemp' ? (v > 0 ? '+' : '') + num(v, dec) : num(v, dec)) : '–'}<small class="xs"> ${unit}</small></div>
+    <div class="n">${last && last.date !== todayStr() ? fmtDate(last.date) + ' · ' : ''}${delta != null ? (delta > 0 ? '▲ ' : delta < 0 ? '▼ ' : '') + t('v.vs7') : ''}</div>${sparkline(series.map((p: any) => p[field]), 'var(--info)')}</button>`;
 }
+
+export function renderWerte(): string {
+  const d = D(); const R = STATE.settings.readiness;
+  let h = `<div class="crit-grid">${tile('hrv', t('v.hrv'), 'ms', 0)}${tile('restingHR', t('v.rhr'), 'bpm', 0)}${tile('sleepHours', t('v.sleep'), 'h', 1)}${tile('bodyTemp', t('v.tempShort'), '°C', 1)}${tile('spo2', 'SpO2', '%', 1)}${tile('breathingRate', t('v.breathShort'), '/min', 1)}</div>
+    <button class="btn ghost block" data-act="checkin-open" data-date="${todayStr()}" style="margin-top:var(--s3)">${ic('edit')} ${esc(t('v.edit'))}</button>`;
+  const bH = C.baselineOf(STATE.trend, STATE.illnessPeriods, C.addDays(d.today, 1), 'hrv', Math.log);
+  const bR = C.baselineOf(STATE.trend, STATE.illnessPeriods, C.addDays(d.today, 1), 'restingHR');
+  const tr = (STATE.trend || []).filter((p: any) => p.date >= C.addDays(d.today, -60));
+  const avg7 = (arr: any[], k: string, i: number) => { const sl = arr.slice(Math.max(0, i - 6), i + 1).filter(p => p[k] != null); return sl.length ? sl.reduce((a, p) => a + p[k], 0) / sl.length : null; };
+  const hp = tr.filter((p: any) => p.hrv != null).map((p: any, i: number, a: any[]) => ({ date: p.date, hrv: p.hrv, avg: avg7(a, 'hrv', i), note: p.illness || '' }));
+  h += sec(t('v.hrvTitle'), `<div class="card">${lineChart(hp, [{ key: 'hrv', name: t('v.hrv'), color: 'var(--info)', area: true }, { key: 'avg', name: t('v.avg7'), color: 'var(--ink-2)', dashed: true }], { legend: true, shade: illnessShades(), lines: bH && bH.n >= C.MIN_DAYS ? [{ v: Math.round(Math.exp(bH.mean)), label: t('v.normal', { v: Math.round(Math.exp(bH.mean)) }), color: 'var(--good)' }] : [{ v: R.hrvMin, label: '≥' + R.hrvMin, color: 'var(--good)' }], label: t('v.hrv') })}<div class="hint">${esc(t('v.hrvHint'))}</div></div>`);
+  const rp = tr.filter((p: any) => p.restingHR != null).map((p: any) => ({ date: p.date, rhr: p.restingHR, note: p.illness || '' }));
+  h += sec(t('v.rhrTitle'), `<div class="card">${lineChart(rp, [{ key: 'rhr', name: t('v.rhr'), color: 'var(--run)', area: true }], { shade: illnessShades(), lines: bR && bR.n >= C.MIN_DAYS ? [{ v: Math.round(bR.mean), label: t('v.normal', { v: Math.round(bR.mean) }), color: 'var(--good)' }] : [], label: t('v.rhr') })}</div>`);
+  const sp = tr.filter((p: any) => p.sleepHours != null).map((p: any) => ({ date: p.date, s: p.sleepHours }));
+  h += sec(t('v.sleepTitle'), `<div class="card">${lineChart(sp, [{ key: 's', name: t('v.sleep'), color: 'var(--strength)', area: true, fmt: (v: number) => num(v, 1) }], { h: 150, fmt: (v: number) => num(v, 1), lines: [{ v: d.fallback.sleepNeed[0], label: t('v.needLine', { h: num(d.fallback.sleepNeed[0], 1) }), color: 'var(--good)' }], label: t('v.sleep') })}</div>`);
+  const tp = tr.filter((p: any) => p.bodyTemp != null).map((p: any) => ({ date: p.date, temp: p.bodyTemp }));
+  if (tp.length > 1) h += sec(t('v.tempTitle'), `<div class="card">${lineChart(tp, [{ key: 'temp', name: t('v.tempShort'), color: 'var(--warn)', fmt: (v: number) => (v > 0 ? '+' : '') + num(v, 1) }], { h: 130, shade: illnessShades(), lines: [{ v: 0.3, label: '+0,3', color: 'var(--warn)' }, { v: 0.5, label: '+0,5', color: 'var(--bad)' }], label: t('v.tempShort') })}</div>`);
+  // Belastung
+  const own = C.ownLoadSeries(STATE, PLAN.weeks, d.today).filter(o => o.date >= C.addDays(d.today, -90));
+  const icu: Record<string, any> = {}; (STATE.trend || []).filter((p: any) => p.ctl != null && p.date >= C.addDays(d.today, -90)).forEach((p: any) => { icu[p.date] = p; });
+  const pts = own.map(o => ({ date: o.date, ctl: o.ctl, atl: o.atl, tsb: o.tsb, ictl: icu[o.date] ? icu[o.date].ctl : null }));
+  const last = own[own.length - 1];
+  h += sec(t('v.loadTitle'), `<div class="card">${last ? `<div class="row wrap" style="gap:var(--s4)"><div><div class="lbl">CTL</div><div class="big">${num(last.ctl, 0)}</div></div><div><div class="lbl">ATL</div><div class="big">${num(last.atl, 0)}</div></div><div><div class="lbl">TSB</div><div class="big" style="color:${last.tsb < -20 ? 'var(--bad)' : last.tsb < -10 ? 'var(--warn)' : 'var(--good)'}">${num(last.tsb, 0)}</div></div><div><div class="lbl">ATL/CTL</div><div class="big">${last.ctl ? num(last.atl / last.ctl, 2) : '–'}</div></div></div>` : ''}
+    ${lineChart(pts, [{ key: 'ctl', name: t('v.ctl'), color: 'var(--info)', area: true }, { key: 'atl', name: t('v.atl'), color: 'var(--run)' }, { key: 'tsb', name: t('v.tsb'), color: 'var(--good)' }, ...(Object.keys(icu).length ? [{ key: 'ictl', name: 'CTL intervals.icu', color: 'var(--info)', dashed: true }] : [])], { h: 190, legend: true, shade: illnessShades(), lines: [{ v: 0, label: '' }], label: t('v.loadTitle') })}
+    ${more(t('common.whatMeans'), `<div class="hint">${esc(t('v.loadHint'))}</div>`)}</div>`);
+  // Tabelle
+  const rows = (STATE.trend || []).filter((p: any) => C.hasRecovery(p) || p.illness).slice(-10).reverse();
+  if (rows.length) h += sec(t('v.nights'), `<div class="card tight scroll-x"><table class="tbl"><thead><tr><th>${esc(t('common.date'))}</th><th>${esc(t('v.sleep'))}</th><th>${esc(t('v.hrv'))}</th><th>${esc(t('v.rhr'))}</th><th>${esc(t('v.tempShort'))}</th><th></th></tr></thead><tbody>${rows.map((p: any) => `<tr><td><button class="link" data-act="checkin-open" data-date="${p.date}">${dowShort(p.date)} ${fmtDate(p.date)}</button></td><td>${num(p.sleepHours, 1)}</td><td>${p.hrv ?? '–'}</td><td>${p.restingHR ?? '–'}</td><td>${p.bodyTemp != null ? temp(p.bodyTemp, true) : '–'}</td><td>${[...new Set(Object.values(p._src || {}))].map((s: any) => srcBadge(s)).join(' ')}</td></tr>`).join('')}</tbody></table></div>`);
+  return h;
+}
+
+/* ---------- Morgenwerte eintragen / korrigieren ---------- */
+let CHECK_DATE = '';
+export function openCheckin(date: string): void {
+  CHECK_DATE = date;
+  openSheet(t('v.editTitle'), checkinSheet);
+}
+function checkinSheet(): string {
+  const p: any = pointOf(CHECK_DATE) || {};
+  return `<div class="stack">
+    <div class="fld"><label for="ck-date">${esc(t('common.date'))}</label><input class="inp" type="date" id="ck-date" value="${CHECK_DATE}" max="${todayStr()}" data-ch="ck-date"></div>
+    <div class="fgrid">${FIELDS.map(([k, lk]) => {
+      const src = (p._src || {})[k];
+      const orig = hasOriginal(p, k) ? bestAuto(p, k, STATE.settings) : null;
+      return `<div class="fld"><label for="ck-${k}">${esc(t(lk))} ${srcBadge(src)}</label><input class="inp" id="ck-${k}" type="text" inputmode="decimal" data-ch="ck-field" data-k="${k}" value="${esc(p[k] ?? '')}">
+        ${orig ? `<button class="link" data-act="ck-reset" data-k="${k}">${ic('back').replace('<svg', '<svg width="12" height="12"')} ${esc(t('v.original', { v: num(orig.value, 1), s: SOURCE_LABEL[orig.source] || orig.source }))}</button>` : ''}</div>`;
+    }).join('')}</div>
+    <div class="fld"><label for="ck-note">${esc(t('v.note'))}</label><input class="inp" id="ck-note" type="text" data-ch="ck-note" value="${esc(p.illness || '')}" placeholder="${esc(t('v.notePh'))}"></div>
+    <div class="hint">${esc(t('v.editHint'))}</div>
+    <button class="btn block" data-act="sheet-close">${esc(t('common.done'))}</button></div>`;
+}
+function savePoint(p: any) {
+  STATE.trend = (STATE.trend || []).filter((x: any) => x.date !== p.date).concat([p]).sort((a: any, b: any) => a.date.localeCompare(b.date));
+  saveState(); nav.rerender();
+}
+onChange('ck-date', el => { CHECK_DATE = (el as HTMLInputElement).value || todayStr(); refreshSheet(); });
+onChange('ck-field', el => {
+  const k = el.dataset.k!; const raw = (el as HTMLInputElement).value.trim();
+  const v = raw === '' ? null : parseNum(raw);
+  savePoint(setManual(pointOf(CHECK_DATE), CHECK_DATE, k, v));
+  refreshSheet();
+});
+onChange('ck-note', el => {
+  const p = { ...(pointOf(CHECK_DATE) || { date: CHECK_DATE }) };
+  p.illness = (el as HTMLInputElement).value.trim() || null;
+  savePoint(p);
+});
+on('ck-reset', el => { savePoint(resetToOriginal(pointOf(CHECK_DATE), el.dataset.k!, STATE.settings)); refreshSheet(); toast(t('common.resetDone')); });
+on('checkin-open', el => openCheckin(el.dataset.date || D().today));

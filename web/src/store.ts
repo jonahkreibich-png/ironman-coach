@@ -37,10 +37,10 @@ export function defaultState(): any {
     settings: {
       lthrRun: PLAN.meta.defaultLthrRun || 170, lthrBike: PLAN.meta.defaultLthrBike || 165,
       thresholdPaceRunSec: PLAN.meta.defaultThresholdPaceRunSec || 339, thresholdSpeedBikeKmh: PLAN.meta.defaultThresholdSpeedBikeKmh || 28,
-      readiness: { rhrMax: 56, hrvMin: 65, tempMax: 0.5 }
+      readiness: { rhrMax: 65, hrvMin: 35, tempMax: 0.5 }
     },
     weekNotes: {}, nutrition: {},
-    nutritionProfile: { age: 17, heightCm: 184, weightKg: 73, pal: 1.4 },
+    nutritionProfile: { pal: 1.4 },
     illnessPeriods: clone(PLAN.seedIllness || []),
     adjustments: {},
     profile: null, goals: {}, activities: {}, coachMsgs: {}, coachNotes: {}, raceResults: {}, meals: {},

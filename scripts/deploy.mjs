@@ -9,7 +9,7 @@ if (target !== 'test') { console.error('Nur "test" ist erlaubt. Die echte App wi
 const only = process.argv[3] || '';
 const env = { ...process.env, NODE_USE_SYSTEM_CA: '1' };
 if (fs.existsSync('C:\\ProgramData\\Norton\\Antivirus\\wscert.pem')) env.NODE_EXTRA_CA_CERTS = 'C:\\ProgramData\\Norton\\Antivirus\\wscert.pem';
-const run = (cmd, cwd) => { console.log('> ' + cmd); execSync(cmd, { stdio: 'inherit', cwd, env }); };
+const run = (cmd, cwd, extra = {}) => { console.log('> ' + cmd); execSync(cmd, { stdio: 'inherit', cwd, env: { ...env, ...extra } }); };
 const wr = process.platform === 'win32' ? 'npx.cmd wrangler' : 'npx wrangler';
 
 if (only !== '--only-web') {
@@ -17,7 +17,7 @@ if (only !== '--only-web') {
   run(`${wr} deploy --env test`, 'server');
 }
 if (only !== '--only-api') {
-  run('npm run build');
+  run('npm run build', undefined, { VITE_APP_ENV: 'test' });
   fs.copyFileSync('pages/wrangler.test.toml', 'pages/wrangler.toml');
   run(`${wr} pages deploy ../dist --project-name stamio-test --branch main --commit-dirty=true`, 'pages');
 }

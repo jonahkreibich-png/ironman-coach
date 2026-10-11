@@ -1,62 +1,77 @@
-/* Plan-Bildschirm mit Anpassungen */
-import * as CoachCore from '../../../shared/core';
-import { STATE, PLAN, SESS, UI, HAS_PLAN, BASE_WEEKS, findDay, currentWeekIdx } from '../store';
-import { $, esc, de, todayStr, addDays, daysBetween, fmtDate, dowShort, dowLong, secToPace, parseNum, round5, round50, rng } from '../util';
-import { SPORTS, icon, uiIcon } from '../icons';
-import * as D from '../domain';
-import { sessState, effStatus, illnessAt, activeIllness, returnPhase, RETURN_STAGES, trendAt, latestTrend, latestWithKey, hasRecovery, rollingAvg, arrow, computeReadiness, readinessHistoryHtml, computeScore, tierLabel, perfEntries, forgottenSessions, computeZones, computePaceZones, computeSpeedZones } from '../domain';
-import { sessionCard, dayCard, dayBadge, weekStrip, weekProgress, checkinFields } from '../components';
-import { lineChart, illnessShades } from '../charts';
-import { VS } from '../viewstate';
-import { APP } from '../config';
+/* Plan: Woche wählen, Tage mit Einheiten, Anpassungen mit Rückgängig. Hauptaktion: Einheit antippen. */
+import { STATE, PLAN, UI, saveState, rebuildPlanIndex, currentWeekIdx, findDay, saveUi } from '../store';
+import { esc, fmtDate, dowShort, dowLong, addDays, todayStr } from '../util';
+import { t, num, hours } from '../../../shared/i18n';
+import { on, sec, ic, pill, empty, more } from '../kit';
+import { sessionRow } from './session';
+import { dayStats, sessState } from '../domain';
+import { nav } from '../nav';
+import { toast } from '../toast';
+import { weekMinutes } from '../../../shared/rules';
 
-
-
-export function renderPlan() {
-  if (VS.PLAN_WEEK == null) VS.PLAN_WEEK = currentWeekIdx();
-  const cw = currentWeekIdx();
-  const week = PLAN.weeks[VS.PLAN_WEEK];
-  const wp = weekProgress(week);
-  let h = `<h1 class="view-title">Trainingsplan<small>${esc(PLAN.meta.blockName || 'Block 1 · Grundlage')} · ${PLAN.weeks.length} Wochen</small></h1>
-    <div class="chips" role="tablist">${PLAN.weeks.map((w, i) => `<button class="chip ${i === VS.PLAN_WEEK ? 'on' : ''}" data-act="week" data-i="${i}" role="tab" aria-selected="${i === VS.PLAN_WEEK}">${esc(w.label)}${i === cw ? '<span class="dot" aria-label="aktuelle Woche"></span>' : ''}</button>`).join('')}</div>
-    <div class="sec" style="margin-top:16px">
-      <div class="sec-h"><h2>${fmtDate(week.startDate)} – ${fmtDate(week.endDate)}</h2><span class="aside num">${wp.done}/${wp.total} erledigt</span></div>
-      <div class="hint"><strong>${esc(week.focus)}</strong>${week.isRecoveryWeek ? ' · Erholungswoche' : ''}</div>
-      ${wp.html}
-      ${weekStrip(week, true)}
-      <textarea class="inp" rows="2" data-f="weeknote" data-week="${week.weekNumber}" placeholder="Wochennotiz: wie hat sich die Woche angefühlt?">${esc(STATE.weekNotes[week.weekNumber] || '')}</textarea>
-    </div>
-    <div class="sec">${week.days.map(d => dayCard({ ...d, weekIdx: VS.PLAN_WEEK })).join('')}</div>`;
-  h += adjustmentsSection();
-  $('#app').innerHTML = h;
-}
-/* Liste aller automatischen Anpassungen, gruppiert, mit Rückgängig */
 export function adjustmentGroups() {
-  const groups = {};
-  Object.values(STATE.adjustments || {}).forEach(a => {
+  const groups: Record<string, any> = {};
+  Object.values(STATE.adjustments || {}).forEach((a: any) => {
     if (!a || !a.id) return;
     const g = a.group || a.id;
     (groups[g] = groups[g] || { id: g, items: [], createdAt: 0, date: a.date }).items.push(a);
     groups[g].createdAt = Math.max(groups[g].createdAt, a.createdAt || 0);
   });
-  return Object.values(groups).sort((a, b) => b.createdAt - a.createdAt);
+  return Object.values(groups).sort((a: any, b: any) => b.createdAt - a.createdAt);
 }
-export function adjustmentsSection() {
+
+export function renderPlan(): string {
+  if (!PLAN.weeks.length) return empty(t('plan.none'));
+  const today = todayStr();
+  if (UI.planDate) { const d = findDay(UI.planDate); if (d) UI.planWeek = d.weekIdx; }
+  if (UI.planWeek == null || !PLAN.weeks[UI.planWeek]) UI.planWeek = currentWeekIdx();
+  const cw = currentWeekIdx();
+  const w = PLAN.weeks[UI.planWeek];
+  let done = 0, total = 0;
+  w.days.forEach((d: any) => { const s = dayStats(d); done += s.done; total += s.total; });
+  let h = `<div class="chips" role="tablist">${PLAN.weeks.map((x: any, i: number) => `<button class="chip ${i === UI.planWeek ? 'on' : ''}" data-act="plan-week" data-i="${i}" role="tab" aria-selected="${i === UI.planWeek}">${esc(t('plan.weekShort', { n: x.weekNumber }))}${i === cw ? ' ●' : ''}</button>`).join('')}</div>
+    <div class="card" style="margin-top:var(--s3)"><div class="spread"><div><div class="lbl">${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div><div class="t" style="font-weight:600">${esc(w.focus || '')}</div></div>
+      <div style="text-align:right"><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(weekMinutes(w) / 60))}</div></div></div></div>`;
+  for (const d of w.days) {
+    const isToday = d.date === today;
+    const list = d.sessions.map((s: any) => ({ ...s, date: d.date }));
+    const customs = (STATE.customWorkouts || {})[d.date] || [];
+    h += `<div class="day-h ${isToday ? 'today' : ''}" id="day-${d.date}"><b>${esc(dowLong(d.date))}</b><span>${fmtDate(d.date)}${isToday ? ' · ' + esc(t('common.today')) : ''}</span></div>
+      <div class="list">${list.filter((s: any) => s.sport !== 'rest').map((s: any) => sessionRow(s)).join('') || `<div class="li"><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="t muted">${esc(t('heute.restDay'))}</span></div>`}
+      ${(d.moved || []).map((m: any) => `<div class="li"><span class="s">${esc(t('plan.movedTo', { t: m.title, d: `${dowShort(m.to)} ${fmtDate(m.to)}` }))}</span></div>`).join('')}
+      ${customs.map((c: any) => `<button class="li" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}"><span class="grow"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')}<br><span class="s">${esc([c.metrics && c.metrics.min ? c.metrics.min + ' min' : c.plannedMinutes ? c.plannedMinutes + ' min' : '', c.metrics && c.metrics.km ? c.metrics.km + ' km' : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`;
+  }
+  h += `<button class="btn ghost block" data-act="custom-add" data-date="${UI.planDate && w.days.some((d: any) => d.date === UI.planDate) ? UI.planDate : (w.days.some((d: any) => d.date === today) ? today : w.startDate)}" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('plan.addExtra'))}</button>`;
+  h += sec(t('plan.adjustments'), adjustmentsList(), t('plan.last30'));
+  return h;
+}
+
+function adjustmentsList(): string {
   const from = addDays(todayStr(), -30);
-  const groups = adjustmentGroups().filter(g => !g.date || g.date >= from);
-  const body = groups.length ? groups.map(g => {
-    const undone = g.items.every(a => a.undone);
-    const note = g.items.find(a => a.type === 'note');
-    const changes = g.items.filter(a => a.type !== 'note');
+  const groups = adjustmentGroups().filter((g: any) => !g.date || g.date >= from);
+  if (!groups.length) return `<div class="card">${empty(t('plan.noAdj'))}</div>`;
+  return `<div class="list">${groups.slice(0, 15).map((g: any) => {
+    const undone = g.items.every((a: any) => a.undone);
+    const note = g.items.find((a: any) => a.type === 'note');
+    const changes = g.items.filter((a: any) => a.type !== 'note');
     const reason = (note && note.reason) || (changes[0] && changes[0].reason) || '';
-    return `<div class="adj ${undone ? 'undone' : ''}" data-group="${esc(g.id)}">
-      <div class="adj-h"><span class="lbl">${g.date ? dowShort(g.date) + ' ' + fmtDate(g.date) : ''}</span>${undone ? '<span class="pill pill-skipped">Rückgängig gemacht</span>' : ''}</div>
-      ${note ? `<div class="adj-t">${esc(note.what)}</div>` : ''}
-      ${changes.map(a => `<div class="adj-t">${esc(a.what || '')}</div>`).join('')}
-      ${changes.length || !note ? '' : '<div class="hint">Keine Einheit geändert.</div>'}
-      <div class="hint">Warum: ${esc(reason)}</div>
-      ${changes.length ? `<button class="btn ghost small" data-act="adj-undo">${undone ? 'Wieder anwenden' : 'Rückgängig'}</button>` : ''}</div>`;
-  }).join('') : '<div class="empty">Noch keine automatischen Anpassungen. Die App passt den Plan morgens nach der Ampel und sonntags um 18 Uhr für die nächste Woche an.</div>';
-  return `<div class="sec"><div class="sec-h"><h2>Anpassungen</h2><span class="aside">letzte 30 Tage</span></div><div class="panel">
-    <div class="hint">Große Änderungen wie neue Blöcke, Tests und Wettkämpfe kommen weiter vom Coach über „Plan aktualisieren“.</div>${body}</div></div>`;
+    return `<div class="li" data-group="${esc(g.id)}" style="align-items:flex-start"><span class="grow"><span class="lbl">${g.date ? dowShort(g.date) + ' ' + fmtDate(g.date) : ''} ${changes.some((a: any) => a.from_ai) ? '· KI' : ''}</span><br>
+      ${note ? `<span class="t">${esc(note.what)}</span><br>` : ''}${changes.slice(0, 4).map((a: any) => `<span class="${undone ? 'muted' : ''}" style="${undone ? 'text-decoration:line-through' : ''}">${esc(a.what || '')}</span>`).join('<br>')}${changes.length > 4 ? `<br><span class="s">+${changes.length - 4}</span>` : ''}
+      <br><span class="s">${esc(t('adj.why'))}: ${esc(reason)}</span></span>${changes.length ? `<button class="btn ghost sm" data-act="adj-undo">${esc(undone ? t('plan.redo') : t('plan.undo'))}</button>` : ''}</div>`;
+  }).join('')}</div>`;
 }
+
+on('plan-week', el => { UI.planWeek = +el.dataset.i!; UI.planDate = null; saveUi(); nav.rerender(); });
+on('adj-undo', el => {
+  const id = (el.closest('[data-group]') as HTMLElement).dataset.group;
+  const g: any = adjustmentGroups().find((x: any) => x.id === id); if (!g) return;
+  const undo = !g.items.every((a: any) => a.undone);
+  g.items.forEach((a: any) => { STATE.adjustments[a.id] = { ...a, undone: undo }; });
+  rebuildPlanIndex(); saveState(); nav.rerender(); toast(undo ? t('plan.undone') : t('plan.redone'));
+});
+export function scrollToPlanDay() {
+  if (!UI.planDate) return;
+  const el = document.getElementById('day-' + UI.planDate);
+  if (el) { el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); }
+}
+void num; void more; void sessState;
