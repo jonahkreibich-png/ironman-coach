@@ -31,6 +31,18 @@ Grenzen in der App: Monatsbudget (Standard 5 $, höchstens 20 $), höchstens 30 
 
 **Wer zahlt:** Du als Betreiber hast KI-Coach und Essens-Foto immer freigeschaltet. Die API-Kosten deiner eigenen Nutzung zahlst trotzdem du an Anthropic (siehe Tabelle, unter 1 $ im Monat). Für andere Nutzer sind die Funktionen aus, bis du sie freischaltest oder sie später im Store kaufen.
 
+## KI-Chat im Coach-Tab (Auftrag 4 D2)
+
+Ohne Schlüssel beantwortet die Engine typische Sätze kostenlos (46 Absichten). Mit Schlüssel übernimmt der KI-Coach dieselbe Oberfläche. Geschätzte Kosten pro Monat (starkes Modell für Gespräche, Routine-Modell für den Rest, Preise wie oben):
+
+| | normal (10 Gespräche + Briefings + Fotos) | viel (30 Gespräche) |
+|---|---|---|
+| **Jonah allein** | ~0,80 $ | ~2,30 $ |
+| **10 Nutzer** | ~8 $ | ~23 $ |
+| **100 Nutzer** | ~80 $ | ~230 $ |
+
+Mit Prompt-Caching (gleicher Anfang jeder Anfrage: Handbuch und Regeln) sinkt der Eingabe-Anteil spürbar, grob um 30-50 %. Die Grenzen pro Nutzer (Monatsbudget, 30 Nachrichten pro Tag) bleiben. Ab 10 Nutzern lohnt es sich, die KI nur für Nutzer mit Kauf freizuschalten (siehe STORE-PLAN.md).
+
 ## Oura-Bedingungen in drei Sätzen
 
-Oura-Daten dürfen nicht an KI-Dienste weitergegeben oder zum Trainieren verwendet werden, deshalb filtert die App sie aus KI-Coach und Claude-Zusammenfassung heraus. Für den Oura-Zugang darf kein Geld verlangt werden, und beim Trennen müssen die Daten innerhalb von 72 Stunden gelöscht werden (die App löscht sofort). Nutzer unter 18 brauchen die Einwilligung der Eltern.
+Oura-Daten dürfen nicht an KI-Dienste weitergegeben oder zum Trainieren verwendet werden, deshalb filtert die App sie aus dem KI-Coach heraus. Für den Oura-Zugang darf kein Geld verlangt werden, und beim Trennen müssen die Daten innerhalb von 72 Stunden gelöscht werden (die App löscht sofort). Nutzer unter 18 brauchen die Einwilligung der Eltern.

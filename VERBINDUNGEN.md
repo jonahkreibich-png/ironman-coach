@@ -1,6 +1,27 @@
 # Verbindungen
 
-Stand der Recherche: Oktober 2026. Jeder Nutzer verbindet seine Dienste selbst in der App (**Mehr → Verbindungen**). Zugangs-Tokens liegen nur verschlüsselt in der Datenbank (Schlüssel `TOKEN_KEY`), App-Schlüssel der Dienste nur als Cloudflare-Secrets. Strava ist bewusst nicht dabei (Auftrag).
+Stand der Recherche: Oktober 2026, aktualisiert mit Auftrag 4 (11.10.2026).
+
+## Auftrag 4: Warum „Verbinden“ beim ersten Test nicht ging
+
+Geprüft am 11.10.2026 mit `node scripts/check-secrets.mjs` (zeigt nur Namen, keine Werte), der Test-Datenbank (nur Gerätenamen) und simulierten Anbietern in den Tests.
+
+| Dienst | Ursache | Was am Code lag und repariert ist | Was noch fehlt |
+|---|---|---|---|
+| **Oura** | Server-Schlüssel fehlen: `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET` | Meldung ohne Ausweg → jetzt klare Erklärung plus Alternative (Apple Health per Kurzbefehl) | Entwickler-App anlegen (FUER-JONAH.md, Verbindungen) |
+| **Dropbox (HealthFit)** | Server-Schlüssel fehlen: `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET` | wie oben, Alternative: HealthFit-Datei hochladen | Dropbox-App anlegen |
+| **WHOOP** | Server-Schlüssel fehlen: `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | wie oben | Entwickler-App anlegen |
+| **Polar** | Server-Schlüssel fehlen: `POLAR_CLIENT_ID`, `POLAR_CLIENT_SECRET` | wie oben, Alternative: Polar in intervals.icu verbinden | Entwickler-App anlegen |
+| **Withings** | Server-Schlüssel fehlen: `WITHINGS_CLIENT_ID`, `WITHINGS_CLIENT_SECRET` | wie oben | Entwickler-App anlegen |
+| **intervals.icu** | lief, aber nur mit Server-Verbindung | Nach dem Verbinden wird sofort abgerufen | – |
+| **Kurzbefehl (Apple Health)** | lief, aber nur mit Server-Verbindung | – | – |
+| **Garmin, COROS, Suunto, Wahoo** | Partner-Freischaltung nötig, der Knopf erklärte nur „Partner nötig“ | geführter Weg über intervals.icu in 3 Schritten mit Knopf „intervals.icu jetzt verbinden“; Status „kommt über intervals.icu“ | – |
+| **Knopf „Verbinden“ im Fragebogen** | sprang nur zur Verbindungsseite; der Rückweg führte nie in den Fragebogen; nach dem Erlaubnis-Bildschirm landete man immer unter Verbindungen | Liste direkt im Fragebogen, gleiche Abläufe wie unter Verbindungen, Rückkehr an dieselbe Stelle (`returnTo`), Antworten bleiben gespeichert | – |
+| **Alle Dienste ohne Server-Verbindung** | Der Vater hat die App nur auf seinem Gerät genutzt (in der Test-Datenbank gibt es nur Jonahs zwei PCs). Ohne Konto auf dem Server kann kein Dienst verbunden werden; die App sagte das nur knapp. | klare Erklärung im Fragebogen und unter Verbindungen, Einladung für Test-Nutzer (F4) | Jonah gibt dem Vater den Einladungscode (FUER-JONAH.md) |
+
+Die Weiterleitungs-Adresse stimmt: `https://stamio-test.pages.dev/api/connect/<dienst>/callback` antwortet live mit einer Rückleitung in die App. Jeder OAuth-Ablauf (Oura, Dropbox, WHOOP, Withings, Polar) ist mit einem simulierten Anbieter von Anfang bis Ende getestet: Verbinden, Rückkehr in die App bzw. in den Fragebogen, erster Abruf, Token erneuern, Trennen (`server/test/oauth-flow.test.ts`).
+
+**Status in der App:** Unter Mehr → Verbindungen steht bei jedem Dienst, ob er bereit ist. Als Betreiber siehst du zusätzlich „Server-Schlüssel“ mit den Namen der Secrets und ob sie gesetzt sind (`gesetzt` / `fehlt`). Jeder Nutzer verbindet seine Dienste selbst in der App (**Mehr → Verbindungen**). Zugangs-Tokens liegen nur verschlüsselt in der Datenbank (Schlüssel `TOKEN_KEY`), App-Schlüssel der Dienste nur als Cloudflare-Secrets. Strava ist bewusst nicht dabei (Auftrag).
 
 ## Übersicht
 
@@ -17,10 +38,10 @@ Stand der Recherche: Oktober 2026. Jeder Nutzer verbindet seine Dienste selbst i
 | **Withings** | fertig, Server-Schlüssel fehlt | Gewicht, Schlaf, Puls | kostenlos bis 1000 Nutzer | Entwickler-App anlegen |
 | **Fitbit / Google Health** | vorbereitet | Schlaf, Aktivität | kostenlos | Fitbit-Web-API wird am 30.10.2026 abgeschaltet; die neue Google-Health-API nimmt noch keine neuen Apps auf. Freischalten, sobald möglich. |
 | **HealthKit direkt** | vorbereitet (Plan in SPAETER.md) | alles aus Apple Health, im Hintergrund | 99 $/Jahr Apple-Entwicklerkonto | braucht eine echte iPhone-App (Capacitor-Hülle). Bis dahin: Kurzbefehl. |
-| **Suunto** | angezeigt als „Partner nötig“ | Trainings | kostenlos | Antrag beim Suunto-Partnerprogramm |
-| **COROS** | „Partner nötig“ | Trainings | kostenlos | Antrag bei COROS |
-| **Wahoo** | „Partner nötig“ | Fahrten | kostenlos | Freigabe durch Wahoo |
-| **Garmin** | „Partner nötig“ | alles | kostenlos für Firmen | Garmin Connect Developer Program nur für Unternehmen. Bis dahin: Garmin → Apple Health/HealthFit oder intervals.icu |
+| **Suunto** | über intervals.icu (geführt) | Trainings | kostenlos | direkt nur mit Partnerprogramm |
+| **COROS** | über intervals.icu (geführt) | Trainings | kostenlos | direkt nur mit Partner-Freigabe |
+| **Wahoo** | über intervals.icu (geführt) | Fahrten | kostenlos | direkt nur mit Freigabe durch Wahoo |
+| **Garmin** | über intervals.icu (geführt) | Trainings, über intervals.icu auch Wellness | kostenlos | direkt nur über das Garmin-Programm für Firmen |
 | **TrainingPeaks** | „Partner nötig“ | Pläne, Einheiten | – | nur für Partner-Firmen |
 | **Zepp (Amazfit)** | nicht möglich | – | – | keine öffentliche Schnittstelle. Weg: Zepp → Apple Health → Kurzbefehl |
 | **Terra** (ein Anschluss für alle) | nicht eingebaut | alles | 399–499 $/Monat | siehe SPAETER.md |
@@ -37,7 +58,7 @@ Stand der Recherche: Oktober 2026. Jeder Nutzer verbindet seine Dienste selbst i
 
 ## Oura: besondere Bedingungen (API Agreement, gültig ab 08.06.2026)
 
-- Oura-Daten dürfen nicht an KI-Dienste gehen (4(d), 6(g)). Die App filtert sie aus dem KI-Coach und aus der Zusammenfassung für Claude heraus.
+- Oura-Daten dürfen nicht an KI-Dienste gehen (4(d), 6(g)). Die App filtert sie aus dem KI-Coach heraus. (Die Zusammenfassung für Claude gibt es seit Auftrag 4 nicht mehr.)
 - Keine Gebühren für den Oura-Zugang (4(a)(xiii)) – passt, die App ist kostenlos.
 - Nutzer unter 18 brauchen die Einwilligung der Eltern (12(a)(viii)).
 

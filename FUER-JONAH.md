@@ -1,55 +1,75 @@
 # Für Jonah
 
-Was nur du machen kannst, in dieser Reihenfolge. Die echte App läuft währenddessen ganz normal weiter.
-Test-App: **https://stamio-test.pages.dev** · Einrichtungscode: steht in `ZUGANG.local.md` (nur auf deinem PC, nicht im Repo).
+Nur die Schritte, die wirklich noch nötig sind. Die echte App läuft währenddessen ganz normal weiter.
+Test-App: **https://stamio-test.pages.dev** · Zugangscodes: `ZUGANG.local.md` (nur auf deinem PC, nicht im Repo).
+Alle Befehle im Ordner `ironman-coach` ausführen.
 
-Befehle immer im Ordner `ironman-coach` ausführen. Für `wrangler`-Befehle in `server` wechseln.
+## 1. Verbindungen (am wichtigsten)
 
-## Pflicht (zusammen ca. 45 min)
+**Warum „Verbinden“ nicht ging:** Für Oura, Dropbox, WHOOP, Polar und Withings fehlen auf dem Server die App-Schlüssel der Anbieter. Das kannst nur du anlegen (kostenlos). Details je Dienst: [VERBINDUNGEN.md](VERBINDUNGEN.md). Garmin, COROS, Suunto und Wahoo brauchen nichts von dir: die laufen jetzt über intervals.icu (Anleitung steht in der App).
 
-1. **Deine echten Daten in die Testumgebung kopieren (10 min, am PC).**
-   ```bash
-   node scripts/copy-prod-to-test.mjs
-   ```
-   Liest die echte Datenbank nur (Sicherung landet in `data-export/`, nicht im Repo), spielt sie in die Test-Datenbank und testet dabei die Umstellung auf mehrere Nutzer. Am Ende steht „Fertig“. Steht da „ACHTUNG“: nichts freigeben, Ausgabe an Claude geben.
-   *Alternative ohne PC:* alte App → Einstellungen → „Backup kopieren“, dann in der Test-App auf dem Startbildschirm „Backup laden“.
+**So setzt du einen Schlüssel (immer gleich, 30 Sekunden):** Wert beim Anbieter kopieren, dann
+```bash
+node scripts/set-secret.mjs NAME_DES_SCHLÜSSELS
+```
+Das Skript nimmt den Wert aus der Zwischenablage (kein Einfügen im Terminal nötig). Zum Schluss prüfen:
+```bash
+node scripts/check-secrets.mjs
+```
+Den Status siehst du auch in der App unter Mehr → Verbindungen → „Server-Schlüssel“.
 
-2. **Test-App aufs iPhone (5 min).** Safari → https://stamio-test.pages.dev → drei Punkte → Teilen → „Zum Home-Bildschirm“. Über das neue Icon öffnen → „Schon dabei?“ → „Server zum ersten Mal einrichten“ → Einrichtungscode eingeben. Deine Daten kommen vom Server – den Fragebogen brauchst du nicht. Als Betreiber hast du alle Funktionen freigeschaltet. Das alte Icon bleibt, beide Apps laufen getrennt.
+Du brauchst nur die Dienste, die du oder ein Tester wirklich nutzt.
 
-3. **Mitteilungen erlauben (2 min).** Test-App → Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“ → „Test senden“.
+**1a. Dropbox für HealthFit (10 min)**
+1. https://www.dropbox.com/developers/apps → „Create app“ → **Scoped access** → **App folder** → Name z. B. `stamio-test-jonah`.
+2. Tab *Permissions*: Haken bei `files.metadata.read`, `files.content.read`, `account_info.read` → „Submit“.
+3. Tab *Settings*: Redirect URI `https://stamio-test.pages.dev/api/connect/dropbox/callback` → „Add“. Webhook URI `https://stamio-test.pages.dev/api/hooks/dropbox` → „Add“.
+4. „App key“ kopieren → `node scripts/set-secret.mjs DROPBOX_APP_KEY`. „App secret“ (Show) kopieren → `node scripts/set-secret.mjs DROPBOX_APP_SECRET`.
 
-4. **Apple-Health-Kurzbefehl bauen (20 min).** Test-App → Mehr → Verbindungen → „Apple Health (Kurzbefehl)“ → „Schlüssel erzeugen“, Schlüssel kopieren. Die Schritte stehen direkt darunter („So baust du den Kurzbefehl“), das Format in VERBINDUNGEN.md. Zwei Automationen:
-   - täglich **6:30 Uhr** „Werte senden“ (ohne Nachfrage ausführen),
-   - **„Training beendet“** der Apple Watch, oder falls es das bei dir nicht gibt: **stündlich 6–22 Uhr**.
+**1b. Oura (10 min)** – du bist unter 18: laut Oura-Bedingungen vorher **mit deinen Eltern klären**.
+1. https://cloud.ouraring.com/oauth/applications → „New Application“.
+2. Name `Stamio Test`, Website und Privacy/Terms jeweils `https://stamio-test.pages.dev`.
+3. Redirect URI: `https://stamio-test.pages.dev/api/connect/oura/callback`. Scopes: personal, daily, heartrate, session, spo2, workout.
+4. Client ID → `node scripts/set-secret.mjs OURA_CLIENT_ID`, Client Secret → `node scripts/set-secret.mjs OURA_CLIENT_SECRET`.
 
-5. **intervals.icu verbinden (3 min).** Test-App → Verbindungen → intervals.icu → Athleten-ID und API-Schlüssel (intervals.icu → Einstellungen → Developer Settings).
+**1c. WHOOP (10 min, nur wer WHOOP hat)**
+1. https://developer-dashboard.whoop.com → Team anlegen → „Create App“, Name `Stamio Test`, Privacy-Policy `https://stamio-test.pages.dev`.
+2. Redirect URL `https://stamio-test.pages.dev/api/connect/whoop/callback`. Scopes: read:recovery, read:sleep, read:workout, read:cycles, offline. Webhook (v2): `https://stamio-test.pages.dev/api/hooks/whoop`.
+3. `WHOOP_CLIENT_ID` und `WHOOP_CLIENT_SECRET` wie oben setzen.
 
-6. **1–2 Wochen benutzen.** Was stört oder fehlt: einfach Claude sagen.
+**1d. Polar (10 min, nur wer Polar hat)** – Alternative ohne Schlüssel: Polar in intervals.icu verbinden.
+1. https://admin.polaraccesslink.com → mit Polar-Flow-Konto anmelden → „Create client“, Name `Stamio Test`.
+2. Redirect URL `https://stamio-test.pages.dev/api/connect/polar/callback`.
+3. `POLAR_CLIENT_ID` und `POLAR_CLIENT_SECRET` setzen.
 
-## Empfohlen (je 10–15 min)
+**1e. Withings (10 min, nur wer Withings hat)**
+1. https://developer.withings.com/dashboard → „Create an application“ → „Public API integration“, Name `Stamio Test`.
+2. Callback URL `https://stamio-test.pages.dev/api/connect/withings/callback`.
+3. Client ID → `WITHINGS_CLIENT_ID`, Consumer Secret → `WITHINGS_CLIENT_SECRET`.
 
-7. **HealthFit über Dropbox (15 min).** https://www.dropbox.com/developers/apps → „Create app“ → Scoped access → App folder → Name z. B. „stamio-test“. Unter *Permissions*: `files.metadata.read`, `files.content.read`, `account_info.read`. Unter *Settings*: Redirect URI `https://stamio-test.pages.dev/api/connect/dropbox/callback`, Webhook `https://stamio-test.pages.dev/api/hooks/dropbox`. Dann:
-   ```bash
-   cd server
-   npx wrangler secret put DROPBOX_APP_KEY --env test
-   npx wrangler secret put DROPBOX_APP_SECRET --env test
-   ```
-   In HealthFit: Einstellungen → Automatischer Export → Dropbox, Format FIT. In der Test-App: Verbindungen → Dropbox (HealthFit) → Verbinden.
+**1f. intervals.icu für dich (3 min, falls noch nicht gemacht)** – Test-App → Mehr → Verbindungen → intervals.icu → Athleten-ID und API-Schlüssel (intervals.icu → Einstellungen → Developer Settings).
 
-8. **Oura (15 min).** https://cloud.ouraring.com/oauth/applications → neue Anwendung, Redirect URI `https://stamio-test.pages.dev/api/connect/oura/callback`. Weil du unter 18 bist, verlangen die Oura-Bedingungen die **Einwilligung deiner Eltern** – bitte vorher mit ihnen klären. Dann `OURA_CLIENT_ID` und `OURA_CLIENT_SECRET` wie oben mit `--env test` setzen.
+## 2. Papa neu testen lassen (5 min)
 
-9. **Optional: WHOOP, Polar, Withings (je 10 min),** nur wenn du die Geräte hast. Gleiches Muster: Entwickler-App anlegen, Redirect `https://stamio-test.pages.dev/api/connect/<whoop|polar|withings>/callback`, Secrets `<NAME>_CLIENT_ID` und `<NAME>_CLIENT_SECRET` mit `--env test`.
+Papa hatte die App nur auf seinem iPhone, ohne Konto auf dem Server. Deshalb sah er die alten Standardwerte (behoben) und konnte nichts verbinden.
+1. Gib ihm den **Einladungscode aus `ZUGANG.local.md`** (Abschnitt „Test-Zugang für Papa“, gilt 14 Tage).
+2. Auf seinem iPhone: Test-App öffnen → Mehr → Daten und Geräte → „Ich habe eine Einladung“ → Code und „Papa“ → „Einladung einlösen“. Den Schalter „Daten auf diesem Gerät gehören mir“ **aus** lassen: dann löscht die App die alten Daten und er beginnt mit dem neuen Fragebogen.
+3. Fehler oder Ideen kann er direkt in der App schicken (Mehr → „Fehler melden / Idee“). Du siehst alle Meldungen dort ganz unten.
+4. Später neu anfangen lassen: Mehr → Daten und Geräte → Nutzer → bei Papa „Zurücksetzen“.
 
-10. **Optional: automatischer Deploy aus GitHub (10 min).** Cloudflare → My Profile → API Tokens → „Edit Cloudflare Workers“ + Pages-Rechte. In GitHub → Repository → Settings → Secrets: `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID`. Ohne das deployt Claude von Hand.
+## 3. Was von vorher noch offen ist
+
+1. **Test-App auf dein iPhone (5 min).** In der Test-Datenbank sind bisher nur deine zwei PCs angemeldet. Safari → https://stamio-test.pages.dev → Teilen → „Zum Home-Bildschirm“ → öffnen → „Schon dabei?“ → „Server zum ersten Mal einrichten“ → Einrichtungscode aus `ZUGANG.local.md`. Deine Daten kommen vom Server.
+2. **Mitteilungen erlauben (2 min).** Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“ → „Test senden“.
+3. **Apple-Health-Kurzbefehl (20 min).** Mehr → Verbindungen → „Apple Health (Kurzbefehl)“ → „Schlüssel erzeugen“, dann die Schritte unter „So baust du den Kurzbefehl“ (2 Automationen: 6:30 Uhr und „Training beendet“).
+4. **1-2 Wochen benutzen** – und Papa auch. Was stört: „Fehler melden / Idee“ in der App.
+
+## Optional
+- **Automatischer Deploy aus GitHub (10 min).** Cloudflare → My Profile → API Tokens → „Edit Cloudflare Workers“ + Pages-Rechte; in GitHub → Settings → Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. Ohne das deployt Claude von Hand.
 
 ## Freigeben (wenn du zufrieden bist)
-
-11. **„Freigeben“ zu Claude sagen.** Claude führt `scripts/release.md` aus: neue Datenbank aus einer frischen Kopie, Umstellung, echte Adresse **https://stamio.pages.dev**, Tests. Die alte App bleibt 4 Wochen als Rückfall.
-
-12. **iPhone umziehen (10 min).** Safari → https://stamio.pages.dev → Zum Home-Bildschirm → mit dem neuen Einrichtungscode verbinden (bekommst du von Claude in `ZUGANG.local.md`) → Mitteilungen erlauben → Kurzbefehl auf die neue Adresse und einen neuen Schlüssel umstellen → Dienste (Dropbox, Oura …) unter Verbindungen neu verbinden → altes Icon und Test-Icon löschen.
-
-13. **Repository umbenennen (2 min, nach dem Umzug).** GitHub → Repository → Settings → Name `stamio`.
+- **„Freigeben“ zu Claude sagen.** Claude führt `scripts/release.md` aus (neue Datenbank aus frischer Kopie, Umstellung, echte Adresse https://stamio.pages.dev). Die alte App bleibt 4 Wochen als Rückfall. Danach iPhone umziehen (neue Adresse, neuer Einrichtungscode, Dienste neu verbinden; die App-Schlüssel aus Schritt 1 brauchst du dann einmal für die echte Umgebung: gleiche Befehle, Claude passt das Skript an) und das Repository in `stamio` umbenennen.
 
 ## Später (kostet Geld, siehe SPAETER.md)
-- KI-Coach einschalten: Anthropic-Konto + API-Schlüssel (geschätzt unter 1 $ im Monat), mit Einwilligung deiner Eltern.
+- KI-Coach: Anthropic-Konto + API-Schlüssel (geschätzt unter 1 $ im Monat für dich), mit Einwilligung deiner Eltern.
 - Echte iPhone-App mit HealthKit: 99 $/Jahr.
