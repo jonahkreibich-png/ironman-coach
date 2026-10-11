@@ -165,7 +165,7 @@ details.more > .body { margin-top: var(--s2); display: flex; flex-direction: col
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring .rv { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
 .ring .rv b { font: 700 34px/1 var(--f-display); font-variant-numeric: tabular-nums; color: var(--st); }
-.ring .rv span { display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); margin-top: 2px; }
+.ring .rv span { display: block; max-width: 64px; margin: 2px auto 0; font-size: 9px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ring.sm { width: 58px; height: 58px; } .ring.sm .rv b { font-size: 22px; }
 .status-word { font: 700 var(--t-xl)/1.05 var(--f-display); text-transform: uppercase; letter-spacing: .02em; color: var(--st); }
 .coach-line { font-size: var(--t-md); line-height: 1.4; }

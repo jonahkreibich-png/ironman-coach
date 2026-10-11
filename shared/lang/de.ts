@@ -44,7 +44,7 @@ export const de: Record<string, string> = {
   'heute.sickLine': 'Heute kein Training. Erholung geht vor.', 'heute.noValuesLine': 'Noch keine Werte. Trag sie ein oder verbinde Uhr oder Ring.',
   'heute.staleLine': 'Noch keine Morgenwerte für heute. Die Ampel nutzt die letzten Werte.',
   'heute.greenLine': 'Alles im grünen Bereich. Die Einheit kann wie geplant laufen.', 'heute.yellowLine': 'Einige Werte sind auffällig',
-  'heute.readiness': 'Bereitschaft', 'heute.why': 'Warum?', 'heute.fixedLimits': 'Noch weniger als {n} Tage Werte: die Ampel nutzt feste Grenzwerte.',
+  'heute.readiness': 'von 100', 'heute.why': 'Warum?', 'heute.fixedLimits': 'Noch weniger als {n} Tage Werte: die Ampel nutzt feste Grenzwerte.',
   'heute.history': 'Ampel der letzten 14 Tage', 'heute.14ago': 'vor 14 Tagen',
   'heute.restDay': 'Ruhetag', 'heute.restLine': 'Erholung ist Training. Genieß den Tag.',
   'heute.imSick': 'Ich bin krank', 'heute.editValues': 'Werte ändern', 'heute.enterValues': 'Morgenwerte eintragen',

@@ -1,0 +1,82 @@
+{
+  "today": "2026-10-14",
+  "screens": {
+    "heute": {
+      "height": 995,
+      "cards": 3,
+      "buttons": 20,
+      "inputs": 0,
+      "words": 102
+    },
+    "heute-feed": {
+      "height": 1079,
+      "cards": 2,
+      "buttons": 18,
+      "inputs": 0,
+      "words": 117
+    },
+    "plan": {
+      "height": 1347,
+      "cards": 9,
+      "buttons": 25,
+      "inputs": 0,
+      "words": 129
+    },
+    "coach": {
+      "height": 394,
+      "cards": 0,
+      "buttons": 9,
+      "inputs": 0,
+      "words": 47
+    },
+    "fortschritt": {
+      "height": 1653,
+      "cards": 4,
+      "buttons": 7,
+      "inputs": 1,
+      "words": 155
+    },
+    "mehr": {
+      "height": 871,
+      "cards": 3,
+      "buttons": 8,
+      "inputs": 0,
+      "words": 50
+    },
+    "werte": {
+      "height": 2517,
+      "cards": 6,
+      "buttons": 17,
+      "inputs": 0,
+      "words": 256
+    },
+    "essen": {
+      "height": 1862,
+      "cards": 4,
+      "buttons": 7,
+      "inputs": 2,
+      "words": 212
+    },
+    "einstellungen": {
+      "height": 2932,
+      "cards": 7,
+      "buttons": 17,
+      "inputs": 13,
+      "words": 256
+    },
+    "onboarding": {
+      "height": 1072,
+      "cards": 2,
+      "buttons": 12,
+      "inputs": 7,
+      "words": 115
+    },
+    "start": {
+      "height": 1003,
+      "cards": 3,
+      "buttons": 5,
+      "inputs": 6,
+      "words": 86
+    }
+  }
+}
