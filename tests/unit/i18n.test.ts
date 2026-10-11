@@ -28,6 +28,17 @@ describe('Texte (i18n)', () => {
     }
     expect([...missing]).toEqual([]);
   });
+  it('Schlüssel in Listen (z. B. Feldnamen) sind vorhanden', () => {
+    const prefixes = new Set(Object.keys(de).map(k => k.split('.')[0]));
+    const missing = new Set<string>();
+    for (const s of sources()) for (const m of s.matchAll(/'([a-z]+)\.([a-zA-Z0-9.]+)'/g)) {
+      const k = m[1] + '.' + m[2];
+      if (!prefixes.has(m[1]) || k.endsWith('.') || /\.(ts|js|json|css|png|svg|html|mjs|md)$/.test(k) || k in de) continue;
+      if (Object.keys(de).some(h => h.startsWith(k) && /^[\d.]/.test(h.slice(k.length)))) continue;
+      missing.add(k);
+    }
+    expect([...missing]).toEqual([]);
+  });
   it('dynamische Schlüssel-Familien sind vollständig', () => {
     const need = [
       ...Object.keys(GOALS).map(k => 'goal.' + k), ...[0, 1, 2, 3, 4, 5, 6].map(d => 'dow.' + d),

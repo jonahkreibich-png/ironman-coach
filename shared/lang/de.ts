@@ -33,7 +33,7 @@ export const de: Record<string, string> = {
 
   /* ---------- Messwerte ---------- */
   'm.min': 'Minuten', 'm.km': 'Kilometer', 'm.hr': 'Puls Ø', 'm.pace': 'Pace', 'm.pace100': 'Pace /100 m', 'm.speed': 'Tempo',
-  'm.spl': 'Züge pro Bahn', 'm.dps': 'Meter pro Zug',
+  'm.spl': 'Züge pro Bahn', 'm.dps': 'Meter pro Zug', 'm.power': 'Leistung Ø (W)', 'm.meters': 'Meter', 'm.liftKg': 'Gewicht (kg)',
   'src.from': 'Quelle: {s}',
   'group.workouts': 'Einheiten', 'group.sleep': 'Schlaf', 'group.hrv': 'HFV', 'group.restingHR': 'Ruhepuls', 'group.temp': 'Temperatur',
   'group.spo2': 'Sauerstoff (SpO2)', 'group.breath': 'Atemfrequenz', 'group.load': 'Belastung (CTL/ATL)', 'group.weight': 'Gewicht',
@@ -87,6 +87,7 @@ export const de: Record<string, string> = {
   'plan.undo': 'Rückgängig', 'plan.redo': 'Wieder anwenden', 'plan.undone': 'Anpassung rückgängig gemacht', 'plan.redone': 'Anpassung wieder angewendet',
 
   /* ---------- Werte ---------- */
+  'v.hrvMs': 'HFV (ms)', 'v.sleepH': 'Schlaf (h)', 'v.sleepQ': 'Schlafqualität (%)', 'v.deep': 'Tiefschlaf (min)', 'v.rem': 'REM-Schlaf (min)', 'v.spo2': 'SpO2 (%)', 'v.latency': 'Einschlafzeit (min)', 'v.temp': 'Temperatur-Abweichung (°C)', 'v.breath': 'Atemfrequenz (/min)',
   'v.hrv': 'HFV', 'v.rhr': 'Ruhepuls', 'v.sleep': 'Schlaf', 'v.need': 'Bedarf {h} h', 'v.vs7': 'vs. 7 Tage', 'v.tempShort': 'Temp.',
   'v.breathShort': 'Atmung', 'v.edit': 'Werte eintragen oder korrigieren', 'v.hrvTitle': 'HFV (Herzfrequenzvariabilität)', 'v.avg7': '7-Tage-Schnitt',
   'v.normal': 'normal ~{v}', 'v.hrvHint': 'Höher ist meist besser. Entscheidend ist der Vergleich mit deinem eigenen Normalbereich.',

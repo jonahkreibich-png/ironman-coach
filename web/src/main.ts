@@ -108,7 +108,12 @@ on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!;
 on('go-sub', el => { if (sheetOpen()) closeSheet(); go(el.dataset.sub!); });
 on('back', () => { UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
 on('ill-start', () => { STATE.illnessPeriods.push({ id: 'ill-' + Date.now(), start: todayStr(), end: null, note: '' }); saveState(); rerender(); toast(t('ill.started')); });
-on('ill-end', () => { const ill = D().ill; if (!ill) return; const t0 = todayStr(); let end = addDays(t0, -1); if (end < ill.start) end = ill.start; ill.end = end; saveState(); rerender(); toast(t('ill.ended')); });
+on('ill-end', () => {
+  const ill = D().ill; if (!ill) return; const t0 = todayStr();
+  // Am selben Tag begonnen und beendet: war ein Versehen, Phase entfernen. Sonst endet sie gestern, heute beginnt der Wiedereinstieg.
+  if (ill.start >= t0) STATE.illnessPeriods = STATE.illnessPeriods.filter((p: any) => p !== ill); else ill.end = addDays(t0, -1);
+  saveState(); rerender(); toast(t('ill.ended'));
+});
 on('ill-reopen', () => { const r = D().ret; if (r) { r.period.end = null; saveState(); rerender(); toast(t('ill.reopened')); } });
 on('reload', () => location.reload());
 
@@ -123,7 +128,8 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', async e => {
   const el = e.target as HTMLElement;
-  const name = el.dataset && el.dataset.ch;
+  const ds = el.dataset || ({} as DOMStringMap);
+  const name = ds.ch || (ds.sm ? 'sess-metric' : ds.sf ? 'sess-field' : '');
   if (!name || !CHANGE[name]) return;
   try { await CHANGE[name](el, e); } catch (err: any) { toast(err && err.message ? err.message : String(err)); throw err; }
 });

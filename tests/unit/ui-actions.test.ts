@@ -18,6 +18,7 @@ describe('UI-Aktionen', () => {
   });
   it('jedes data-ch hat einen Handler', () => {
     const ch = used(/data-ch=\?"([a-z0-9-]+)\?"/g);
+    ch.add('sess-metric'); ch.add('sess-field');
     const reg = used(/\bonChange\('([a-z0-9-]+)'/g);
     expect([...ch].filter(a => !reg.has(a))).toEqual([]);
   });
