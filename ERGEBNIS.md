@@ -1,5 +1,47 @@
 # Ergebnis
 
+## Auftrag 5 (12.10.2026)
+
+**Neue Version in der Test-App: https://stamio-test.pages.dev** (Version 2.2.0). Die echte App ist unverändert. Alles liegt jetzt auch auf GitHub (Branch `entwicklung`), `main` ist unverändert.
+**Was du jetzt tun musst:** [FUER-JONAH.md](FUER-JONAH.md) – kurz: Papa neu starten lassen, Mitteilungen auf deinem iPhone erlauben.
+
+**Warum Papas Lauf auf Montag lag:** Die alte Zuordnung von Notizen (Auftrag 4) kannte keine Wochentage, Sportarten oder Verneinungen; „kann mittwochs nicht laufen, nur Samstag oder Sonntag“ blieb wirkungslos. Jetzt ist jede Angabe eine Regel, die Plan, Engine, Chat und KI einhalten.
+**Warum Meldungen nicht ankamen:** Ohne Server-Konto oder ohne Verbindung wurde die Meldung nur in die Zwischenablage kopiert (die App sagte „kopiert“, nicht „gesendet“); dazu ging der getippte Text verloren, wenn die App im Hintergrund neu zeichnete, und deine Liste lud nie neu. In der Test-Datenbank ist von Papa keine Meldung angekommen.
+
+**Geprüft:** 589 Unit- und Server-Tests und 95 E2E-Tests (iPhone-Breite, Chromium und WebKit) grün, darunter 87 echte Sätze für den Regel-Parser, über 150 Chat-Gespräche auf den Plänen aller 6 Test-Personen, 100 Zufallsnachrichten und die Layout-Prüfung aller Bildschirme auf 320/375/390/430 px und 130 % Zoom, hell und dunkel.
+
+| Punkt | Stand | Was |
+|---|---|---|
+| **0** Arbeit sichern | erledigt | Vorher alle Dateien und die ganze Git-Historie nach Schlüsseln, Codes, persönlichen Daten und Auftragsdateien durchsucht (nichts gefunden), `entwicklung` gepusht und nach jeder Phase erneut. `AUFTRAG-5.md` steht in `.gitignore`. |
+| **A1** Regel-Modell | erledigt | `shared/constraints.ts`: nur an Tagen, nie an Tagen, Tag frei, Höchstdauer, Ort/Gerät (auch Monate), Zeitraum, Körper mit Folgen, Vorliebe; hart oder weich. |
+| **A2** Wochenraster | erledigt | Im Fragebogen (Teil „Zeit und Alltag“) und unter „Berücksichtigungen“: Sportart × Mo-So, geht / lieber nicht / geht nicht; Tage ohne Zeit gesperrt, Teamsport-Tage markiert, Regeln aus Sätzen erscheinen sofort im Raster. |
+| **A3** Freitext | erledigt | Satz-Parser (Tage, Spannen, Wochenende, Synonyme, Verneinung, „nur“, „lieber“, Minuten, Daten, Jahreszeiten, Orte, Körperteile, Tippfehler, Mundart), 87 Testsätze inkl. Papas Satz. Nach jeder Eingabe „So habe ich es verstanden“ mit „Stimmt“/„Ändern“; Unverstandenes öffnet ein passendes Formular. Mit KI-Schlüssel übersetzt die KI in dasselbe Format (geprüft, mit Bestätigung). |
+| **A4** Harte Regeln immer | erledigt | Plan-Generator, wöchentliche Anpassung, Verschieben der Engine, Chat und KI-Werkzeuge halten sie ein; unmögliche Wünsche → klarer Hinweis mit „2 Läufe am Wochenende, dafür einer länger“ / „Laufen auch am … erlauben?“; weiche Ausnahmen mit Begründung in der Einheit; „Plan bearbeiten“ darf mit Warnung „nur dieses Mal“; neue Planprüfung „keine harte Regel verletzt“ für alle 6 Test-Personen (neu: Vater-Profil mit Sa/So, Mi nie, Schwimmbad Do, Di frei); bei geänderten Regeln wird sofort neu geplant und die laufende Woche repariert, mit Nachricht im Coach. |
+| **B** Meldungen | erledigt (ohne E-Mail) | Ausgang auf dem Gerät (geht nach dem Einrichten bzw. bei Verbindung automatisch raus), Mitteilung an alle deine Geräte mit Link zur Meldung, Posteingang neu/in Arbeit/erledigt mit Text, Bildschirm, Version, Gerät, Screenshot (ein Tipp öffnet die Fotos), „Als Text kopieren“ für Claude Code, Antwort an den Nutzer (erscheint bei ihm im Coach und unter „Meine Meldungen“). Test: Nutzer B meldet, Betreiber A sieht es. **E-Mail:** geht nicht kostenlos (braucht eigene Domain), siehe SPAETER.md. |
+| **C** Nichts ragt heraus | erledigt | Fester WebKit-Test über alle Bildschirme (aus dem Code gelesen, neue laufen mit), Zustände leer/normal/voll/Fehler, Sheets, Begrüßung, 320/375/390/430 px und 130 % Zoom, hell und dunkel. Ursachen zentral behoben (Umbruch, schrumpfbare Bausteine, Zeitfelder, Tab-Beschriftung, Safe-Area). |
+| **D1-D5** Chat | erledigt | Jede Nachricht bekommt eine Antwort; Rückfragen mit Zusammenhang („Ich hab Mittwoch keine Zeit“ → „Donnerstag oder Samstag?“ → „Samstag“); verschieben, tauschen, kürzer, länger, leichter, härter, streichen, Tag frei, Woche leichter, Woche mit wenig Zeit, krank, Schmerzen (mit Stärke), Verletzung, Urlaub/Prüfungen, neue dauerhafte Regel, Ziel und Wunschzeit – mit Vorschau, Bestätigen, Rückgängig; Schnellaktionen je nach Lage; gezielte Rückfragen mit Knöpfen statt Floskeln. |
+| **D6** Test-Paket | erledigt | 186 Gespräche (31 Abläufe × 6 Personen, mindestens 150 laufen wirklich), D2-Beispiel, Regel-Ablehnung, Schnellaktionen, 100 Zufallsnachrichten. |
+| **D7** KI-Schlüssel | erledigt (vorbereitet) | Mit Schlüssel versteht und formuliert die KI; KI-Werkzeuge prüfen dieselben harten Regeln, neue Regeln über `add_rule` als Vorschlag. Ab wann es sich lohnt: SPAETER.md. |
+| **D8** Nachrichten altern | erledigt | „Gerade aktuell“ oben; Briefings/Kommentare nach 7 Tagen (3/7/14 einstellbar) in den durchsuchbaren Verlauf; erledigte Gespräche nach 3 Tagen als eine Zeile; offen/ungelesen/angeheftet bleibt; Planänderungen bleiben im Anpassungs-Protokoll. |
+| **E1** Export/Löschen | erledigt | Mehr → Daten und Geräte → „Meine Daten als Datei“ und „Konto löschen“ („LÖSCHEN“ eintippen + zweiter Tipp): alles sofort, Verbindungen getrennt, Server-Backups nach 30 Tagen. |
+| **E2** Privatsphäre | erledigt | Betreiber sieht nur Name, Status, Version, Geräte, Meldungen; Trainingsdaten nur mit Freigabe pro Meldung. Server-Test sucht in allen Antworten nach Gesundheitsfeldern. Abschnitt in STORE-PLAN.md. |
+| **E3** Start für Tester | erledigt | Einladung als Link (`?invite=…`, „Link teilen“), iPhone-Weg über Home-Bildschirm mit Code aus der Zwischenablage, Begrüßung in 3 Seiten, dann Fragebogen. |
+| **E4** Daten verlieren unmöglich | erledigt | Neue Konten synchronisieren ab dem ersten Eintrag; Wiederherstellungscode beim Einrichten (einmal angezeigt, erneuerbar), damit bekommt ein neues Gerät alles zurück (E2E: Safari-Daten gelöscht → Code → Daten zurück). |
+| **E5** Fehler je Tester | erledigt | Im Posteingang „Fehler bei Testern (14 Tage)“, ohne Gesundheitsdaten. |
+| **E6** Neu in dieser Version | erledigt | Einmal nach dem Update 3 Punkte. |
+| Abschluss | erledigt | Deploy in die Test-Umgebung (Datenbank-Erweiterung 0004: nur neue Spalten und Tabellen), Papa als Test-Nutzer zurückgesetzt, `entwicklung` gepusht. |
+
+**Ehrlich offen:**
+- Kein E-Mail-Versand bei Meldungen (kostet eine Domain). Nur Mitteilungen; die musst du auf deinem iPhone einmal erlauben.
+- Ein echter Bildschirm-Abdruck „mit einem Tipp“ ist im Browser nicht möglich; der Tipp öffnet die Fotos, dort wählt man das iPhone-Bildschirmfoto.
+- Die echten Anbieter-Anmeldungen (Oura, Dropbox …) fehlen weiter, bis du die App-Schlüssel anlegst.
+- Der Chat ohne KI versteht viel, aber nicht alles; was er nicht versteht, fragt er gezielt nach.
+- Auf dem iPhone muss ein Tester den Einladungscode einmal einfügen, weil die Home-Bildschirm-App ihren Speicher nicht mit Safari teilt.
+
+Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) (Nr. 50-71) · [SPAETER.md](SPAETER.md) · [STORE-PLAN.md](STORE-PLAN.md) (Abschnitt 6)
+
+---
+
 ## Auftrag 4 (11.10.2026)
 
 **Neue Version ist in der Test-App: https://stamio-test.pages.dev** (Version 2.1.0). Die echte App ist unverändert.
