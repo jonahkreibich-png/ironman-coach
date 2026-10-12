@@ -155,6 +155,9 @@ async function api(method, path, body?, noAuth?) {
 }
 
 let STATUS = 'idle'; // idle | syncing | ok | offline | error
+/* Nach jedem erfolgreichen Abgleich (z. B. Ausgang für Meldungen leeren) */
+const SYNCED: (() => void)[] = [];
+export function onSynced(fn: () => void) { SYNCED.push(fn); }
 let syncing = false, again = false;
 export async function syncNow(opts?) {
   opts = opts || {};
@@ -176,6 +179,7 @@ export async function syncNow(opts?) {
       more = !!res.more || Object.keys(META.pending).length > 0;
     }
     META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok';
+    SYNCED.forEach(f => { try { f(); } catch (e) {} });
   } catch (e) {
     if (e.status === 401) { disconnect(true); toast(t('sync.removed')); }
     STATUS = (e.status && e.status !== 0) ? 'error' : 'offline';

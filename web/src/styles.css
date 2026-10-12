@@ -332,3 +332,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .rl-r { display: block; font-size: var(--t-sm); color: var(--ink-2); margin-top: 2px; }
 .rl-confirm .li { flex-wrap: wrap; }
 .seg.sm button { padding: 4px 8px; min-height: 30px; font-size: var(--t-xs); }
+
+/* Meldungen (Auftrag 5 B) */
+.fb-text { white-space: pre-line; margin: 4px 0; overflow-wrap: anywhere; }
+.fb-meta { overflow-wrap: anywhere; white-space: pre-wrap; }
+.fb-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.fb-shot { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--line); margin: 6px 0; }
+.fb-reply { margin-top: 6px; }
+.fb-item.hl { background: var(--accent-soft); }

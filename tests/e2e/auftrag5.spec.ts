@@ -60,3 +60,73 @@ test('A4: Plan bearbeiten – Regel bewusst brechen nur mit Warnung, gilt dann n
   const adj = Object.values((await stored(page)).adjustments) as any[];
   expect(adj.some(a => a.sessionId === bike.id && a.type === 'move' && a.override)).toBe(true);
 });
+
+test.describe('B: Meldungen mit Server', () => {
+  test.skip(({ browserName }) => browserName === 'webkit', 'Server-Abläufe einmal reichen (Chromium)');
+  const authOf = (page: any) => page.evaluate(() => JSON.parse(localStorage.getItem('ec_sync_auth') || 'null'));
+
+  test('ohne Konto gemeldet → wartet im Ausgang → nach der Einrichtung beim Betreiber; Antwort kommt beim Nutzer an', async ({ page, request }) => {
+    await request.post('/__reset');
+    const admin = await (await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } })).json();
+    const H = { Authorization: 'Bearer ' + admin.token };
+    const inv = await (await request.post('/api/admin/testusers', { headers: H, data: { note: 'Papa' } })).json();
+    await seed(page);
+    await open(page, '/?go=feedback');
+    await page.fill('#fb-text', 'Lauf liegt am Montag, obwohl ich nur Sa/So kann');
+    await page.locator('[data-act="fb-send"]').click();
+    await expect(page.locator('[data-feedback-queued]')).toContainText('Ausgang');
+    // jetzt mit Einladung einrichten (Daten auf dem Gerät gehören nicht zum Konto)
+    await page.locator('[data-act="back"]').click().catch(() => {});
+    await open(page, '/?go=daten');
+    await page.locator('summary', { hasText: 'Einladung' }).click();
+    await page.fill('#inv-code', inv.code); await page.fill('#inv-name', 'Papa');
+    await page.locator('[data-act="sync-invite"]').click();
+    await page.waitForLoadState('load');
+    await expect.poll(async () => (await (await request.get('/api/admin/feedback', { headers: H })).json()).feedback.length, { timeout: 15000 }).toBe(1);
+    const fb = (await (await request.get('/api/admin/feedback', { headers: H })).json()).feedback[0];
+    expect(fb).toMatchObject({ user: 'Papa', text: 'Lauf liegt am Montag, obwohl ich nur Sa/So kann', status: 'neu' });
+    expect(fb.version).not.toBe('#');
+    // Betreiber antwortet → Nutzer sieht die Antwort unter „Meine Meldungen“
+    await request.post('/api/admin/feedback/' + fb.id, { headers: H, data: { reply: 'Danke, ist repariert!' } });
+    await open(page, '/?go=feedback');
+    await expect(page.locator('[data-feedback-mine]')).toContainText('Danke, ist repariert!');
+  });
+
+  test('Server nicht erreichbar: Meldung geht nicht verloren, wird beim nächsten Start gesendet', async ({ page, request }) => {
+    await request.post('/__reset');
+    const admin = await (await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } })).json();
+    const H = { Authorization: 'Bearer ' + admin.token };
+    const inv = await (await request.post('/api/admin/testusers', { headers: H, data: { note: 'Tester' } })).json();
+    const user = await (await request.post('/api/setup', { data: { name: 'iPhone Tester', invite: inv.code, userName: 'Tester' } })).json();
+    await page.addInitScript(([a]) => { if (!sessionStorage.getItem('__s')) { localStorage.setItem('ec_sync_auth', a as string); localStorage.setItem('ec_owner', '2'); sessionStorage.setItem('__s', '1'); } }, [JSON.stringify({ token: user.token, deviceId: user.deviceId, userId: 2 })]);
+    await page.route('**/api/feedback', r => r.fulfill({ status: 503, body: '{"error":"weg"}' }));
+    await open(page, '/?go=feedback');
+    await page.fill('#fb-text', 'Offline gemeldet');
+    await page.locator('[data-act="fb-send"]').click();
+    await expect(page.locator('[data-feedback-queued]')).toBeVisible();
+    await page.unroute('**/api/feedback');
+    await page.reload();
+    await expect.poll(async () => (await (await request.get('/api/admin/feedback', { headers: H })).json()).feedback.map((f: any) => f.text), { timeout: 15000 }).toEqual(['Offline gemeldet']);
+    expect(await page.evaluate(() => localStorage.getItem('ec_fb_outbox'))).toBeNull();
+  });
+
+  test('Betreiber-Posteingang: Filter, Status, Als Text kopieren, Link aus der Mitteilung öffnet die Meldung', async ({ page, request, context }) => {
+    await request.post('/__reset');
+    const admin = await (await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } })).json();
+    const H = { Authorization: 'Bearer ' + admin.token };
+    const inv = await (await request.post('/api/admin/testusers', { headers: H, data: { note: 'Papa' } })).json();
+    const u = await (await request.post('/api/setup', { data: { name: 'iPhone Papa', invite: inv.code, userName: 'Papa' } })).json();
+    const r = await (await request.post('/api/feedback', { headers: { Authorization: 'Bearer ' + u.token }, data: { kind: 'bug', text: 'Coach antwortet nicht', version: '20261012', screen: 'coach', device: 'iPhone' } })).json();
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.addInitScript(([a]) => { if (!sessionStorage.getItem('__s')) { localStorage.setItem('ec_sync_auth', a as string); localStorage.setItem('ec_owner', '1'); localStorage.setItem('ec_me', JSON.stringify({ role: 'admin', entitlements: {} })); sessionStorage.setItem('__s', '1'); } }, [JSON.stringify({ token: admin.token, deviceId: admin.deviceId, userId: 1 })]);
+    await open(page, `/?go=feedback&fb=${r.id}`);
+    const item = page.locator(`[data-fb="${r.id}"]`);
+    await expect(item).toContainText('Coach antwortet nicht');
+    await item.locator('[data-act="fb-copy"]').click();
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip).toContain('Meldung #' + r.id + ' von Papa');
+    expect(clip).toContain('Version 20261012');
+    await item.locator('[data-act="fb-status"][data-v="erledigt"]').click();
+    await expect.poll(async () => (await (await request.get('/api/admin/feedback', { headers: H })).json()).feedback[0].status).toBe('erledigt');
+  });
+});

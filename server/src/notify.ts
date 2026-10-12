@@ -47,12 +47,16 @@ export async function queueWarning(env: Env, uid: number, key: string, msg: any)
 }
 
 /* ---------- Verschicken an alle Geräte ---------- */
+/* Austauschbar für Tests (kein echter Versand) */
+type PushFn = (sub: any, msg: any) => Promise<{ ok?: boolean; gone?: boolean }>;
+let pushOverride: PushFn | null = null;
+export function setPushOverride(fn: PushFn | null) { pushOverride = fn; }
 export async function deliver(env: Env, uid: number, msg: any): Promise<number> {
   const subs = await subscriptions(env, uid);
   let ok = 0;
   for (const s of subs) {
     try {
-      const r = await sendPush(env, s, msg, { urgency: msg.urgent ? 'high' : 'normal' });
+      const r = pushOverride ? await pushOverride(s, msg) : await sendPush(env, s, msg, { urgency: msg.urgent ? 'high' : 'normal' });
       if (r.ok) ok++;
       else if (r.gone) await env.DB.prepare('DELETE FROM push_subs WHERE id = ?').bind(s.id).run();
     } catch (e) { console.error('Push fehlgeschlagen:', e && e.message); }

@@ -12,6 +12,7 @@ import { vapidPublicKey } from './webpush';
 import { logError, recentErrors, scrub } from './errlog';
 import { extraRoutes, publicRoutes, scheduledExtras, onRecordsChanged } from './extensions';
 import { BRAND } from '../../shared/brand';
+import { feedbackRoutes } from './feedback';
 import { SYNC_KINDS } from '../../shared/kinds';
 
 const KINDS = new Set(SYNC_KINDS);
@@ -100,7 +101,10 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   if (p === '/api/me' && M === 'GET') {
     const u = await env.DB.prepare('SELECT name, role, features, test FROM users WHERE id = ?').bind(uid).first();
     const features = JSON.parse((u && u.features) || '{}');
-    return { deviceId: a.deviceId, name: a.deviceName, userId: uid, role: a.role, test: !!(u && u.test), features, entitlements: entitlements(a.role, features), resetAt: (await getMeta(env, uid, 'reset_at')) || null, time: Date.now() };
+    // Posteingang: neue Meldungen (Betreiber) bzw. ungelesene Antworten (Nutzer)
+    const fbNew = a.role === 'admin' ? await env.DB.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'neu'").first() : null;
+    const fbRep = await env.DB.prepare('SELECT COUNT(*) AS n FROM feedback WHERE user_id = ? AND reply IS NOT NULL AND reply_seen = 0').bind(uid).first();
+    return { deviceId: a.deviceId, name: a.deviceName, userId: uid, role: a.role, test: !!(u && u.test), features, entitlements: entitlements(a.role, features), resetAt: (await getMeta(env, uid, 'reset_at')) || null, feedbackNew: fbNew ? fbNew.n : 0, repliesUnseen: fbRep ? fbRep.n : 0, time: Date.now() };
   }
   // Abmelden: dieses Gerät entfernen (Nutzerwechsel auf dem Gerät)
   if (p === '/api/devices/self/logout' && M === 'POST') {
@@ -108,16 +112,9 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     await env.DB.prepare('DELETE FROM devices WHERE id = ?').bind(a.deviceId).run();
     return { ok: true };
   }
-  // „Fehler melden / Idee“: Text plus Bildschirm, Version, Gerät und letzte Fehlermeldungen (keine Gesundheitsdaten)
-  if (p === '/api/feedback' && M === 'POST') {
-    const b = await readJson(req);
-    const text = String(b.text || '').trim().slice(0, 2000);
-    if (!text) throw new HttpError(400, 'Bitte kurz beschreiben, was los ist.');
-    const errs = Array.isArray(b.errors) ? b.errors.slice(-5).map((e: any) => ({ msg: scrub(e && e.msg, 200), where: scrub(e && e.where, 80), at: Number(e && e.at) || null })) : [];
-    await env.DB.prepare('INSERT INTO feedback (user_id, at, kind, text, screen, version, device, errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(uid, Date.now(), b.kind === 'idea' ? 'idea' : 'bug', text, scrub(b.screen, 60), scrub(b.version, 40), String(b.device || '').slice(0, 120), JSON.stringify(errs)).run();
-    return { ok: true };
-  }
+  // „Fehler melden / Idee“ und Posteingang des Betreibers (server/src/feedback.ts)
+  const fbr = await feedbackRoutes(req, env, p, a);
+  if (fbr !== undefined) return fbr;
   // Fehlerprotokoll der App (ohne Gesundheitsdaten)
   if (p === '/api/log' && M === 'POST') {
     const body = await readJson(req);
@@ -146,12 +143,6 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
       if (um[2] === 'reset' && M === 'POST') return { ok: true, removed: await resetUser(env, target) };
       if (!um[2] && M === 'DELETE') { await deleteUser(env, target); return { ok: true }; }
     }
-    if (p === '/api/admin/feedback' && M === 'GET') {
-      const rows = await env.DB.prepare('SELECT f.id, f.user_id, f.at, f.kind, f.text, f.screen, f.version, f.device, f.errors, f.done, u.name FROM feedback f LEFT JOIN users u ON u.id = f.user_id ORDER BY f.at DESC LIMIT 200').all();
-      return { feedback: (rows.results || []).map((r: any) => ({ id: r.id, userId: r.user_id, user: r.name || 'Nutzer ' + r.user_id, at: r.at, kind: r.kind, text: r.text, screen: r.screen, version: r.version, device: r.device, errors: JSON.parse(r.errors || '[]'), done: !!r.done })) };
-    }
-    const fd = /^\/api\/admin\/feedback\/(\d+)$/.exec(p);
-    if (fd && M === 'POST') { await env.DB.prepare('UPDATE feedback SET done = ? WHERE id = ?').bind((await readJson(req)).done ? 1 : 0, +fd[1]).run(); return { ok: true }; }
     const fm = /^\/api\/admin\/users\/(\d+)\/features$/.exec(p);
     if (fm && M === 'POST') {
       const body = await readJson(req); const next: Record<string, boolean> = {};

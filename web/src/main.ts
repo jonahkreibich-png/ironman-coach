@@ -22,6 +22,7 @@ import { renderDaten, resetDatenCache } from './views/daten';
 import { renderGenerator } from './views/generator';
 import { renderWettkampf } from './views/wettkampf';
 import { renderBeruecksichtigungen } from './views/beruecksichtigungen';
+import { focusFeedback } from './views/feedback';
 import { renderFeedback } from './views/feedback';
 import { renderOnboarding, renderWelcome } from './views/onboarding';
 import './views/session';
@@ -154,7 +155,7 @@ function openFromUrl(href: string) {
   const map: Record<string, string> = { settings: 'einstellungen', verbindungen: 'verbindungen', wettkampf: 'wettkampf', daten: 'daten', profil: 'profil', onboarding: 'onboarding' };
   if (open && map[open]) go(map[open]);
   else if (open === 'export' || open === 'week') go('coach');
-  else if (view) go(view);
+  else if (view) { if (view === 'feedback' && u.searchParams.get('fb')) focusFeedback(u.searchParams.get('fb')!); go(view); }
   if (open === 'checkin' && HAS_PLAN) openCheckin(todayStr());
   if (u.searchParams.get('verbunden') || u.searchParams.get('fehler')) { if (!(open && map[open])) go('verbindungen'); handleOAuthReturn(u); }
   try { history.replaceState(null, '', location.pathname); } catch (e) {}

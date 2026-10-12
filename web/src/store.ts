@@ -73,7 +73,8 @@ function loadState(): any {
    Nur die Darstellung (hell/dunkel) bleibt. keepAuth: die Anmeldung bleibt (z. B. beim Zurücksetzen). */
 export function wipeLocalData(keepAuth = false): void {
   try {
-    const keep = new Set<string>([STORAGE.theme, ...(keepAuth ? [STORAGE.syncAuth, STORAGE.owner] : [])]);
+    // Meldungen im Ausgang bleiben (keine Gesundheitsdaten), damit „Fehler melden“ vor der Einrichtung nicht verloren geht
+    const keep = new Set<string>([STORAGE.theme, 'ec_fb_outbox', ...(keepAuth ? [STORAGE.syncAuth, STORAGE.owner] : [])]);
     Object.keys(localStorage).filter(k => /^ec_/.test(k) && !keep.has(k)).forEach(k => localStorage.removeItem(k));
   } catch (e) {}
   const fresh = mergeIntoDefaults(null);
