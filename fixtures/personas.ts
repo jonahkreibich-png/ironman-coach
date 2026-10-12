@@ -1,4 +1,4 @@
-/* Fünf erfundene Test-Personen (Auftrag 4): Antworten auf den kompletten Fragebogen.
+/* Sechs erfundene Test-Personen (Auftrag 4, Nr. 6 aus Auftrag 5): Antworten auf den kompletten Fragebogen.
    Keine echten Personen, keine echten Daten. Stichtag der Tests: 2026-10-14 (Mittwoch). */
 export const PERSONA_TODAY = '2026-10-14';
 const ALL = { 0: 3, 1: 1, 2: 2, 3: 2, 4: 2, 5: 1, 6: 3 };
@@ -63,6 +63,19 @@ export const PERSONAS: { id: string; label: string; answers: Record<string, any>
       teamYes: false,
       dayLoad: ALL, timeOfDay: 'morning', weeklyHours: 10, maxDayHours: 4,
       freq: { swim: [2, 3], bike: [3, 3], run: [3, 4], strength: [1, 1] }, notes: ['Laufband im Keller'], wantTests: false
+    }
+  },
+  {
+    id: 'vater-regeln', label: 'Vater-Profil mit Regeln: Laufen nur Sa/So, mittwochs nie, Schwimmbad nur donnerstags, dienstags gar nichts',
+    answers: {
+      goals: [{ id: 'g-oly', type: 'tri_olympic', name: 'Olympische Distanz', date: '2027-06-20', priority: 'A' }],
+      birthYear: 1975, sex: 'm', heightCm: 181, weightKg: 82, injuries: 'keine', medical: false,
+      sports: ['swim', 'bike', 'run', 'strength'], experienceYears: 3, weeklyHoursNow: 5,
+      swimCrawl: 'yes', swimCrawlM: 400, runContinuousMin: 60, bikeLongestMin: 120, bikes: ['gravel', 'trainer'], powerMeter: false,
+      teamYes: false,
+      dayLoad: { 0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 3 }, timeOfDay: 'morning', weeklyHours: 7, maxDayHours: 3,
+      freq: { swim: [1, 2], bike: [2, 2], run: [3, 3], strength: [1, 1] },
+      notes: ['kann mittwochs nicht laufen, nur Samstag oder Sonntag', 'Schwimmbad nur donnerstags', 'dienstags gar nichts'], wantTests: false
     }
   }
 ];

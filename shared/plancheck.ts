@@ -10,9 +10,10 @@ import { addDays } from './core';
 import { validateWeeks, isIntense } from './rules';
 import * as W from './workouts';
 import { abilityCap, dayCap, freqOf, teamActive } from './plangen';
-import { parseConsiderations, effectsOf } from './considerations';
+import { rulesOf, effectsOf, hardViolations, allowedHard, dayLimit } from './constraints';
+import { parseFor } from './ruleparse';
 
-export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format';
+export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint';
 export interface CheckIssue { rule: CheckRule; week?: number; date?: string; msg: string }
 
 const dowOf = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
@@ -21,7 +22,8 @@ const pace = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).
 export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: string, o: { from?: number } = {}): CheckIssue[] {
   const out: CheckIssue[] = [];
   const minor = isMinor(profile, today);
-  const eff = effectsOf(parseConsiderations([...(profile.notes || []), ...(profile.injuries ? [profile.injuries] : [])]));
+  const rules = rulesOf(profile, parseFor(today));
+  const eff = effectsOf(rules);
   const sk = profile.skills || {};
   const swimStart = W.swimLadderStart(sk);
   const runStart = W.runLadderStart(sk.runContinuousMin);
@@ -85,7 +87,9 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
       const n = count[sp] || 0;
       if (n > f[1]) out.push({ rule: 'frequency', week: w.weekNumber, msg: `Woche ${w.weekNumber}: ${n}× ${sp}, gewünscht höchstens ${f[1]}×.` });
       const blocked = sp === 'swim' && (eff.noSwim || (eff.noSwimMonths && eff.noSwimMonths.includes(+w.startDate.slice(5, 7))));
-      if (normal && n < f[0] && !blocked) out.push({ rule: 'frequency', week: w.weekNumber, msg: `Woche ${w.weekNumber}: ${n}× ${sp}, gewünscht mindestens ${f[0]}×.` });
+      // Wunsch-Häufigkeit nur so weit, wie die harten Regeln Tage erlauben (sonst meldet der Plan einen Konflikt)
+      const can = (w.days || []).filter((d: any) => dayCap(profile, dowOf(d.date)) > 0 && dayLimit(rules, d.date).cap > 0 && !d.sessions.some((s: any) => s.race) && allowedHard(rules, { sport: sp, place: sp === 'swim' ? 'pool' : undefined }, d.date)).length;
+      if (normal && n < Math.min(f[0], can) && !blocked) out.push({ rule: 'frequency', week: w.weekNumber, msg: `Woche ${w.weekNumber}: ${n}× ${sp}, gewünscht mindestens ${f[0]}×.` });
     }
     if (strengthWanted && w.phase !== 'race' && !(count.strength)) out.push({ rule: 'strength', week: w.weekNumber, msg: `Woche ${w.weekNumber}: keine Krafteinheit, obwohl Kraft gewählt ist.` });
     if (!w.headline && !w.target) out.push({ rule: 'goals', week: w.weekNumber, msg: `Woche ${w.weekNumber}: kein Ziel angegeben.` });
@@ -98,6 +102,8 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
     const day = weeks.flatMap(w => w.days).find((d: any) => d.date === g.date);
     if (!day || !day.sessions.some((s: any) => s.race && s.goalId === g.id)) out.push({ rule: 'goals', date: g.date, msg: `${g.name} am ${g.date} fehlt im Plan.` });
   }
+  // Harte Regeln der Person (Tage, Orte, Zeiträume, Tagesgrenzen)
+  hardViolations(weeks, rules).forEach(v => out.push({ rule: 'constraint', date: v.date, msg: v.msg }));
   // Umfang und harte Tage
   validateWeeks(weeks, { minor }).forEach(v => out.push({ rule: v.rule as CheckRule, week: v.week, date: v.date, msg: v.msg }));
   return out;

@@ -14,7 +14,9 @@ import { addDays } from './core';
 import { validateWeeks, weekMinutes, goalAllowed, type Violation } from './rules';
 import { HR_ZONES } from './sports';
 import * as W from './workouts';
-import { parseConsiderations, effectsOf, tipFor, type Effects, type Consideration } from './considerations';
+import { tipFor } from './considerations';
+import { rulesOf, effectsOf, evaluate, allowedHard, dayLimit, prefers, describe as ruleText, daysText, SPORT_NAME, type Rule, type Effects, type RuleSport } from './constraints';
+import { parseFor } from './ruleparse';
 
 export type Phase = 'base' | 'build' | 'specific' | 'taper' | 'race';
 export interface GenInput {
@@ -33,8 +35,12 @@ export interface GenInput {
   maxWeeks?: number;
   /** erreichte Lernstufen aus den Messdaten (sonst aus dem Profil) */
   stages?: { swim?: { ladder: 'swim' | 'swimBreast'; n: number } | null; runwalk?: number | null };
+  /** Regeln (sonst aus dem Profil: gespeicherte Regeln plus Notizen) */
+  rules?: Rule[];
 }
-export interface GenResult { plan: any; summary: string[]; violations: Violation[]; phases: { phase: Phase; from: string; to: string; weeks: number }[]; dropped: string[] }
+/* Passt etwas nicht zu den harten Regeln (z. B. 3 Läufe gewünscht, aber nur Sa/So erlaubt), sagt der Plan es klar und bietet Lösungen an */
+export interface Conflict { id: string; sport: RuleSport; want: number; can: number; days: number[]; text: string; options: { id: 'fewer' | 'allow'; label: string; day?: number; n?: number }[] }
+export interface GenResult { plan: any; summary: string[]; violations: Violation[]; phases: { phase: Phase; from: string; to: string; weeks: number }[]; dropped: string[]; conflicts: Conflict[] }
 
 const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const DOW_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -146,7 +152,7 @@ export function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, to
 const BIKE_LABEL: Record<string, string> = { road: 'Rennrad', gravel: 'Gravelbike', mtb: 'Mountainbike', tt: 'Zeitfahrrad', trekking: 'Trekkingrad', ebike: 'E-Bike', trainer: 'Rolle', spin: 'Indoor-Bike' };
 function bikeChoice(p: Profile, hard: boolean, month: number, eff: Effects): { indoor: boolean; name: string | null } {
   const b = p.bikes || [];
-  const indoorAvail = b.includes('trainer') || b.includes('spin');
+  const indoorAvail = (b.includes('trainer') || b.includes('spin')) && !(eff.noTrainerMonths && eff.noTrainerMonths.includes(month));
   const forcedIndoor = !!eff.bikeIndoor || !!(eff.bikeIndoorMonths && eff.bikeIndoorMonths.includes(month));
   if (forcedIndoor) return { indoor: true, name: indoorAvail ? BIKE_LABEL[b.includes('trainer') ? 'trainer' : 'spin'] : null };
   if (hard && indoorAvail) return { indoor: true, name: BIKE_LABEL[b.includes('trainer') ? 'trainer' : 'spin'] };
@@ -169,7 +175,7 @@ function raceSession(g: Goal): any {
 }
 const hm = (s: number) => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? `${h}:${String(m).padStart(2, '0')} h` : `${m} min`; };
 
-interface Cand { s: any; long?: boolean; hard?: boolean; strength?: boolean; fixed?: boolean; pairDay?: string; prio: number }
+interface Cand { s: any; long?: boolean; hard?: boolean; strength?: boolean; fixed?: boolean; pairDay?: string; prio: number; /** lockere Variante, falls die harte Einheit keinen Platz findet */ easy?: W.Spec }
 
 export function generatePlan(inp: GenInput): GenResult {
   const { profile, today } = inp;
@@ -185,8 +191,9 @@ export function generatePlan(inp: GenInput): GenResult {
   const age = ageOf(profile, today);
   const ageAtRace = profile.birthYear ? +goalDate.slice(0, 4) - profile.birthYear : null;
   const minor = isMinor(profile, today);
-  const cons: Consideration[] = parseConsiderations([...(profile.notes || []), ...(profile.injuries ? [profile.injuries] : [])]);
-  const eff = effectsOf(cons);
+  const rules: Rule[] = inp.rules || rulesOf(profile, parseFor(today));
+  const eff = effectsOf(rules);
+  const conflicts: Conflict[] = [];
   const cautious = profile.medicalCaution || eff.caution || (age != null && age >= 50);
   const recoveryEvery = minor || cautious ? 3 : 4;
   const phases = phasePlan(nWeeks, A.type, recoveryEvery);
@@ -225,7 +232,7 @@ export function generatePlan(inp: GenInput): GenResult {
   const weeks: any[] = [];
   const dropped: string[] = [];
   const idp = 'g' + today.replace(/-/g, '').slice(2) + 'w';
-  let prevSundayHard = false;
+  let prevSundayHard = false, prevSundayStrength = false;
   phases.forEach((ph, wi) => {
     const mon = addDays(start, wi * 7);
     const month = +addDays(mon, 3).slice(5, 7);
@@ -236,7 +243,8 @@ export function generatePlan(inp: GenInput): GenResult {
     const slots = dates.map((date, i) => {
       const dow = dowOf(date);
       const tsOn = teamActive(ts, date);
-      let cap = dayCap(profile, dow), noHard = false;
+      const lim = dayLimit(rules, date);
+      let cap = Math.min(dayCap(profile, dow), lim.cap), noHard = lim.noHard;
       for (const g of allGoals) {
         const d = daysBetween(g.date!, date); // >0: nach dem Rennen
         if (g.priority !== 'C' && d < 0 && d >= -(g.priority === 'A' ? 3 : 4)) { noHard = true; cap = Math.round(cap * 0.7); }
@@ -244,11 +252,20 @@ export function generatePlan(inp: GenInput): GenResult {
         if (g.priority === 'C' && d === -1) noHard = true;
       }
       return { i, date, dow, cap, used: 0, items: [] as Cand[], team: tsOn && ts!.trainingDays.includes(dow), game: tsOn && ts!.gameDays.includes(dow), race: raceOn[date] || null, noHard,
-        pool: !eff.poolDays || eff.poolDays.includes(dow) };
+        pool: allowedHard(rules, { sport: 'swim', place: 'pool' }, date) };
     });
     const isHardDay = (i: number) => i >= 0 && i < 7 && (slots[i].game || !!slots[i].race || slots[i].items.some(x => x.hard));
     const prevHard = (i: number) => i === 0 ? prevSundayHard : isHardDay(i - 1);
     const put = (i: number, c: Cand) => { slots[i].items.push(c); slots[i].used += c.s.plannedMinutes || 0; };
+    /* Häufigkeit auf die Tage begrenzen, die die harten Regeln erlauben; passt der Wunsch nicht, gibt es einen klaren Hinweis mit Lösungen */
+    const limitByRules = (sport: RuleSport, n: number, want: number) => {
+      const okDays = slots.filter(sl => sl.cap > 0 && !sl.race && allowedHard(rules, { sport, place: sport === 'swim' ? 'pool' : undefined }, sl.date));
+      if (n <= okDays.length) return n;
+      const seasonal = !okDays.length && slots.filter(sl => sl.cap > 0).every(sl => evaluate(rules, { sport, place: sport === 'swim' ? 'pool' : undefined }, sl.date).hard.every(r => (r.months && r.months.length) || r.kind === 'period'));
+      if (seasonal) return 0;
+      if (!ph.recovery && ph.phase !== 'race' && ph.phase !== 'taper') noteConflict(conflicts, rules, slots, sport, Math.max(want, n), okDays.map(x => x.dow));
+      return okDays.length;
+    };
 
     // 1) Feste Termine: Wettkämpfe, Teamsport, alte feste Termine
     slots.forEach(sl => {
@@ -278,10 +295,12 @@ export function generatePlan(inp: GenInput): GenResult {
       return `${sport === 'swim' ? 'Wassergefühl und Grundlage' : 'Grundlage'} für ${goalName}, ohne müde zu machen.`;
     };
     const cands: Cand[] = [];
-    const tip = (sport: string) => tipFor(sport, cons) || (age != null && age >= 50 ? 'Länger aufwärmen, Gelenke freuen sich.' : undefined);
+    const tip = (sport: string) => tipFor(sport, rules) || (age != null && age >= 50 ? 'Länger aufwärmen, Gelenke freuen sich.' : undefined);
     const add = (spec: W.Spec, o: Partial<Cand> = {}) => {
       spec.why = spec.why || whyBase(spec.sport, spec.kind); const tp = tip(spec.sport); if (tp && !spec.tip) spec.tip = tp;
-      const s = W.build(spec);
+      let s = W.build(spec);
+      const smax = sportMax(rules, spec.sport);
+      if (smax && s.plannedMinutes > smax && s.spec && !s.stage) { let sp = s.spec; for (let k = 0; k < 8 && W.totals(sp).min > smax; k++) sp = W.scaleSpec(sp, Math.max(0.5, smax / W.totals(sp).min)); s = W.build(sp); }
       cands.push({ s, hard: !!s.hard, prio: s.sport === 'swim' || s.stage ? 3 : 5, ...o });
     };
     const swimBlocked = !!eff.noSwim || !!(eff.noSwimMonths && eff.noSwimMonths.includes(month)) || !slots.some(sl => sl.pool && sl.cap > 0);
@@ -293,6 +312,7 @@ export function generatePlan(inp: GenInput): GenResult {
       let n = Math.max(fmin, Math.min(fmax, Math.round(mins / typ)));
       if (!n && (share[sport] || 0) > 0.05) n = 1;
       if (ph.phase === 'race') n = Math.min(n, sport === 'swim' ? 1 : 2);
+      if (!(sport === 'swim' && swimBlocked)) n = limitByRules(sport as RuleSport, n, fmin);
       if (!n) continue;
       if (sport === 'swim' && swimBlocked) {
         const noPool = eff.noSwim || (eff.noSwimMonths && eff.noSwimMonths.includes(month));
@@ -313,7 +333,7 @@ export function generatePlan(inp: GenInput): GenResult {
         let rest = mins; let left = n;
         if (n >= 2 && ph.phase !== 'race') { const L = Math.max(30, Math.min(longCap, rest * 0.4)); add(W.runLong(ctx, L), { long: true, prio: 1 }); rest -= L; left--; }
         if (hardOk && hardLeft > 0 && runAllowed && left >= 1 && ph.phase !== 'base' && n >= 2) {
-          const spec = keyRun(ctx, target.type, ph.phase, wi); add(spec, { hard: true, prio: 2 }); rest -= W.totals(spec).min; left--; hardLeft--;
+          const spec = keyRun(ctx, target.type, ph.phase, wi); add(spec, { hard: true, prio: 2, easy: W.runEasy(ctx, Math.min(60, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--;
         }
         for (let k = 0; k < left; k++) { const m = Math.max(25, Math.min(cap ?? 60, 60, rest / Math.max(1, left - k))); add(W.runEasy(ctx, m, { strides: ph.phase === 'base' && k === 0 && !eff.runEasyOnly })); rest -= m; }
       }
@@ -326,7 +346,7 @@ export function generatePlan(inp: GenInput): GenResult {
           const c = bikeChoice(profile, true, month, eff);
           const step = [[3, 8], [3, 10], [3, 12], [2, 15], [2, 20]][Math.min(4, Math.floor(wi / 3))];
           const spec = ph.phase === 'base' ? W.bikeIntervals(pc(c.indoor, c.name), step[0], step[1], 3, 5) : W.bikeIntervals(pc(c.indoor, c.name), step[0], step[1], 4, 5);
-          add(spec, { hard: true, prio: 2 }); rest -= W.totals(spec).min; left--; hardLeft--;
+          add(spec, { hard: true, prio: 2, easy: W.bikeEasy(pc(c.indoor, c.name), Math.min(90, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--;
         }
         for (let k = 0; k < left; k++) { const c = bikeChoice(profile, false, month, eff); const m = Math.max(30, Math.min(cap ?? 90, 90, rest / Math.max(1, left - k))); add(W.bikeEasy(pc(c.indoor, c.name), m)); rest -= m; }
       }
@@ -353,8 +373,8 @@ export function generatePlan(inp: GenInput): GenResult {
     // Kraft mit gewählter Häufigkeit, in Erholungs- und Wettkampfwochen leichter
     if (sports.includes('strength')) {
       const [smin, smax] = freqOf(profile, 'strength');
-      const n = ph.phase === 'race' ? Math.min(1, smax) : Math.max(smin, Math.min(smax, smin || 1));
-      for (let k = 0; k < n; k++) cands.push({ s: W.build({ ...W.strengthSession([...profile.sports, ...sports], { light: ph.recovery || ph.phase === 'taper' || ph.phase === 'race', back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, variant: k, why: 'stabile Muskeln und Sehnen schützen vor Verletzungen und machen dich ökonomischer.' }), tip: tipFor('strength', cons) || undefined }), strength: true, prio: 4 });
+      const n = limitByRules('strength', ph.phase === 'race' ? Math.min(1, smax) : Math.max(smin, Math.min(smax, smin || 1)), smin);
+      for (let k = 0; k < n; k++) cands.push({ s: W.build({ ...W.strengthSession([...profile.sports, ...sports], { light: ph.recovery || ph.phase === 'taper' || ph.phase === 'race', back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, variant: k, why: 'stabile Muskeln und Sehnen schützen vor Verletzungen und machen dich ökonomischer.' }), tip: tipFor('strength', rules) || undefined }), strength: true, prio: 4 });
     }
     // Koppellauf in der spezifischen Phase (Triathlon): direkt nach der langen Ausfahrt
     if (GOALS[target.type].group === 'tri' && ph.phase === 'specific' && !ph.recovery && sports.includes('run') && sports.includes('bike') && runStage == null) {
@@ -367,15 +387,18 @@ export function generatePlan(inp: GenInput): GenResult {
     for (const c of order) {
       const s = c.s;
       const fits = (i: number, min: number) => slots[i].used + min <= slots[i].cap;
+      const probe = { ...s, long: !!c.long || s.long, hard: !!c.hard || s.hard };
       const ok = (i: number) => {
         const sl = slots[i];
         if (sl.race) return false;
         if (sl.cap <= 0) return false;
         if (s.sport === 'swim' && !sl.pool) return false;
+        // harte Regeln der Person (Tage, Orte, Zeiträume) werden nie verletzt
+        if (!c.fixed && evaluate(rules, probe, sl.date).hard.length) return false;
         const own = sl.items.filter(x => !x.fixed || x.s.sport === 'football');
         if (own.length >= 2) return false;
         if (sl.items.some(x => x.s.sport === s.sport && !c.pairDay)) return false;
-        if (c.hard) { if (sl.noHard || isHardDay(i) || prevHard(i) || isHardDay(i + 1) || (i + 1 < 7 && slots[i + 1].noHard && !!slots[i + 1].race) || (i > 0 && !!slots[i - 1].race) || (sl.team && !sl.game)) return false; }
+        if (c.hard) { if ((i === 0 ? prevSundayStrength : slots[i - 1].items.some(x => x.strength)) || sl.noHard || isHardDay(i) || prevHard(i) || isHardDay(i + 1) || (i + 1 < 7 && slots[i + 1].noHard && !!slots[i + 1].race) || (i > 0 && !!slots[i - 1].race) || (sl.team && !sl.game)) return false; }
         if (c.strength) { if (isHardDay(i) || isHardDay(i + 1) || (i + 1 < 7 && (slots[i + 1].game || !!slots[i + 1].race)) || sl.noHard && sl.cap < 45) return false; }
         if (c.long && i + 1 < 7 && (slots[i + 1].game || !!slots[i + 1].race)) return false;
         if ((c.long || c.hard || c.strength) && (sl.game || sl.team)) return false;
@@ -389,6 +412,9 @@ export function generatePlan(inp: GenInput): GenResult {
         if (c.long && s.sport === 'bike' && sl.dow === 6) sc += 50;
         if (c.strength) sc += sl.items.length ? 40 : 0;
         sc -= sl.items.length * 60;
+        // weiche Regeln möglichst einhalten, Vorlieben bevorzugen
+        sc -= evaluate(rules, probe, sl.date).soft.length * 400;
+        rules.forEach(r => { if (prefers(r, probe, sl.date) === true) sc += 250; });
         return sc;
       };
       let idx = [...Array(7).keys()].filter(i => ok(i) && fits(i, s.plannedMinutes)).sort((a, b) => score(b) - score(a))[0];
@@ -405,7 +431,16 @@ export function generatePlan(inp: GenInput): GenResult {
           if (W.totals(sp).min <= room) placed = { ...W.build(sp) }; else idx = undefined as any;
         }
       }
+      if (idx == null && c.easy) {
+        // harte Einheit findet keinen Platz (z. B. wegen Regeln): lieber locker als gar nicht
+        const e = W.build({ ...c.easy, why: c.easy.why || s.spec?.why, tip: s.spec?.tip });
+        order.splice(order.indexOf(c) + 1, 0, { s: e, prio: c.prio });
+        dropped.push(`Woche ${wi + 1}: ${s.title} wird locker (kein passender Tag für eine harte Einheit)`); hardLeft++; continue;
+      }
       if (idx == null) { dropped.push(`Woche ${wi + 1}: ${s.title} passt zeitlich nicht`); if (c.hard) hardLeft++; continue; }
+      // weiche Regel nicht einzuhalten: in der Einheit erklären
+      const softHit = evaluate(rules, probe, slots[idx].date).soft;
+      if (softHit.length) { const note = softNote(softHit[0], probe, slots, idx); placed = { ...placed, ruleNote: note, description: `${placed.description || ''}\nAusnahme: ${note}`.trim() }; }
       put(idx, { ...c, s: placed });
     }
 
@@ -416,7 +451,7 @@ export function generatePlan(inp: GenInput): GenResult {
       const list = sl.items.map(x => ({ id: `${idp}${wi + 1}-${DOW[sl.dow].toLowerCase()}-${++id}`, ...x.s, ...(x.fixed && x.s.sport === 'football' ? { fixed: true } : {}) }));
       return { date: sl.date, dow: DOW[sl.dow], sessions: list.length ? list : [{ id: `${idp}${wi + 1}-${DOW[sl.dow].toLowerCase()}-rest`, sport: 'rest', title: 'Ruhetag' }] };
     });
-    prevSundayHard = isHardDay(6);
+    prevSundayHard = isHardDay(6); prevSundayStrength = slots[6].items.some(x => x.strength);
     const races = slots.filter(sl => sl.race).map(sl => ({ goalId: sl.race!.id, name: sl.race!.name, date: sl.date, priority: sl.race!.priority }));
     const otherRaces = races.filter(r => r.goalId !== A.id);
     const headline = `Woche ${wi + 1} von ${nWeeks} → ${A.name}${otherRaces.length ? ', mit ' + otherRaces.map(r => `${r.name} am ${DOW_LONG[dowOf(r.date)]}`).join(' und ') : ''}${races.some(r => r.goalId === A.id) ? ': Wettkampf!' : ''}`;
@@ -440,13 +475,13 @@ export function generatePlan(inp: GenInput): GenResult {
   const phaseList: GenResult['phases'] = [];
   weeks.forEach(w => { const last = phaseList[phaseList.length - 1]; if (last && last.phase === w.phase) { last.to = w.endDate; last.weeks++; } else phaseList.push({ phase: w.phase, from: w.startDate, to: w.endDate, weeks: 1 }); });
   const shown = inp.maxWeeks ? weeks.slice(0, inp.maxWeeks) : weeks;
-  const explain = planExplain(A as Goal, inBlock, later, phaseList, shown, profile, sports, cons, runStage, swimStage);
+  const explain = planExplain(A as Goal, inBlock, later, phaseList, shown, profile, sports, rules, runStage, swimStage, conflicts);
   const plan = {
-    meta: { generated: true, generatedAt: today, goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `${A.name}: ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? !minor, phases: phaseList, explain, totalWeeks: nWeeks },
+    meta: { generated: true, generatedAt: today, goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `${A.name}: ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? !minor, phases: phaseList, explain, totalWeeks: nWeeks, conflicts },
     weeks: shown, keyDates,
     zonePercents: HR_ZONES.map(z => ({ zone: z.zone, label: z.label, low: z.low, high: z.high }))
   };
-  return { plan, phases: phaseList, violations, dropped, summary: planSummary(plan, inp, A as Goal, inBlock, phaseList, volumes, sports, minor, runStage, swimStage) };
+  return { plan, phases: phaseList, violations, dropped, conflicts, summary: planSummary(plan, inp, A as Goal, inBlock, phaseList, volumes, sports, minor, runStage, swimStage) };
 }
 
 /* Schwimmeinheit mit Ziel-Minuten: Serien so wählen, dass die Zeit passt */
@@ -505,7 +540,7 @@ function weekImportant(ph: { phase: Phase; recovery: boolean }, races: any[], wi
 }
 
 /* Kurze Erklärung oben im Plan (Auftrag 4 F3) */
-function planExplain(A: Goal, inBlock: Goal[], later: Goal[], phases: GenResult['phases'], weeks: any[], p: Profile, sports: SportKey[], cons: Consideration[], runStage: number | null, swimStage: any): string[] {
+function planExplain(A: Goal, inBlock: Goal[], later: Goal[], phases: GenResult['phases'], weeks: any[], p: Profile, sports: SportKey[], rules: Rule[], runStage: number | null, swimStage: any, conflicts: Conflict[]): string[] {
   const out: string[] = [];
   out.push(`Phasen bis ${A.name}: ${phases.map(x => `${PHASE_LABEL[x.phase]} (${x.weeks} ${x.weeks === 1 ? 'Woche' : 'Wochen'})`).join(' → ')}.`);
   if (inBlock.length) out.push(`Unterwegs: ${inBlock.map(g => `${g.name} (${g.priority === 'B' ? 'B: kurzes Tapering, danach Erholung' : 'C: als Training'})`).join(', ')}.`);
@@ -515,8 +550,9 @@ function planExplain(A: Goal, inBlock: Goal[], later: Goal[], phases: GenResult[
   out.push('So oft pro Woche: ' + sports.map(s => `${SPORT_DE[s]} ${counts(s)}× (${why[s] || ''})`).join(', ') + (p.teamSport ? `, dazu ${p.teamSport.name || 'Teamsport'}` : '') + '.');
   if (runStage != null) out.push('Laufen startet mit Lauf-Geh-Wechsel und steigt eine Stufe, sobald die letzte geklappt hat.');
   if (swimStage) out.push(swimStage.ladder === 'swimBreast' ? 'Schwimmen: zuerst Brust plus Kraul-Technik, dann Schritt für Schritt Kraul.' : 'Schwimmen: Kraul lernen in Stufen, nie längere Strecken als du schon kannst.');
-  const u = cons.filter(c => c.understood);
-  if (u.length) out.push('Berücksichtigt: ' + u.map(c => `${c.label} (${c.effect})`).join('; ') + '.');
+  const u = rules.filter(r => r.kind !== 'info');
+  if (u.length) out.push('Deine Regeln: ' + [...new Set(u.map(ruleText))].join('; ') + '.');
+  conflicts.forEach(c => out.push(c.text));
   return out;
 }
 
@@ -543,3 +579,36 @@ export function transitionPlan(oldPlan: any, newPlan: any, today: string): any {
   return { ...newPlan, weeks, meta: { ...newPlan.meta, previousBlock: oldPlan && oldPlan.meta && oldPlan.meta.blockName } };
 }
 export { weekMinutes };
+
+/* Höchstdauer je Sportart aus harten Regeln (z. B. „Schwimmen höchstens 45 min“) */
+function sportMax(rules: Rule[], sport: string): number | null {
+  const m = rules.filter(r => r.kind === 'maxDay' && r.strength === 'hard' && r.sport === sport && !(r.days || []).length).map(r => r.minutes || 0).filter(x => x > 0);
+  return m.length ? Math.min(...m) : null;
+}
+const SPORT_UNIT: Record<RuleSport, [string, string]> = { run: ['Lauf', 'Läufe'], bike: ['Radeinheit', 'Radeinheiten'], swim: ['Schwimmeinheit', 'Schwimmeinheiten'], strength: ['Krafteinheit', 'Krafteinheiten'] };
+const DOW_FULL = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+function noteConflict(list: Conflict[], rules: Rule[], slots: any[], sport: RuleSport, want: number, days: number[]) {
+  if (list.some(c => c.sport === sport)) return;
+  const can = days.length;
+  const where = daysText(days) === 'Sa und So' ? 'am Wochenende' : can ? 'an ' + daysText(days) : '';
+  // ein Tag, der nur wegen einer „nur an“-Regel fehlt (nicht ausdrücklich verboten, mit Zeit)
+  const blockedOnlyBy = (sl: any) => { const ev = evaluate(rules.filter(r => r.strength === 'hard'), { sport, place: sport === 'swim' ? 'pool' : undefined }, sl.date).hard; return ev.length > 0 && ev.every(r => r.kind === 'onlyDays' || (r.kind === 'placeDays' && !!r.placeOnly)); };
+  const dist = (d: number) => Math.min(7, ...days.map(x => Math.min(Math.abs(x - d), 7 - Math.abs(x - d))));
+  const extra = slots.filter(sl => sl.cap > 0 && !sl.race && !days.includes(sl.dow) && blockedOnlyBy(sl)).sort((a, b) => b.cap - a.cap || dist(a.dow) - dist(b.dow))[0];
+  const [one, many] = SPORT_UNIT[sport];
+  const options: Conflict['options'] = [];
+  if (can) options.push({ id: 'fewer', n: can, label: `${can} ${can === 1 ? one : many} ${where}, dafür ${can === 1 ? 'länger' : 'einer länger'}` });
+  if (extra) options.push({ id: 'allow', day: extra.dow, label: `${SPORT_NAME[sport]} auch am ${DOW_FULL[extra.dow]} erlauben?` });
+  list.push({ id: 'freq-' + sport, sport, want, can, days, options,
+    text: can ? `Du möchtest ${want}× ${SPORT_NAME[sport]} pro Woche, deine Regeln erlauben ${SPORT_NAME[sport]} nur ${daysText(days)}. Der Plan plant deshalb ${can}× ein.` : `${SPORT_NAME[sport]} passt an keinem Tag zu deinen Regeln und Zeiten.` });
+}
+/* Erklärung, warum eine weiche Regel nicht eingehalten werden konnte */
+function softNote(r: Rule, s: any, slots: any[], idx: number): string {
+  const here = DOW_FULL[slots[idx].dow];
+  const what = r.what === 'long' || (r.kind === 'prefer' && s.long) ? (s.sport === 'run' ? 'Langer Lauf' : s.sport === 'bike' ? 'Lange Ausfahrt' : 'Lange Einheit') : (s.title || 'Einheit');
+  const wish = (r.kind === 'prefer' || r.kind === 'onlyDays') ? (r.days || []) : [];
+  const raceDay = slots.find(sl => wish.includes(sl.dow) && sl.race);
+  const noTime = slots.find(sl => wish.includes(sl.dow) && sl.cap <= 0);
+  const reason = raceDay ? `weil ${DOW_FULL[raceDay.dow]} dein Rennen ist` : noTime ? `weil am ${DOW_FULL[noTime.dow]} keine Zeit eingeplant ist` : r.kind === 'neverDays' ? 'weil an den anderen Tagen kein Platz mehr war' : 'weil an deinen Wunschtagen kein Platz mehr war';
+  return `${what} ausnahmsweise am ${here}, ${reason}.`;
+}
