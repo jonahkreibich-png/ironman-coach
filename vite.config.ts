@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { BRAND } from './shared/brand';
 
+const RELEASE = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
 const VERSION = process.env.APP_VERSION || new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
 
 /* Setzt den App-Namen in index.html ein und erzeugt Manifest und Service Worker mit allen gebauten Dateien. */
@@ -43,7 +44,7 @@ export default defineConfig({
   root: 'web',
   base: './',
   publicDir: 'public',
-  define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(VERSION) },
+  define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(VERSION), 'import.meta.env.VITE_APP_RELEASE': JSON.stringify(RELEASE) },
   build: { outDir: '../dist', emptyOutDir: true, target: 'es2020', sourcemap: false },
   server: { port: 5173, proxy: { '/api': 'http://localhost:8787' } },
   plugins: [brandAndOffline()]

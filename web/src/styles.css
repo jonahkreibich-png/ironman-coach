@@ -366,3 +366,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .msg-line { align-self: center; font-size: var(--t-sm); color: var(--ink-2); background: var(--surface-2); border-radius: var(--r-pill); padding: 4px 12px; max-width: 100%; text-align: center; }
 .hist-item { font-size: var(--t-sm); padding: 6px 0; border-top: 1px solid var(--line); white-space: pre-line; }
 .hist-item.user b { color: var(--accent); }
+
+/* Einladung und Begrüßung (Auftrag 5 E3) */
+.intro h2 { margin: 0 0 var(--s2); }
+.intro-list { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.intro-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.intro-dot.on { background: var(--accent); }
+.invite-link { word-break: break-all; color: var(--ink-2); }

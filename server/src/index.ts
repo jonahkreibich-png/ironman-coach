@@ -13,6 +13,7 @@ import { logError, recentErrors, scrub } from './errlog';
 import { extraRoutes, publicRoutes, scheduledExtras, onRecordsChanged } from './extensions';
 import { BRAND } from '../../shared/brand';
 import { feedbackRoutes } from './feedback';
+import { accountRoutes, makeRecovery, recover, purgeDeleted } from './account';
 import { SYNC_KINDS } from '../../shared/kinds';
 
 const KINDS = new Set(SYNC_KINDS);
@@ -71,6 +72,7 @@ async function nightly(env: Env) {
   await env.DB.prepare('DELETE FROM pair_attempts WHERE ts < ?').bind(Date.now() - 86400000).run();
   await env.DB.prepare('DELETE FROM push_log WHERE day < ?').bind(berlinDate(Date.now() - 14 * 86400000)).run();
   await env.DB.prepare('DELETE FROM oauth_states WHERE created_at < ?').bind(Date.now() - 3600000).run();
+  await purgeDeleted(env);
 }
 
 /* ---------- Routen ---------- */
@@ -87,7 +89,13 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind auf dem Server noch nicht eingerichtet.');
     return { key: vapidPublicKey(env) };
   }
-  if (p === '/api/setup' && M === 'POST') return await setup(env, await readJson(req));
+  if (p === '/api/setup' && M === 'POST') {
+    const r: any = await setup(env, await readJson(req));
+    // Neues Konto: Wiederherstellungscode gleich mitgeben (wird einmal angezeigt)
+    if (r.newUser || !(await env.DB.prepare('SELECT 1 FROM recovery WHERE user_id = ?').bind(r.userId).first())) r.recoveryCode = await makeRecovery(env, r.userId);
+    return r;
+  }
+  if (p === '/api/recover' && M === 'POST') return await recover(env, await readJson(req));
   if (p === '/api/pair/redeem' && M === 'POST') return await redeemPairCode(env, await readJson(req));
 
   // Öffentliche Routen der Erweiterungen (OAuth-Rückkehr, Webhooks, Kurzbefehl mit eigenem Schlüssel)
@@ -115,6 +123,8 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   // „Fehler melden / Idee“ und Posteingang des Betreibers (server/src/feedback.ts)
   const fbr = await feedbackRoutes(req, env, p, a);
   if (fbr !== undefined) return fbr;
+  const acc = await accountRoutes(req, env, p, a);
+  if (acc !== undefined) return acc;
   // Fehlerprotokoll der App (ohne Gesundheitsdaten)
   if (p === '/api/log' && M === 'POST') {
     const body = await readJson(req);
@@ -131,8 +141,8 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   if (p.startsWith('/api/admin/')) {
     if (a.role !== 'admin') throw new HttpError(403, 'Nur der Betreiber darf das.');
     if (p === '/api/admin/users' && M === 'GET') {
-      const rows = await env.DB.prepare('SELECT u.id, u.name, u.role, u.features, u.created_at, u.test, (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) AS devices, (SELECT COUNT(*) FROM records r WHERE r.user_id = u.id AND r.deleted = 0) AS records FROM users u ORDER BY u.id').all();
-      return { users: (rows.results || []).map((r: any) => { const f = JSON.parse(r.features || '{}'); return { id: r.id, name: r.name, role: r.role, test: !!r.test, devices: r.devices, records: r.records, features: f, entitlements: entitlements(r.role, f), createdAt: r.created_at, self: r.id === uid }; }) };
+      const rows = await env.DB.prepare('SELECT u.id, u.name, u.role, u.features, u.created_at, u.test, (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) AS devices, (SELECT MAX(last_seen) FROM devices d WHERE d.user_id = u.id) AS last_seen, (SELECT version FROM devices d WHERE d.user_id = u.id ORDER BY last_seen DESC LIMIT 1) AS version, (SELECT COUNT(*) FROM feedback f WHERE f.user_id = u.id) AS reports FROM users u ORDER BY u.id').all();
+      return { users: (rows.results || []).map((r: any) => { const f = JSON.parse(r.features || '{}'); return { id: r.id, name: r.name, role: r.role, test: !!r.test, devices: r.devices, lastSeen: r.last_seen || null, version: r.version || null, reports: r.reports || 0, features: f, entitlements: entitlements(r.role, f), createdAt: r.created_at, self: r.id === uid }; }) };
     }
     // Test-Nutzer: Einladung erzeugen (der Tester richtet sich damit selbst ein)
     if (p === '/api/admin/testusers' && M === 'POST') return await createInvite(env, a, (await readJson(req)).note || 'Test-Nutzer', true);

@@ -22,6 +22,7 @@ import { APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
 import { gridHtml, listHtml, addHtml, registerTarget, conflictsHtml } from './rules';
+import { recoveryBanner } from './intro';
 
 const DOW = [1, 2, 3, 4, 5, 6, 0];
 /* Regeln im Fragebogen: Wochenraster und Sätze landen in den Antworten (answers.rules, answers.notes) */
@@ -37,7 +38,7 @@ const draft = (): { answers: Answers; block: number; done?: boolean; confirmed?:
 export function renderWelcome(): string {
   const needInstall = isIOS() && !isStandalone();
   const d = STATE.onboarding;
-  return `<div class="welcome stack">
+  return `<div class="welcome stack">${recoveryBanner()}
     <div style="text-align:center;margin:var(--s4) 0 var(--s2)"><img src="icons/icon-192.png" alt="" width="72" height="72" style="border-radius:18px"><h1 style="margin:var(--s2) 0 4px">${esc(APP.name)}</h1><div class="muted">${esc(t('welcome.tagline'))}</div></div>
     ${needInstall ? `<div class="card stack"><div class="lbl">${esc(t('welcome.step1'))}</div><div class="hint">${esc(t('welcome.installFirst'))}</div>${installSteps()}</div>` : ''}
     <div class="card stack"><div class="lbl">${esc(t('welcome.newTitle'))}</div><div class="hint">${esc(t('welcome.newHint'))}</div><button class="btn block" data-act="ob-start">${ic('wand')} ${esc(t(d && Object.keys(d.answers || {}).length ? 'welcome.continue' : 'welcome.newBtn'))}</button></div>

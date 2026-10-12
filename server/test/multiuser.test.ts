@@ -33,6 +33,8 @@ describe('Migration 0002 an einer Kopie mit Altdaten', () => {
       INSERT INTO push_queue (key, type, payload, created_at) VALUES ('warn', 'warnings', '{}', 1);`);
     const before = db.db.prepare('SELECT COUNT(*) AS n FROM records').get().n;
     db.db.exec(sql('0002_multiuser.sql'));
+    // spätere Migrationen (Meldungen, Auftrag 5) laufen ebenfalls über die Altdaten
+    fs.readdirSync(MIG).filter(f => f.endsWith('.sql') && f > '0002_multiuser.sql').sort().forEach(f => db.db.exec(sql(f)));
     const recs = db.db.prepare('SELECT user_id, kind, key, deleted, rev FROM records ORDER BY rev').all();
     expect(recs.length).toBe(before);
     expect(recs.every((r: any) => r.user_id === 1)).toBe(true);

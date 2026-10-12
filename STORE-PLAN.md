@@ -44,3 +44,11 @@ Mit Capacitor bleiben `web/`, `shared/` und der Server unverändert. Neu wären 
 3. Capacitor-Hülle, HealthKit-Plugin, TestFlight mit wenigen Testern.
 4. Store-Einträge (Texte, Screenshots aus `scripts/screens.mjs`), Review.
 5. Erst danach: KI-Coach für alle (Kosten pro Nutzer siehe SPAETER.md) und ggf. ein Bezahlmodell – Achtung: Für den Oura-Zugang darf kein Geld verlangt werden.
+
+## 6. Privatsphäre gegenüber dem Betreiber (Auftrag 5 E2, umgesetzt)
+
+- **Was der Betreiber sieht:** von anderen Nutzern nur Name, Status (Test-Nutzer, Freischaltungen), App-Version, Zahl der Geräte und wann zuletzt aktiv, Zahl der Meldungen, die Meldungen selbst (Text, Bildschirm, Version, Gerät, optional Screenshot) und Fehlertexte der App (ohne Zahlen, ohne Gesundheitsdaten).
+- **Was er nicht sieht:** Trainingsplan, Einheiten, Morgenwerte, Profil, Ziele, Essen, Verbindungen. Ausnahme: Ein Nutzer kreuzt bei einer Meldung „Trainingsdaten für diese Meldung freigeben“ an; dann gehen nur für diese Meldung Plan der Woche, Regeln und Ampel mit.
+- **Geprüft im Server, nicht nur in der Oberfläche:** Jeder Lese-Endpunkt arbeitet ausschließlich mit der Nutzer-Nummer des angemeldeten Geräts; es gibt keinen Parameter, mit dem der Betreiber fremde Datensätze abrufen kann. Die Betreiber-Endpunkte geben nur die oben genannten Felder zurück. Ein Server-Test (`server/test/account.test.ts`) sucht in allen Antworten an den Betreiber nach Gesundheits- und Trainingsfeldern.
+- **Datenexport und Löschen:** „Meine Daten als Datei“ (alles Eigene als JSON) und „Konto löschen“ (sofort alles, Verbindungen getrennt, nächtliche Sicherungen nach 30 Tagen) sind unter Mehr → Daten und Geräte. Für den Store nötig, für die DSGVO (Art. 15, 17, 20) ebenfalls.
+- **Technisch kann der Betreiber die Datenbank lesen** (Cloudflare-Konto). Für einen Store-Start gehört das in die Datenschutzerklärung; eine Ende-zu-Ende-Verschlüsselung der Gesundheitsdaten wäre der nächste Schritt (macht aber Server-Funktionen wie Mitteilungen und Coach-Engine aufwendiger).

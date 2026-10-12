@@ -23,6 +23,7 @@ import { renderGenerator } from './views/generator';
 import { renderWettkampf } from './views/wettkampf';
 import { renderBeruecksichtigungen } from './views/beruecksichtigungen';
 import { focusFeedback } from './views/feedback';
+import { takeInviteFromUrl, pendingInvite, inviteHtml, introStep, introHtml, maybeWhatsNew } from './views/intro';
 import { renderFeedback } from './views/feedback';
 import { renderOnboarding, renderWelcome } from './views/onboarding';
 import './views/session';
@@ -87,7 +88,7 @@ function render() {
   for (const k in CHARTS) delete (CHARTS as any)[k];
   document.body.classList.toggle('no-plan', !HAS_PLAN);
   let html: string;
-  if (!HAS_PLAN) html = UI.sub && NO_PLAN_SUBS.has(UI.sub) ? SUBS[UI.sub]() : renderWelcome();
+  if (!HAS_PLAN) html = UI.sub && NO_PLAN_SUBS.has(UI.sub) ? SUBS[UI.sub]() : pendingInvite() ? inviteHtml() : introStep() ? introHtml() : renderWelcome();
   else if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) html = SUBS[UI.sub]();
   else html = TABS.find(x => x.id === UI.tab)!.render();
   byId('app').innerHTML = `<div class="view" data-view="${esc(UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab)}">${html}</div>`;
@@ -149,6 +150,8 @@ window.addEventListener('resize', () => { clearTimeout((window as any).__rz); (w
 /* ?go=heute|plan|coach|fortschritt|mehr|werte|essen (+ alte Werte) und &open=checkin|export|week|settings|verbindungen|wettkampf */
 function openFromUrl(href: string) {
   let u: URL; try { u = new URL(href, location.href); } catch (e) { return; }
+  // Einladung als Link (Auftrag 5 E3)
+  if (takeInviteFromUrl(u)) { UI.sub = null; render(); try { history.replaceState(null, '', location.pathname); } catch (e) {} return; }
   const view = u.searchParams.get('go'), open = u.searchParams.get('open');
   if (!view && !open && !u.searchParams.get('verbunden') && !u.searchParams.get('fehler')) return;
   if (sheetOpen()) closeSheet();
@@ -174,6 +177,7 @@ try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } 
 render();
 openFromUrl(location.href);
 startPwa();
+setTimeout(maybeWhatsNew, 400);
 if (isSyncOn()) { loadMe().then(() => { if (UI.tab === 'mehr') rerender(); }); loadAiState().then(() => { if (UI.tab === 'coach' || UI.sub === 'einstellungen') rerender(); }); loadConnections(); }
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); rerender(); } });

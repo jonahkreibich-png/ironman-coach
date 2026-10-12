@@ -39,7 +39,9 @@ async function prepare(page: Page, state: State, dark: boolean) {
   const demo = data(state);
   const plan = demo.plan; const st: any = { ...demo }; delete st.plan;
   await page.addInitScript(([p, s, empty, err]) => {
+    if (sessionStorage.getItem('__keep')) return;
     localStorage.clear();
+    localStorage.setItem('ec_ui', JSON.stringify({ seenRelease: '9.9.9' }));
     if (!empty) { localStorage.setItem('ec_plan', p as string); localStorage.setItem('ec_state_v2', s as string); }
     if (err) { localStorage.setItem('ec_sync_auth', JSON.stringify({ token: 'ungueltig', deviceId: 'dev-x', userId: 2 })); localStorage.setItem('ec_err_log', JSON.stringify([{ msg: 'TypeError: ' + 'x'.repeat(200), where: 'plan.ts:1', at: 1 }])); }
   }, [JSON.stringify(plan), JSON.stringify(st), state === 'leer', state === 'fehler']);
@@ -67,7 +69,7 @@ async function overflow(page: Page): Promise<string[]> {
     return [...new Set(out)].slice(0, 15);
   });
 }
-const SCREENS = (state: State) => state === 'leer' ? ['/', '/?go=onboarding', '/?go=daten', '/?go=verbindungen', '/?go=feedback'] : [...TABS.map(x => '/?go=' + x), ...SUBS.map(x => '/?go=' + x)];
+const SCREENS = (state: State) => state === 'leer' ? ['/', '/?go=onboarding', '/?go=daten', '/?go=verbindungen', '/?go=feedback', '/?invite=ABCDEFGH', '#intro'] : [...TABS.map(x => '/?go=' + x), ...SUBS.map(x => '/?go=' + x)];
 
 for (const [wname, w] of WIDTHS) {
   for (const dark of [false, true]) {
@@ -79,6 +81,13 @@ for (const [wname, w] of WIDTHS) {
         await prepare(page, state, dark);
         const problems: string[] = [];
         for (const url of SCREENS(state)) {
+          if (url === '#intro') {
+            // Begrüßung neuer Tester mit Wiederherstellungscode, alle 3 Seiten
+            await page.evaluate(() => { sessionStorage.setItem('__keep', '1'); localStorage.removeItem('ec_invite'); localStorage.setItem('ec_intro', '1'); localStorage.setItem('ec_rc_show', 'ABCD-EFGH-JKLM-NPQR'); });
+            await page.goto('/');
+            for (let i = 1; i <= 3; i++) { await expect(page.locator(`[data-intro="${i}"]`)).toBeVisible(); (await overflow(page)).forEach(p => problems.push(`Begrüßung ${i}: ${p}`)); if (i < 3) await page.locator('[data-act="intro-next"]').click(); }
+            continue;
+          }
           await page.goto(url);
           await expect(page.locator('#app')).not.toBeEmpty();
           await page.waitForTimeout(60);

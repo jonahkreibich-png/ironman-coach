@@ -22,6 +22,8 @@ export const STORAGE = {
 
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string) ?? '';
 export const APP_VERSION: string = (import.meta.env.VITE_APP_VERSION as string) || 'dev';
+/* Versionsnummer für Menschen (package.json), z. B. für „Neu in dieser Version“ */
+export const APP_RELEASE: string = (import.meta.env.VITE_APP_RELEASE as string) || '0';
 
 /* Umgebung: Testumgebung (eigene Adresse), lokal oder echte App. Neue Funktionen, die erst nach „Freigeben“
    für alle gelten sollen, hängen an FEATURES. */

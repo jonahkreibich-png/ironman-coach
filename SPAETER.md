@@ -46,3 +46,17 @@ Mit Prompt-Caching (gleicher Anfang jeder Anfrage: Handbuch und Regeln) sinkt de
 ## Oura-Bedingungen in drei Sätzen
 
 Oura-Daten dürfen nicht an KI-Dienste weitergegeben oder zum Trainieren verwendet werden, deshalb filtert die App sie aus dem KI-Coach heraus. Für den Oura-Zugang darf kein Geld verlangt werden, und beim Trennen müssen die Daten innerhalb von 72 Stunden gelöscht werden (die App löscht sofort). Nutzer unter 18 brauchen die Einwilligung der Eltern.
+
+## Ab wann lohnt sich der KI-Schlüssel? (Auftrag 5 D7)
+
+Seit Auftrag 5 versteht der Coach auch ohne KI die wichtigsten Wünsche (verschieben, tauschen, kürzer, länger, leichter, härter, streichen, Tag frei, Woche leichter, krank, Schmerzen, Urlaub, neue Regeln, Ziele) mit Rückfragen und Rückgängig. Der Schlüssel lohnt sich, wenn:
+- Tester oft Dinge schreiben, die der Coach nur mit Rückfrage versteht (das siehst du im Posteingang unter „Fehler bei Testern“ bzw. in den Meldungen), oder
+- du freie Fragen zu Training und Ernährung beantwortet haben willst, die über die eingebauten Antworten hinausgehen, oder
+- Sätze unter „Berücksichtigungen“ sehr frei formuliert werden (die KI übersetzt sie in dasselbe Regel-Format, die App zeigt es zur Bestätigung).
+
+Planänderungen laufen auch mit KI immer über dieselben Aktionen und Regeln; die KI kann keine harte Regel brechen. Kosten: siehe oben, für dich allein unter 1 $ im Monat. Freitext → Regeln kostet mit dem Routine-Modell etwa 0,01 Cent pro Satz.
+
+## E-Mail bei neuen Meldungen (Auftrag 5 B)
+
+Cloudflare Email Routing (kostenloser Mail-Versand aus dem Worker) braucht eine eigene Domain in Cloudflare (ca. 10 €/Jahr, siehe „Eigene Adresse“). Deshalb gibt es vorerst nur die Push-Mitteilung an deine Geräte. Mit Domain: Email Routing einschalten, deine Adresse bestätigen, im Worker die Bindung `send_email` ergänzen; der Posteingang und der Text „Als Text kopieren“ sind schon fertig.
+Ebenfalls mit Domain möglich: Anmeldung per E-Mail-Link als zweiter Weg neben dem Wiederherstellungscode.

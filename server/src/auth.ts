@@ -25,21 +25,22 @@ export async function authDevice(req: Request, env: Env): Promise<Auth> {
   const h = req.headers.get('Authorization') || '';
   const m = /^Bearer\s+([A-Za-z0-9_-]{20,})$/.exec(h);
   if (!m) throw new HttpError(401, 'Nicht angemeldet');
-  const dev = await env.DB.prepare('SELECT d.id, d.name, d.last_seen, d.user_id, u.role FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = ?').bind(await sha256(m[1])).first();
+  const dev = await env.DB.prepare('SELECT d.id, d.name, d.last_seen, d.version, d.user_id, u.role FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_hash = ?').bind(await sha256(m[1])).first();
   if (!dev) throw new HttpError(401, 'Gerät unbekannt oder entfernt');
-  if (!dev.last_seen || Date.now() - dev.last_seen > 60000) {
-    await env.DB.prepare('UPDATE devices SET last_seen = ? WHERE id = ?').bind(Date.now(), dev.id).run();
+  const ver = String(req.headers.get('X-App-Version') || '').replace(/[^\w.+-]/g, '').slice(0, 40);
+  if (!dev.last_seen || Date.now() - dev.last_seen > 60000 || (ver && ver !== dev.version)) {
+    await env.DB.prepare('UPDATE devices SET last_seen = ?, version = COALESCE(NULLIF(?, \'\'), version) WHERE id = ?').bind(Date.now(), ver, dev.id).run();
   }
   return { uid: dev.user_id, deviceId: dev.id, deviceName: dev.name, role: dev.role };
 }
 
 /* Vergleich über Hashes, damit die Laufzeit nichts über den Code verrät */
 async function sameSecret(a: string, b: string): Promise<boolean> { return (await sha256('s:' + a)) === (await sha256('s:' + b)); }
-async function guardAttempts(env: Env) {
+export async function guardAttempts(env: Env) {
   const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM pair_attempts WHERE ts > ?').bind(Date.now() - PAIR_TTL_MS).first();
   if (recent && recent.n >= 20) throw new HttpError(429, 'Zu viele Versuche. Warte 10 Minuten.');
 }
-async function failedAttempt(env: Env) { await env.DB.prepare('INSERT INTO pair_attempts (ts) VALUES (?)').bind(Date.now()).run(); }
+export async function failedAttempt(env: Env) { await env.DB.prepare('INSERT INTO pair_attempts (ts) VALUES (?)').bind(Date.now()).run(); }
 
 /* Erstes Gerät: ohne Einladung nur, solange der Server noch kein einziges Gerät hat (wird Nutzer 1, Admin).
    Mit Einladungscode: ein neuer Nutzer. Eine offene Registrierung gibt es nicht. */

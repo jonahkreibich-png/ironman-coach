@@ -6,7 +6,7 @@
 import { STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData } from './store';
 import { esc, fmtDate, ymd } from './util';
 import { toast } from './toast';
-import { STORAGE, API_BASE } from './config';
+import { STORAGE, API_BASE, APP_VERSION } from './config';
 import { nav } from './nav';
 import { t } from '../../shared/i18n';
 
@@ -145,7 +145,7 @@ function applyRecord(rec) {
 async function api(method, path, body?, noAuth?) {
   const res = await fetch(API + path, {
     method, cache: 'no-store',
-    headers: Object.assign({ 'Content-Type': 'application/json' }, (!noAuth && AUTH) ? { Authorization: 'Bearer ' + AUTH.token } : {}),
+    headers: Object.assign({ 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION }, (!noAuth && AUTH) ? { Authorization: 'Bearer ' + AUTH.token } : {}),
     body: body ? JSON.stringify(body) : undefined
   });
   let data = null; try { data = await res.json(); } catch (e) {}
@@ -282,6 +282,7 @@ export async function setupFirst(setupCode?: string) {
   // Betreiber (Nutzer 1): vorhandene Daten dieses Geräts sind seine (alte App), außer sie gehören erkennbar jemand anderem
   prepareDevice(res.userId ?? 1, true);
   connected(res, true);
+  remember(res);
   await syncNow(); if (!planChanged) rebaseline();
   return res;
 }
@@ -291,9 +292,30 @@ export async function setupWithInvite(invite: string, userName: string, keepLoca
   const res = await api('POST', '/api/setup', { name: deviceName(), invite, userName }, true);
   prepareDevice(res.userId ?? null, keepLocal);
   connected(res, true);
+  remember(res);
+  // neuer Tester: kurze Begrüßung vor dem Fragebogen (Auftrag 5 E3)
+  if (res.newUser) try { localStorage.setItem('ec_intro', '1'); } catch (e) {}
   await syncNow(); rebaseline();
   reloadSoon();
   return res;
+}
+/* Wiederherstellungscode einmal anzeigen (Auftrag 5 E4) */
+function remember(res: any) { if (res && res.recoveryCode) try { localStorage.setItem('ec_rc_show', res.recoveryCode); } catch (e) {} }
+/* Neues Gerät mit Wiederherstellungscode: das eigene Konto mit allen Daten zurück */
+export async function recoverWith(code: string, name?: string) {
+  const res = await api('POST', '/api/recover', { code, name: name || deviceName() }, true);
+  prepareDevice(res.userId ?? null, false);
+  connected(res, false);
+  await syncNow(); rebaseline();
+  reloadSoon();
+  return res;
+}
+/* Konto löschen: auf dem Server alles weg (Backups nach Frist), dann das Gerät leeren */
+export async function deleteAccount(confirmWord: string) {
+  await apiCall('DELETE', '/api/me', { confirm: confirmWord });
+  AUTH = null; wipeLocalData();
+  try { localStorage.removeItem('ec_fb_outbox'); } catch (e) {}
+  setTimeout(() => location.reload(), 600);
 }
 export async function pair(code: string, keepLocal = false) { await pairWith(code, keepLocal); }
 export function stopSync() { disconnect(false); }

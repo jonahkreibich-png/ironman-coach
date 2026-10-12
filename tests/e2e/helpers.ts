@@ -16,6 +16,8 @@ export async function seed(page: Page, opts: { today?: string; time?: string; ex
     if (!sessionStorage.getItem('__seeded')) {
       localStorage.clear();
       if (!noPlan) { localStorage.setItem('ec_plan', p as string); localStorage.setItem('ec_state_v2', s as string); }
+      // „Neu in dieser Version“ gilt als gesehen (eigener Test prüft das Fenster)
+      localStorage.setItem('ec_ui', JSON.stringify({ seenRelease: '9.9.9' }));
       sessionStorage.setItem('__seeded', '1');
     }
   }, [JSON.stringify(plan), JSON.stringify(state), !!opts.noPlan]);

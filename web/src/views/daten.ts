@@ -4,7 +4,8 @@ import { STATE, HAS_PLAN, hasLocalData } from '../store';
 import { esc, fmtDate, dowShort, ymd, daysBetween, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, armed, more, empty } from '../kit';
-import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify } from '../sync';
+import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify, deleteAccount } from '../sync';
+import { recoveryBanner } from './intro';
 import { backupText, parseBackupText, isBackup, isPlan, applyBackup, markBackedUp, shareBackupFile } from '../backup';
 import { readErrors } from '../errlog';
 import { checkForUpdate } from '../pwa';
@@ -38,6 +39,8 @@ export function connectPanel(): string {
   return `<div class="stack">
     ${more(t('data.pairTitle'), `<div class="hint">${esc(t('data.pairHint'))}</div><div class="row"><input class="inp grow" id="sync-code" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" aria-label="${esc(t('data.pairCode'))}"><button class="btn" data-act="sync-pair">${esc(t('data.pairBtn'))}</button></div>${keepLocalToggle('keep-pair')}`, true)}
     ${more(t('data.inviteTitle'), `<div class="hint">${esc(t('data.inviteHint'))}</div><div class="fgrid">${field('inv-code', t('data.inviteCode'), '', { placeholder: 'ABCD-EFGH' })}${field('inv-name', t('data.yourName'), '')}</div>${keepLocalToggle('keep-inv')}<button class="btn" data-act="sync-invite">${esc(t('data.inviteBtn'))}</button>`)}
+    ${more(t('data.recoverTitle'), `<div class="hint">${esc(t('data.recoverHint'))}</div><div class="row"><input class="inp grow" id="rc-code" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="${esc(t('data.recoverCode'))}"><button class="btn" data-act="rc-recover">${esc(t('data.recoverBtn'))}</button></div>`)}
+    ${isStandalone() ? `<button class="btn ghost" data-act="intro-paste">${esc(t('data.pasteInvite'))}</button>` : ''}
     ${more(t('data.setupTitle'), `<div class="hint">${esc(t('data.setupHint'))}</div><div class="row"><input class="inp grow" id="setup-code" type="password" autocomplete="off" aria-label="${esc(t('data.setupCode'))}" placeholder="${esc(t('data.setupCode'))}"><button class="btn ghost" data-act="sync-setup">${esc(t('data.setupBtn'))}</button></div>`)}
   </div>`;
 }
@@ -54,10 +57,14 @@ export function renderDaten(): string {
       ${DEVICES == null ? `<div class="hint">${esc(t('common.loading'))}</div>` : `<div class="list">${DEVICES.map(d => `<div class="li" data-dev="${esc(d.id)}"><span class="ic">${ic('phone')}</span><span class="grow"><span class="t">${esc(d.name)}${d.self ? ' ' + pill(t('data.thisDevice')) : ''}</span><br><span class="s">${esc(t('data.lastSeen', { ago: d.lastSeen ? ago(d.lastSeen) : '–' }))}</span></span>${d.self ? '' : `<button class="btn danger sm" data-act="dev-del">${esc(t('common.remove'))}</button>`}</div>`).join('')}</div>`}
       ${PAIR && PAIR.expiresAt > Date.now() ? `<div class="pair-code num">${esc(PAIR.code)}</div><div class="hint">${esc(t('data.pairShow', { time: time(PAIR.expiresAt) }))}</div>` : `<button class="btn ghost" data-act="pair-create">${ic('plus')} ${esc(t('data.addDevice'))}</button>`}
       <button class="link" data-act="sync-off">${esc(t('data.syncOff'))}</button></div>`);
+    h = recoveryBanner() + h;
+    h += sec(t('data.recovery'), `<div class="card stack"><div class="hint">${esc(t('data.recoveryHint'))}</div>${NEW_RC ? `<div class="pair-code num" data-new-rc>${esc(NEW_RC)}</div><div class="hint">${esc(t('intro.rcHint'))}</div>` : ''}<button class="btn ghost" data-act="rc-new">${esc(t('data.recoveryNew'))}</button></div>`);
     if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside'));
   }
   h += sec(t('data.backup'), backupCard(), STATE.lastBackupAt ? t('data.lastBackup', { d: fmtDate(STATE.lastBackupAt.slice(0, 10)) }) : '');
   if (isSyncOn() || hasLocalData()) h += sec(t('data.signOut'), `<div class="card stack"><div class="hint">${esc(t(isSyncOn() ? 'data.signOutHint' : 'data.wipeHint'))}</div><button class="btn danger" data-act="sign-out">${esc(t(isSyncOn() ? 'data.signOutBtn' : 'data.wipeBtn'))}</button></div>`);
+  if (isSyncOn()) h += sec(t('data.account'), `<div class="card stack"><div class="hint">${esc(t('data.exportHint'))}</div><button class="btn ghost" data-act="acc-export">${esc(t('data.export'))}</button>
+    ${ME && ME.role === 'admin' ? '' : `<div class="lbl" style="margin-top:var(--s3)">${esc(t('data.deleteTitle'))}</div><div class="hint">${esc(t('data.deleteHint'))}</div><div class="fld"><label for="acc-confirm">${esc(t('data.deleteType'))}</label><input class="inp" id="acc-confirm" autocomplete="off" autocapitalize="characters"></div><button class="btn danger" data-act="acc-delete">${esc(t('data.deleteBtn'))}</button>`}</div>`);
   h += sec(t('data.errors'), errorsCard());
   h += sec(t('data.app'), appCard(), t('data.version', { v: APP_VERSION }));
   return h;
@@ -65,7 +72,7 @@ export function renderDaten(): string {
 
 function invitesCard(): string {
   return `<div class="card stack"><div class="hint">${esc(t('data.invitesHint'))}</div>
-    ${NEW_INVITE ? `<div class="pair-code num">${esc(NEW_INVITE)}</div><div class="hint">${esc(t('data.inviteShow'))}</div><button class="btn ghost sm" data-act="invite-copy">${esc(t('common.copy'))}</button>` : ''}
+    ${NEW_INVITE ? `<div class="pair-code num">${esc(NEW_INVITE)}</div><div class="hint">${esc(t('data.inviteShowLink'))}</div><div class="small invite-link" data-invite-link>${esc(inviteLink(NEW_INVITE))}</div><div class="row"><button class="btn sm" data-act="invite-share">${esc(t('data.inviteShare'))}</button><button class="btn ghost sm" data-act="invite-copy">${esc(t('data.inviteCopyLink'))}</button></div>` : ''}
     <div class="row">${field('inv-note', t('data.inviteFor'), '', { placeholder: t('data.inviteForPh'), wide: true })}<button class="btn" data-act="invite-create" style="align-self:flex-end">${esc(t('data.inviteCreate'))}</button></div>
     <div class="list">${(INVITES || []).map(i => `<div class="li"><span class="grow"><span class="t">${esc(i.note || t('data.inviteNoNote'))}</span><br><span class="s">${esc(i.used ? t('data.inviteUsed', { d: fmtDate(ymd(new Date(i.usedAt))) }) : i.expiresAt < Date.now() ? t('data.inviteExpired') : t('data.inviteOpen', { d: fmtDate(ymd(new Date(i.expiresAt))) }))}</span></span></div>`).join('') || `<div class="li"><span class="muted">${esc(t('data.noInvites'))}</span></div>`}</div></div>`;
 }
@@ -74,11 +81,11 @@ function invitesCard(): string {
 function usersCard(): string {
   if (!USERS) return `<div class="card">${empty(t('common.loading'))}</div>`;
   return `<div class="card stack"><div class="hint">${esc(t('data.usersHint'))}</div>
-    ${NEW_TEST ? `<div class="banner good" data-test-invite><b>${esc(t('data.testCode'))}</b><div class="pair-code num">${esc(NEW_TEST)}</div>${esc(t('data.testCodeHint'))}</div>` : ''}
+    ${NEW_TEST ? `<div class="banner good" data-test-invite><b>${esc(t('data.testCode'))}</b><div class="pair-code num">${esc(NEW_TEST)}</div><div class="small invite-link">${esc(inviteLink(NEW_TEST))}</div>${esc(t('data.testCodeHint2'))}<div class="row"><button class="btn sm" data-act="invite-share" data-code="${esc(NEW_TEST)}">${esc(t('data.inviteShare'))}</button></div></div>` : ''}
     <div class="row">${field('tu-name', t('data.testName'), '', { placeholder: t('data.testNamePh'), wide: true })}<button class="btn" data-act="tu-create" style="align-self:flex-end">${esc(t('data.testCreate'))}</button></div>
     <div class="list">${USERS.map(u => `<div class="li" style="display:block" data-user="${u.id}">
     <div class="spread"><span class="t">${esc(u.name || t('data.userN', { n: u.id }))}${u.self ? ' ' + pill(t('data.you')) : ''}${u.test ? ' ' + pill(t('data.test')) : ''}</span>${u.role === 'admin' ? pill(t('data.admin'), 'accent') : ''}</div>
-    ${u.role !== 'admin' ? `<div class="xs muted">${esc(t('data.userStats', { d: u.devices ?? 0, r: u.records ?? 0 }))}</div>` : ''}
+    ${u.role !== 'admin' ? `<div class="xs muted">${esc(t('data.userStats2', { d: u.devices ?? 0, v: u.version || '–', s: u.lastSeen ? ago(u.lastSeen) : '–', m: u.reports ?? 0 }))}</div>` : ''}
     <div class="chips" style="margin-top:6px">${FEATURE_KEYS.map(k => { const onK = !!u.entitlements[k]; return `<button class="chip ${onK ? 'on' : ''}" aria-pressed="${onK}" data-act="feat-toggle" data-uid="${u.id}" data-k="${k}" ${u.role === 'admin' ? 'disabled' : ''}>${esc(t('feature.' + k))}</button>`; }).join('')}</div>
     ${u.role !== 'admin' ? `<div class="row" style="margin-top:6px"><button class="btn ghost sm" data-act="tu-reset" data-uid="${u.id}">${esc(t('data.reset'))}</button><button class="btn danger sm" data-act="tu-del" data-uid="${u.id}">${esc(t('data.delUser'))}</button></div>` : ''}</div>`).join('')}</div></div>`;
 }
@@ -172,7 +179,33 @@ on('dev-del', el => {
   return busy(el, async () => { await apiCall('DELETE', '/api/devices/' + encodeURIComponent(id)); toast(t('data.devRemoved')); DEVICES = null; loadLists(); });
 });
 on('invite-create', el => busy(el, async () => { const r = await apiCall('POST', '/api/invites', { note: val('inv-note') }); NEW_INVITE = r.code; INVITES = (await apiCall('GET', '/api/invites')).invites; nav.rerender(); }));
-on('invite-copy', async () => { if (!NEW_INVITE) return; try { await navigator.clipboard.writeText(NEW_INVITE); toast(t('common.copied')); } catch (e) { toast(t('common.copyManual')); } });
+/* Einladung als Link (Auftrag 5 E3) */
+export function inviteLink(code: string): string { return location.origin + location.pathname.replace(/[^/]*$/, '') + '?invite=' + encodeURIComponent(code); }
+on('invite-copy', async () => { if (!NEW_INVITE) return; try { await navigator.clipboard.writeText(inviteLink(NEW_INVITE)); toast(t('common.copied')); } catch (e) { toast(t('common.copyManual')); } });
+on('invite-share', async el => {
+  const code = el.dataset.code || NEW_INVITE; if (!code) return;
+  const text = t('data.inviteMessage', { app: APP.name, link: inviteLink(code) });
+  try { if ((navigator as any).share) await (navigator as any).share({ title: APP.name, text }); else { await navigator.clipboard.writeText(text); toast(t('common.copied')); } } catch (e) { /* abgebrochen */ }
+});
+let NEW_RC: string | null = null;
+on('rc-new', el => { if (!armed(el, t('data.recoveryNewSure'))) return; return busy(el, async () => { NEW_RC = (await apiCall('POST', '/api/recovery', {})).code; nav.rerender(); }); });
+/* Meine Daten als Datei (Auftrag 5 E1) */
+on('acc-export', el => busy(el, async () => {
+  const data = await apiCall('GET', '/api/me/export');
+  const name = `${APP.name.toLowerCase()}-daten-${todayStr()}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'application/json' }) : null;
+  if (file && (navigator as any).canShare && (navigator as any).canShare({ files: [file] })) { try { await (navigator as any).share({ files: [file], title: name }); return; } catch (e) { /* weiter mit Download */ } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast(t('data.exported'));
+}));
+/* Konto löschen (Auftrag 5 E1): „LÖSCHEN“ eintippen und noch einmal tippen */
+on('acc-delete', el => {
+  const word = ((document.getElementById('acc-confirm') as HTMLInputElement)?.value || '').trim();
+  if (word.toUpperCase() !== 'LÖSCHEN') { toast(t('data.deleteTypeFirst')); return; }
+  if (!armed(el, t('data.deleteSure'))) return;
+  return busy(el, async () => { await deleteAccount(word); toast(t('data.deleted')); });
+});
 on('err-server', el => busy(el, async () => { SERVER_ERR = (await apiCall('GET', '/api/log')).errors || []; nav.rerender(); }));
 on('bk-restore', el => {
   if (!armed(el, t('data.replaceAll'))) return;

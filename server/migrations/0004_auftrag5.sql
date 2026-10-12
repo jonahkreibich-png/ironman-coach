@@ -20,3 +20,5 @@ CREATE TABLE IF NOT EXISTS deleted_users (
   deleted_at INTEGER NOT NULL,
   purge_after INTEGER NOT NULL
 );
+-- App-Version je Gerät (für den Betreiber: welche Version ein Tester gerade nutzt)
+ALTER TABLE devices ADD COLUMN version TEXT;

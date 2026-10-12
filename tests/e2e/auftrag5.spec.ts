@@ -169,3 +169,59 @@ test.describe('D: Coach-Chat', () => {
     await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bno\b/);
   });
 });
+
+test.describe('E: bereit für Tester', () => {
+  test.skip(({ browserName }) => browserName === 'webkit', 'Server-Abläufe einmal reichen (Chromium)');
+  test('Einladungslink → Begrüßung → Fragebogen; Safari-Daten weg → mit Wiederherstellungscode alles zurück; Export; Konto löschen', async ({ page, request }) => {
+    await request.post('/__reset');
+    const admin = await (await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } })).json();
+    const H = { Authorization: 'Bearer ' + admin.token };
+    const inv = await (await request.post('/api/admin/testusers', { headers: H, data: { note: 'Papa' } })).json();
+    await page.goto('/?invite=' + inv.code);
+    await expect(page.locator('[data-invite]')).toBeVisible();
+    await page.fill('#intro-name', 'Papa');
+    await page.locator('[data-act="intro-accept"]').click();
+    await page.waitForLoadState('load');
+    await expect(page.locator('[data-intro="1"]')).toBeVisible({ timeout: 10000 });
+    const rc = (await page.locator('[data-recovery] .pair-code').textContent())!.trim();
+    expect(rc).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    await page.locator('[data-act="rc-done"]').click();
+    await page.locator('[data-act="intro-next"]').click();
+    await expect(page.locator('[data-intro="2"]')).toBeVisible();
+    await page.locator('[data-act="intro-next"]').click();
+    await page.locator('[data-act="intro-next"]').click();
+    await expect(page.locator('.ob')).toBeVisible();
+    // eine Berücksichtigung eintragen, die auf den Server geht
+    const auth = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_sync_auth') || 'null'));
+    await request.post('/api/sync', { headers: { Authorization: 'Bearer ' + auth.token }, data: { since: 0, changes: [{ kind: 'profile', key: 'main', data: { name: 'Papa', notes: ['dienstags gar nichts'] }, updatedAt: Date.now() }] } });
+    // Safari-Daten gelöscht / neues Handy
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/?go=daten');
+    await page.locator('summary', { hasText: 'Wiederherstellungscode' }).click();
+    await page.fill('#rc-code', rc);
+    await page.locator('[data-act="rc-recover"]').click();
+    await page.waitForLoadState('load');
+    await expect.poll(async () => (await page.evaluate(() => (JSON.parse(localStorage.getItem('ec_state_v2') || '{}').profile || {}).notes)), { timeout: 10000 }).toEqual(['dienstags gar nichts']);
+    // Export und Löschen
+    await page.goto('/?go=daten');
+    const dl = page.waitForEvent('download');
+    await page.locator('[data-act="acc-export"]').click();
+    const file = await dl; expect(file.suggestedFilename()).toMatch(/daten-\d{4}-\d{2}-\d{2}\.json$/);
+    await page.fill('#acc-confirm', 'LÖSCHEN');
+    await page.locator('[data-act="acc-delete"]').click(); await page.locator('[data-act="acc-delete"]').click();
+    await expect.poll(async () => (await (await request.get('/api/admin/users', { headers: H })).json()).users.length).toBe(1);
+    await page.waitForLoadState('load');
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('ec_sync_auth'))).toBeNull();
+  });
+});
+test('E6: nach einem Update einmal „Neu in dieser Version“', async ({ page }) => {
+  await seed(page);
+  await page.addInitScript(() => { if (!sessionStorage.getItem('__ui')) { localStorage.setItem('ec_ui', JSON.stringify({ seenRelease: '2.1.0' })); sessionStorage.setItem('__ui', '1'); } });
+  await open(page, '/');
+  await expect(page.locator('[data-whatsnew]')).toBeVisible();
+  await expect(page.locator('[data-whatsnew] li')).toHaveCount(3);
+  await page.locator('[data-act="news-ok"]').click();
+  await page.reload();
+  await page.waitForTimeout(800);
+  await expect(page.locator('[data-whatsnew]')).toHaveCount(0);
+});
