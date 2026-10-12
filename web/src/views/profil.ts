@@ -1,4 +1,6 @@
-/* Profil und Ziele: persönliche Angaben statt fester Werte im Code, mehrere Ziele mit Priorität, Sprache und Einheiten. */
+/* Profil und Ziele: persönliche Angaben statt fester Werte im Code, mehrere Ziele mit Priorität, Sprache und Einheiten.
+   Was den Plan bestimmt (Ziele, Sportarten, Stunden, Stil …), wird erst vorgemerkt und mit Vorschau übernommen (Auftrag 6, web/src/staged.ts).
+   Persönliche Angaben (Name, Gewicht, Sprache …) werden sofort gespeichert. */
 import { STATE, saveState, profile, goals, saveProfile } from '../store';
 import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr } from '../util';
 import { t, hhmm } from '../../../shared/i18n';
@@ -11,15 +13,20 @@ import { daysUntil } from '../../../shared/race';
 import { invalidate } from '../data';
 import { nav } from '../nav';
 import { toast } from '../toast';
+import { stage, draftProfile, draftGoals, draftGoal, stageBarHtml, lastApplied, PLAN_FIELDS } from '../staged';
+
+const SCREEN = 'profil';
 
 const SPORT_KEYS: SportKey[] = ['swim', 'bike', 'run', 'strength', 'football'];
 export const goalLabel = (type: string) => t('goal.' + type);
 
 export function renderProfil(): string {
-  const p = profile(), today = todayStr();
-  const gl = goals().sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
+  const p = profile(), dp = draftProfile(SCREEN), today = todayStr();
+  const gl = draftGoals(SCREEN).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
   const main = mainGoal(gl, today);
-  let h = sec(t('prof.goals'), `<div class="list">${gl.map(g => `<button class="li" data-act="goal-open" data-id="${esc(g.id)}"><span class="ic" style="--c:var(--accent)">${ic(g.result ? 'trophy' : 'target')}</span>
+  const last = lastApplied(SCREEN);
+  let h = last ? `<div class="banner good" data-replanned style="margin-bottom:var(--s3)">${esc(last)}</div>` : '';
+  h += sec(t('prof.goals'), `<div class="list">${gl.map(g => `<button class="li" data-act="goal-open" data-id="${esc(g.id)}"><span class="ic" style="--c:var(--accent)">${ic(g.result ? 'trophy' : 'target')}</span>
       <span class="grow"><span class="t">${esc(g.name)}</span> ${pill(g.priority, g.priority === 'A' ? 'accent' : '')}${main && main.id === g.id ? ' ' + pill(t('prof.main'), 'good') : ''}<br>
       <span class="s">${esc(goalLabel(g.type))}${g.date ? ' · ' + fmtDate(g.date) + (g.date >= today ? ' · ' + t('prof.inDays', { n: daysUntil(today, g.date) }) : '') : ''}${g.result && g.result.timeSec ? ' · ' + hhmm(g.result.timeSec) : ''}</span></span><span class="chev">${ic('right')}</span></button>`).join('') || `<div class="li"><span class="muted">${esc(t('prof.noGoals'))}</span></div>`}</div>
     <button class="btn ghost block" data-act="goal-new" style="margin-top:var(--s2)">${ic('plus')} ${esc(t('prof.addGoal'))}</button>`, t('prof.goalsAside'));
@@ -31,20 +38,20 @@ export function renderProfil(): string {
     ${field('pf-w', t('prof.weight'), p.weightKg ?? '', { inputmode: 'decimal', data: 'data-ch="pf" data-k="weightKg" data-num="1"' })}
     ${select('pf-pal', t('prof.pal'), String(p.pal), [['1.2', t('prof.pal12')], ['1.4', t('prof.pal14')], ['1.6', t('prof.pal16')], ['1.8', t('prof.pal18')]], 'data-ch="pf" data-k="pal" data-num="1"')}
     </div>${ageOf(p, todayStr()) != null ? `<div class="hint">${esc(t('prof.age', { n: ageOf(p, todayStr()) }))}${isMinor(p, todayStr()) ? ' · ' + esc(t('prof.minorHint')) : ''}</div>` : ''}</div>`);
-  h += sec(t('prof.training'), `<div class="card"><div class="lbl">${esc(t('prof.sports'))}</div><div class="chips" style="margin:6px 0 var(--s3)">${SPORT_KEYS.filter(s => s !== 'football' || p.teamSport || p.sports.includes('football')).map(s => `<button class="chip ${p.sports.includes(s) ? 'on' : ''}" data-act="pf-sport" data-s="${s}" aria-pressed="${p.sports.includes(s)}">${esc(s === 'football' && p.teamSportName ? p.teamSportName : sportLabel(s))}</button>`).join('')}</div>
-    <div class="fgrid">${p.sports.includes('football') ? field('pf-team', t('prof.teamSport'), p.teamSportName, { data: 'data-ch="pf" data-k="teamSportName"' }) : ''}
-    ${field('pf-wh', t('prof.weeklyHours'), p.weeklyHours, { inputmode: 'decimal', data: 'data-ch="pf" data-k="weeklyHours" data-num="1"' })}
-    ${field('pf-dh', t('prof.maxDayHours'), p.maxDayHours, { inputmode: 'decimal', data: 'data-ch="pf" data-k="maxDayHours" data-num="1"' })}
-    ${field('pf-exp', t('prof.experience'), p.experienceYears ?? '', { inputmode: 'numeric', data: 'data-ch="pf" data-k="experienceYears" data-num="1"' })}
-    ${select('pf-style', t('prof.planStyle'), p.planStyle, [['flexible', t('prof.flexible')], ['strict', t('prof.strict')]], 'data-ch="pf" data-k="planStyle"')}
-    ${select('pf-likes', t('prof.likes'), p.likesIntensity, [['balanced', t('prof.balanced')], ['intensity', t('prof.intensity')], ['volume', t('prof.volume')]], 'data-ch="pf" data-k="likesIntensity"')}</div>
-    <div class="fld wide"><label for="pf-inj">${esc(t('prof.injuries'))}</label><input class="inp" id="pf-inj" data-ch="pf" data-k="injuries" value="${esc(p.injuries)}" placeholder="${esc(t('prof.injuriesPh'))}"></div>
-    ${toggle('pf-med', t('prof.medical'), p.medicalCaution, 'data-ch="pf" data-k="medicalCaution" data-bool="1"')}
-    ${toggle('pf-veg', t('prof.vegetarian'), !!p.vegetarian, 'data-ch="pf" data-k="vegetarian" data-bool="1"')}
+  h += sec(t('prof.training'), `<div class="card"><div class="lbl">${esc(t('prof.sports'))}</div><div class="chips" style="margin:6px 0 var(--s3)">${SPORT_KEYS.filter(s => s !== 'football' || dp.teamSport || dp.sports.includes('football')).map(s => `<button class="chip ${dp.sports.includes(s) ? 'on' : ''}" data-act="pf-sport" data-s="${s}" aria-pressed="${dp.sports.includes(s)}">${esc(s === 'football' && dp.teamSportName ? dp.teamSportName : sportLabel(s))}</button>`).join('')}</div>
+    <div class="fgrid">${dp.sports.includes('football') ? field('pf-team', t('prof.teamSport'), dp.teamSportName, { data: 'data-ch="pf" data-k="teamSportName"' }) : ''}
+    ${field('pf-wh', t('prof.weeklyHours'), dp.weeklyHours, { inputmode: 'decimal', data: 'data-ch="pf" data-k="weeklyHours" data-num="1"' })}
+    ${field('pf-dh', t('prof.maxDayHours'), dp.maxDayHours, { inputmode: 'decimal', data: 'data-ch="pf" data-k="maxDayHours" data-num="1"' })}
+    ${field('pf-exp', t('prof.experience'), dp.experienceYears ?? '', { inputmode: 'numeric', data: 'data-ch="pf" data-k="experienceYears" data-num="1"' })}
+    ${select('pf-style', t('prof.planStyle'), dp.planStyle, [['flexible', t('prof.flexible')], ['strict', t('prof.strict')]], 'data-ch="pf" data-k="planStyle"')}
+    ${select('pf-likes', t('prof.likes'), dp.likesIntensity, [['balanced', t('prof.balanced')], ['intensity', t('prof.intensity')], ['volume', t('prof.volume')]], 'data-ch="pf" data-k="likesIntensity"')}</div>
+    <div class="fld wide"><label for="pf-inj">${esc(t('prof.injuries'))}</label><input class="inp" id="pf-inj" data-ch="pf" data-k="injuries" value="${esc(dp.injuries)}" placeholder="${esc(t('prof.injuriesPh'))}"></div>
+    ${toggle('pf-med', t('prof.medical'), dp.medicalCaution, 'data-ch="pf" data-k="medicalCaution" data-bool="1"')}
+    <div class="hint">${esc(t('stage.profHint'))}</div>${toggle('pf-veg', t('prof.vegetarian'), !!p.vegetarian, 'data-ch="pf" data-k="vegetarian" data-bool="1"')}
     <div class="hint">${esc(t('prof.thresholdsHint'))}</div><button class="btn ghost sm" data-act="go-sub" data-sub="einstellungen">${esc(t('prof.toZones'))}</button></div>`);
   h += sec(t('prof.lang'), `<div class="card"><div class="fgrid">${select('pf-lang', t('prof.language'), p.lang, [['de', 'Deutsch'], ['en', 'English (beta)']], 'data-ch="pf" data-k="lang"')}${select('pf-units', t('prof.units'), p.units, [['metric', t('prof.metric')], ['imperial', t('prof.imperial')]], 'data-ch="pf" data-k="units"')}</div></div>`);
   h += `<button class="btn ghost block" data-act="go-sub" data-sub="onboarding" style="margin-top:var(--s3)">${ic('wand')} ${esc(t('prof.redoOnboarding'))}</button>`;
-  return h;
+  return h + stageBarHtml(SCREEN);
 }
 
 onChange('pf', el => {
@@ -54,15 +61,16 @@ onChange('pf', el => {
   if (el.dataset.num) { v = parseNum(v); if (v == null && k !== 'birthYear' && k !== 'heightCm' && k !== 'weightKg' && k !== 'experienceYears') { toast(t('common.invalidNumber')); return; } }
   if (k === 'birthYear' && v != null && (v < 1930 || v > +todayStr().slice(0, 4) - 5)) { toast(t('common.invalidNumber')); return; }
   if (k === 'sex' && !v) v = null;
+  if ((PLAN_FIELDS as readonly string[]).includes(k)) { stage(SCREEN, (x: any) => { x[k] = v; }); return; }
   p[k] = v;
   saveProfile(p); invalidate();
   if (k === 'lang' || k === 'units' || k === 'birthYear') { nav.rerender(); toast(t('common.saved')); }
 });
 on('pf-sport', el => {
-  const p = profile(); const s = el.dataset.s as SportKey;
-  p.sports = p.sports.includes(s) ? p.sports.filter(x => x !== s) : [...p.sports, s];
-  if (!p.sports.length) { toast(t('prof.oneSport')); return; }
-  saveProfile(p); invalidate(); nav.rerender();
+  const s = el.dataset.s as SportKey; const cur = draftProfile(SCREEN).sports;
+  const next = cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s];
+  if (!next.length) { toast(t('prof.oneSport')); return; }
+  stage(SCREEN, p => { p.sports = next; });
 });
 
 /* ---------- Ziel bearbeiten ---------- */
@@ -88,8 +96,8 @@ function goalSheet(): string {
     <div class="hint">${esc(t('goal.planHint'))}</div></div>`;
 }
 const parseHm = (s: string): number | null => { const m = /^(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?$/.exec(String(s).trim()); if (!m) return null; return m[3] != null ? +m[1] * 3600 + +m[2] * 60 + +m[3] : +m[1] * 3600 + +m[2] * 60; };
-on('goal-new', () => { G = { id: 'goal-' + Date.now(), type: 'run_10k', name: goalLabel('run_10k'), date: null, priority: goals().length ? 'B' : 'A', outcome: 'finish' }; G_NEW = true; openSheet(t('prof.addGoal'), goalSheet); });
-on('goal-open', el => { const g = (STATE.goals || {})[el.dataset.id!]; if (!g) return; G = JSON.parse(JSON.stringify(g)); G_NEW = false; openSheet(g.name, goalSheet); });
+on('goal-new', () => { G = { id: 'goal-' + Date.now(), type: 'run_10k', name: goalLabel('run_10k'), date: null, priority: draftGoals(SCREEN).length ? 'B' : 'A', outcome: 'finish' }; G_NEW = true; openSheet(t('prof.addGoal'), goalSheet); });
+on('goal-open', el => { const g = draftGoal(SCREEN, el.dataset.id!); if (!g) return; G = JSON.parse(JSON.stringify(g)); G_NEW = false; openSheet(g.name, goalSheet); });
 onChange('g', el => {
   if (!G) return; const k = el.dataset.k!; const v = (el as HTMLInputElement).value;
   if (k === 'type') { const wasDefault = !G.name || TYPES.some(x => goalLabel(x) === G!.name); G.type = v as GoalType; if (wasDefault) G.name = goalLabel(v); refreshSheet(); return; }
@@ -102,13 +110,12 @@ onChange('g', el => {
 on('goal-save', () => {
   if (!G) return;
   if (!G.name.trim()) { toast(t('goal.nameMissing')); return; }
-  STATE.goals = { ...(STATE.goals || {}), [G.id]: { ...G, createdAt: G.createdAt || Date.now() } };
-  saveState(); invalidate(); closeSheet(); nav.rerender(); toast(t('common.saved'));
+  const g = { ...G, createdAt: G.createdAt || Date.now() };
+  closeSheet(); stage(SCREEN, (_p, gs) => { gs[g.id] = g; });
 });
 on('goal-del', el => {
   if (!G || !armed(el, t('common.reallyDelete'))) return;
-  const next = { ...(STATE.goals || {}) }; delete next[G.id]; STATE.goals = next;
-  saveState(); invalidate(); closeSheet(); nav.rerender();
+  const id = G.id; closeSheet(); stage(SCREEN, (_p, gs) => { delete gs[id]; });
 });
 void more; void paceToSec; void secToPace;
 export type { Profile };

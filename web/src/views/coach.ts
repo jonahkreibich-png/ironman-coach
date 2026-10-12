@@ -141,7 +141,7 @@ on('chat-action', el => {
   if (a.kind === 'adjust') { if (!(a.payload || []).length) { done(t('chat.nothing')); return; } propose(a.payload, t('chat.adjusted')); done(t('chat.adjustedShort')); return; }
   if (a.kind === 'go') { done(t('chat.opened')); nav.go(String(a.payload)); return; }
   if (a.kind === 'say') { done(''); ask(String(a.payload || '')); return; }
-  if (a.kind === 'rule-fix') { const msg = fixConflict('cons', a.payload || {}); done(msg || t('chat.nothing')); return; }
+  if (a.kind === 'rule-fix') { const msg = fixConflict('now', a.payload || {}); done(msg || t('chat.nothing')); return; }
 });
 on('prop', async el => {
   try { await apiCall('POST', '/api/coach/proposal/' + el.dataset.id, { accept: el.dataset.ok === '1' }); await syncNow(); toast(el.dataset.ok === '1' ? t('coach.accepted') : t('coach.rejected')); }

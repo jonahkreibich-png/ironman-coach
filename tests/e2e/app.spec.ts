@@ -109,6 +109,9 @@ test.describe('Grundfunktionen', () => {
     await page.selectOption('#g-type', 'run_10k');
     await page.fill('#g-date', '2027-04-18'); await page.locator('#g-date').blur();
     await page.locator('[data-act="goal-save"]').click();
+    // Auftrag 6: Ziel erst vorgemerkt, dann übernommen
+    expect(Object.values((await stored(page)).goals).some((g: any) => g.type === 'run_10k' && g.date === '2027-04-18')).toBe(false);
+    await page.locator('[data-act="stage-apply"]').click(); await page.locator('[data-act="stage-confirm"]').click();
     expect(Object.values((await stored(page)).goals).some((g: any) => g.type === 'run_10k' && g.date === '2027-04-18')).toBe(true);
     await tab(page, 'fortschritt').click();
     await page.locator('[data-act="score-open"]').first().click();

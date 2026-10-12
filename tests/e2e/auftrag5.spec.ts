@@ -25,6 +25,11 @@ test('A: Papas Satz → App zeigt, was sie verstanden hat → Läufe nur noch Sa
   // die Regel landet direkt im Wochenraster
   await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bno\b/);
   await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="6"]')).toHaveClass(/\byes\b/);
+  // Auftrag 6: erst vorgemerkt, Vorschau zeigt die Folgen, dann übernehmen
+  await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bchg\b/);
+  await page.locator('[data-act="stage-apply"]').click();
+  await expect(page.locator('[data-stage-preview]')).toContainText(/Laufen von \S+ auf (Sa|So)\b/);
+  await page.locator('[data-act="stage-confirm"]').click();
   await expect(page.locator('[data-replanned]')).toBeVisible({ timeout: 5000 });
   // ab heute (Mi 14.10.) kein Lauf mehr außer Sa/So
   const all = await effectiveSessions(page);
@@ -42,6 +47,9 @@ test('A2: Wochenraster antippen ändert die Regel (geht → lieber nicht → geh
   await expect(cell).toHaveClass(/\byes\b/);
   await cell.click(); await expect(cell).toHaveClass(/\bsoft\b/);
   await cell.click(); await expect(cell).toHaveClass(/\bno\b/);
+  await expect(page.locator('[data-stage-bar]')).toContainText('1 Änderung');
+  await page.locator('[data-act="stage-apply"]').click(); await page.locator('[data-act="stage-confirm"]').click();
+  await expect(page.locator('[data-stage-bar]')).toHaveCount(0);
   const p = (await stored(page)).profile;
   expect(p.rules.some((r: any) => r.kind === 'neverDays' && r.sport === 'bike' && r.days.includes(2) && r.strength === 'hard')).toBe(true);
 });

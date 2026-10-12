@@ -106,6 +106,17 @@ for (const [wname, w] of WIDTHS) {
               await page.keyboard.press('Escape');
             }
           }
+          // Auftrag 6: vorgemerkte Änderung – Leiste unten und Vorschau-Sheet
+          if (url.endsWith('beruecksichtigungen') && state !== 'leer') {
+            const cell = page.locator('[data-act="rule-cell"]').first();
+            if (await cell.count()) {
+              await cell.click(); await expect(page.locator('[data-stage-bar]')).toBeVisible();
+              (await overflow(page)).forEach(p => problems.push(`${url} Leiste „übernehmen“: ${p}`));
+              await page.locator('[data-act="stage-apply"]').click(); await expect(page.locator('[data-stage-sheet]')).toBeVisible();
+              (await overflow(page)).forEach(p => problems.push(`${url} Sheet Vorschau: ${p}`));
+              await page.locator('[data-act="stage-back"]').click(); await page.locator('[data-act="stage-discard"]').click();
+            }
+          }
         }
         expect(problems).toEqual([]);
       });

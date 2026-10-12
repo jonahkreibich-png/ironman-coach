@@ -1,4 +1,5 @@
 /* Einstieg: Tabs (Heute, Plan, Coach, Fortschritt, Mehr), Unterseiten unter „Mehr“, Aktionen, Deep Links. */
+import { guardLeave } from './staged';
 import './styles.css';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi } from './store';
 import { esc, todayStr, addDays } from './util';
@@ -100,6 +101,8 @@ function render() {
 }
 function go(target: string, scroll?: string | null) {
   const [a, b] = target.split(':');
+  // offene, nicht übernommene Änderungen (Auftrag 6): vor dem Verlassen nachfragen
+  if (guardLeave(SUBS[a] && !b ? a : b && SUBS[b] ? b : a, () => go(target, scroll))) return;
   if (SUBS[a] && !b) { UI.tab = 'mehr'; UI.sub = a; }
   else { UI.tab = (TABS.some(x => x.id === a) ? a : 'heute') as Tab; UI.sub = b && SUBS[b] ? b : null; }
   if (UI.sub === 'daten') resetDatenCache();
@@ -115,7 +118,7 @@ nav.render = render; nav.rerender = rerender; nav.go = go;
 /* ---------- Aktionen ---------- */
 on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!; if (tab === UI.tab && !UI.sub) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } if (tab === 'plan') UI.planDate = null; go(tab); });
 on('go-sub', el => { if (sheetOpen()) closeSheet(); go(el.dataset.sub!); });
-on('back', () => { UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
+on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
 on('ill-start', () => { STATE.illnessPeriods.push({ id: 'ill-' + Date.now(), start: todayStr(), end: null, note: '' }); saveState(); rerender(); toast(t('ill.started')); });
 on('ill-end', () => {
   const ill = D().ill; if (!ill) return; const t0 = todayStr();

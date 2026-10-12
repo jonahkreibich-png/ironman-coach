@@ -373,3 +373,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .intro-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .intro-dot.on { background: var(--accent); }
 .invite-link { word-break: break-all; color: var(--ink-2); }
+
+/* Auftrag 6: vorgemerkte Änderungen */
+.stage-bar { position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 8px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); margin-top: var(--s4); padding: var(--s3); border-radius: 16px; background: var(--surface); border: 2px solid var(--accent); box-shadow: var(--shadow); }
+.stage-bar > div:first-child { min-width: 0; flex: 1 1 140px; }
+.stage-btns { flex-wrap: wrap; gap: var(--s2); justify-content: flex-end; margin-left: auto; }
+.rg-c.chg { outline: 2px dashed var(--accent); outline-offset: -3px; font-weight: 800; }

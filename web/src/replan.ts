@@ -10,6 +10,11 @@ import { repairWeek } from '../../shared/repair';
 import { rulesOf, type Rule } from '../../shared/constraints';
 import { parseFor } from '../../shared/ruleparse';
 import type { Conflict } from '../../shared/plangen';
+import { planDiff } from '../../shared/plandiff';
+import type { Profile } from '../../shared/profile';
+import type { Goal } from '../../shared/goals';
+import { t } from '../../shared/i18n';
+import { sportLabel } from './kit';
 
 /* Aktuelle Lernstufen aus dem Plan (die zuletzt geplante Stufe je Lernweg) */
 export function currentStages(): { swim?: any; runwalk?: number | null } {
@@ -36,6 +41,27 @@ export function repairNow(rules?: Rule[]): string[] {
   adj.forEach((a, i) => { STATE.adjustments[a.id] = { ...a, createdAt: now + i, date: today }; });
   if (adj.length) rebuildPlanIndex();
   return adj.map(a => a.what);
+}
+/* Vorschau ohne Speichern (Auftrag 6, Punkt 1): was ändert sich in dieser und der nächsten Woche, wenn Profil/Ziele so übernommen werden?
+   Rechnet genau wie replanFuture: neuer Plan ab nächster Woche, laufende Woche nach den Regeln repariert. */
+export function previewReplan(p: Profile, goalList: Goal[]): { ok: boolean; msg: string; changes: string[]; thisWeek: string[]; nextWeek: string[]; conflicts: number } {
+  const old = readPlan(); const gl = (goalList || []).filter(g => g && !g.result);
+  if (!old || !gl.length) return { ok: false, msg: t('stage.noReplan'), changes: [], thisWeek: [], nextWeek: [], conflicts: 0 };
+  const today = todayStr();
+  const r = replanPlan(old, p, gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {} });
+  if (!r) return { ok: false, msg: t('stage.noReplan'), changes: [], thisWeek: [], nextWeek: [], conflicts: 0 };
+  const before = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}));
+  const adj = { ...(STATE.adjustments || {}) };
+  repairWeek(C.applyAdjustments(r.plan.weeks, adj), STATE, rulesOf(p, parseFor(today)), today, 'preview').forEach((a: any) => { adj[a.id] = a; });
+  const after = C.planDays(C.applyAdjustments(r.plan.weeks, adj));
+  const dowIdx = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
+  const mon = addDays(today, -((dowIdx(today) + 6) % 7));
+  const wk = (d: string) => d > addDays(mon, 6) ? 1 : 0;
+  const day = (d: string, anchor: string) => t('dow.' + dowIdx(d)) + (wk(d) !== wk(anchor) ? ' ' + t(wk(d) ? 'stage.nextWeek' : 'stage.thisWeek') : '');
+  const done = (id: string) => !!(STATE.sessions && STATE.sessions[id] && STATE.sessions[id].completed);
+  const diff = planDiff(before, after, today, addDays(mon, 13), { sport: sportLabel, day }, done);
+  const thisWeek = diff.filter(c => !wk(c.from || c.to || today)).map(c => c.text), nextWeek = diff.filter(c => wk(c.from || c.to || today)).map(c => c.text);
+  return { ok: true, msg: '', changes: [...thisWeek, ...nextWeek], thisWeek, nextWeek, conflicts: (r.gen.conflicts || []).length };
 }
 export function replanFuture(reason: string, why: string): { ok: boolean; msg: string; conflicts?: Conflict[]; changed?: string[] } {
   const old = readPlan();

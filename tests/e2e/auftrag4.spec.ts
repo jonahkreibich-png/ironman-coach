@@ -157,6 +157,7 @@ test('C3: Berücksichtigung eintragen, Plan passt die kommenden Wochen an, Coach
   await page.locator('[data-act="rule-ed-save"]').click();
   await page.locator('[data-act="rule-ok"]').click();
   await expect(page.locator('[data-cons-list]')).toContainText('Mondphase beachten');
+  await page.locator('[data-act="stage-apply"]').click(); await page.locator('[data-act="stage-confirm"]').click();
   await expect(page.locator('[data-replanned]')).toBeVisible({ timeout: 5000 });
   const msgs = Object.values((await stored(page)).coachMsgs) as any[];
   expect(msgs.some(m => /Plan angepasst/.test(m.title || ''))).toBe(true);

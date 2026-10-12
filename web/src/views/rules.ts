@@ -13,7 +13,7 @@ import { rulesOf, cellOf, setCell, describe, ruleId, GRID_SPORTS, GRID_DAYS, typ
 import { parseRules, parseFor, type Ask } from '../../../shared/ruleparse';
 
 export interface RuleData { notes: string[]; rules: Rule[]; dayLoad: Record<number, number>; sports: string[]; team?: { name: string; trainingDays: number[]; gameDays: number[] } | null }
-export interface RuleTarget { get(): RuleData; set(next: { notes: string[]; rules: Rule[] }, what: string): void; setFreq?(sport: string, n: number, what: string): void }
+export interface RuleTarget { get(): RuleData; base?(): RuleData; set(next: { notes: string[]; rules: Rule[] }, what: string): void; setFreq?(sport: string, n: number, what: string): void }
 const TARGETS: Record<string, RuleTarget> = {};
 export function registerTarget(id: string, tg: RuleTarget) { TARGETS[id] = tg; }
 
@@ -37,14 +37,18 @@ const SYM: Record<Cell, string> = { yes: '✓', soft: '–', no: '✕' };
 export function gridHtml(tid: string): string {
   const d = TARGETS[tid].get();
   const rules = rulesOf({ notes: d.notes, rules: d.rules } as any, parseFor(todayStr()));
+  // vorgemerkt, noch nicht übernommen (Auftrag 6): geänderte Felder markieren
+  const bd = TARGETS[tid].base ? TARGETS[tid].base!() : null;
+  const brules = bd ? rulesOf({ notes: bd.notes, rules: bd.rules } as any, parseFor(todayStr())) : null;
   const sports = GRID_SPORTS.filter(s => d.sports.includes(s));
   if (!sports.length) return `<div class="hint">${esc(t('rules.gridNoSports'))}</div>`;
   const team = d.team;
   const head = `<span></span>${GRID_DAYS.map(x => `<b class="rg-h">${esc(t('dow.' + x))}${team && (team.trainingDays.includes(x) || team.gameDays.includes(x)) ? `<i class="rg-team" title="${esc(team.name)}">${team.gameDays.includes(x) ? '●' : '○'}</i>` : ''}</b>`).join('')}`;
   const rows = sports.map(s => `<span class="rg-l">${esc(sportLabel(s))}</span>${GRID_DAYS.map(x => {
     const c = cellOf(rules, s, x, d.dayLoad);
-    const label = `${sportLabel(s)} ${t('dow.' + x)}: ${t('rules.cell.' + (c.noTime ? 'noTime' : c.state))}`;
-    return `<button class="rg-c ${c.state}${c.noTime ? ' notime' : ''}" data-act="rule-cell" data-t="${tid}" data-s="${s}" data-d="${x}" aria-label="${esc(label)}" title="${esc(label)}">${SYM[c.state]}</button>`;
+    const chg = !!brules && !c.noTime && cellOf(brules, s, x, bd!.dayLoad).state !== c.state;
+    const label = `${sportLabel(s)} ${t('dow.' + x)}: ${t('rules.cell.' + (c.noTime ? 'noTime' : c.state))}${chg ? ' (' + t('stage.changedCell') + ')' : ''}`;
+    return `<button class="rg-c ${c.state}${c.noTime ? ' notime' : ''}${chg ? ' chg' : ''}"${chg ? ' data-chg="1"' : ''} data-act="rule-cell" data-t="${tid}" data-s="${s}" data-d="${x}" aria-label="${esc(label)}" title="${esc(label)}">${SYM[c.state]}</button>`;
   }).join('')}`).join('');
   return `<div class="rgrid" role="group" aria-label="${esc(t('rules.grid'))}">${head}${rows}</div>
     <div class="xs muted rg-legend">${esc(t('rules.legend'))}${team ? ' ' + esc(t('rules.teamLegend', { n: team.name })) : ''}</div>`;
