@@ -14,6 +14,8 @@ import { buildContext } from '../../shared/coach/summary';
 import type { EngineCtx, CoachMsg } from '../../shared/coach/engine';
 import { isMinor, ageOf } from '../../shared/profile';
 import { BRAND } from '../../shared/brand';
+import { rulesOf, describe as ruleText } from '../../shared/constraints';
+import { parseFor } from '../../shared/ruleparse';
 import { withoutSource, hasSource } from '../../shared/activity/merge';
 
 /* Oura-Daten dürfen laut Oura-API-Vertrag (gültig ab 08.06.2026, Abschnitt 4(d)) nicht an KI-Modelle gehen. Sie werden vor jedem KI-Aufruf entfernt. */
@@ -66,13 +68,19 @@ async function addUsage(env: Env, uid: number, model: string, usage: any, countM
     .bind(uid, berlinDate(), countMessage ? 1 : 0, tin, tout, cost).run();
 }
 
+/* Regeln des Athleten (Auftrag 5): stehen im Systemprompt, gelten aber unabhängig davon in jedem Werkzeug */
+function rulesBlock(ctx: EngineCtx): string {
+  const rs = rulesOf(ctx.profile, parseFor(ctx.today)).filter(r => !r.hidden && r.kind !== 'info');
+  return rs.length ? '\n## Regeln des Athleten (nie brechen; „möglichst“ darf mit Begründung abweichen)\n' + rs.map(r => '- ' + ruleText(r) + (r.strength === 'soft' ? ' (möglichst)' : '')).join('\n') : '';
+}
 function systemPrompt(ctx: EngineCtx): string {
   const minor = isMinor(ctx.profile, ctx.today);
   return [
     COACHING_HANDBOOK,
     `\n## Diese App\nDu bist der Coach in der App „${BRAND.name}“. Heute ist ${ctx.today}. Antworte in höchstens 120 Wörtern, außer der Athlet will eine ausführliche Wochenplanung.`,
     minor ? `\n## Wichtig\nDer Athlet ist ${ageOf(ctx.profile, ctx.today)} Jahre alt und minderjährig: keine Gewichtsziele, keine Kalorien-Defizite, kein Druck. Schule und Schlaf gehen vor.` : '',
-    '\nNutze die Werkzeuge für jede Planänderung. Wenn die Regel-Engine ablehnt, erkläre kurz warum und schlage eine erlaubte Alternative vor.'
+    rulesBlock(ctx),
+    '\nNutze die Werkzeuge für jede Planänderung. Neue dauerhafte Einschränkungen speicherst du mit add_rule. Wenn die Regel-Engine ablehnt, erkläre kurz warum und schlage eine erlaubte Alternative vor.'
   ].join('\n');
 }
 

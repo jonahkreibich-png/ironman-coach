@@ -7,6 +7,8 @@ import { GOALS, type GoalType } from '../goals';
 import { isMinor } from '../profile';
 import type { EngineCtx } from './engine';
 import { checkPlanCode } from './plancode';
+import { rulesOf, hardViolations, describe as ruleText } from '../constraints';
+import { parseFor, parseRules } from '../ruleparse';
 
 export const TOOL_DEFS = [
   { name: 'get_data', description: 'Liest Daten des Athleten. what: "day" (Plan und Status eines Tages), "week" (Woche um ein Datum), "values" (Morgenwerte der letzten Tage), "sessions" (erledigte Einheiten mit Messwerten der letzten Tage).',
@@ -25,6 +27,8 @@ export const TOOL_DEFS = [
     input_schema: { type: 'object', properties: { date: { type: 'string' } }, required: ['date'], additionalProperties: false } },
   { name: 'save_note', description: 'Speichert eine wichtige Tatsache als Langzeit-Notiz (z. B. Beschwerden, Vorlieben, Probleme). Der Athlet sieht und löscht Notizen selbst.',
     input_schema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'], additionalProperties: false } },
+  { name: 'add_rule', description: 'Speichert eine dauerhafte Einschränkung des Athleten in seinen Regeln (z. B. „ab jetzt mittwochs kein Laufen“, „Schwimmbad nur donnerstags“, „Urlaub vom 20.12. bis 6.1.“). text ist der Satz in einfachen Worten. Wird als Vorschlag gezeigt; danach plant die App die kommenden Wochen neu.',
+    input_schema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 }, reason: { type: 'string' } }, required: ['text'], additionalProperties: false } },
   { name: 'change_goal', description: 'Ändert oder legt ein Ziel an (großer Eingriff, wird als Vorschlag gezeigt).',
     input_schema: { type: 'object', properties: { goal_id: { type: 'string' }, name: { type: 'string' }, type: { type: 'string', enum: Object.keys(GOALS) }, date: { type: 'string' }, priority: { type: 'string', enum: ['A', 'B', 'C'] }, target_time_min: { type: 'integer' }, reason: { type: 'string' } }, required: ['name', 'type', 'date', 'priority', 'reason'], additionalProperties: false } }
 ] as const;
@@ -99,6 +103,11 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
     const more = minsOf(after, target) > minsOf(weeks, target);
     const fresh = [...new Map(problems.filter(v => !before.has(key(v)) || ((v.rule === 'volume' || v.rule === 'runVolume') && more)).map(v => [key(v), v.msg])).values()];
     if (fresh.length) return err('Abgelehnt von der Regel-Engine: ' + fresh.join(' ') + ' Finde eine andere Lösung.');
+    // harte Regeln des Athleten (Tage, Orte, Zeiträume, Tagesgrenzen) gelten auch für die KI
+    const rules = rulesOf(ctx.profile, parseFor(today));
+    const had = new Set(hardViolations(weeks, rules, today).map(v => v.msg));
+    const broken = hardViolations(after, rules, today).filter(v => !had.has(v.msg));
+    if (broken.length) return err('Abgelehnt: ' + broken[0].msg + '. Diese Regel hat der Athlet selbst festgelegt, sie darf nicht gebrochen werden. Schlage einen erlaubten Tag oder eine andere Lösung vor.');
     // groß: Dauer um mehr als 30 % höher, eine lockere Einheit wird hart
     const s2 = findSession(after, hit.s.id);
     const grows = s2 && hit.s.plannedMinutes && s2.s.plannedMinutes && s2.s.plannedMinutes > hit.s.plannedMinutes * 1.3;
@@ -131,6 +140,13 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
     if (!text) return err('Leere Notiz.');
     const id = 'note-' + ctx.now + '-' + (++seq);
     return { result: 'Notiz gespeichert.', isError: false, changes: [{ kind: 'coachNote', key: id, data: { id, text, createdAt: ctx.now, from: 'ai' } }] };
+  }
+  if (name === 'add_rule') {
+    const text = String(input.text || '').trim().slice(0, 200);
+    const r = parseRules(text, today).rules.filter(x => x.kind !== 'info');
+    if (!r.length) return err('Diesen Satz verstehe ich nicht als Regel. Formuliere ihn einfacher, z. B. „mittwochs kein Laufen“ oder „Urlaub vom 20.12. bis 6.1.“.');
+    const prof = { ...ctx.profile, rules: [...(ctx.profile.rules || []), ...r.map(x => ({ ...x, source: 'ai' as const, text }))], notes: [...new Set([...(ctx.profile.notes || []), text])], updatedAt: ctx.now };
+    return { result: 'Als Vorschlag gespeichert: ' + r.map(ruleText).join('; ') + '. Der Athlet entscheidet.', isError: false, changes: [], proposal: { title: 'Neue Regel: ' + r.map(ruleText).join('; '), text: String(input.reason || text), changes: [{ kind: 'profile', key: 'main', data: prof }] } };
   }
   if (name === 'change_goal') {
     if (!GOALS[input.type as GoalType]) return err('Unbekannte Zielart.');

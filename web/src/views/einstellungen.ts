@@ -12,6 +12,7 @@ import { needsParentConsent } from '../../../shared/features';
 import { STORAGE, APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
+import { keepDays } from './coach';
 
 const NOTIFY_DEFAULTS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
@@ -41,6 +42,7 @@ export function renderEinstellungen(): string {
     <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`);
   h += sec(t('set.zones'), zonesCard(), t('set.zonesAside'));
   h += sec(t('set.notify'), notifyCard());
+  h += sec(t('set.chat'), `<div class="card stack"><span class="lab">${esc(t('set.chatKeep'))}</span><div class="seg" role="group" aria-label="${esc(t('set.chatKeep'))}">${[3, 7, 14].map(n => `<button class="${keepDays() === n ? 'on' : ''}" aria-pressed="${keepDays() === n}" data-act="set-chat-keep" data-v="${n}">${esc(t('set.chatDays', { n }))}</button>`).join('')}</div><div class="hint">${esc(t('set.chatKeepHint'))}</div></div>`);
   h += sec(t('set.ai'), aiCard());
   h += sec(t('set.illness'), illnessCard());
   h += sec(t('set.ready'), readyCard(), t('set.readyAside'));
@@ -214,3 +216,5 @@ on('score-reset', () => { STATE.scoreAdjust = {}; saveState(); invalidate(); nav
 on('set-theme', el => { applyTheme(el.dataset.v || ''); nav.rerender(); });
 on('set-variant', el => { UI.heuteVariant = el.dataset.v; saveUi(); nav.rerender(); });
 void fmtDate; void refreshSheet; void saveProfile;
+
+on('set-chat-keep', el => { STATE.settings.coachKeepDays = +el.dataset.v!; saveState(); nav.rerender(); });

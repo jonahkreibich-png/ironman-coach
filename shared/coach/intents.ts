@@ -236,3 +236,5 @@ export function understand(ctx: EngineCtx, text: string, extra: Extra = {}): Cha
   return { intent: 'unknown', text: 'Das verstehe ich leider noch nicht. Ich kann Fragen zu Training, Erholung, Plan und Zielen beantworten und den Plan umstellen. Probier zum Beispiel einen dieser Sätze:', suggestions: SUGGEST };
 }
 void GOALS; void A;
+/* Für die Gesprächsführung (shared/coach/dialog.ts) */
+export { has, wordHit, dayIn, sportIn, bodyIn, weeksOf, dayOf, live, fmtD, sessLine, easyToday, helpText };

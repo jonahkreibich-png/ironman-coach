@@ -130,3 +130,42 @@ test.describe('B: Meldungen mit Server', () => {
     await expect.poll(async () => (await (await request.get('/api/admin/feedback', { headers: H })).json()).feedback[0].status).toBe('erledigt');
   });
 });
+
+test.describe('D: Coach-Chat', () => {
+  const send = async (page: any, text: string) => { await page.fill('#coach-in', text); await page.locator('[data-act="coach-send"]').click(); };
+  test('Rückfrage mit Knöpfen: keine Zeit → Tag wählen → verschoben → Rückgängig', async ({ page }) => {
+    await seed(page);
+    await open(page, '/?go=coach');
+    await expect(page.locator('[data-now]')).toContainText('Gerade aktuell');
+    await send(page, 'Ich habe morgen keine Zeit');
+    const last = page.locator('.msg').last();
+    await expect(last.locator('[data-act="chat-opt"]').first()).toBeVisible();
+    await last.locator('[data-act="chat-opt"]').first().click();
+    let reply = page.locator('.msg').last();
+    if (await reply.locator('[data-act="chat-opt"]', { hasText: /Ja/ }).count()) { await reply.locator('[data-act="chat-opt"]', { hasText: /Ja/ }).first().click(); reply = page.locator('.msg').last(); }
+    await expect(reply).toContainText('Erledigt');
+    const adj = Object.values((await stored(page)).adjustments).filter((a: any) => a.from_chat && !a.undone);
+    expect(adj.length).toBeGreaterThan(0);
+    await reply.locator('[data-act="chat-undo"]').click();
+    await expect.poll(async () => Object.values((await stored(page)).adjustments).filter((a: any) => a.from_chat && !a.undone).length).toBe(0);
+  });
+  test('Schnellaktion „Mir geht\'s nicht gut“ mit zwei Tipps, Verlauf durchsuchbar', async ({ page }) => {
+    await seed(page);
+    await open(page, '/?go=coach');
+    await page.locator('[data-quick] [data-act="chat-say"]', { hasText: "Mir geht's nicht gut" }).click();
+    await expect(page.locator('.msg').last()).toContainText('Gute Besserung');
+    await page.locator('[data-act="chat-history"]').click();
+    await page.fill('#hist-q', 'Besserung'); await page.locator('#hist-q').blur();
+    await expect(page.locator('[data-history]')).toContainText('Gute Besserung');
+  });
+  test('Neue Regel im Chat: ab jetzt mittwochs kein Laufen → im Wochenraster sichtbar', async ({ page }) => {
+    await seed(page);
+    await open(page, '/?go=coach');
+    await send(page, 'Ab jetzt kann ich mittwochs nicht laufen');
+    await expect(page.locator('.msg').last()).toContainText('Laufen: nie Mi');
+    await page.locator('.msg').last().locator('[data-act="chat-opt"]').first().click();
+    await expect(page.locator('.msg').last()).toContainText('Erledigt');
+    await open(page, '/?go=beruecksichtigungen');
+    await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bno\b/);
+  });
+});

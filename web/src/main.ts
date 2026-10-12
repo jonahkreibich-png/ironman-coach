@@ -91,7 +91,7 @@ function render() {
   else if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) html = SUBS[UI.sub]();
   else html = TABS.find(x => x.id === UI.tab)!.render();
   byId('app').innerHTML = `<div class="view" data-view="${esc(UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab)}">${html}</div>`;
-  if (HAS_PLAN && UI.tab === 'coach') { UI.coachSeenAt = Date.now(); saveUi(); }
+  if (HAS_PLAN && UI.tab === 'coach') { if (!UI.coachVisit) { UI.coachSeenPrev = UI.coachSeenAt || 0; UI.coachVisit = true; } UI.coachSeenAt = Date.now(); saveUi(); } else if (UI.coachVisit) { UI.coachVisit = false; saveUi(); }
   // Letzte Bildschirme (für „Fehler melden“)
   const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');
   const trail: string[] = UI.trail || []; if (trail[trail.length - 1] !== here && here !== 'feedback') { UI.trail = [...trail, here].slice(-6); saveUi(); }

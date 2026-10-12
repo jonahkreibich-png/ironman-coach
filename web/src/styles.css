@@ -352,3 +352,17 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .fb-shot { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--line); margin: 6px 0; }
 .fb-reply { margin-top: 6px; }
 .fb-item.hl { background: var(--accent-soft); }
+
+/* Coach (Auftrag 5 D) */
+.now-card { padding: var(--s3) var(--s4); }
+.now-card > * + * { margin-top: 4px; }
+.msg { position: relative; }
+.msg .msg-pin { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); opacity: .55; display: grid; place-items: center; padding: 0; }
+.msg .msg-pin svg { width: 15px; height: 15px; }
+.msg .msg-pin.on { color: var(--accent); opacity: 1; }
+.msg.coach { padding-right: 34px; }
+.msg.pinned { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.msg.hl { outline: 2px solid var(--accent); }
+.msg-line { align-self: center; font-size: var(--t-sm); color: var(--ink-2); background: var(--surface-2); border-radius: var(--r-pill); padding: 4px 12px; max-width: 100%; text-align: center; }
+.hist-item { font-size: var(--t-sm); padding: 6px 0; border-top: 1px solid var(--line); white-space: pre-line; }
+.hist-item.user b { color: var(--accent); }

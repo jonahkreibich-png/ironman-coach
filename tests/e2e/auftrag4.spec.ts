@@ -115,13 +115,13 @@ test('D: freies Schreiben mit dem Coach ohne KI, Aktion erst nach Bestätigung',
   await page.locator('[data-act="coach-send"]').click();
   await expect(page.locator('.msg').last()).toContainText('Krankheitsphase eintragen');
   expect((await stored(page)).illnessPeriods.some((p: any) => !p.end)).toBe(false);
-  await page.locator('[data-act="chat-action"]').first().click();
+  await page.locator('[data-act="chat-opt"]').first().click();
   await expect.poll(async () => (await stored(page)).illnessPeriods.some((p: any) => !p.end)).toBe(true);
-  // Unbekanntes: ehrliche Antwort mit Vorschlägen
+  // Unbekanntes: gezielte Rückfrage mit Knöpfen statt Floskel (Auftrag 5 D5)
   await page.fill('#coach-in', 'Was kostet ein Eis?');
   await page.locator('[data-act="coach-send"]').click();
-  await expect(page.locator('.msg').last()).toContainText('verstehe ich leider noch nicht');
-  await expect(page.locator('.msg').last().locator('[data-act="chat-say"]')).not.toHaveCount(0);
+  await expect(page.locator('.msg').last()).toContainText('?');
+  await expect(page.locator('.msg').last().locator('[data-act="chat-opt"]')).not.toHaveCount(0);
 });
 
 test('C5: Plan bearbeiten – Einheit ändern, als fest markieren, rückgängig und Original', async ({ page }) => {

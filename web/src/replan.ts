@@ -3,7 +3,7 @@
    Die Änderung erscheint mit Begründung im Coach-Chat. */
 import { STATE, PLAN, BASE_WEEKS, PLAN_KEY, readPlan, saveState, profile, goals, replacePlanInPlace, rebuildPlanIndex } from './store';
 import { todayStr, addDays } from './util';
-import { generatePlan, transitionPlan } from '../../shared/plangen';
+import { replanPlan } from '../../shared/replan';
 import * as C from '../../shared/core';
 import { D } from './data';
 import { repairWeek } from '../../shared/repair';
@@ -42,17 +42,9 @@ export function replanFuture(reason: string, why: string): { ok: boolean; msg: s
   const gl = goals().filter(g => !g.result);
   if (!old || !gl.length) return { ok: false, msg: 'Ohne Plan und Ziel gibt es nichts neu zu planen.' };
   const today = todayStr();
-  const stages = currentStages();
-  const gen = generatePlan({ profile: profile(), goals: gl, today, currentWeeklyHours: recentHours(), stages: { swim: stages.swim === undefined ? undefined as any : stages.swim, runwalk: stages.runwalk === undefined ? undefined as any : stages.runwalk } });
-  const next = transitionPlan(old, gen.plan, today);
-  // Feste Einheiten der kommenden Wochen mitnehmen
-  const eff = C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {});
-  const locked = C.planDays(eff).flatMap(d => d.sessions.filter((s: any) => s.locked && d.date > today).map((s: any) => ({ s, date: d.date })));
-  for (const { s, date } of locked) {
-    const day = next.weeks.flatMap((w: any) => w.days).find((d: any) => d.date === date);
-    if (day) { day.sessions = day.sessions.filter((x: any) => x.sport !== 'rest'); if (!day.sessions.some((x: any) => x.id === s.id)) day.sessions.push({ ...s, _adj: undefined, _orig: undefined }); }
-  }
-  next.meta = { ...next.meta, explain: gen.plan.meta.explain };
+  const r = replanPlan(old, profile(), gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {} });
+  if (!r) return { ok: false, msg: 'Ohne Plan und Ziel gibt es nichts neu zu planen.' };
+  const { plan: next, gen } = r;
   try { localStorage.setItem(PLAN_KEY + '_prev', JSON.stringify(old)); } catch (e) { return { ok: false, msg: 'Speichern nicht möglich.' }; }
   replacePlanInPlace(next);
   // diese Woche: was jetzt gegen eine harte Regel verstößt, sofort verschieben oder streichen
