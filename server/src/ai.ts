@@ -199,3 +199,39 @@ export async function decideProposal(env: Env, uid: number, msgId: string, accep
   await putRecords(env, uid, changes);
   return { applied: accept ? changes.length - 1 : 0 };
 }
+
+/* Freitext → Regeln mit der KI (Auftrag 5 A3). Dasselbe Regel-Format wie der eingebaute Parser; die App zeigt das Ergebnis
+   immer zur Bestätigung. Jede Regel wird geprüft (sanitizeRule). Fällt die KI aus, gilt der eingebaute Parser. */
+const RULE_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['rules'],
+  properties: { rules: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['kind', 'strength'],
+    properties: {
+      kind: { type: 'string', enum: ['onlyDays', 'neverDays', 'dayOff', 'maxDay', 'placeDays', 'period', 'body', 'prefer', 'info'] },
+      strength: { type: 'string', enum: ['hard', 'soft'] },
+      sport: { type: 'string', enum: ['run', 'bike', 'swim', 'strength'] },
+      days: { type: 'array', items: { type: 'integer' } }, months: { type: 'array', items: { type: 'integer' } },
+      minutes: { type: 'integer' }, place: { type: 'string', enum: ['pool', 'trainer', 'outdoor', 'gym', 'treadmill', 'track'] }, placeOnly: { type: 'boolean' },
+      from: { type: 'string' }, to: { type: 'string' }, level: { type: 'string', enum: ['none', 'low'] },
+      body: { type: 'string' }, noIntervals: { type: 'boolean' }, noDownhill: { type: 'boolean' }, what: { type: 'string', enum: ['long', 'hard'] }, note: { type: 'string' }
+    } } } }
+};
+const RULE_PROMPT = `Du übersetzt einen Satz eines Ausdauersportlers über seinen Alltag in Regeln für seinen Trainingsplan.
+Wochentage: 0=Sonntag, 1=Montag … 6=Samstag. Monate 1-12. Datumsangaben als JJJJ-MM-TT; ohne Jahr das nächste passende Datum ab heute.
+Arten: onlyDays (Sportart nur an diesen Tagen; ohne sport = Training nur an diesen Tagen), neverDays (Sportart nie an diesen Tagen; ohne days = gar nicht),
+dayOff (Tag ganz frei), maxDay (höchstens minutes an diesen Tagen, mit sport = je Einheit dieser Sportart), placeDays (Ort/Gerät nur bzw. nie: placeOnly),
+period (from/to, level none = kein Training, low = wenig), body (Körperteil knee, achilles, shin, hip, back, shoulder, foot, groin, calf, injury, heart, asthma mit Folgen),
+prefer (Vorliebe, z. B. langer Lauf lieber sonntags: what long), info (nur merken).
+strength hard, wenn die Person etwas nicht kann oder ausschließt („nicht“, „nie“, „nur“); soft bei „lieber“, „möglichst“, „wenn es geht“.
+Gib nur Regeln aus, die der Satz wirklich sagt. Unklar oder nichts davon: leere Liste.`;
+export async function aiParseRules(env: Env, uid: number, text: string, today: string): Promise<any[]> {
+  const res = await creator(env)({
+    model: MODELS.routine, max_tokens: 2000,
+    output_config: { format: { type: 'json_schema', schema: RULE_SCHEMA } },
+    system: RULE_PROMPT,
+    messages: [{ role: 'user', content: `Heute ist ${today}. Satz: ${String(text).slice(0, 400)}` }]
+  });
+  await addUsage(env, uid, MODELS.routine, res.usage || {}, false);
+  if (res.stop_reason === 'refusal') return [];
+  const raw = (res.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
+  try { const j = JSON.parse(raw); return Array.isArray(j.rules) ? j.rules : []; } catch (e) { return []; }
+}

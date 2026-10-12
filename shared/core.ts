@@ -2,6 +2,8 @@
 // Bewusst locker typisiert: Datensätze kommen aus Sync und Backups und sind nicht immer vollständig.
 import { GENERIC_LTHR } from './profile';
 import * as W from './workouts';
+import { rulesOf, evaluate, dayLimit } from './constraints';
+import { parseFor } from './ruleparse';
 /* ---------- Datum ---------- */
 function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
@@ -222,12 +224,14 @@ function applyAdjustments(weeks, adjustments) {
     if (a.type === 'add') {
       const to = dayByDate[a.to]; if (!to || !a.session || where[a.session.id]) continue;
       to.sessions = to.sessions.filter(x => x.sport !== 'rest');
-      to.sessions.push(Object.assign({}, a.session, { _adj: [a.id], added: true })); where[a.session.id] = to; continue;
+      to.sessions.push(Object.assign({}, a.session, { _adj: [a.id], added: true }, a.override ? { ruleOverride: true } : {})); where[a.session.id] = to; continue;
     }
     const d = where[a.sessionId]; if (!d) continue;
     const s = d.sessions.find(x => x.id === a.sessionId); if (!s) continue;
     if (!s._orig) { s._orig = {}; ADJ_FIELDS.forEach(k => { s._orig[k] = s[k] == null ? null : s[k]; }); s._orig.date = d.date; }
     s._adj = (s._adj || []).concat(a.id);
+    // bewusste Ausnahme von einer harten Regel: gilt nur für diese eine Einheit (Auftrag 5 A4)
+    if (a.override) s.ruleOverride = true;
     if (a.type === 'modify') Object.assign(s, a.set || {});
     else if (a.type === 'cancel') { s.cancelled = true; s.cancelReason = a.reason; if (a.removed) s.removed = true; }
     else if (a.type === 'move') {
@@ -342,6 +346,13 @@ function sessDone(state, s) { const st = (state.sessions || {})[s.id]; return !!
 function sessSkipped(state, s) { const st = (state.sessions || {})[s.id]; return !!(st && st.skipped); }
 
 /* ---------- Täglich (morgens) ---------- */
+/* Darf die Einheit an diesem Tag liegen? Harte Regeln der Person und Tagesgrenzen (Auftrag 5 A4) */
+function ruleOk(rules, s, date, others) {
+  if (evaluate(rules, s, date).hard.length) return false;
+  const lim = dayLimit(rules.filter(r => r.strength === 'hard'), date, false);
+  const used = (others || []).filter(x => x && x.sport !== 'rest' && !x.cancelled && !x.fixed && x.id !== s.id).reduce((a, x) => a + (x.plannedMinutes || 0), 0);
+  return used + (s.plannedMinutes || 0) <= lim.cap + 5;
+}
 function dailyAdjustments(state, baseWeeks, date, opts) {
   opts = opts || {};
   const res = [];
@@ -358,6 +369,7 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   const live = d => { const x = dayOf(d); return x ? x.sessions.filter(s => s.sport !== 'rest' && !s.cancelled) : []; };
   const push = a => { if (has(a.id)) return false; if (a.sessionId && isLocked(weeks, a.sessionId)) return false; a.createdAt = now + res.length; a.date = date; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
   const pain = painFlag(state, weeks, date);
+  const rules = rulesOf(state.profile, parseFor(date));
 
   // 1) Schutzregeln für heute: Lauf-Intervalle ohne Freigabe oder bei Leistenschmerz
   live(date).forEach(s => {
@@ -401,6 +413,7 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
         if (hardDay(to, s.id)) continue;                         // Ziel muss frei oder locker sein
         if (hardDay(addDays(to, -1), s.id) || hardDay(addDays(to, 1), s.id)) continue; // nie zwei harte Tage hintereinander
         if (gameDay(addDays(to, 1))) continue;                   // nie direkt vor einem Spiel
+        if (!ruleOk(rules, s, to, live(to))) continue;           // nie gegen die Regeln der Person (Auftrag 5)
         const easySame = live(to).find(x => x.sport === s.sport && !isHard(x) && !sessDone(state, x));
         push({ id: 'move-' + s.id, type: 'move', sessionId: s.id, from, to, group: 'move-' + s.id,
           what: `${s.title}: von ${dowDe(from)} ${dm(from)} auf ${dowDe(to)} ${dm(to)} verschoben`, reason: 'Schlüsseleinheit verpasst, Platz innerhalb von 48 h gefunden' });
@@ -516,11 +529,13 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   pct = Math.max(-20, Math.min(10, pct));
 
   const nextSessions = planDays([next]).flatMap(d => d.sessions.map(s => Object.assign({}, s, { date: d.date })));
+  const wRules = rulesOf(state.profile, parseFor(date));
   if (pct !== 0) {
     nextSessions.forEach(s => {
       if (!['swim', 'bike', 'run'].includes(s.sport) || s.cancelled || isTestOrRace(s) || !s.plannedMinutes) return;
       if (s.stage || s.race || s.fixed) return;
       const f = 1 + pct / 100;
+      if (pct > 0 && !ruleOk(wRules, { ...s, plannedMinutes: round5(s.plannedMinutes * f) }, s.date, nextSessions.filter(x => x.date === s.date && x.id !== s.id && !x.cancelled))) return;
       const rb = W.rebuildScaled(s, f);
       push({ id: `${group}-vol-${s.id}`, type: 'modify', sessionId: s.id,
         set: rb || { plannedMinutes: round5(s.plannedMinutes * f), plannedKm: s.plannedKm ? r1(s.plannedKm * f) : s.plannedKm == null ? null : s.plannedKm },
@@ -666,6 +681,7 @@ function bests(entries) {
 }
 
 export {
+  ruleOk,
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,

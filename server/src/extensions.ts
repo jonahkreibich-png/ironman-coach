@@ -5,7 +5,9 @@ import type { Auth } from './auth';
 import { HttpError, readJson } from './http';
 import * as X from './connect';
 import { runEngineFor, loadState, engineCtx } from './coach';
-import { aiChat, aiStatus, aiFoodEstimate, decideProposal, aiRephrase } from './ai';
+import { aiChat, aiStatus, aiFoodEstimate, decideProposal, aiRephrase, aiParseRules } from './ai';
+import { sanitizeRule } from '../../shared/constraints';
+import { parseRules } from '../../shared/ruleparse';
 import { putRecords } from './store';
 import { isMinor, ageOf } from '../../shared/profile';
 import { needsParentConsent } from '../../shared/features';
@@ -66,6 +68,23 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     const s = await getRecord(env, a.uid, 'settings', 'main');
     const prof = await getRecord(env, a.uid, 'profile', 'main');
     return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {}, prof ? needsParentConsent(ageOf(prof.data, berlinParts().date)) : false);
+  }
+  /* Freitext → Regeln: mit aktivem KI-Coach über die KI, sonst (und bei Fehlern) mit dem eingebauten Parser */
+  if (p === '/api/rules/parse' && M === 'POST') {
+    const body = await readJson(req); const text = String(body.text || '').trim().slice(0, 400);
+    if (!text) throw new HttpError(400, 'Leerer Text.');
+    const today = berlinParts().date;
+    const s = await getRecord(env, a.uid, 'settings', 'main');
+    const prof = await getRecord(env, a.uid, 'profile', 'main');
+    const st = await aiStatus(env, a.uid, (s && s.data && s.data.settings) || {}, prof ? needsParentConsent(ageOf(prof.data, today)) : false);
+    if (st.active) {
+      try {
+        const rules = (await aiParseRules(env, a.uid, text, today)).map((r: any) => sanitizeRule(r, text, 'ai')).filter(Boolean);
+        if (rules.length) return { rules, by: 'ai' };
+      } catch (e) { /* eingebauter Parser */ }
+    }
+    const r = parseRules(text, today);
+    return { rules: r.rules, ask: r.ask || null, by: 'parser' };
   }
   if (p === '/api/coach/chat' && M === 'POST') {
     const body = await readJson(req);

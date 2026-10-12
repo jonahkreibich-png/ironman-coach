@@ -317,3 +317,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .li.locked .t::after { content: ' 🔒'; }
 .understood .li { align-items: flex-start; }
 .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* Wochenraster (Auftrag 5 A2): Sportart × Wochentag, passt ab 320 px */
+.rgrid { display: grid; grid-template-columns: minmax(52px, auto) repeat(7, minmax(0, 1fr)); gap: 4px; align-items: center; }
+.rg-h { text-align: center; font-size: var(--t-xs); color: var(--ink-2); position: relative; }
+.rg-team { display: block; font-style: normal; font-size: 9px; line-height: 1; color: var(--football); }
+.rg-l { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); overflow-wrap: anywhere; }
+.rg-c { min-width: 0; min-height: 40px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: var(--t-md); padding: 0; }
+.rg-c.yes { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.rg-c.soft { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.rg-c.no { background: var(--bad-soft); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+.rg-c.notime { opacity: .45; }
+.rg-legend { margin-top: var(--s2); }
+.rl-r { display: block; font-size: var(--t-sm); color: var(--ink-2); margin-top: 2px; }
+.rl-confirm .li { flex-wrap: wrap; }
+.seg.sm button { padding: 4px 8px; min-height: 30px; font-size: var(--t-xs); }

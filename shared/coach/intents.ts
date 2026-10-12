@@ -13,7 +13,7 @@ import { mainGoal, nextGoal, GOALS } from '../goals';
 import { parseConsiderations } from '../considerations';
 import { hrZonesFor } from '../sports';
 
-export interface ChatAction { label: string; kind: 'illness-start' | 'illness-end' | 'add-note' | 'adjust' | 'go' | 'say'; payload?: any }
+export interface ChatAction { label: string; kind: 'illness-start' | 'illness-end' | 'add-note' | 'adjust' | 'go' | 'say' | 'rule-fix'; payload?: any }
 export interface ChatReply { intent: string; text: string; actions?: ChatAction[]; suggestions?: string[] }
 type Extra = { scores?: any[]; prognosis?: any };
 

@@ -39,7 +39,7 @@ test('Vater-Profil: 3 Läufe gewünscht, nur Sa/So erlaubt → klarer Hinweis mi
 test('Lösung „Laufen auch am Montag erlauben“ wirkt: Regel wird erweitert, Konflikt verschwindet', () => {
   const p = PERSONAS.find(x => x.id === 'vater-regeln')!;
   const r = applyOnboarding(p.answers, today);
-  let rules = rulesOf(r.profile, parseFor(today)).map(x => ({ ...x, source: 'text' as const }));
+  let rules: Rule[] = rulesOf(r.profile, parseFor(today)).map(x => ({ ...x, source: 'text' as const }));
   const day = r.gen!.conflicts[0].options[1].day!;
   rules = setCell(rules, 'run', day, 'yes');
   const g = generatePlan({ profile: r.profile, goals: r.goals, today, rules });

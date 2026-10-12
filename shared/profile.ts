@@ -3,6 +3,8 @@
    Im Code stehen keine Werte einer bestimmten Person: fehlende Schwellen werden aus dem Profil geschätzt
    (Alter, Bestzeiten, Können) und als „geschätzt“ markiert, bis ein Test oder eine Messung sie ersetzt. */
 
+import type { Rule } from './constraints';
+
 export type SportKey = 'swim' | 'bike' | 'run' | 'strength' | 'football';
 export type Units = 'metric' | 'imperial';
 export type Lang = 'de' | 'en';
@@ -69,6 +71,8 @@ export interface Profile {
   bests: Bests;
   /** freie Berücksichtigungen (eine pro Eintrag): Verletzungen, Vorlieben, Ausrüstung, Schwimmbad-Zeiten … */
   notes: string[];
+  /** Regeln aus Wochenraster, Freitext und Chat (Auftrag 5): harte und weiche Einschränkungen */
+  rules?: Rule[];
   fixed: FixedEvent[];
   routines: Routine[];
   units: Units;
@@ -204,6 +208,7 @@ export function mergeProfile(stored: any, fallback: Profile, today?: string): Pr
   p.bikes = Array.isArray(stored.bikes) ? stored.bikes : [];
   p.notes = Array.isArray(stored.notes) ? stored.notes : (typeof stored.notes === 'string' && stored.notes ? [stored.notes] : []);
   p.fixed = Array.isArray(stored.fixed) ? stored.fixed : [];
+  p.rules = Array.isArray(stored.rules) ? stored.rules.filter((r: any) => r && r.kind) : [];
   p.routines = Array.isArray(stored.routines) ? stored.routines : [];
   p.sports = Array.isArray(stored.sports) && stored.sports.length ? stored.sports : fallback.sports;
   return withEstimates(p, today || new Date().toISOString().slice(0, 10));

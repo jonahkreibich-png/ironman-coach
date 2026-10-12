@@ -11,6 +11,8 @@ import * as W from '../../../shared/workouts';
 import { paceCtx } from '../../../shared/plangen';
 import { validateWeeks } from '../../../shared/rules';
 import { checkPlan } from '../../../shared/plancheck';
+import { rulesOf, hardViolations, describe as ruleText } from '../../../shared/constraints';
+import { parseFor } from '../../../shared/ruleparse';
 import { isMinor } from '../../../shared/profile';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -19,6 +21,12 @@ export const editing = () => !!UI.planEdit;
 const uid = () => 'user-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
 
 /* ---------- Prüfung: welche Hinweise kommen durch die Änderung neu dazu? ---------- */
+/* Harte Regeln der Person (Auftrag 5 A4): Verstöße durch die Änderung */
+function ruleBreaks(adjustments: any): string[] {
+  const today = todayStr();
+  const weeks = C.applyAdjustments(BASE_WEEKS, adjustments).filter((w: any) => w.endDate >= today);
+  return hardViolations(weeks, rulesOf(profile(), parseFor(today)), today).map(v => t('edit.w.rule', { r: ruleText(v.rule), s: v.title }));
+}
 function issuesOf(adjustments: any): string[] {
   const weeks = C.applyAdjustments(BASE_WEEKS, adjustments);
   const today = todayStr();
@@ -30,16 +38,18 @@ function issuesOf(adjustments: any): string[] {
   ];
   return [...new Set(out)];
 }
-let PENDING: { adj: any[]; warnings: string[]; label: string } | null = null;
+let PENDING: { adj: any[]; warnings: string[]; label: string; rule: boolean } | null = null;
 /* Änderung vorschlagen: ohne neue Hinweise sofort übernehmen, sonst freundlich nachfragen */
 export function propose(adj: any[], label: string) {
+  const next = { ...STATE.adjustments, ...Object.fromEntries(adj.map(a => [a.id, a])) };
   const before = new Set(issuesOf(STATE.adjustments));
-  const after = issuesOf({ ...STATE.adjustments, ...Object.fromEntries(adj.map(a => [a.id, a])) });
-  const fresh = after.filter(x => !before.has(x));
+  const rb = new Set(ruleBreaks(STATE.adjustments));
+  const freshRules = ruleBreaks(next).filter(x => !rb.has(x));
+  const fresh = [...freshRules, ...issuesOf(next).filter(x => !before.has(x))];
   if (!fresh.length) { commit(adj, label); return; }
-  PENDING = { adj, warnings: fresh, label };
-  openSheet(t('edit.checkTitle'), () => `<div class="stack" data-edit-warn><div class="banner warn">${fresh.slice(0, 4).map(w => esc(friendly(w))).join('<br>')}</div><div class="hint">${esc(t('edit.checkHint'))}</div>
-    <button class="btn block" data-act="edit-anyway">${esc(t('edit.anyway'))}</button><button class="btn ghost block" data-act="edit-cancel">${esc(t('common.cancel'))}</button></div>`);
+  PENDING = { adj, warnings: fresh, label, rule: freshRules.length > 0 };
+  openSheet(t('edit.checkTitle'), () => `<div class="stack" data-edit-warn><div class="banner warn">${fresh.slice(0, 4).map(w => esc(friendly(w))).join('<br>')}</div><div class="hint">${esc(t(PENDING.rule ? 'edit.ruleHint' : 'edit.checkHint'))}</div>
+    <button class="btn block" data-act="edit-anyway">${esc(t(PENDING.rule ? 'edit.ruleAnyway' : 'edit.anyway'))}</button><button class="btn ghost block" data-act="edit-cancel">${esc(t('common.cancel'))}</button></div>`);
 }
 function friendly(msg: string): string {
   if (/beide hart/.test(msg)) return t('edit.w.hard', { msg });
@@ -51,7 +61,7 @@ function commit(adj: any[], label: string) {
   adj.forEach((a, i) => { STATE.adjustments[a.id] = { ...a, createdAt: now + i, date: todayStr(), from_user: true }; });
   rebuildPlanIndex(); saveState(); closeSheet(); nav.rerender(); toast(label);
 }
-on('edit-anyway', () => { if (!PENDING) return; const p = PENDING; PENDING = null; commit(p.adj, p.label); });
+on('edit-anyway', () => { if (!PENDING) return; const p = PENDING; PENDING = null; commit(p.rule ? p.adj.map(a => ({ ...a, override: true })) : p.adj, p.label); });
 on('edit-cancel', () => { PENDING = null; closeSheet(); });
 
 /* ---------- Leiste über der Woche ---------- */

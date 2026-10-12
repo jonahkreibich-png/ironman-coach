@@ -7,8 +7,10 @@ import { defaultProfile, withEstimates, type Profile, type SportKey, type DayWin
 import { GOALS, type Goal, type GoalType } from './goals';
 import { generatePlan, type GenResult } from './plangen';
 import { addDays } from './core';
+import { rulesOf, describe as ruleText } from './constraints';
+import { parseFor } from './ruleparse';
 
-export type QType = 'goals' | 'select' | 'multi' | 'number' | 'text' | 'notes' | 'yesno' | 'dayload' | 'freq' | 'days' | 'date' | 'bests' | 'windows' | 'fixed' | 'connect' | 'info';
+export type QType = 'grid' | 'goals' | 'select' | 'multi' | 'number' | 'text' | 'notes' | 'yesno' | 'dayload' | 'freq' | 'days' | 'date' | 'bests' | 'windows' | 'fixed' | 'connect' | 'info';
 export interface Question { id: string; label: string; type: QType; required?: boolean; options?: [string, string][]; unit?: string; hint?: string; min?: number; max?: number; show?: (a: Answers) => boolean }
 export interface Block { id: string; title: string; intro: string; questions: Question[] }
 export type Answers = Record<string, any>;
@@ -62,10 +64,11 @@ export const BLOCKS: Block[] = [
     { id: 'timeOfDay', label: 'Ich trainiere eher …', type: 'select', options: [['', 'egal'], ['morning', 'morgens'], ['evening', 'abends']], hint: 'Nur für die Uhrzeit der Mitteilungen.' },
     { id: 'weeklyHours', label: 'Höchstens so viele Stunden pro Woche', type: 'number', unit: 'h', required: true, min: 1, max: 30 },
     { id: 'maxDayHours', label: 'Höchstens so lange an einem langen Tag', type: 'number', unit: 'h', min: 1, max: 10 },
-    { id: 'freq', label: 'Wie oft pro Woche willst oder kannst du …?', type: 'freq', hint: 'Der Plan hält sich daran.' }
+    { id: 'freq', label: 'Wie oft pro Woche willst oder kannst du …?', type: 'freq', hint: 'Der Plan hält sich daran.' },
+    { id: 'grid', label: 'Welche Sportart geht an welchem Tag?', type: 'grid', hint: 'Tippe ein Feld an: geht → lieber nicht → geht nicht. „Geht nicht“ hält der Plan immer ein.' }
   ] },
   { id: 'notes', title: 'Berücksichtigungen', intro: 'Was soll der Plan noch wissen?', questions: [
-    { id: 'notes', label: 'Was soll der Plan noch berücksichtigen?', type: 'notes', hint: 'Eine Sache pro Zeile, z. B. „Knie zwickt beim Bergablaufen“, „Schwimmbad nur samstags“, „kein Schwimmbad im Winter“.' },
+    { id: 'notes', label: 'Was soll der Plan noch berücksichtigen?', type: 'notes', hint: 'Ein Satz pro Sache, z. B. „kann mittwochs nicht laufen, nur Samstag oder Sonntag“, „Knie zwickt beim Bergablaufen“, „Urlaub vom 20.12. bis 6.1.“. Die App zeigt dir, was sie verstanden hat.' },
     { id: 'sleep', label: 'Übliche Schlafdauer', type: 'number', unit: 'h', min: 3, max: 12 },
     { id: 'diet', label: 'Ernährung', type: 'select', options: [['', 'alles'], ['vegetarian', 'vegetarisch'], ['vegan', 'vegan']] },
     { id: 'planStyle', label: 'Plan genau vorgeben oder flexibel?', type: 'select', options: [['flexible', 'flexibel mit Vorschlägen'], ['strict', 'genau vorgeben']] }
@@ -195,6 +198,8 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   const notes = Array.isArray(a.notes) ? a.notes : String(a.notes || '').split(/\n+/);
   p.notes = notes.map((x: string) => String(x).trim()).filter(Boolean);
   if (a.poolDays) p.notes.push('Schwimmbad nur ' + a.poolDays);
+  // Regeln aus Wochenraster und bestätigten Sätzen (Auftrag 5)
+  if (Array.isArray(a.rules)) p.rules = a.rules.filter((r: any) => r && r.kind);
   if (a.diet === 'vegetarian' || a.diet === 'vegan') p.vegetarian = true;
   p.trackCalories = !!a.trackCalories;
   p.planStyle = a.planStyle === 'strict' ? 'strict' : 'flexible';
@@ -250,7 +255,8 @@ export function understood(a: Answers, today: string): Understood[] {
   if (p.sports.includes('bike') && sk.bikeLongestMin != null) can.push(`längste Radfahrt ${sk.bikeLongestMin} min`);
   if ((p.bikes || []).length) can.push('Räder: ' + p.bikes.map(b => (BIKE_OPTIONS.find(x => x[0] === b) || [b, b])[1]).join(', ') + (p.powerMeter ? ', mit Wattmessung' : ''));
   out.push({ block: 'skills', label: 'Können', text: can.join('; ') || 'keine Angaben' });
-  out.push({ block: 'notes', label: 'Einschränkungen', text: [p.injuries, ...(p.notes || [])].filter(Boolean).join('; ') || 'keine' });
+  const rs = rulesOf(p, parseFor(today)).filter(r => !r.hidden && r.kind !== 'info');
+  out.push({ block: 'notes', label: 'Einschränkungen', text: [...new Set(rs.map(ruleText))].join('; ') || [p.injuries, ...(p.notes || [])].filter(Boolean).join('; ') || 'keine' });
   out.push({ block: 'time', label: 'Kraft', text: p.sports.includes('strength') ? `ja, ${fr('strength')} pro Woche` : 'nein' });
   return out;
 }

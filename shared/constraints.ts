@@ -45,6 +45,8 @@ export interface Rule {
   source?: 'grid' | 'text' | 'chat' | 'ai' | 'note' | 'onboarding';
   /** zusätzliche Erklärung (info) */
   note?: string;
+  /** unsichtbarer Merker: der Satz ist bearbeitet, nicht neu lesen */
+  hidden?: boolean;
   createdAt?: number;
 }
 
@@ -308,3 +310,24 @@ export function allowedDays(rules: Rule[], sport: RuleSport, dayHasTime: (dow: n
   });
 }
 function shiftToDow(date: string, dow: number): string { const d = new Date(date + 'T12:00:00Z'); const cur = d.getUTCDay(); const mon = (cur + 6) % 7; d.setUTCDate(d.getUTCDate() - mon + ((dow + 6) % 7)); return d.toISOString().slice(0, 10); }
+
+/* Regel aus fremder Quelle (KI, Sync) prüfen und auf erlaubte Werte begrenzen; ungültig → null */
+const KINDS_OK: RuleKind[] = ['onlyDays', 'neverDays', 'dayOff', 'maxDay', 'placeDays', 'period', 'body', 'prefer', 'info'];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export function sanitizeRule(x: any, text: string, source: Rule['source']): Rule | null {
+  if (!x || !KINDS_OK.includes(x.kind)) return null;
+  const days = Array.isArray(x.days) ? [...new Set(x.days.map(Number).filter((d: number) => d >= 0 && d <= 6))] as number[] : undefined;
+  const months = Array.isArray(x.months) ? [...new Set(x.months.map(Number).filter((m: number) => m >= 1 && m <= 12))] as number[] : undefined;
+  const r: Rule = { id: ruleId(source === 'ai' ? 'ai' : 's'), kind: x.kind, strength: x.strength === 'soft' || x.kind === 'prefer' ? 'soft' : 'hard', source, text, createdAt: Date.now() };
+  if (['run', 'bike', 'swim', 'strength'].includes(x.sport)) r.sport = x.sport;
+  if (days && days.length) r.days = days;
+  if (months && months.length) r.months = months;
+  if (x.what === 'long' || x.what === 'hard') r.what = x.what;
+  if (x.kind === 'maxDay') { const m = Math.round(+x.minutes); if (!(m >= 10 && m <= 600)) return null; r.minutes = m; }
+  if (x.kind === 'placeDays') { if (!['pool', 'trainer', 'outdoor', 'gym', 'treadmill', 'track'].includes(x.place)) return null; r.place = x.place; r.placeOnly = !!x.placeOnly; }
+  if (x.kind === 'period') { if (!DATE_RE.test(x.from || '') || !DATE_RE.test(x.to || '') || x.to < x.from) return null; r.from = x.from; r.to = x.to; r.level = x.level === 'low' ? 'low' : 'none'; }
+  if (x.kind === 'body') { r.body = BODY_NAME[x.body] ? x.body : 'injury'; r.noIntervals = !!x.noIntervals; r.noDownhill = !!x.noDownhill; if (x.volume > 0.3 && x.volume < 1) r.volume = +x.volume; }
+  if (x.kind === 'info') r.note = String(x.note || text).slice(0, 200);
+  if ((x.kind === 'onlyDays' || x.kind === 'neverDays' || x.kind === 'dayOff' || x.kind === 'prefer') && !r.days && !r.months && x.kind !== 'neverDays') return null;
+  return r;
+}

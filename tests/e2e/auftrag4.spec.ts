@@ -48,7 +48,9 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
   await expect(page.locator('[data-freq="strength"]')).toHaveText('2×');
   await next(page);
   // 7 Berücksichtigungen
-  await fill(page, '#q-notes', 'Knie links zwickt beim Bergablaufen');
+  await page.fill('#rule-new-ob', 'Knie links zwickt beim Bergablaufen'); await page.locator('[data-act="rule-check"]').click();
+  await expect(page.locator('[data-rule-confirm]')).toContainText('Knie: keine Lauf-Intervalle, kein Bergablaufen');
+  await page.locator('[data-act="rule-ok"]').click();
   await next(page); await next(page); await next(page);
   // F2: Das habe ich verstanden
   await expect(page.locator('h2', { hasText: 'Das habe ich verstanden' })).toBeVisible();
@@ -144,10 +146,17 @@ test('C5: Plan bearbeiten – Einheit ändern, als fest markieren, rückgängig 
 test('C3: Berücksichtigung eintragen, Plan passt die kommenden Wochen an, Coach erklärt es', async ({ page }) => {
   await seed(page);
   await open(page, '/?go=beruecksichtigungen');
-  await page.fill('#cons-new', 'Knie zwickt'); await page.locator('[data-act="cons-add"]').click();
+  // Auftrag 5: erst zeigen, was verstanden wurde, dann „Stimmt“
+  await page.fill('#rule-new-cons', 'Knie zwickt'); await page.locator('[data-act="rule-check"]').click();
+  await expect(page.locator('[data-rule-confirm]')).toContainText('Knie');
+  await page.locator('[data-act="rule-ok"]').click();
   await expect(page.locator('[data-cons-list]')).toContainText('berücksichtigt');
-  await page.fill('#cons-new', 'Mondphase beachten'); await page.locator('[data-act="cons-add"]').click();
-  await expect(page.locator('[data-cons-list]')).toContainText('noch nicht berücksichtigt');
+  // Unverstandenes wird nicht ignoriert: die App fragt mit einem Formular nach
+  await page.fill('#rule-new-cons', 'Mondphase beachten'); await page.locator('[data-act="rule-check"]').click();
+  await expect(page.locator('[data-rule-editor]')).toContainText('noch nicht verstanden');
+  await page.locator('[data-act="rule-ed-save"]').click();
+  await page.locator('[data-act="rule-ok"]').click();
+  await expect(page.locator('[data-cons-list]')).toContainText('Mondphase beachten');
   await expect(page.locator('[data-replanned]')).toBeVisible({ timeout: 5000 });
   const msgs = Object.values((await stored(page)).coachMsgs) as any[];
   expect(msgs.some(m => /Plan angepasst/.test(m.title || ''))).toBe(true);

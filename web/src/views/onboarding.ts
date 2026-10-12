@@ -21,8 +21,16 @@ import { D, invalidate } from '../data';
 import { APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
+import { gridHtml, listHtml, addHtml, registerTarget, conflictsHtml } from './rules';
 
 const DOW = [1, 2, 3, 4, 5, 6, 0];
+/* Regeln im Fragebogen: Wochenraster und Sätze landen in den Antworten (answers.rules, answers.notes) */
+registerTarget('ob', {
+  get: () => { const a = draft().answers; const notes = Array.isArray(a.notes) ? a.notes : String(a.notes || '').split(/\n+/).map((x: string) => x.trim()).filter(Boolean);
+    return { notes, rules: Array.isArray(a.rules) ? a.rules : [], dayLoad: a.dayLoad || {}, sports: a.sports || [], team: a.teamYes ? { name: String(a.teamName || 'Teamsport'), trainingDays: (a.teamTrainingDays || []).map(Number), gameDays: (a.teamGameDays || []).map(Number) } : null }; },
+  set: next => { const a = draft().answers; a.notes = next.notes; a.rules = next.rules; saveState(); nav.rerender(); },
+  setFreq: (sport, n) => { const a = draft().answers; a.freq = { ...(a.freq || {}), [sport]: [n, n] }; saveState(); nav.rerender(); }
+});
 const draft = (): { answers: Answers; block: number; done?: boolean; confirmed?: boolean } => (STATE.onboarding = STATE.onboarding || { answers: {}, block: 0 });
 
 /* ---------- Start (noch kein Plan) ---------- */
@@ -96,7 +104,8 @@ function question(q: Question, a: Answers): string {
     case 'number': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}${pre}</label><input class="inp" id="q-${q.id}" inputmode="decimal" data-ch="ob-q" data-q="${q.id}" data-t="number" value="${esc(v ?? '')}"></div>${hint}`;
     case 'text': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}${pre}</label><input class="inp" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}" data-t="text" value="${esc(v ?? '')}"></div>${hint}`;
     case 'date': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><input class="inp" type="date" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}" data-t="text" value="${esc(v ?? '')}"></div>${hint}`;
-    case 'notes': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><textarea class="inp" id="q-${q.id}" rows="4" data-ch="ob-q" data-q="${q.id}" data-t="text">${esc(Array.isArray(v) ? v.join('\n') : v ?? '')}</textarea></div>${hint}`;
+    case 'notes': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${listHtml('ob')}<div style="margin-top:var(--s2)">${addHtml('ob')}</div></div>`;
+    case 'grid': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${gridHtml('ob')}</div>`;
     case 'select': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><select class="inp" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}">${(q.options || []).map(([k, l]) => `<option value="${esc(k)}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>${hint}`;
     case 'yesno': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span><div class="seg">${[['1', t('common.yes')], ['0', t('common.no')]].map(([k, l]) => `<button class="${(v === true && k === '1') || (v === false && k === '0') ? 'on' : ''}" data-act="ob-yn" data-q="${q.id}" data-v="${k}">${esc(l)}</button>`).join('')}</div></div>${hint}`;
     case 'multi': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}${pre}</span><div class="chips" style="flex-wrap:wrap">${(q.options || []).map(([k, l]) => { const on = Array.isArray(v) && v.includes(k); return `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="ob-multi" data-q="${q.id}" data-v="${esc(k)}">${esc(l)}</button>`; }).join('')}</div></div>${hint}`;
@@ -177,6 +186,7 @@ function preview(): string {
   const g = RESULT.gen;
   return `<div class="stack"><h2 style="margin:var(--s2) 0 0">${esc(t('ob.planTitle'))}</h2>
     ${RESULT.warnings.map(w => `<div class="banner warn">${esc(w)}</div>`).join('')}
+    ${g ? conflictsHtml('ob', g.conflicts) : ''}
     ${g ? `<div class="card stack"><div class="lbl">${esc(t('ob.summary'))}</div>${g.summary.map(s => `<p class="small" style="margin:0">${esc(s)}</p>`).join('')}</div>
       <div class="card stack plan-explain"><div class="lbl">${esc(t('plan.explain'))}</div>${(g.plan.meta.explain || []).map((s: string) => `<p class="small">${esc(s)}</p>`).join('')}</div>
       ${more(t('ob.firstWeeks'), g.plan.weeks.slice(0, 2).map((w: any) => `<div class="lbl" style="margin-top:var(--s2)">${esc(w.headline || t('plan.weekShort', { n: w.weekNumber }))} · ${esc(w.focus || '')}</div>${w.days.map((d: any) => `<div class="kv small"><span>${esc(t('dow.' + new Date(d.date + 'T12:00:00').getDay()))}</span><span style="text-align:right">${esc(d.sessions.filter((s: any) => s.sport !== 'rest').map((s: any) => s.title + (s.plannedMinutes && !/\d+ min/.test(s.title) ? ` (${s.plannedMinutes} min)` : '')).join(', ') || t('heute.restDay'))}</span></div>`).join('')}`).join(''))}
