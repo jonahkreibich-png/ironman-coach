@@ -7,7 +7,7 @@
 import { isGame, isIntervals, plannedLoad, addDays, illnessAt, returnStageActive } from './core';
 
 /* Hart = Intensität (Intervalle, Tests, Spiel, Koppeltraining im Renntempo). Lange lockere Einheiten zählen nicht als hart. */
-export function isIntense(s: any): boolean { return !!s && !s.cancelled && (isIntervals(s) || isGame(s) || !!s.hard || /test|koppel|wettkampf/i.test(s.title || '')); }
+export function isIntense(s: any): boolean { return !!s && !s.cancelled && (isIntervals(s) || isGame(s) || !!s.hard || /test\b|koppel|wettkampf/i.test(s.title || '')); }
 
 export interface Violation { rule: 'volume' | 'runVolume' | 'hardDays' | 'illness' | 'age' | 'hardCount' | 'format'; week?: number; date?: string; msg: string }
 export interface RuleCtx { minor?: boolean; age?: number | null; illness?: any[]; today?: string; maxHardPerWeek?: number }

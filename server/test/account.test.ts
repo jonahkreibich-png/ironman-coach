@@ -35,7 +35,7 @@ test('neues Konto bekommt einen Wiederherstellungscode; damit bekommt ein neues 
 test('E1: Meine Daten als Datei enthält alles Eigene und nichts Fremdes', async () => {
   const { env, A, B } = await two();
   const ex = (await call(env, 'GET', '/api/me/export', undefined, B.token)).data;
-  expect(ex.format).toBe('stamio-export');
+  expect(ex.format).toBe('coach-export');
   expect(ex.records.find((r: any) => r.kind === 'trend').data.hrv).toBe(61);
   expect(ex.devices.map((d: any) => d.name)).toEqual(['iPhone Papa']);
   const exA = (await call(env, 'GET', '/api/me/export', undefined, A.token)).data;

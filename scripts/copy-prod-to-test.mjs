@@ -1,44 +1,60 @@
-// Kopiert die Daten der echten App in die Testumgebung und testet dabei die Datenbank-Umstellung (Migration 0002) an der Kopie.
+// Kopiert deine Daten aus der echten App in die Test-App und testet dabei die Datenbank-Umstellung an der Kopie.
 // Die echte Datenbank wird nur gelesen (Export), nie verändert.
-// Aufruf (im Projektordner): node scripts/copy-prod-to-test.mjs
-// Ergebnis: data-export/prod-JJJJ-MM-TT.sql (Sicherung, nicht im Repo) und eine Test-Datenbank mit deinen echten Daten.
+// Aufruf (im Projektordner): node scripts/copy-prod-to-test.mjs <echte-db>     z. B. ironman (alt) oder coach-db-efc7 (neu, schon umgestellt)
+// Ablauf:
+//  1) echte Datenbank exportieren (Sicherung in data-export/, nicht im Repo), Test-Datenbank ebenfalls sichern
+//  2) Kopie lokal auf den neuen Aufbau bringen (scripts/lib/upgrade-copy.mjs) und Zahlen vergleichen
+//  3) in der Test-Datenbank nur die Daten von Nutzer 1 (Betreiber) ersetzen: alte als gelöscht markieren, die kopierten mit neuen
+//     Revisionsnummern eintragen, Geräte von Nutzer 1 laden beim nächsten Öffnen alles neu. Test-Nutzer (z. B. Papa) bleiben unberührt.
+//  4) Zahlen je Art in der Test-Datenbank mit der Kopie vergleichen
 import { execSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
+import { upgradeCopy } from './lib/upgrade-copy.mjs';
 
+const SOURCE = process.argv[2] || 'ironman';
 const env = { ...process.env, NODE_USE_SYSTEM_CA: '1' };
 if (fs.existsSync('C:\\ProgramData\\Norton\\Antivirus\\wscert.pem')) env.NODE_EXTRA_CA_CERTS = 'C:\\ProgramData\\Norton\\Antivirus\\wscert.pem';
-const wr = process.platform === 'win32' ? 'npx.cmd wrangler' : 'npx wrangler';
-const run = cmd => { console.log('> ' + cmd); return execSync(cmd, { cwd: 'server', env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }); };
+const wr = 'node node_modules/wrangler/bin/wrangler.js';
+const run = cmd => { console.log('> ' + cmd.slice(0, 160)); return execSync(cmd, { cwd: 'server', env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 50e6 }); };
+const q = sql => JSON.parse(run(`${wr} d1 execute stamio-test --env test --remote --json --command "${sql}"`))[0].results;
 const day = new Date().toISOString().slice(0, 10);
 fs.mkdirSync('data-export', { recursive: true });
-const dump = `../data-export/prod-${day}.sql`;
 
-// 1) Echte Datenbank exportieren (nur lesen)
-run(`${wr} d1 export ironman --remote --output=${dump}`);
-console.log('Sicherung der echten Daten: data-export/prod-' + day + '.sql');
+// 1) Sicherungen
+const dump = `data-export/prod-${day}.sql`;
+run(`${wr} d1 export ${SOURCE} --remote --output=../${dump}`);
+run(`${wr} d1 export stamio-test --env test --remote --output=../data-export/test-vor-kopie-${day}-${Date.now()}.sql`);
 
-// 2) Test-Datenbank leeren (nur stamio-test!)
-const tables = JSON.parse(run(`${wr} d1 execute stamio-test --env test --remote --json --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"`))[0].results.map(r => r.name);
-if (tables.length) {
-  fs.writeFileSync('data-export/drop.sql', 'PRAGMA foreign_keys=OFF;\n' + tables.map(t => `DROP TABLE IF EXISTS "${t}";`).join('\n') + '\n');
-  run(`${wr} d1 execute stamio-test --env test --remote --file=../data-export/drop.sql --yes`);
-}
+// 2) lokal umstellen
+const local = `data-export/prod-${day}-migriert.sqlite`;
+if (fs.existsSync(local)) fs.unlinkSync(local);
+const db = new DatabaseSync(local);
+db.exec(fs.readFileSync(dump, 'utf8'));
+const liveBefore = db.prepare('SELECT COUNT(*) AS n FROM records WHERE deleted = 0').get().n;
+upgradeCopy(db, 'server/migrations');
+const rows = db.prepare('SELECT kind, key, data, updated_at, deleted, src FROM records WHERE user_id = 1 ORDER BY rev').all();
+const want = Object.fromEntries(db.prepare('SELECT kind, COUNT(*) AS n FROM records WHERE user_id = 1 AND deleted = 0 GROUP BY kind').all().map(r => [r.kind, r.n]));
+if (rows.filter(r => !r.deleted).length !== liveBefore) { console.error('ACHTUNG: Umstellung verliert Datensätze. Abbruch, nichts kopiert.'); process.exit(1); }
+console.log(`Kopie umgestellt: ${liveBefore} Datensätze, je Art: ${JSON.stringify(want)}`);
 
-// 3) Kopie einspielen (alter Aufbau) und als „0001 angewendet“ markieren
-run(`${wr} d1 execute stamio-test --env test --remote --file=${dump} --yes`);
-fs.writeFileSync('data-export/mark.sql', `CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
-INSERT OR IGNORE INTO d1_migrations (name) VALUES ('0001_initial.sql');
--- Keine Mitteilungen aus der Testumgebung an deine echten Geräte
-DELETE FROM push_subs;\n`);
-run(`${wr} d1 execute stamio-test --env test --remote --file=../data-export/mark.sql --yes`);
+// 3) in der Test-Datenbank nur Nutzer 1 ersetzen
+const s = v => v == null ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`;
+const now = Date.now();
+const base = +q("SELECT v FROM meta WHERE k = 'rev'")[0].v;
+const keys = new Set(rows.map(r => r.kind + '\u0000' + r.key));
+const old = q('SELECT kind, key FROM records WHERE user_id = 1 AND deleted = 0').filter(r => !keys.has(r.kind + '\u0000' + r.key));
+let rev = base; const out = [];
+for (const r of old) out.push(`UPDATE records SET deleted = 1, data = NULL, updated_at = ${now}, rev = ${++rev} WHERE user_id = 1 AND kind = ${s(r.kind)} AND key = ${s(r.key)};`);
+for (const r of rows) out.push(`INSERT OR REPLACE INTO records (user_id, kind, key, data, updated_at, deleted, rev, src) VALUES (1, ${s(r.kind)}, ${s(r.key)}, ${s(r.data)}, ${s(r.updated_at)}, ${r.deleted ? 1 : 0}, ${++rev}, ${s(r.src)});`);
+out.push(`UPDATE meta SET v = '${rev}' WHERE k = 'rev';`);
+out.push(`INSERT INTO user_meta (user_id, k, v) VALUES (1, 'reset_at', '${now}') ON CONFLICT (user_id, k) DO UPDATE SET v = excluded.v;`);
+fs.writeFileSync('data-export/kopie-in-test.sql', out.join('\n') + '\n');
+run(`${wr} d1 execute stamio-test --env test --remote --file=../data-export/kopie-in-test.sql --yes`);
 
-// 4) Umstellung auf mehrere Nutzer an der Kopie ausführen
-run(`${wr} d1 migrations apply stamio-test --env test --remote`);
-
-// 5) Prüfen: gleiche Anzahl Datensätze wie in der Sicherung
-const count = q => JSON.parse(run(`${wr} d1 execute stamio-test --env test --remote --json --command "${q}"`))[0].results[0].n;
-const recs = count('SELECT COUNT(*) AS n FROM records'), devs = count('SELECT COUNT(*) AS n FROM devices');
-const inDump = (fs.readFileSync(dump.replace('../', ''), 'utf8').match(/INSERT INTO "?records"? /g) || []).length;
-console.log(`Datensätze in der Sicherung: ${inDump}, in der Test-Datenbank nach der Umstellung: ${recs}, Geräte: ${devs}`);
-if (inDump && recs !== inDump) { console.error('ACHTUNG: Anzahl stimmt nicht. Bitte nicht freigeben und Claude die Ausgabe zeigen.'); process.exit(1); }
-console.log('Fertig. Öffne https://stamio-test.pages.dev und verbinde das iPhone mit dem Einrichtungscode.');
+// 4) vergleichen
+const got = Object.fromEntries(q('SELECT kind, COUNT(*) AS n FROM records WHERE user_id = 1 AND deleted = 0 GROUP BY kind').map(r => [r.kind, r.n]));
+const ok = JSON.stringify(Object.entries(got).sort()) === JSON.stringify(Object.entries(want).sort());
+console.log(`In der Test-App (Nutzer 1) je Art: ${JSON.stringify(got)}`);
+console.log(ok ? 'OK: alle Datensätze sind in der Test-App angekommen.' : 'ACHTUNG: Anzahl stimmt nicht. Bitte nicht freigeben und Claude die Ausgabe zeigen.');
+process.exit(ok ? 0 : 1);

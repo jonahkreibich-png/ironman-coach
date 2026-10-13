@@ -39,7 +39,7 @@ export async function exportAll(env: Env, uid: number) {
   const con = await env.DB.prepare('SELECT provider, status, created_at FROM connections WHERE user_id = ?').bind(uid).all().catch(() => ({ results: [] }));
   const u = await env.DB.prepare('SELECT name, created_at FROM users WHERE id = ?').bind(uid).first();
   return {
-    format: 'stamio-export', version: 1, exportedAt: new Date().toISOString(), user: { name: u ? (u as any).name : '', createdAt: u ? (u as any).created_at : null },
+    format: 'coach-export', version: 1, exportedAt: new Date().toISOString(), user: { name: u ? (u as any).name : '', createdAt: u ? (u as any).created_at : null },
     records: (recs.results || []).map((r: any) => ({ kind: r.kind, key: r.key, updatedAt: r.updated_at, data: JSON.parse(r.data) })),
     feedback: fb.results || [], devices: dev.results || [], connections: (con as any).results || []
   };

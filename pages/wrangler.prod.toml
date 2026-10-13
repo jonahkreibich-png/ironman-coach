@@ -1,0 +1,9 @@
+# Pages-Projekt der echten App. Der Name ist bewusst neutral (hängt nicht vom App-Namen ab, der nur in shared/brand.ts steht),
+# damit ein späterer Namenswechsel keinen Umzug braucht. scripts/deploy.mjs kopiert diese Datei vor dem Deploy nach pages/wrangler.toml.
+name = "coach-app-efc7"
+pages_build_output_dir = "../dist"
+compatibility_date = "2026-09-01"
+
+[[services]]
+binding = "API"
+service = "coach-api-efc7"

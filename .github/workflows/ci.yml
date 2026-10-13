@@ -49,7 +49,8 @@ jobs:
         run: npm ci && npm ci --prefix server
       - name: Server (Worker) deployen
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npx --prefix server wrangler deploy --config server/wrangler.toml
+        run: cd server && npx wrangler d1 migrations apply coach-db-efc7 --remote && npx wrangler deploy
       - name: App bauen und auf Cloudflare Pages deployen
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npm run build && npx --prefix server wrangler pages deploy dist --project-name "${{ vars.PAGES_PROJECT || 'stamio' }}" --branch main
+        # Adresse und Projektname sind bewusst neutral (hängen nicht vom App-Namen ab, siehe scripts/release.md)
+        run: VITE_APP_ENV=production npm run build && cp pages/wrangler.prod.toml pages/wrangler.toml && cd pages && npx --prefix ../server wrangler pages deploy ../dist --project-name coach-app-efc7 --branch main

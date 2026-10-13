@@ -122,6 +122,30 @@ test('A4 im Chat: Verschieben gegen eine harte Regel wird abgelehnt, erlaubte Ta
   expect(W.violations()).toEqual([]);
 });
 
+/* Auftrag 6, Punkt 4 (Durchlauf mit Jonahs echten Daten: krank seit 6 Tagen mit Fieber) */
+test('krank: „Kann ich morgen schon wieder schwimmen?“ → Antwort zur Krankheit, keine Plan-Rückfrage', () => {
+  const W = world('jugend-langdistanz');
+  W.state.illnessPeriods = [{ id: 'ill-x', start: C.addDays(W.today, -5), end: null, note: 'Erkältung mit Fieber' }];
+  for (const s of ['Kann ich morgen schon wieder schwimmen?', 'Darf ich heute laufen?', 'Kann ich wieder trainieren?']) {
+    const r = W.say(s);
+    expect(r.intent, s).toBe('sick-question');
+    expect(r.text, s).toMatch(/krank/);
+    expect(r.text, s).toMatch(/24 Stunden/);
+    expect((r.options || []).map(o => o.label), s).toContain('Wieder gesund');
+    expect(r.apply || [], s).toEqual([]);
+  }
+});
+test('verschieben bietet abends den heutigen Tag nicht mehr an', () => {
+  const W = world('jugend-langdistanz');
+  W.now = Date.parse(W.today + 'T19:30:00Z'); // 21:30 in Berlin
+  const sess = W.sessions(C.addDays(W.today, 1), C.addDays(W.today, 4))[0];
+  const name = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][new Date(sess.date + 'T12:00:00Z').getUTCDay()];
+  const r = W.say(`Ich habe ${name} keine Zeit`);
+  const labels = (r.options || []).map(o => o.label).join(' | ');
+  const todayLabel = new Date(W.today + 'T12:00:00Z').getUTCDate() + '.';
+  expect(labels, labels).not.toMatch(new RegExp('\\b' + todayLabel.replace('.', '\\.') + String(new Date(W.today + 'T12:00:00Z').getUTCMonth() + 1).padStart(2, '0')));
+});
+
 test('D4: Schnellaktionen passen zur Lage', () => {
   const W = world('jugend-langdistanz');
   expect(quickOptions(W.ctx(), {}).map(o => o.label)).toEqual(expect.arrayContaining(['Keine Zeit heute', "Mir geht's nicht gut", 'Tag tauschen']));

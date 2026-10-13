@@ -19,6 +19,28 @@ export async function call(env: any, method: string, p: string, body?: any, toke
   return { status: res.status, data: await res.json().catch(() => null) as any };
 }
 
+describe('Kopie der echten Datenbank umstellen (Auftrag 6, Punkt 4)', () => {
+  // Die echte Datenbank stammt aus einer früheren Fassung von 0001 ohne Tabelle error_log; 0002 erweitert error_log
+  // und brach deshalb an der echten Kopie ab („no such table: error_log“).
+  test('Altbestand ohne error_log: upgradeCopy bringt ihn auf den neuen Aufbau, nichts geht verloren', async () => {
+    // @ts-ignore – reines JS
+    const { upgradeCopy } = await import('../../scripts/lib/upgrade-copy.mjs');
+    const db = new D1Shim();
+    db.db.exec(sql('0001_initial.sql'));
+    db.db.exec('DROP TABLE error_log;');
+    db.db.exec(`INSERT INTO devices (id, name, token_hash, created_at, last_seen) VALUES ('dev-a', 'iPhone', 'h1', 1, 1);
+      INSERT INTO records (kind, key, data, updated_at, deleted, rev) VALUES ('plan', 'main', '{"weeks":[]}', 5, 0, 1), ('session', 's1', '{"completed":true}', 6, 0, 2);`);
+    expect(() => db.db.exec(sql('0002_multiuser.sql'))).toThrow(/error_log/);
+    const db2 = new D1Shim();
+    db2.db.exec(sql('0001_initial.sql')); db2.db.exec('DROP TABLE error_log;');
+    db2.db.exec(`INSERT INTO records (kind, key, data, updated_at, deleted, rev) VALUES ('plan', 'main', '{"weeks":[]}', 5, 0, 1), ('session', 's1', '{"completed":true}', 6, 0, 2);`);
+    const applied = upgradeCopy(db2.db, MIG);
+    expect(applied).toContain('0002_multiuser.sql');
+    expect(db2.db.prepare('SELECT COUNT(*) AS n FROM records WHERE user_id = 1').get()).toMatchObject({ n: 2 });
+    expect(db2.db.prepare("SELECT COUNT(*) AS n FROM d1_migrations").get()).toMatchObject({ n: fs.readdirSync(MIG).filter(f => f.endsWith('.sql')).length });
+  });
+});
+
 describe('Migration 0002 an einer Kopie mit Altdaten', () => {
   test('Daten landen bei Nutzer 1, nichts geht verloren', async () => {
     const db = new D1Shim();

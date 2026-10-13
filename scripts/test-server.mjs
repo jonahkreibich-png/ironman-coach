@@ -15,6 +15,8 @@ const worker = (await import('file://' + out.replace(/\\/g, '/') + '?t=' + Date.
 
 function freshDb() {
   const db = new D1Shim(process.env.DB_FILE || ':memory:');
+  // vorhandene, schon umgestellte Datenbank-Datei (z. B. eine Kopie der echten Daten aus scripts/migrate-copy.mjs): nicht erneut migrieren
+  if (process.env.DB_FILE && db.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'd1_migrations'").get().n) return db;
   for (const f of [...fs.readdirSync('server/migrations').filter(f => f.endsWith('.sql')).sort().map(f => 'server/migrations/' + f)]) {
     if (fs.existsSync(f)) db.execFile(f);
   }

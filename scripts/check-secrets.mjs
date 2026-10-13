@@ -21,7 +21,7 @@ const NEED = [
   ['KI-Coach (später, kostet Geld)', [['ANTHROPIC_API_KEY', 'nur nach Absprache, siehe SPAETER.md']]]
 ];
 let missing = 0;
-console.log('Server-Schlüssel der Test-Umgebung (stamio-api-test):\n');
+console.log('Server-Schlüssel der Test-Umgebung (Worker der Test-Umgebung):\n');
 for (const [group, keys] of NEED) {
   const ok = keys.every(([k]) => set.has(k));
   console.log(`${ok ? '✓' : '✗'} ${group}`);

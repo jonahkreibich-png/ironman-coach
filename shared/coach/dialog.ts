@@ -80,7 +80,9 @@ const label = (x: Sx) => `${x.s.title} (${fmtD(x.date)})`;
 /* ---------- Regeln und erlaubte Tage ---------- */
 function allowedDays(ctx: EngineCtx, x: Sx, rules: Rule[]): string[] {
   const w = weeksOf(ctx).find((ww: any) => ww.days.some((dd: any) => dd.date === x.date));
-  const days = (w ? w.days : []).map((dd: any) => dd.date).filter((dt: string) => dt >= ctx.today && dt !== x.date);
+  // heute nur, solange der Tag noch nicht gelaufen ist (ab 18 Uhr in Berlin nicht mehr anbieten)
+  const late = ctx.now != null && parseInt(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Berlin' }).format(new Date(ctx.now)), 10) >= 18;
+  const days = (w ? w.days : []).map((dd: any) => dd.date).filter((dt: string) => (late ? dt > ctx.today : dt >= ctx.today) && dt !== x.date);
   return days.filter((dt: string) => { const l = live(dayOf(ctx, dt)); return !l.some((y: any) => y.sport === x.s.sport) && C.ruleOk(rules, x.s, dt, l) && (!isHard(x.s) || !l.some((y: any) => C.isHard(y))); })
     .sort((a: string, b: string) => live(dayOf(ctx, a)).length - live(dayOf(ctx, b)).length || a.localeCompare(b));
 }
@@ -320,6 +322,12 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
         options: [...(e.length ? [{ label: 'Heute nur locker', say: 'ja' }] : []), { label: 'Ich bin richtig krank', say: 'Ich bin krank' }, { label: 'Heute ganz frei', say: 'heute frei' }] };
     }
     return propose('sick', 'Gute Besserung! Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Bei Fieber gilt: kein Training.', [{ op: 'illness-start', date: ctx.today }], [{ label: 'Ja, Krankheit eintragen', say: 'ja' }, { label: 'Nur heute locker', say: 'heute nur locker' }, { label: 'Nein', say: 'nein' }]);
+  }
+  // Während einer Krankheitsphase: Fragen nach Training beantwortet der Coach zur Krankheit, statt den Plan zu ändern
+  if (illNow && /^(kann|darf|soll|koennte|duerfte|sollte) ich\b|\b(wieder|schon) (trainieren|laufen|schwimmen|radfahren|rad fahren|fahren|sport)\b/.test(j) && !verbOf(toks.filter(x => x !== 'locker' && x !== 'lockerer'))) {
+    const days = Math.round((Date.parse(ctx.today) - Date.parse(illNow.start)) / 86400000) + 1;
+    return { intent: 'sick-question', text: `Du bist seit ${days} ${days === 1 ? 'Tag' : 'Tagen'} als krank eingetragen${illNow.note ? ` (${illNow.note})` : ''}. Solange du krank bist: kein Training, bei Fieber erst recht nicht. Wenn du 24 Stunden ohne Fieber und ohne Symptome bist, tipp auf „Wieder gesund“. Dann beginnt der Wiedereinstieg in Stufen: die ersten Tage nur locker und kurz.`,
+      options: [{ label: 'Wieder gesund', say: 'Ich bin wieder gesund' }, { label: 'Immer noch krank', say: 'Ich bin noch krank' }] };
   }
   // Schmerzen / Verletzung
   const body = bodyIn(toks);
