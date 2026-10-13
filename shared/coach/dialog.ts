@@ -16,6 +16,7 @@ import { paceCtx } from '../plangen';
 import { GOALS, mainGoal, type Goal, type GoalType } from '../goals';
 import { isMinor } from '../profile';
 import type { Op } from './ops';
+import { explainDay, explainWanted, limitIn } from './explain';
 
 export interface Opt { label: string; say: string }
 export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
@@ -207,7 +208,17 @@ function step(ctx: EngineCtx, d: DialogState, raw: string, extra: Extra): Reply 
   // 1) offene Rückfrage auflösen
   const p = d.pending;
   if (p && Date.now() - p.at < 60 * 60 * 1000) { const r = resolve(ctx, d, p, toks, raw); if (r) return r; }
-  // 2) Aktionen und Plan-Wünsche
+  // 2) Einheit tagesgenau erklären (Auftrag 7): „Was genau soll ich heute beim Schwimmen machen?“, „Ich hab nur 20 min“
+  const j0 = toks.join(' ');
+  if (explainWanted(toks, raw) || (limitIn(j0) && /\b(hab|habe)\b/.test(j0) && !/\b(verschieb|streich|tausch)/.test(j0))) {
+    const date = dayIn(toks, ctx.today) || daysOf(ctx, toks).any[0] || ctx.today;
+    const ex = explainDay(ctx, date, sportIn(toks), limitIn(j0));
+    const sx = (dayOf(ctx, date) ? live(dayOf(ctx, date)) : []).find((x: any) => !sportIn(toks) || x.sport === sportIn(toks));
+    if (sx) d.focus = { sid: sx.id, date };
+    if (ex.ops && ex.ops.length) return propose('explain', ex.text, ex.ops, [{ label: ex.yes || 'Ja, ändern', say: 'ja' }, { label: 'Nein, so lassen', say: 'nein' }]);
+    return { intent: 'explain', text: ex.text, options: ex.options };
+  }
+  // 3) Aktionen und Plan-Wünsche
   const a = action(ctx, d, toks, raw);
   if (a) return a;
   // 3) Fragen (Wissen, Werte, Plan)

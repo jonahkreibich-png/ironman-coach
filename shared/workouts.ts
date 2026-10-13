@@ -118,7 +118,7 @@ function hrRange(lthr: number, zone: number): string {
   if (z.high >= 999) return `Puls über ${Math.round(lthr * z.low / 100)}`;
   return `Puls ${Math.round(lthr * z.low / 100)}–${Math.round(lthr * z.high / 100)}`;
 }
-function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
+export function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
   const c = spec.ctx;
   const parts: string[] = [];
   if (spec.sport === 'run') {
@@ -134,14 +134,14 @@ function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
   return `Z${zone}${parts.length ? ': ' + parts.join(', ') : ''}`;
 }
 const STROKE: Record<StrokeMode, string> = { crawl: 'Kraul', breast: 'Brust', drill: 'Technikübungen', kick: 'Beinschlag mit Brett', mixed: 'Lage nach Wahl', easy: 'locker, Lage nach Wahl' };
-function stepText(spec: Spec, s: Step): string {
+export function stepText(spec: Spec, s: Step): string {
   const reps = s.reps || 1; const z = s.zone || 2;
   if (spec.sport === 'swim') {
     const what = `${reps > 1 ? `${reps}×${s.m} m` : `${s.m} m`} ${STROKE[s.mode || 'crawl']}`;
     return `${what}${s.mode === 'crawl' || s.mode === 'breast' ? ` (${intensity(spec, z, s.mode)})` : ''}${reps > 1 && s.restSec ? `, ${s.restSec} s Pause am Rand` : ''}${s.note ? '. ' + s.note : ''}`;
   }
   if (s.walkOnly) return `${s.min} min ${s.note || 'zügig gehen'}`;
-  if (s.walkMin) return `${reps}× (${s.min} min locker laufen + ${s.walkMin} min zügig gehen)${s.note ? ', ' + s.note : ''}`;
+  if (s.walkMin) return `${reps}× (${s.min} min locker laufen + ${s.walkMin} min zügig gehen), laufen ${intensity(spec, z)}${s.note ? ', ' + s.note : ''}`;
   const len = `${reps > 1 ? `${reps}×${s.min} min` : `${s.min} min`}`;
   const rest = reps > 1 && s.restMin ? `, dazwischen ${s.restMin} min ${spec.sport === 'run' ? 'locker traben' : 'locker rollen'}` : '';
   return `${len} ${ZNAME[z]} (${intensity(spec, z)})${rest}${s.note ? ', ' + s.note : ''}`;

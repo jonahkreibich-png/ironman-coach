@@ -10,6 +10,7 @@ import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
 import { fieldsBlock } from './fieldsui';
+import { structureOf } from '../../../shared/coach/explain';
 import { toast } from '../toast';
 import { SPORT_COLOR } from '../icons';
 
@@ -69,7 +70,7 @@ function sessionSheet(id: string): string {
   const fields = FIELDS[s.sport] || [['min', 'm.min']];
   let h = `<div class="stack">
     <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div></div>${statusIcon(status)}</div>
-    ${s.description ? `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>` : ''}`;
+    ${structureHtml(s)}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
     const o = s._orig || {};
@@ -86,6 +87,15 @@ function sessionSheet(id: string): string {
   if (act) h += activityDetails(act);
   if (s.sport !== 'rest') h += more(t('sess.time'), `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>`);
   return h + '</div>';
+}
+/* Ablauf der Einheit in Schritten (Auftrag 7): Ein-/Aufwärmen, Hauptteil mit Wiederholungen, Pausen und Zonen, Ausklang */
+export function structureHtml(s: any): string {
+  const x = s.sport !== 'rest' ? structureOf(s, profile(), todayStr()) : null;
+  if (!x || !x.parts.length) return s.description ? `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>` : '';
+  const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
+  return `<div class="card flat tight structure" data-structure>${when}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${p.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>
+    ${x.how ? `<div class="small"><b>${esc(t('sess.how'))}:</b> ${esc(x.how)}</div>` : ''}${x.tip ? `<div class="small"><b>${esc(t('sess.tip'))}:</b> ${esc(x.tip)}</div>` : ''}${x.why ? `<div class="small muted"><b>${esc(t('sess.why'))}:</b> ${esc(x.why)}</div>` : ''}
+    ${x.derived && s.description ? more(t('sess.original'), `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>`) : ''}</div>`;
 }
 export function activityDetails(a: any): string {
   const rows: string[] = [];

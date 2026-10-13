@@ -395,3 +395,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .ex-row { margin-bottom: 6px; }
 .ex-row .ex-name { flex: 1 1 100%; }
 .ex-row .inp.sm:not(.ex-name) { flex: 1 1 52px; width: 0; }
+/* Ablauf einer Einheit (Auftrag 7) */
+.structure .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.structure .steps > li > b { font-size: var(--t-sm); }
+.structure .steps ul { margin: 2px 0 0; padding-left: 16px; font-size: var(--t-sm); }
+.structure .steps ul li { margin: 1px 0; overflow-wrap: anywhere; }
