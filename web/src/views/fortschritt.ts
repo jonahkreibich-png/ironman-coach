@@ -31,16 +31,18 @@ export function renderFortschritt(): string {
       ${p.runDistances && d.goal.type.startsWith('run') ? more(t('prog.otherDistances'), p.runDistances.map(x => `<div class="kv"><span class="muted">${esc(x.label)}</span><b class="num">${fmtDuration(x.best)}</b></div>`).join('')) : ''}`
       : `<div class="hint">${esc(t('prog.missing'))}</div><ul class="small">${(p.missing || []).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`}</div>`);
   }
-  // Umfang pro Woche
+  // Umfang pro Woche: höchstens 12 Wochen rund um die aktuelle (bei langen Plänen ragten sonst 60+ Balken aus dem Bildschirm, Auftrag 7)
   const cw = currentWeekIdx();
-  const wk = PLAN.weeks.map((w: any, i: number) => {
+  const from = Math.max(0, Math.min(cw - 7, PLAN.weeks.length - 12)), to = Math.min(PLAN.weeks.length, from + 12);
+  const wk = PLAN.weeks.slice(from, to).map((w: any, k: number) => {
     let pl = 0, dn = 0;
     w.days.forEach((day: any) => day.sessions.forEach((s: any) => { if (s.sport === 'rest' || s.cancelled) return; pl += s.plannedMinutes || 0; const st = STATE.sessions[s.id]; if (st && st.completed) dn += +(st.metrics && st.metrics.min ? String(st.metrics.min).replace(',', '.') : s.plannedMinutes || 0); }));
-    return { i, n: w.weekNumber, p: pl / 60, d: dn / 60, cur: i === cw };
+    return { i: from + k, n: w.weekNumber, p: pl / 60, d: dn / 60, cur: from + k === cw };
   });
   const max = Math.max(0.5, ...wk.map(x => Math.max(x.p, x.d)));
-  h += sec(t('prog.volume'), `<div class="card"><div class="row" style="align-items:flex-end;height:120px;gap:6px">${wk.map(x => `<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;align-items:center;gap:4px"><div style="width:100%;max-width:34px;height:${(x.p / max * 92).toFixed(1)}%;background:color-mix(in srgb, var(--accent) 16%, var(--surface-2));border-radius:7px 7px 3px 3px;position:relative;${x.cur ? 'outline:2px solid var(--accent)' : ''}"><i style="position:absolute;left:0;right:0;bottom:0;height:${x.p ? Math.min(100, x.d / x.p * 100).toFixed(1) : 0}%;background:var(--accent);border-radius:7px 7px 3px 3px"></i></div><div class="xs muted">${x.n}</div></div>`).join('')}</div>
-    <div class="hint">${esc(t('prog.volumeHint', { d: num(wk[cw] ? wk[cw].d : 0, 1), p: num(wk[cw] ? wk[cw].p : 0, 1) }))}</div></div>`);
+  const curW = wk.find(x => x.cur);
+  h += sec(t('prog.volume'), `<div class="card" data-volume><div class="vol-bars">${wk.map(x => `<div class="vol-col"><div class="vol-bar" style="height:${(x.p / max * 92).toFixed(1)}%;${x.cur ? 'outline:2px solid var(--accent)' : ''}"><i style="height:${x.p ? Math.min(100, x.d / x.p * 100).toFixed(1) : 0}%"></i></div><div class="xs muted">${x.n}</div></div>`).join('')}</div>
+    <div class="hint">${esc(t('prog.volumeHint', { d: num(curW ? curW.d : 0, 1), p: num(curW ? curW.p : 0, 1) }))}${PLAN.weeks.length > wk.length ? ' ' + esc(t('prog.volumeRange', { a: wk[0].n, b: wk[wk.length - 1].n, n: PLAN.weeks[PLAN.weeks.length - 1].weekNumber })) : ''}</div></div>`);
   // Meilensteine
   const ms = [...(STATE.milestones || [])].sort((a: any, b: any) => b.date.localeCompare(a.date));
   h += sec(t('prog.milestones'), `<div class="list">${ms.slice(0, 8).map((m: any) => `<div class="li" data-mid="${esc(m.id)}"><span class="ic" style="--c:var(--accent)">${ic('trophy')}</span><span class="grow"><span class="t">${esc(m.text)}</span><br><span class="s">${fmtDate(m.date)}</span></span><button class="btn danger sm" data-act="ms-del">${esc(t('common.delete'))}</button></div>`).join('') || `<div class="li"><span class="muted">${esc(t('prog.noMilestones'))}</span></div>`}</div>

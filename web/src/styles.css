@@ -379,3 +379,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .stage-bar > div:first-child { min-width: 0; flex: 1 1 140px; }
 .stage-btns { flex-wrap: wrap; gap: var(--s2); justify-content: flex-end; margin-left: auto; }
 .rg-c.chg { outline: 2px dashed var(--accent); outline-offset: -3px; font-weight: 800; }
+/* Umfang pro Woche (Fortschritt): Balken schrumpfen, nie breiter als die Karte */
+.vol-bars { display: flex; align-items: flex-end; height: 120px; gap: 4px; min-width: 0; }
+.vol-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; align-items: center; gap: 4px; }
+.vol-bar { width: 100%; max-width: 34px; background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); border-radius: 7px 7px 3px 3px; position: relative; }
+.vol-bar i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 7px 7px 3px 3px; }
+.vol-col .xs { font-variant-numeric: tabular-nums; }

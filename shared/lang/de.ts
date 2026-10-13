@@ -141,7 +141,7 @@ export const de: Record<string, string> = {
   'prog.form': 'Gesamt-Form', 'prog.formOf': 'für {name}', 'prog.formHint': 'Aus gemessener Belastung der letzten Wochen im Vergleich zu dem, was dein Ziel braucht.',
   'prog.scores': 'Leistung je Sportart', 'prog.6w': '6 Wo.', 'prog.lowData': 'wenig Messdaten', 'prog.basis': 'Basis: {b}', 'prog.tapWhy': 'Antippen für „Warum?“',
   'prog.prognosis': 'Prognose', 'prog.confidence': 'Sicherheit: {c}', 'prog.otherDistances': 'Andere Distanzen',
-  'prog.missing': 'Für eine Prognose fehlen noch Daten:', 'prog.volume': 'Umfang pro Woche',
+  'prog.missing': 'Für eine Prognose fehlen noch Daten:', 'prog.volume': 'Umfang pro Woche', 'prog.volumeRange': 'Gezeigt: Woche {a} bis {b} von {n}.',
   'prog.volumeHint': 'Diese Woche {d} h von {p} h geplant. Hell = geplant, kräftig = erledigt.',
   'prog.milestones': 'Meilensteine', 'prog.noMilestones': 'Noch keine Meilensteine.', 'prog.msPh': 'z. B. erstes Mal 2 km am Stück gekrault',
   'prog.msEmpty': 'Schreib kurz, was du geschafft hast.', 'prog.msSaved': 'Meilenstein gespeichert',

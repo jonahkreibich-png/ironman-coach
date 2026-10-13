@@ -32,6 +32,15 @@ function data(state: State) {
     const msgs: any = {};
     for (let i = 0; i < 30; i++) msgs['m' + i] = { id: 'm' + i, at: Date.parse(TODAY + 'T06:00:00Z') - i * 3600e3, date: TODAY, kind: i % 3 ? 'answer' : 'adjust', from: i % 2 ? 'coach' : 'user', title: i % 2 ? 'Plan angepasst: ' + LONG : undefined, text: `${LONG} ${'Wort '.repeat(30)} https://example.com/${LONG}`, actions: i === 1 ? [{ label: 'Ja, ' + LONG, kind: 'say', payload: 'x' }] : [] };
     demo.coachMsgs = msgs;
+    // Auftrag 7: langer Plan (über 60 Wochen, wie nach dem Fragebogen mit Ziel in 3 Jahren). Daran ragte „Umfang pro Woche“ heraus.
+    const ws = demo.plan.weeks; const last = ws[ws.length - 1];
+    const add = (d: string, n: number) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+    for (let i = 1; i <= 64; i++) {
+      const mon = add(last.startDate, 7 * i);
+      ws.push({ weekNumber: last.weekNumber + i, label: 'Woche ' + (last.weekNumber + i), startDate: mon, endDate: add(mon, 6), isRecoveryWeek: i % 4 === 0,
+        headline: `Woche ${last.weekNumber + i} · Block ${2 + Math.floor((i - 1) / 4)}, Woche ${((i - 1) % 4) + 1} → Langdistanz ${LONG}`, focus: 'Grundlage: ' + LONG,
+        days: Array.from({ length: 7 }, (_, k) => ({ date: add(mon, k), sessions: k % 2 ? [{ id: `x${i}-${k}`, sport: k % 3 ? 'run' : 'bike', title: `Lockerer Lauf ${LONG}`, plannedMinutes: 40 + i, zone: 'Zone 2', description: LONG }] : [{ id: `x${i}-${k}-r`, sport: 'rest', title: 'Ruhetag' }] })) });
+    }
   }
   return demo;
 }
@@ -59,10 +68,18 @@ async function overflow(page: Page): Promise<string[]> {
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || el.closest('[hidden]') || el.closest('[aria-hidden="true"]') && el.tagName !== 'svg') continue;
+      // Inhalt zugeklappter Abschnitte ist nicht sichtbar (WebKit meldet trotzdem eine Position)
+      const det = el.closest('details'); if (det && !(det as HTMLDetailsElement).open && !el.closest('summary')) continue;
       const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
       if (cs.position === 'fixed' && (r.top > window.innerHeight || r.bottom < 0)) continue;
       if (scroller(el)) continue;
       if (r.right > W + 1 || r.left < -1) out.push(`${desc(el)} ragt heraus (${Math.round(r.left)}..${Math.round(r.right)} bei ${W})`);
+      // Auftrag 7: auch nicht aus der eigenen Karte (oben, unten, seitlich), z. B. umbrechende Diagramm-Balken über die nächste Karte
+      const card = el.parentElement && el.parentElement.closest('.card');
+      if (card && cs.position !== 'fixed' && cs.position !== 'absolute') {
+        const cr = card.getBoundingClientRect();
+        if (r.bottom > cr.bottom + 2 || r.top < cr.top - 2 || r.right > cr.right + 2 || r.left < cr.left - 2) out.push(`${desc(el)} ragt aus seiner Karte (${Math.round(r.top)}..${Math.round(r.bottom)} statt ${Math.round(cr.top)}..${Math.round(cr.bottom)})`);
+      }
       // Text, der abgeschnitten wird, ohne „…“
       if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && el.scrollWidth > el.clientWidth + 2 && cs.textOverflow !== 'ellipsis' && el.children.length === 0 && (el.textContent || '').trim()) out.push(`${desc(el)} schneidet Text ab`);
     }
