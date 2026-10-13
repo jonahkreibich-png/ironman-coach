@@ -9,10 +9,17 @@ import type { EngineCtx } from './engine';
 import { checkPlanCode } from './plancode';
 import { rulesOf, hardViolations, describe as ruleText } from '../constraints';
 import { parseFor, parseRules } from '../ruleparse';
+import { explainDay } from './explain';
+import { analyze, doneSessions } from './analysis';
+import { zoneVerdict } from '../fields';
 
 export const TOOL_DEFS = [
-  { name: 'get_data', description: 'Liest Daten des Athleten. what: "day" (Plan und Status eines Tages), "week" (Woche um ein Datum), "values" (Morgenwerte der letzten Tage), "sessions" (erledigte Einheiten mit Messwerten der letzten Tage).',
+  { name: 'get_data', description: 'Liest Daten des Athleten. what: "day" (Plan und Status eines Tages), "week" (Woche um ein Datum), "values" (Morgenwerte der letzten Tage), "sessions" (erledigte Einheiten mit allen Feldern: Dauer, Distanz, Pace, Puls, max. Puls, Pulszone, Entkopplung, Effizienz, Kadenz, Watt, Schwimm-Technik, RPE, Gefühl, geplant vs. gemacht).',
     input_schema: { type: 'object', properties: { what: { type: 'string', enum: ['day', 'week', 'values', 'sessions'] }, date: { type: 'string', description: 'JJJJ-MM-TT, Standard heute' }, days: { type: 'integer', minimum: 1, maximum: 42 } }, required: ['what'], additionalProperties: false } },
+  { name: 'explain_day', description: 'Erklärt die Einheit(en) eines Tages Schritt für Schritt wie die App (Ein-/Aufwärmen, Hauptteil mit Wiederholungen, Pausen, Zonen mit den Pulswerten des Athleten, Ausklang) und berücksichtigt Krankheit, Wiedereinstieg, Ampel und Zeitgrenze. Liefert ggf. einen Änderungsvorschlag (noch nicht übernommen).',
+    input_schema: { type: 'object', properties: { date: { type: 'string', description: 'JJJJ-MM-TT, Standard heute' }, sport: { type: 'string', enum: ['swim', 'bike', 'run', 'strength', 'football'] }, minutes: { type: 'integer', minimum: 10, maximum: 240, description: 'nur so viel Zeit' } }, additionalProperties: false } },
+  { name: 'get_analysis', description: 'Ergebnis des Analyse-Coachs: Belastung (CTL/ATL/TSB, ACWR) und Erkenntnisse mit Begründung und Tipp (Trends wie aerobe Effizienz, zu hoher Puls, Ermüdung).',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'move_session', description: 'Verschiebt eine geplante Einheit auf einen anderen Tag.',
     input_schema: { type: 'object', properties: { session_id: { type: 'string' }, to_date: { type: 'string' }, reason: { type: 'string', description: 'ein Satz Begründung für den Athleten' } }, required: ['session_id', 'to_date', 'reason'], additionalProperties: false } },
   { name: 'modify_session', description: 'Ändert eine geplante Einheit (Titel, Dauer, Zone, Beschreibung, Sport). Nur angegebene Felder ändern sich.',
@@ -66,8 +73,22 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
     const n = Math.min(42, input.days || 14);
     const from = C.addDays(date, -n);
     if (input.what === 'values') return { result: JSON.stringify((ctx.state.trend || []).filter((p: any) => p && p.date > from && p.date <= date).map((p: any) => ({ date: p.date, sleepHours: p.sleepHours, hrv: p.hrv, restingHR: p.restingHR, bodyTemp: p.bodyTemp, note: p.illness }))), isError: false, changes: [] };
-    if (input.what === 'sessions') return { result: JSON.stringify(Object.values(ctx.state.activities || {}).filter((a: any) => a && !a.mergedInto && a.date > from && a.date <= date).map((a: any) => ({ date: a.date, sport: a.sport, min: a.min, km: a.km, avgHr: a.avgHr, pace: a.paceSecKm, intervals: a.intervals && a.intervals.count, decoupling: a.decouplingPct }))), isError: false, changes: [] };
+    if (input.what === 'sessions') {
+      // alle erledigten Einheiten mit ihren Feldern (Uhr, intervals.icu, von Hand, aus Notizen)
+      const rows = doneSessions(ctx, C.addDays(from, 1), date).map(x => { const f = x.f; const zv = x.planned ? zoneVerdict(x.planned, (ctx.state.sessions || {})[x.id], ctx.profile.thresholds) : null;
+        return Object.fromEntries(Object.entries({ date: x.date, sport: x.sport, title: x.title, min: f.min, km: f.km, meters: f.meters, pace: f.paceSec, pace100: f.pace100, hr: f.hr, maxHr: f.maxHr, zone: zv ? zv.text : null, decoupling: f.decoupling, efficiency: f.efficiency, cadence: f.cadence, power: f.power, spl: f.spl, longestCrawl: f.longestCrawl, technique: f.technique || null, rpe: f.rpe, feel: f.feel, deviation: f.deviation || null }).filter(([, v]) => v != null && v !== '')); });
+      return { result: JSON.stringify(rows), isError: false, changes: [] };
+    }
     return err('Unbekannte Abfrage.');
+  }
+  if (name === 'explain_day') {
+    const date = DATE.test(input.date || '') ? input.date : today;
+    const ex = explainDay(ctx, date, input.sport || null, input.minutes || null);
+    return { result: ex.text + (ex.ops && ex.ops.length ? '\n[Vorschlag, noch nicht übernommen: ' + ex.ops.flatMap((o: any) => o.op === 'adjust' ? o.adj.map((a: any) => a.what) : []).join('; ') + ']' : ''), isError: false, changes: [] };
+  }
+  if (name === 'get_analysis') {
+    const a = analyze(ctx, 'view');
+    return { result: JSON.stringify({ load: a.load, insights: a.insights.slice(0, 8).map(i => ({ title: i.title, why: i.why, tip: i.tip, tone: i.tone })) }), isError: false, changes: [] };
   }
   if (name === 'move_session' || name === 'modify_session' || name === 'cancel_session') {
     const hit = findSession(weeks, input.session_id || '');

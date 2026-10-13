@@ -23,6 +23,13 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   const t = p.thresholds;
   L.push(`Schwellen: Laufen ${t.lthrRun} bpm, ${mmss(t.thresholdPaceRunSec)}/km; Rad ${t.lthrBike} bpm${t.ftp ? `, FTP ${t.ftp} W` : `, ${t.thresholdSpeedBikeKmh} km/h`}${t.cssSec ? `; Schwimmen CSS ${mmss(t.cssSec)}/100 m` : ''}`);
   L.push(`Zeitbudget ${p.weeklyHours} h/Woche${p.fixed.length ? `; feste Termine: ${p.fixed.map(f => `${DOW[f.dow]} ${f.title}${f.time ? ' ' + f.time : ''}`).join(', ')}` : ''}; Schlafbedarf ${sleepNeed(p, today).join('-')} h`);
+  if (t.aetHr || t.vo2max) L.push(`Weitere Werte: ${t.aetHr ? `aerobe Schwelle ${t.aetHr[0]}-${t.aetHr[1]} bpm` : ''}${t.aetHr && t.vo2max ? ', ' : ''}${t.vo2max ? `VO2max ${String(t.vo2max).replace('.', ',')}` : ''}${(t.estimated || []).length ? ` (geschätzt: ${(t.estimated || []).join(', ')})` : ''}`);
+  if (p.progression) L.push(`Aufbau: ${p.progression.buildWeeks} Wochen steigern (+${p.progression.incPct} %), dann 1 Woche Erholung`);
+  if (p.strengthPlan) L.push(`Kraft: ${(p.strengthPlan.lower || []).map(d => 'Unterkörper ' + DOW[d]).concat((p.strengthPlan.upper || []).map(d => 'Oberkörper ' + DOW[d])).join(', ')}; nie Beine am Spieltag`);
+  if (p.morning) L.push(`Morgens ${p.morning.label || 'vor der Schule'} (${p.morning.days.map(d => DOW[d]).join(', ')}): höchstens ${p.morning.maxMin} min${p.morning.noPool ? ', kein Schwimmbad' : ''}`);
+  if (p.runGoal) L.push(`Langfristiges Lauf-Ziel: ${mmss(p.runGoal.paceSec)}/km bei Puls ${p.runGoal.hr}`);
+  if (p.teamSport) L.push(`Teamsport: ${p.teamSport.name}, Training ${p.teamSport.trainingDays.map(d => DOW[d]).join(', ')}, Spiel ${p.teamSport.gameDays.map(d => DOW[d]).join(', ')}${p.teamSport.seasonTo ? ` bis ${d2(p.teamSport.seasonTo)}${p.teamSport.seasonTo.slice(0, 4)}` : ''}`);
+  (p.focus || []).forEach(f => L.push('- ' + f));
   if (p.injuries) L.push(`Beschwerden/Verletzungen: ${p.injuries}`);
   if (p.medicalCaution) L.push('Gesundheit: ärztliche Freigabe empfohlen, vorsichtig planen.');
   L.push('## Ziele');
@@ -43,7 +50,8 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
     const m = st.metrics || {};
     const status = st.completed ? '✓' : st.skipped ? `ausgefallen${st.skipReason ? ' (' + st.skipReason + ')' : ''}` : C.illnessAt(ctx.state.illnessPeriods, d.date) ? 'krank' : 'nicht gemacht';
     const data = [m.km ? m.km + ' km' : null, m.meters ? m.meters + ' m' : null, m.min ? m.min + ' min' : null, m.hr ? 'HF ' + m.hr : null, m.pace ? m.pace + '/km' : null, m.pace100 ? m.pace100 + '/100m' : null, m.spl ? m.spl + ' Züge/Bahn' : null, st.rpe ? 'RPE ' + st.rpe : null].filter(Boolean).join(', ');
-    L.push(`${d2(d.date)} ${SPORT[s.sport] || s.sport} ${s.title}: ${status}${data ? ' – ' + data : ''}${st.notes ? ` „${String(st.notes).slice(0, 120)}“` : ''}`);
+    const more = [m.maxHr ? 'max ' + m.maxHr : null, m.decoupling != null && m.decoupling !== '' ? 'Entkopplung ' + m.decoupling + ' %' : null, m.cadence ? 'Kadenz ' + m.cadence : null, m.power ? m.power + ' W' : null, m.longestCrawl ? 'Kraul am Stück ' + m.longestCrawl + ' m' : null, m.technique ? 'Technik: ' + m.technique : null, st.rpe ? 'RPE ' + st.rpe : null, st.feel ? 'Gefühl ' + st.feel + '/5' : null, st.deviation ? 'Abweichung: ' + st.deviation : null].filter(Boolean).join(', ');
+    L.push(`${d2(d.date)} ${SPORT[s.sport] || s.sport} ${s.title}: ${status}${data ? ' – ' + data : ''}${more ? ', ' + more : ''}${st.notes ? ` „${String(st.notes).slice(0, 120)}“` : ''}`);
   }));
   Object.entries(ctx.state.customWorkouts || {}).filter(([d]) => d >= from && d < today).forEach(([d, list]: any) => (list || []).forEach((w: any) => L.push(`${d2(d)} Extra ${SPORT[w.sport] || w.sport} ${w.title}${w.metrics && w.metrics.min ? ' ' + w.metrics.min + ' min' : ''}`)));
   L.push('## Werte (Schlaf h / HFV / Ruhepuls / Temp-Abw. / Ampel)');

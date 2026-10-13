@@ -212,3 +212,45 @@ describe('Werkzeuge und Regeln', () => {
     expect((await recs(env, T)).find((x: any) => x.kind === 'coachNote').data.text).toBe('leichtes Leistenziehen beim Fußball');
   });
 });
+
+describe('Auftrag 7: KI-Coach bereit für den echten Schlüssel', () => {
+  test('„Was genau soll ich … machen?“: KI ruft explain_day auf und bekommt dieselben Schritte wie der Regel-Coach', async () => {
+    const d = future(5);
+    mock([tool('explain_day', { date: d, sport: 'swim' }), text('Hier dein Ablauf.')]);
+    const { env, T } = await user();
+    const r = await chat(env, T, 'Was genau soll ich am Freitag beim Schwimmen machen?');
+    expect(r.status).toBe(200);
+    const res = requests[1].messages[requests[1].messages.length - 1].content[0];
+    expect(res.type).toBe('tool_result');
+    expect(String(res.content)).toMatch(/1\. (Einschwimmen|Hauptteil)/);
+  });
+  test('get_analysis und Felder der Einheiten stehen der KI zur Verfügung', async () => {
+    mock([tool('get_analysis', {}), tool('get_data', { what: 'sessions', days: 14 }), text('ok')]);
+    const { env, T } = await user();
+    await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'session', key: 'w1-di', data: { completed: true, rpe: '5', feel: '3', metrics: { min: '40', km: '6.5', hr: '150', decoupling: '3.1', cadence: '164' } }, updatedAt: Date.now() }] }, T);
+    await chat(env, T, 'Wie steht es um meine Form?');
+    const a = JSON.parse(requests[1].messages[requests[1].messages.length - 1].content[0].content);
+    expect(a.load).toBeTruthy(); expect(Array.isArray(a.insights)).toBe(true);
+    const rows = JSON.parse(requests[2].messages[requests[2].messages.length - 1].content[0].content);
+    if (dow(today) >= 3 || dow(today) === 0) expect(rows.find((x: any) => x.cadence === 164 || x.decoupling === 3.1)).toBeTruthy();
+  });
+  test('Anfrage: Opus 5.5 mit Aufwand „medium“, Fallbacks, Cache für System und Verlauf', async () => {
+    mock([text('Hallo!')]);
+    const { env, T } = await user();
+    await chat(env, T, 'Hallo');
+    const q = requests[0];
+    expect(q.model).toBe('claude-opus-5-5');
+    expect(q.output_config.effort).toBe('medium');
+    expect(q.cache_control).toEqual({ type: 'ephemeral' });
+    expect(q.betas).toEqual(['server-side-fallback-2026-07-01']); expect(q.fallbacks).toBe('default');
+    expect(q.tool_choice).toEqual({ type: 'auto' });
+    expect(q.tools.map((x: any) => x.name)).toEqual(expect.arrayContaining(['explain_day', 'get_analysis', 'modify_session', 'add_rule']));
+  });
+  test('Kosten: Cache lesen 0,20 $ pro Mio. Tokens bei Opus 5.5 (nicht 0,40)', async () => {
+    mock([() => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'x' }], usage: { input_tokens: 0, cache_read_input_tokens: 1_000_000, output_tokens: 0 } })]);
+    const { env, T } = await user({ budget: 20 });
+    await chat(env, T, 'Hallo');
+    const row: any = await env.DB.prepare('SELECT cost_micro FROM ai_usage').first();
+    expect(row.cost_micro).toBeGreaterThanOrEqual(200000); expect(row.cost_micro).toBeLessThan(201000); // dazu nur Cent-Bruchteile fürs Umformulieren
+  });
+});
