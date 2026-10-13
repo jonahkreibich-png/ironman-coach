@@ -312,8 +312,11 @@ export default {
     }
   },
   async scheduled(event: any, env: Env, ctx: any) {
-    // Nachts das Backup, jeder andere Zeitplan löst den normalen Lauf aus
-    if (event.cron === '0 2 * * *') ctx.waitUntil(nightly(env));
-    else ctx.waitUntil(everyFive(env));
+    // Nur ein Zeitplan nötig (kostenlos sind 5 pro Konto): der 5-Minuten-Lauf um 02:00 UTC macht auch das nächtliche Backup.
+    // Der frühere eigene Zeitplan „0 2 * * *“ funktioniert weiter.
+    const t = new Date(event.scheduledTime || Date.now());
+    if (event.cron === '0 2 * * *') { ctx.waitUntil(nightly(env)); return; }
+    if (t.getUTCHours() === 2 && t.getUTCMinutes() < 5) ctx.waitUntil(nightly(env));
+    ctx.waitUntil(everyFive(env));
   }
 };

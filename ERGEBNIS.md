@@ -1,5 +1,46 @@
 # Ergebnis
 
+## Freigabe (13.10.2026)
+
+**Deine echte App hat jetzt diese Adresse: https://coach-app-efc7.pages.dev**
+Die Adresse hängt nicht vom App-Namen ab. Wählst du später einen neuen Namen, musst du nicht noch einmal umziehen.
+
+**iPhone umziehen (ca. 5 Minuten):**
+1. Öffne auf dem iPhone in Safari **https://coach-app-efc7.pages.dev**. Tippe auf Teilen → „Zum Home-Bildschirm“ → „Hinzufügen“.
+2. Öffne die neue App vom Home-Bildschirm. Tippe auf „Server zum ersten Mal einrichten“, gib den **Einrichtungscode** ein und tippe auf „Einrichten“. Der Code steht in `ZUGANG.local.md` ganz oben unter „echte App“. Danach lädt die App deine Daten (Stand 13.10., 16:01 Uhr).
+3. Kurz prüfen: „Heute“ zeigt „Krank seit Mi 07.10.“, der Plan zeigt W1–W5, und unter „Fortschritt“ stehen deine Werte.
+4. Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“, dann „Test senden“. Auf der neuen Adresse muss das iPhone Mitteilungen einmal neu erlauben.
+5. Nur wenn du intervals.icu nutzt: Mehr → Verbindungen → intervals.icu → API-Schlüssel und Athleten-ID eintragen. Beides findest du in intervals.icu unter Settings → Developer.
+6. Lösch das alte Icon vom Home-Bildschirm und schreib mir **„iPhone ist umgezogen“**. Danach führe ich `main` zusammen; die alte Adresse leitet dann auf die neue weiter.
+
+Hast du nach 16:01 Uhr noch etwas in der **alten** App eingetragen, sag es mir. Ich hole es dann nach. Die alte App bleibt 4 Wochen unverändert als Rückfall (alter Server, alte Datenbank, altes Icon).
+
+### Was in Auftrag 6 passiert ist
+
+| Punkt | Stand | Was |
+|---|---|---|
+| **1** Bestätigen statt sofort ändern | erledigt | Ein Tipp ins Wochenraster ändert nur die Anzeige. Geänderte Felder sind gestrichelt markiert, unten stehen „X Änderungen übernehmen“ und „Verwerfen“. „Übernehmen“ zeigt zuerst, was sich diese und nächste Woche im Plan ändert (z. B. „Laufen von Di auf Sa“), erst „Übernehmen“ im Fenster speichert. Wer den Bildschirm mit offenen Änderungen verlässt, wird gefragt. Das gilt auch für Sätze, Können und Räder sowie im Profil für Sportarten, Stunden, Stil und Ziele (Ziele passen den Plan jetzt überhaupt erst an). Name, Gewicht und Sprache speichern weiter sofort. Neuer E2E-Test: versehentlicher Tipp → Verwerfen → Plan und Regeln unverändert. |
+| **2** Namenssuche | erledigt | [NAMEN.md](NAMEN.md): 40 Ideen geprüft (Domains .com/.app/.de, App Store, Google Play, Marken DPMA/EUIPO/USPTO/WIPO in den Klassen 9/41/42/44, Websuche, TikTok), dazu die 10 besten freien Namen. **Empfehlung: Tempendo**. Der Name in der App ist unverändert. |
+| **3** Neutrale Adresse | erledigt | Pages `coach-app-efc7`, Server `coach-api-efc7`, Datenbank `coach-db-efc7`. Der App-Name steht nur in `shared/brand.ts`. `scripts/release.md`, `scripts/deploy.mjs production` und die CI sind angepasst. |
+| **4** Letzte Prüfung | erledigt | Typecheck, 612 Unit- und Server-Tests, 105 E2E-Tests (Chromium und WebKit) grün. Die Kopie deiner echten Daten war vorher **nie** gelaufen. Jetzt ist sie gelaufen, und dabei kam ein echter Fehler heraus: Die Umstellung brach an deiner echten Datenbank ab (Tabelle `error_log` fehlte). Der Fehler ist behoben und per Test abgesichert. In der Test-App sind deine Daten vollständig angekommen, Art für Art gezählt: 49 Einheiten (21 erledigt), 42 Tage Werte, Krankheitsphase seit 07.10., 2 Meilensteine, 3 Tage Essen, Plan, Einstellungen. Papa ist unverändert. |
+| **4** Durchlauf mit deinen Daten | erledigt | Heute, Plan, Coach (5 Sätze), Berücksichtigungen, Verbindungen und Fehler melden durchgespielt. Dabei 3 Fehler gefunden und mit Tests behoben (siehe unten). |
+| **5** Freigabe | erledigt bis auf Schritt 5 | Frische Kopie (16:01 Uhr) in die neue Datenbank, Zahlen wieder Art für Art gleich (50 Einheiten, 43 Tage Werte, …). Die echte Datenbank wurde nur gelesen. Neue Schlüssel gesetzt, Server und App deployt, `/api/health` meldet `production`. Die alte App läuft unverändert. **`main` bleibt unverändert, bis du „iPhone ist umgezogen“ schreibst.** |
+
+**Im Durchlauf gefunden und behoben (jeweils erst mit Test nachgestellt):**
+- „Kann ich morgen schon wieder schwimmen?“ während deiner Krankheit: Der Coach fragte, was er mit der Schwimmeinheit machen soll. Jetzt antwortet er zur Krankheit (seit wann, kein Training bei Fieber, ab 24 h symptomfrei „Wieder gesund“).
+- Abends bot „Ich habe Mittwoch keine Zeit“ noch „heute“ als Ausweichtag an. Ab 18 Uhr nicht mehr.
+- Ein unsichtbares Steuerzeichen im Code führte dazu, dass ein „Schwellentest“ nicht als harte Einheit galt. Ein neuer Test prüft jetzt alle Quelltexte auf solche Zeichen.
+
+**Was du wissen solltest:**
+- **Mitteilungs-Schlüssel nicht übernommen:** Der alte Schlüssel liegt nur bei Cloudflare, und Cloudflare gibt solche Schlüssel nicht wieder heraus; eine Kopie gab es nirgends. Er hätte auch nicht geholfen, weil Mitteilungen je Adresse gelten. Deshalb Schritt 4 oben (ein Tipp).
+- **intervals.icu** musst du aus demselben Grund einmal neu eintragen (Schritt 5).
+- **Kostenlos-Grenze:** Cloudflare erlaubt kostenlos nur 5 Zeitpläne pro Konto. Der neue und der Test-Server haben deshalb je einen statt zwei; das nächtliche Backup läuft im 5-Minuten-Lauf um 02:00 UTC mit. Es wurde nichts gekauft.
+- **Dein Plan endet am 18.10.** In der App ist dein Ziel als „Allgemeine Fitness“ eingetragen, und für Fußball fehlen die Tage. Plant die App die Folgewochen selbst (z. B. nach „Übernehmen“ in den Berücksichtigungen), fehlt deshalb Fußball. Die Vorschau zeigt dir das vorher. Besser: Neuen Block wie bisher einspielen, oder vorher unter Profil das Ziel anpassen und den Fragebogen mit Fußball-Tagen ausfüllen.
+- Die Test-App heißt weiter `stamio-test`, weil Papa sie nutzt.
+- In der neuen App habe ich mich **nicht** mit deinem echten Einrichtungscode angemeldet; den ersten echten Login machst du in Schritt 2. Den gleichen Ablauf habe ich vorher lokal mit einer Kopie deiner Daten durchgespielt.
+
+Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) (Nr. 72-80) · [NAMEN.md](NAMEN.md) · [scripts/release.md](scripts/release.md)
+
 ## Auftrag 5 (12.10.2026)
 
 **Neue Version in der Test-App: https://stamio-test.pages.dev** (Version 2.2.0). Die echte App ist unverändert. Alles liegt jetzt auch auf GitHub (Branch `entwicklung`), `main` ist unverändert.

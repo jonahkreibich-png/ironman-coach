@@ -1,23 +1,29 @@
 # Cloudflare Worker (Server der App). Hier stehen keine Geheimnisse: Schlüssel liegen nur als Cloudflare-Secrets vor.
 #
-# Oben: die echte App (noch mit altem Namen, wird erst beim „Freigeben“ umbenannt, siehe scripts/release.md).
-# [env.test]: die Test-Umgebung mit eigener Datenbank. Deploy: npx wrangler deploy --env test
-name = "ironman-coach-api"
+# Oben: die echte App mit neutralen Namen (hängen nicht vom App-Namen ab, siehe scripts/release.md).
+#   Alte App bis zum Aufräumen: Worker "ironman-coach-api", D1 "ironman" (f09acda6-8ded-4b02-a17c-c89aa4480ce9).
+# [env.test]: die Test-Umgebung mit eigener Datenbank. Deploy: node scripts/deploy.mjs test
+name = "coach-api-efc7"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
 
 [[d1_databases]]
 binding = "DB"
-database_name = "ironman"
-database_id = "f09acda6-8ded-4b02-a17c-c89aa4480ce9"
+database_name = "coach-db-efc7"
+database_id = "42d4e471-2ad6-41da-8865-09bbb1d26a38"
+migrations_dir = "migrations"
 
 [triggers]
 # Zeiten in UTC. Der Code prüft selbst die Uhrzeit in Europe/Berlin.
-crons = ["0 2 * * *", "*/5 * * * *"]
+crons = ["*/5 * * * *"]
 
 [vars]
-ALLOWED_ORIGINS = "https://jonahkreibich-png.github.io,http://localhost:8765"
+ALLOWED_ORIGINS = "https://coach-app-efc7.pages.dev"
+PUBLIC_URL = "https://coach-app-efc7.pages.dev"
+ENVIRONMENT = "production"
 
 # ---------------- Test-Umgebung ----------------
 [env.test]
@@ -32,7 +38,7 @@ database_id = "f5a7a245-1fcf-49bd-b29d-4587c69a35cf"
 migrations_dir = "migrations"
 
 [env.test.triggers]
-crons = ["0 2 * * *", "*/5 * * * *"]
+crons = ["*/5 * * * *"]
 
 [env.test.vars]
 ALLOWED_ORIGINS = "https://stamio-test.pages.dev"
