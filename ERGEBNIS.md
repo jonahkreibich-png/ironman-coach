@@ -11,7 +11,7 @@ Die Adresse hängt nicht vom App-Namen ab. Wählst du später einen neuen Namen,
 3. Kurz prüfen: „Heute“ zeigt „Krank seit Mi 07.10.“, der Plan zeigt W1–W5, und unter „Fortschritt“ stehen deine Werte.
 4. Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“, dann „Test senden“. Auf der neuen Adresse muss das iPhone Mitteilungen einmal neu erlauben.
 5. Nur wenn du intervals.icu nutzt: Mehr → Verbindungen → intervals.icu → API-Schlüssel und Athleten-ID eintragen. Beides findest du in intervals.icu unter Settings → Developer.
-6. Lösch das alte Icon vom Home-Bildschirm und schreib mir **„iPhone ist umgezogen“**. Danach führe ich `main` zusammen; die alte Adresse leitet dann auf die neue weiter.
+6. Lösch das alte Icon vom Home-Bildschirm und schreib mir **„iPhone ist umgezogen“**. **Erledigt (13.10.):** `main` ist zusammengeführt, die alte Adresse leitet auf die neue weiter und räumt dabei den alten Offline-Speicher auf.
 
 Hast du nach 16:01 Uhr noch etwas in der **alten** App eingetragen, sag es mir. Ich hole es dann nach. Die alte App bleibt 4 Wochen unverändert als Rückfall (alter Server, alte Datenbank, altes Icon).
 
@@ -24,7 +24,7 @@ Hast du nach 16:01 Uhr noch etwas in der **alten** App eingetragen, sag es mir. 
 | **3** Neutrale Adresse | erledigt | Pages `coach-app-efc7`, Server `coach-api-efc7`, Datenbank `coach-db-efc7`. Der App-Name steht nur in `shared/brand.ts`. `scripts/release.md`, `scripts/deploy.mjs production` und die CI sind angepasst. |
 | **4** Letzte Prüfung | erledigt | Typecheck, 612 Unit- und Server-Tests, 105 E2E-Tests (Chromium und WebKit) grün. Die Kopie deiner echten Daten war vorher **nie** gelaufen. Jetzt ist sie gelaufen, und dabei kam ein echter Fehler heraus: Die Umstellung brach an deiner echten Datenbank ab (Tabelle `error_log` fehlte). Der Fehler ist behoben und per Test abgesichert. In der Test-App sind deine Daten vollständig angekommen, Art für Art gezählt: 49 Einheiten (21 erledigt), 42 Tage Werte, Krankheitsphase seit 07.10., 2 Meilensteine, 3 Tage Essen, Plan, Einstellungen. Papa ist unverändert. |
 | **4** Durchlauf mit deinen Daten | erledigt | Heute, Plan, Coach (5 Sätze), Berücksichtigungen, Verbindungen und Fehler melden durchgespielt. Dabei 3 Fehler gefunden und mit Tests behoben (siehe unten). |
-| **5** Freigabe | erledigt bis auf Schritt 5 | Frische Kopie (16:01 Uhr) in die neue Datenbank, Zahlen wieder Art für Art gleich (50 Einheiten, 43 Tage Werte, …). Die echte Datenbank wurde nur gelesen. Neue Schlüssel gesetzt, Server und App deployt, `/api/health` meldet `production`. Die alte App läuft unverändert. **`main` bleibt unverändert, bis du „iPhone ist umgezogen“ schreibst.** |
+| **5** Freigabe | erledigt | Frische Kopie (16:01 Uhr) in die neue Datenbank, Zahlen wieder Art für Art gleich (50 Einheiten, 43 Tage Werte, …). Die echte Datenbank wurde nur gelesen. Neue Schlüssel gesetzt, Server und App deployt, `/api/health` meldet `production`. Die alte App läuft unverändert. Nach „iPhone ist umgezogen“ ist `entwicklung` nach `main` übernommen; die alte GitHub-Pages-Adresse zeigt „Die App ist umgezogen“ und leitet weiter. Alter Server und alte Datenbank bleiben 4 Wochen unverändert. |
 
 **Im Durchlauf gefunden und behoben (jeweils erst mit Test nachgestellt):**
 - „Kann ich morgen schon wieder schwimmen?“ während deiner Krankheit: Der Coach fragte, was er mit der Schwimmeinheit machen soll. Jetzt antwortet er zur Krankheit (seit wann, kein Training bei Fieber, ab 24 h symptomfrei „Wieder gesund“).
@@ -39,7 +39,7 @@ Hast du nach 16:01 Uhr noch etwas in der **alten** App eingetragen, sag es mir. 
 - Die Test-App heißt weiter `stamio-test`, weil Papa sie nutzt.
 - In der neuen App habe ich mich **nicht** mit deinem echten Einrichtungscode angemeldet; den ersten echten Login machst du in Schritt 2. Den gleichen Ablauf habe ich vorher lokal mit einer Kopie deiner Daten durchgespielt.
 
-Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) (Nr. 72-80) · [NAMEN.md](NAMEN.md) · [scripts/release.md](scripts/release.md)
+Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) (Nr. 72-81) · [NAMEN.md](NAMEN.md) · [scripts/release.md](scripts/release.md)
 
 ## Auftrag 5 (12.10.2026)
 

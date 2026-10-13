@@ -2,9 +2,9 @@
 
 Nur das, was wirklich noch nötig ist.
 
-## 1. iPhone umziehen (5 min) – jetzt
+## 1. iPhone umziehen – erledigt
 
-Die echte App ist freigegeben: **https://coach-app-efc7.pages.dev**. Die Anleitung in 6 Schritten steht in [ERGEBNIS.md](ERGEBNIS.md) ganz oben unter „Freigabe“, der Einrichtungscode in `ZUGANG.local.md` ganz oben. Danach Claude „iPhone ist umgezogen“ schreiben.
+Die echte App läuft unter **https://coach-app-efc7.pages.dev**. Die alte Adresse leitet dorthin weiter. Hast du nach 13.10., 16:01 Uhr noch etwas in der alten App eingetragen, sag es Claude.
 
 ## 2. Namen wählen (wenn du magst)
 
