@@ -60,7 +60,7 @@ export function mergeIntoDefaults(partial: any): any {
   if (!out.nutritionProfile) out.nutritionProfile = base.nutritionProfile;
   if (!Array.isArray(out.illnessPeriods)) out.illnessPeriods = clone(PLAN.seedIllness || []);
   if (!out.adjustments || typeof out.adjustments !== 'object') out.adjustments = {};
-  ['goals', 'activities', 'coachMsgs', 'coachNotes', 'raceResults', 'meals'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
+  ['goals', 'activities', 'coachMsgs', 'coachNotes', 'raceResults', 'meals', 'analysis'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
   out.trend.sort((a, b) => a.date.localeCompare(b.date));
   return out;
 }

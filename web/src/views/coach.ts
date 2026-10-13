@@ -18,6 +18,7 @@ import { propose } from './planedit';
 import { replanFuture } from '../replan';
 import { fixConflict } from './rules';
 import * as C from '../../../shared/core';
+import { analyze } from '../../../shared/coach/analysis';
 
 const time = (ms: number) => { const d = new Date(ms); return `${dowShort(d.toISOString().slice(0, 10))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 export const keepDays = () => [3, 7, 14].includes(+((STATE.settings || {}).coachKeepDays)) ? +STATE.settings.coachKeepDays : 7;
@@ -32,12 +33,25 @@ function msgHtml(m: any, latest: boolean): string {
   const acts = (m.actions || []).length && !m.actionsDone ? `<div class="suggest">${m.actions.map((a: ChatAction, i: number) => `<button class="btn sm ${i ? 'ghost' : ''}" data-act="chat-action" data-id="${esc(m.id)}" data-i="${i}">${esc(a.label)}</button>`).join('')}</div>` : m.actionsDone ? `<div class="xs muted" style="margin-top:6px">${esc(m.actionsDone)}</div>` : '';
   // Knöpfe einer Rückfrage: nur bei der letzten Nachricht aktiv (sonst gehört die Antwort nicht mehr dazu)
   const opts = (m.options || []).length && latest && !m.answered ? `<div class="suggest" data-chat-options>${m.options.map((o: Opt, i: number) => `<button class="btn sm ${i ? 'ghost' : ''}" data-act="chat-opt" data-id="${esc(m.id)}" data-i="${i}">${esc(o.label)}</button>`).join('')}</div>` : '';
+  // automatische Änderungen von Engine und Analyse-Coach: Rückgängig direkt an der Nachricht
+  const adjIds: string[] = (m.refs && m.refs.adjustmentIds) || [];
+  const adjUndo = !m.undo && m.from !== 'user' && adjIds.length && adjIds.some(id => STATE.adjustments[id]) ? `<div class="row" style="margin-top:6px"><button class="btn ghost sm" data-act="chat-adj-undo" data-id="${esc(m.id)}">${ic('back')} ${esc(adjIds.every(id => !STATE.adjustments[id] || STATE.adjustments[id].undone) ? t('plan.redo') : t('chat.undo'))}</button></div>` : '';
   const undo = m.undo && !m.undone ? `<div class="row" style="margin-top:6px"><button class="btn ghost sm" data-act="chat-undo" data-id="${esc(m.id)}">${ic('back')} ${esc(t('chat.undo'))}</button></div>` : m.undone ? `<div class="xs muted" style="margin-top:6px">${esc(t('chat.undone'))}</div>` : '';
   const sugg = (m.suggestions || []).length && latest ? `<div class="suggest">${m.suggestions.map((s: string) => `<button class="chip" data-act="chat-say" data-text="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '';
   const pin = m.from !== 'user' ? `<button class="msg-pin ${m.pinned ? 'on' : ''}" data-act="chat-pin" data-id="${esc(m.id)}" aria-label="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}" title="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}">${ic('flag')}</button>` : '';
-  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}${esc(m.text)}${prop}${acts}${opts}${undo}${sugg}<div class="time">${time(m.at)}</div></div>`;
+  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}${esc(m.text)}${prop}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
 }
 
+/* Was der Coach gerade sieht (Auftrag 7): die 3 wichtigsten Erkenntnisse der Analyse mit Begründung und Tipp.
+   Derselbe Code läuft auf dem Server (morgens, nach neuen Einheiten, sonntags); hier wird er frisch berechnet. */
+function seesCard(): string {
+  let a: any; try { a = analyze(D().engine, 'view'); } catch (e) { return ''; }
+  if (!a || !a.top.length) return '';
+  const L = a.load;
+  return `<div class="card sees" data-sees style="margin-top:var(--s3)"><div class="lbl">${esc(t('ana.title'))}</div>
+    <ol class="sees-list">${a.top.map((i: any) => `<li class="tone-${i.tone}" data-insight="${esc(i.id)}"><b>${esc(i.title)}</b><div class="small">${esc(i.why)}</div><div class="small"><b>${esc(t('ana.tip'))}:</b> ${esc(i.tip)}</div></li>`).join('')}</ol>
+    ${L && L.ctl != null ? `<div class="xs muted">${esc(t('ana.load', { ctl: Math.round(L.ctl), atl: L.atl != null ? Math.round(L.atl) : '–', tsb: L.tsb != null ? Math.round(L.tsb) : '–', acwr: L.acwr != null ? String(L.acwr).replace('.', ',') : '–' }))}</div>` : ''}</div>`;
+}
 /* Gerade aktuell: heutige Lage und offene Punkte */
 function nowCard(open: any[]): string {
   const d = D();
@@ -57,7 +71,7 @@ export function renderCoach(): string {
   const ai = aiState();
   const last = lastMsgId();
   const open = all.filter(m => isOpen(m)).sort((a, b) => b.at - a.at).slice(0, 3);
-  let h = nowCard(open);
+  let h = nowCard(open) + seesCard();
   h += `<div class="spread" style="margin:var(--s3) 0"><span class="xs muted">${esc(ai.active ? t('coach.aiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
   h += `<div class="feed">${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : empty(t('coach.empty'))}</div>`;
   const dlg = STATE.chatDialog || {};
@@ -121,6 +135,12 @@ on('chat-undo', el => {
   rebuildPlanIndex(); STATE.coachMsgs[m.id] = { ...m, undone: true }; saveState(); invalidate();
   if ((m.undo.rules || []).length || m.undo.goal) replanFuture(t('chat.undoneReplan'), t('chat.replanWhy'));
   nav.rerender(); toast(t('chat.undone'));
+});
+on('chat-adj-undo', el => {
+  const m = STATE.coachMsgs[el.dataset.id!]; if (!m) return; const ids: string[] = (m.refs && m.refs.adjustmentIds) || [];
+  const undo = !ids.every(id => !STATE.adjustments[id] || STATE.adjustments[id].undone);
+  ids.forEach(id => { if (STATE.adjustments[id]) STATE.adjustments[id] = { ...STATE.adjustments[id], undone: undo }; });
+  rebuildPlanIndex(); saveState(); invalidate(); nav.rerender(); toast(undo ? t('plan.undone') : t('plan.redone'));
 });
 on('chat-pin', el => { const m = STATE.coachMsgs[el.dataset.id!]; if (!m) return; STATE.coachMsgs[m.id] = { ...m, pinned: !m.pinned }; saveState(); nav.rerender(); });
 on('chat-jump', el => { const n = document.querySelector(`[data-msg="${el.dataset.id}"]`); if (n) { n.scrollIntoView({ block: 'center' }); n.classList.add('hl'); } else openHistory(); });

@@ -12,7 +12,7 @@ import { t } from '../../shared/i18n';
 
 const AUTH_KEY = STORAGE.syncAuth;
 /* Datensatz-Arten, die als Wörterbuch im Zustand liegen: kind → Feld */
-export const DICT_KINDS: Record<string, string> = { goal: 'goals', activity: 'activities', coachMsg: 'coachMsgs', coachNote: 'coachNotes', raceResult: 'raceResults', meal: 'meals' };
+export const DICT_KINDS: Record<string, string> = { goal: 'goals', activity: 'activities', coachMsg: 'coachMsgs', coachNote: 'coachNotes', raceResult: 'raceResults', meal: 'meals', analysis: 'analysis' };
 const META_KEY = STORAGE.syncMeta;
 const API = API_BASE;
 

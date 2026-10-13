@@ -7,6 +7,8 @@ import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../.
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
 import { migrateNotes } from '../../shared/fields';
+import { analyze, type Trigger } from '../../shared/coach/analysis';
+import { extendPlan } from '../../shared/replan';
 
 export async function loadState(env: Env, uid: number): Promise<any> {
   const [planRec, settingsRec, profileRec, sessions, customs, trend, illness, weekNotes, adjustments, nutrition, activities, coachMsgs, coachNotes, goals] = await Promise.all([
@@ -74,6 +76,7 @@ export async function runDaily(env: Env, uid: number, opts?: any): Promise<any> 
   if (!opts.force && !C.hasRecovery(today) && b.hour < 10) return { skipped: 'warte auf Morgenwerte' };
   const r = await runEngineFor(env, uid, { type: 'daily' }, { L, rephrase: opts.rephrase });
   await setMeta(env, uid, 'daily_done', b.date);
+  try { await runAnalysis(env, uid, 'morning', { L, rephrase: opts.rephrase }); } catch (e) { /* die Analyse darf den Morgen nie stören */ }
   return { date: b.date, created: r.created, adjustments: r.adjustments, messages: r.messages.length };
 }
 
@@ -86,8 +89,44 @@ export async function runWeekly(env: Env, uid: number, opts?: any): Promise<any>
   const L = await loadState(env, uid);
   if (!L.plan) return { skipped: 'kein Plan' };
   const date = opts.date || b.date;
+  try { await extendIfNeeded(env, uid, L); } catch (e) { /* weiter mit dem bisherigen Plan */ }
   const r = await runEngineFor(env, uid, { type: 'weekly' }, { L, date, rephrase: opts.rephrase });
   await setMeta(env, uid, 'weekly_done', b.date);
+  try { await runAnalysis(env, uid, 'weekly', { L, date, rephrase: opts.rephrase }); } catch (e) { /* weiter */ }
   const summary = C.weekSummary(L.state, L.baseWeeks, date);
   return { date, created: r.created, adjustments: r.adjustments, summary };
+}
+
+/* Analyse-Coach (Auftrag 7): morgens, nach neuen Einheiten, sonntags. Speichert das Ergebnis (analysis/latest), kleine Änderungen
+   als Anpassung mit Mitteilung (Rückgängig in der App), größere als Vorschlag. rephrase: die KI formuliert nur die Texte um. */
+export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts: { L?: any; date?: string; rephrase?: (m: CoachMsg) => Promise<CoachMsg> } = {}): Promise<any> {
+  const L = opts.L || await loadState(env, uid);
+  if (!L.plan) return { skipped: 'kein Plan' };
+  const ctx = engineCtx(L, opts.date);
+  const r = analyze(ctx, trigger);
+  const t = Date.now();
+  const changes: Change[] = r.auto.map((a, i) => ({ kind: 'adjust', key: a.id, data: a, updatedAt: t + i }));
+  const msgs: CoachMsg[] = [];
+  for (const m of r.messages) msgs.push(opts.rephrase && m.kind !== 'proposal' && m.kind !== 'adjust' ? await opts.rephrase(m) : m);
+  msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));
+  changes.push({ kind: 'analysis', key: 'latest', data: { date: r.date, trigger, at: r.at, load: r.load, top: r.top, insights: r.insights.slice(0, 10) }, updatedAt: t + 200 });
+  await putRecords(env, uid, changes);
+  r.auto.forEach(a => { L.state.adjustments[a.id] = a; });
+  msgs.forEach(m => { L.state.coachMsgs[m.id] = m; });
+  await setMeta(env, uid, 'analysis_last', { at: t, trigger, sig: await dataSignature(env, uid) });
+  return { trigger, top: r.top.map(i => i.title), auto: r.auto.length, proposals: r.proposals.length, messages: msgs.length };
+}
+/* Fingerabdruck der Einheiten: ändert er sich, ist eine neue Einheit da (egal aus welcher Quelle) */
+export async function dataSignature(env: Env, uid: number): Promise<string> {
+  const row: any = await env.DB.prepare("SELECT COUNT(*) AS n, MAX(updated_at) AS m FROM records WHERE user_id = ? AND kind IN ('session', 'custom', 'activity')").bind(uid).first();
+  return row ? row.n + ':' + row.m : '';
+}
+/* Sonntags: Plan verlängern, wenn er bald endet */
+export async function extendIfNeeded(env: Env, uid: number, L: any): Promise<boolean> {
+  if (!L.plan) return false;
+  const next = extendPlan(L.plan, L.profile, L.goals, berlinParts().date);
+  if (!next) return false;
+  await putRecords(env, uid, [{ kind: 'plan', key: 'main', data: next, updatedAt: Date.now() }]);
+  L.plan = next; L.baseWeeks = next.weeks; L.planMeta = next.meta;
+  return true;
 }

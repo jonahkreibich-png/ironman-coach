@@ -4,7 +4,7 @@ import { type Env, type Change, berlinParts, getRecord } from './store';
 import type { Auth } from './auth';
 import { HttpError, readJson } from './http';
 import * as X from './connect';
-import { runEngineFor, loadState, engineCtx } from './coach';
+import { runEngineFor, loadState, engineCtx, runAnalysis } from './coach';
 import { aiChat, aiStatus, aiFoodEstimate, decideProposal, aiRephrase, aiParseRules } from './ai';
 import { sanitizeRule } from '../../shared/constraints';
 import { parseRules } from '../../shared/ruleparse';
@@ -135,5 +135,6 @@ export async function onRecordsChanged(env: Env, uid: number, changes: Change[],
     const st = await aiStatus(env, uid, L.state.settings, needsParentConsent(ageOf(ctx0.profile, ctx0.today)));
     const rephrase = st.active ? (m: any) => aiRephrase(env, uid, engineCtx(L), m) : undefined;
     for (const ev of evs) await runEngineFor(env, uid, ev, { L, rephrase });
+    if (evs.some(e => e.type === 'activity')) await runAnalysis(env, uid, 'activity', { L, rephrase });
   } catch (e) { /* die Engine darf den Sync nie stören */ }
 }

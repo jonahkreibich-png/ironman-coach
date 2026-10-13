@@ -6,7 +6,7 @@ import { type Env, berlinDate, berlinParts, putRecords, getMeta, setMeta, active
 import { HttpError, json, corsHeaders, readJson } from './http';
 import { type Auth, authDevice, setup, createPairCode, redeemPairCode, createInvite, listInvites } from './auth';
 import { runImport, intervalsCreds } from './intervals';
-import { runDaily, runWeekly, loadState } from './coach';
+import { runDaily, runWeekly, loadState, runAnalysis, dataSignature } from './coach';
 import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliver } from './notify';
 import { vapidPublicKey } from './webpush';
 import { logError, recentErrors, scrub } from './errlog';
@@ -251,6 +251,7 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
 
   // Plan-Anpassungen von Hand auslösen
   if (p === '/api/coach/daily' && M === 'POST') return await runDaily(env, uid, { force: true });
+  if (p === '/api/coach/analysis' && M === 'POST') return await runAnalysis(env, uid, 'view');
   if (p === '/api/coach/weekly' && M === 'POST') {
     const body = await readJson(req);
     return await runWeekly(env, uid, { force: true, date: /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : undefined });
@@ -277,6 +278,8 @@ export async function everyFive(env: Env, b?: any, onlyUsers?: number[]) {
       try { daily = await runDaily(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'daily', { uid }); }
       // Sonntag ab 18 Uhr: nächste Woche planen (einmal)
       if (b.dow === 0 && b.hour >= 18) { try { await runWeekly(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'weekly', { uid }); } }
+      // Neue Einheit aus irgendeiner Quelle (Uhr, intervals.icu, Dropbox, Kurzbefehl): Analyse-Coach, auch wenn die App zu ist
+      try { const last = await getMeta(env, uid, 'analysis_last'); const sig = await dataSignature(env, uid); if (!last || last.sig !== sig) await runAnalysis(env, uid, 'activity'); } catch (e) { await logError(env, 'server', (e as Error).message, 'analysis', { uid }); }
       if (env.VAPID_PRIVATE_JWK) {
         try {
           L = await loadState(env, uid);

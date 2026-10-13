@@ -400,3 +400,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .structure .steps > li > b { font-size: var(--t-sm); }
 .structure .steps ul { margin: 2px 0 0; padding-left: 16px; font-size: var(--t-sm); }
 .structure .steps ul li { margin: 1px 0; overflow-wrap: anywhere; }
+/* Was der Coach gerade sieht (Auftrag 7) */
+.sees-list { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.sees-list li { overflow-wrap: anywhere; }
+.sees-list li.tone-bad b { color: var(--bad); } .sees-list li.tone-warn b { color: var(--warn); } .sees-list li.tone-good b { color: var(--good); }

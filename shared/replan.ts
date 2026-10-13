@@ -25,3 +25,16 @@ export function replanPlan(old: any, profile: Profile, goals: Goal[], today: str
   next.meta = { ...next.meta, explain: gen.plan.meta.explain };
   return { plan: next, gen };
 }
+
+/* Plan automatisch verlängern (sonntags auf dem Server): endet der Plan in weniger als 6 Wochen, kommt der nächste Abschnitt dazu.
+   Bestehende Wochen bleiben unverändert (auch Anpassungen und feste Einheiten), der Umfang knüpft an die letzte normale Woche an. */
+export function extendPlan(plan: any, profile: Profile, goals: Goal[], today: string): any | null {
+  const weeks = (plan && plan.weeks) || []; if (!weeks.length) return null;
+  const lastEnd = weeks[weeks.length - 1].endDate || C.addDays(weeks[weeks.length - 1].startDate, 6);
+  const gl = (goals || []).filter(g => g && !g.result && (!g.date || g.date > lastEnd));
+  if (!gl.length || lastEnd > C.addDays(today, 42)) return null;
+  const gen = generatePlan({ profile, goals: gl, today: lastEnd, continueFrom: continuationOf(plan, lastEnd), load: null });
+  const next = transitionPlan(plan, gen.plan, lastEnd);
+  next.meta = { ...next.meta, explain: (plan.meta && plan.meta.explain) || gen.plan.meta.explain, extendedAt: today };
+  return next.weeks.length > weeks.length ? next : null;
+}
