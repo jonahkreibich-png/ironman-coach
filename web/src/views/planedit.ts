@@ -13,7 +13,7 @@ import { validateWeeks } from '../../../shared/rules';
 import { checkPlan } from '../../../shared/plancheck';
 import { rulesOf, hardViolations, describe as ruleText } from '../../../shared/constraints';
 import { parseFor } from '../../../shared/ruleparse';
-import { isMinor } from '../../../shared/profile';
+import { isMinor, progressionOf } from '../../../shared/profile';
 import { nav } from '../nav';
 import { toast } from '../toast';
 
@@ -33,7 +33,7 @@ function issuesOf(adjustments: any): string[] {
   const fut = weeks.filter((w: any) => w.endDate >= today);
   const p = profile();
   const out = [
-    ...validateWeeks(fut, { minor: isMinor(p, today) }).map(v => v.msg),
+    ...validateWeeks(fut, { minor: isMinor(p, today), maxIncPct: progressionOf(p, today).incPct }).map(v => v.msg),
     ...checkPlan(fut, p, goals(), today).filter(i => i.rule === 'dayTime' || i.rule === 'teamSport' || (i.rule === 'strength' && /harten Tag/.test(i.msg))).map(i => i.msg)
   ];
   return [...new Set(out)];

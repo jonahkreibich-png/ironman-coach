@@ -4,7 +4,7 @@
 import * as C from '../core';
 import { validateWeeks, isIntense, weekMinutes } from '../rules';
 import { GOALS, type GoalType } from '../goals';
-import { isMinor } from '../profile';
+import { isMinor, progressionOf } from '../profile';
 import type { EngineCtx } from './engine';
 import { checkPlanCode } from './plancode';
 import { rulesOf, hardViolations, describe as ruleText } from '../constraints';
@@ -48,7 +48,7 @@ function ruleCheck(ctx: EngineCtx, weeks: any[], date: string): any[] {
   const i = weeks.findIndex(w => (w.days || []).some((d: any) => d.date === date));
   if (i < 0) return [];
   const prev = weeks.slice(Math.max(0, i - 2), i);
-  return validateWeeks([weeks[i]], { minor: isMinor(ctx.profile, ctx.today), illness: ctx.state.illnessPeriods }, prev);
+  return validateWeeks([weeks[i]], { minor: isMinor(ctx.profile, ctx.today), illness: ctx.state.illnessPeriods, maxIncPct: progressionOf(ctx.profile, ctx.today).incPct }, prev);
 }
 let seq = 0;
 function adjId(prefix: string, ctx: EngineCtx) { return `ai-${prefix}-${ctx.now}-${++seq}`; }

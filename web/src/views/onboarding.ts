@@ -8,7 +8,7 @@ import { t } from '../../../shared/i18n';
 import { on, onChange, ic, field, select, armed, more, sportLabel, timeField, readTime } from '../kit';
 import { BLOCKS, visibleQuestions, missingRequired, progress, prefillFromData, applyOnboarding, profileFromAnswers, understood, availableDays, goalTarget, DAYLOAD_OPTIONS, type Answers, type Question } from '../../../shared/onboarding';
 import { GOALS, type GoalType } from '../../../shared/goals';
-import { transitionPlan } from '../../../shared/plangen';
+import { currentStages, replanFuture } from '../replan';
 import { goalAllowed } from '../../../shared/rules';
 import { realism } from '../../../shared/goalcheck';
 import { parseBackupText, isBackup, isPlan, applyBackup } from '../backup';
@@ -183,14 +183,17 @@ function understoodPage(): string {
 let RESULT: ReturnType<typeof applyOnboarding> | null = null;
 function preview(): string {
   const a = draft().answers;
-  RESULT = applyOnboarding(a, todayStr(), STATE.profile ? profile() : undefined);
+  // vorhandener Plan: fortsetzen statt neu beginnen (Auftrag 7)
+  RESULT = applyOnboarding(a, todayStr(), STATE.profile ? profile() : undefined, HAS_PLAN ? { old: readPlan(), state: STATE, adjustments: STATE.adjustments || {}, stages: currentStages() } : {});
+  const from = nextMondayStr();
   const g = RESULT.gen;
   return `<div class="stack"><h2 style="margin:var(--s2) 0 0">${esc(t('ob.planTitle'))}</h2>
     ${RESULT.warnings.map(w => `<div class="banner warn">${esc(w)}</div>`).join('')}
     ${g ? conflictsHtml('ob', g.conflicts) : ''}
     ${g ? `<div class="card stack"><div class="lbl">${esc(t('ob.summary'))}</div>${g.summary.map(s => `<p class="small" style="margin:0">${esc(s)}</p>`).join('')}</div>
       <div class="card stack plan-explain"><div class="lbl">${esc(t('plan.explain'))}</div>${(g.plan.meta.explain || []).map((s: string) => `<p class="small">${esc(s)}</p>`).join('')}</div>
-      ${more(t('ob.firstWeeks'), g.plan.weeks.slice(0, 2).map((w: any) => `<div class="lbl" style="margin-top:var(--s2)">${esc(w.headline || t('plan.weekShort', { n: w.weekNumber }))} · ${esc(w.focus || '')}</div>${w.days.map((d: any) => `<div class="kv small"><span>${esc(t('dow.' + new Date(d.date + 'T12:00:00').getDay()))}</span><span style="text-align:right">${esc(d.sessions.filter((s: any) => s.sport !== 'rest').map((s: any) => s.title + (s.plannedMinutes && !/\d+ min/.test(s.title) ? ` (${s.plannedMinutes} min)` : '')).join(', ') || t('heute.restDay'))}</span></div>`).join('')}`).join(''))}
+      ${RESULT.continued ? `<div class="banner good" data-continued>${esc(t('ob.continued'))}</div>` : ''}
+      ${more(t(RESULT.continued ? 'ob.nextWeeks' : 'ob.firstWeeks'), g.plan.weeks.filter((w: any) => !RESULT!.continued || w.startDate >= from).slice(0, 2).map((w: any) => `<div class="lbl" style="margin-top:var(--s2)">${esc(w.headline || t('plan.weekShort', { n: w.weekNumber }))} · ${esc(w.focus || '')}</div>${w.days.map((d: any) => `<div class="kv small"><span>${esc(t('dow.' + new Date(d.date + 'T12:00:00').getDay()))}</span><span style="text-align:right">${esc(d.sessions.filter((s: any) => s.sport !== 'rest').map((s: any) => s.title + (s.plannedMinutes && !/\d+ min/.test(s.title) ? ` (${s.plannedMinutes} min)` : '')).join(', ') || t('heute.restDay'))}</span></div>`).join('')}`).join(''))}
       ${g.dropped.length ? `<div class="hint">${esc(t('ob.dropped', { list: [...new Set(g.dropped.slice(0, 4))].join('; ') }))}</div>` : ''}
       ${g.violations.filter(v => v.rule !== 'age').length ? `<div class="hint">${esc(t('ob.checked', { n: g.violations.length }))}</div>` : `<div class="hint">${esc(t('ob.rulesOk'))}</div>`}`
       : `<div class="card"><div class="hint">${esc(t('ob.noGoal'))}</div></div>`}
@@ -242,14 +245,18 @@ on('ob-apply', el => {
   saveState(); invalidate();
   if (!r.gen) { toast(t('common.saved')); nav.go('mehr:profil'); return; }
   const old = readPlan();
-  try {
-    if (old) localStorage.setItem(PLAN_KEY + '_prev', JSON.stringify(old));
-    const plan = old ? transitionPlan(old, r.gen.plan, todayStr()) : r.gen.plan;
-    localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
-  } catch (e) { toast(t('common.storageFull')); return; }
+  // Vorhandener Plan: fortsetzen (gleicher Weg wie jede Profiländerung), nie neu beginnen. Scores, Verlauf und Erledigtes bleiben.
+  if (old && Array.isArray(old.weeks) && old.weeks.length) {
+    const res = replanFuture(t('ob.replanReason'), t('ob.replanWhy'), { needTests: r.needTests });
+    toast(res.ok ? t('ob.applied') : res.msg);
+    setTimeout(() => { location.href = location.pathname + '?go=plan'; }, 700);
+    return;
+  }
+  try { localStorage.setItem(PLAN_KEY, JSON.stringify(r.gen.plan)); } catch (e) { toast(t('common.storageFull')); return; }
   toast(t('ob.applied'));
   setTimeout(() => { location.href = location.pathname + '?go=plan'; }, 700);
 });
+function nextMondayStr(): string { const d = todayStr(); const dow = new Date(d + 'T12:00:00Z').getUTCDay(); const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + (dow === 1 ? 7 : (8 - dow) % 7 || 7)); return x.toISOString().slice(0, 10); }
 void saveProfile;
 
 on('sync-recheck', async () => { await syncNow(); toast(t('welcome.stillNoData')); });

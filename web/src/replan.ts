@@ -48,7 +48,7 @@ export function previewReplan(p: Profile, goalList: Goal[]): { ok: boolean; msg:
   const old = readPlan(); const gl = (goalList || []).filter(g => g && !g.result);
   if (!old || !gl.length) return { ok: false, msg: t('stage.noReplan'), changes: [], thisWeek: [], nextWeek: [], conflicts: 0 };
   const today = todayStr();
-  const r = replanPlan(old, p, gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {} });
+  const r = replanPlan(old, p, gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {}, state: STATE });
   if (!r) return { ok: false, msg: t('stage.noReplan'), changes: [], thisWeek: [], nextWeek: [], conflicts: 0 };
   const before = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}));
   const adj = { ...(STATE.adjustments || {}) };
@@ -63,12 +63,12 @@ export function previewReplan(p: Profile, goalList: Goal[]): { ok: boolean; msg:
   const thisWeek = diff.filter(c => !wk(c.from || c.to || today)).map(c => c.text), nextWeek = diff.filter(c => wk(c.from || c.to || today)).map(c => c.text);
   return { ok: true, msg: '', changes: [...thisWeek, ...nextWeek], thisWeek, nextWeek, conflicts: (r.gen.conflicts || []).length };
 }
-export function replanFuture(reason: string, why: string): { ok: boolean; msg: string; conflicts?: Conflict[]; changed?: string[] } {
+export function replanFuture(reason: string, why: string, o: { needTests?: any } = {}): { ok: boolean; msg: string; conflicts?: Conflict[]; changed?: string[] } {
   const old = readPlan();
   const gl = goals().filter(g => !g.result);
   if (!old || !gl.length) return { ok: false, msg: 'Ohne Plan und Ziel gibt es nichts neu zu planen.' };
   const today = todayStr();
-  const r = replanPlan(old, profile(), gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {} });
+  const r = replanPlan(old, profile(), gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {}, state: STATE, needTests: o.needTests });
   if (!r) return { ok: false, msg: 'Ohne Plan und Ziel gibt es nichts neu zu planen.' };
   const { plan: next, gen } = r;
   try { localStorage.setItem(PLAN_KEY + '_prev', JSON.stringify(old)); } catch (e) { return { ok: false, msg: 'Speichern nicht möglich.' }; }

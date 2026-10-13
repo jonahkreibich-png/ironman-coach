@@ -6,6 +6,7 @@
 import { defaultProfile, withEstimates, type Profile, type SportKey, type DayWindow, type DayLoad } from './profile';
 import { GOALS, type Goal, type GoalType } from './goals';
 import { generatePlan, type GenResult } from './plangen';
+import { replanPlan } from './replan';
 import { addDays } from './core';
 import { rulesOf, describe as ruleText } from './constraints';
 import { parseFor } from './ruleparse';
@@ -220,16 +221,24 @@ export const GOAL_NAMES: Record<GoalType, string> = {
   tri_olympic: 'Olympischer Triathlon', tri_middle: 'Mitteldistanz', tri_long: 'Langdistanz', duathlon: 'Duathlon', aquathlon: 'Aquathlon', bike_event: 'Radmarathon', swim_goal: 'Schwimm-Ziel', fitness: 'Fitness'
 };
 
-export function applyOnboarding(a: Answers, today: string, base?: Profile, o: { stages?: any } = {}): { profile: Profile; goals: Goal[]; gen: GenResult | null; warnings: string[] } {
+/* Gibt es schon einen Plan (o.old), wird er fortgesetzt statt neu begonnen (Auftrag 7): gen.plan ist dann der ganze Plan
+   mit den vergangenen Wochen, continued = true. Score-Kalibrierung, Verlauf und erledigte Einheiten bleiben. */
+export function applyOnboarding(a: Answers, today: string, base?: Profile, o: { stages?: any; old?: any; state?: any; adjustments?: any } = {}): { profile: Profile; goals: Goal[]; gen: GenResult | null; warnings: string[]; continued: boolean; needTests?: any } {
   const { profile: p, goals, warnings } = profileFromAnswers(a, today, base);
-  let gen: GenResult | null = null;
+  let gen: GenResult | null = null; let continued = false;
+  const need = a.wantTests ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined;
   if (goals.length) {
-    const need = a.wantTests ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined;
-    const dated = goals.map(g => ({ ...g, date: g.date || addDays(today, 84) }));
-    gen = generatePlan({ profile: p, goals: dated, today, currentWeeklyHours: a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? +a.weeklyHoursNow : null, needTests: need, stages: o.stages });
+    if (o.old && Array.isArray(o.old.weeks) && o.old.weeks.length) {
+      const r = replanPlan(o.old, p, goals, today, { stages: o.stages, adjustments: o.adjustments, state: o.state, needTests: need, recentHours: a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? +a.weeklyHoursNow : null });
+      if (r) { gen = { ...r.gen, plan: r.plan }; continued = true; }
+    }
+    if (!gen) {
+      const dated = goals.map(g => ({ ...g, date: g.date || (g.priority === 'A' ? addDays(today, 84) : null) }));
+      gen = generatePlan({ profile: p, goals: dated as Goal[], today, currentWeeklyHours: a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? +a.weeklyHoursNow : null, needTests: need, stages: o.stages });
+    }
     gen.violations.filter(v => v.rule === 'age').forEach(v => warnings.push(v.msg));
   }
-  return { profile: p, goals, gen, warnings };
+  return { profile: p, goals, gen, warnings, continued, needTests: need };
 }
 
 /* „Das habe ich verstanden“ (F2): alle wichtigen Angaben in Sätzen, je mit Sprung zum Block */

@@ -17,9 +17,21 @@ export interface Thresholds {
   lthrRun: number; lthrBike: number; maxHr?: number | null;
   thresholdPaceRunSec: number; thresholdSpeedBikeKmh: number;
   ftp?: number | null; cssSec?: number | null;
+  /** aerobe Schwelle (Puls), Obergrenze für lockere Einheiten; [von, bis] */
+  aetHr?: [number, number] | null;
+  /** VO2max (ml/kg/min), z. B. von der Uhr */
+  vo2max?: number | null;
   /** Werte, die nur aus dem Profil geschätzt sind (kein Test, keine Messung) */
   estimated?: ThresholdKey[];
+  /** Herkunft der Schwellen (z. B. „Lauftest 24.10.“) */
+  source?: string;
 }
+/** Aufbau: so viele Wochen steigern, dann eine Erholungswoche; Steigerung pro Woche in Prozent */
+export interface Progression { buildWeeks: number; incPct: number }
+/** Kraft nach Körperbereich an festen Tagen (0=So … 6=Sa) */
+export interface StrengthPlan { lower: number[]; upper: number[]; core?: number[] }
+/** Morgens vor Schule/Arbeit: an diesen Tagen nur kurze Einheiten am Morgen (ohne Schwimmbad), längere am Nachmittag */
+export interface MorningSlot { days: number[]; maxMin: number; noPool: boolean; /** z. B. „vor der Schule“ */ label?: string }
 /** Zeit pro Wochentag: 0 kein Training, 1 kurz (bis 45 min), 2 mittel (bis 90 min), 3 lang (mehr als 90 min) */
 export type DayLoad = 0 | 1 | 2 | 3;
 export const DAYLOAD_MIN: Record<DayLoad, number> = { 0: 0, 1: 45, 2: 90, 3: 180 };
@@ -86,6 +98,16 @@ export interface Profile {
   likesIntensity: 'intensity' | 'volume' | 'balanced';
   /** Ausdauersport-Erfahrung in Jahren */
   experienceYears: number | null;
+  /** eigener Aufbau-Rhythmus (sonst: Erwachsene 3+1 mit +10 %, Jugendliche 2+1 mit +8 %) */
+  progression?: Progression | null;
+  strengthPlan?: StrengthPlan | null;
+  morning?: MorningSlot | null;
+  /** langfristiges Lauf-Ziel für die Effizienz, z. B. 4:30/km bei Puls 120 */
+  runGoal?: { paceSec: number; hr: number } | null;
+  /** Uhr, Ring und Datenwege (nur zur Info für Plan und Coach) */
+  devices?: string[];
+  /** kurze Sätze für Plan und Coach (Schwächen, Schwerpunkte, Ausblick) */
+  focus?: string[];
   /** Antworten aus dem Onboarding (frei) */
   answers?: Record<string, any>;
   updatedAt?: number;
@@ -121,7 +143,7 @@ export function thresholdPaceFromBest(km: number, sec: number): number {
 const BEST_KM: [keyof Bests, number][] = [['run10k', 10], ['runHalf', 21.0975], ['run5k', 5], ['runMarathon', 42.195]];
 
 /* Geschätzte Schwellen. Jeder Wert sagt, woher er kommt. */
-export function estimateThresholds(p: Partial<Profile>, today: string): { values: Required<Omit<Thresholds, 'estimated' | 'ftp' | 'cssSec'>> & { ftp: number | null; cssSec: number | null }; basis: Partial<Record<ThresholdKey, string>> } {
+export function estimateThresholds(p: Partial<Profile>, today: string): { values: Required<Omit<Thresholds, 'estimated' | 'ftp' | 'cssSec' | 'aetHr' | 'vo2max' | 'source'>> & { ftp: number | null; cssSec: number | null }; basis: Partial<Record<ThresholdKey, string>> } {
   const age = (p.birthYear ? +today.slice(0, 4) - p.birthYear : null);
   const basis: Partial<Record<ThresholdKey, string>> = {};
   const maxHr = Math.round(208 - 0.7 * (age ?? 35));
@@ -212,6 +234,13 @@ export function mergeProfile(stored: any, fallback: Profile, today?: string): Pr
   p.routines = Array.isArray(stored.routines) ? stored.routines : [];
   p.sports = Array.isArray(stored.sports) && stored.sports.length ? stored.sports : fallback.sports;
   return withEstimates(p, today || new Date().toISOString().slice(0, 10));
+}
+
+/* Aufbau-Rhythmus: eigener Wunsch (höchstens +10 % pro Woche, 2-4 Aufbauwochen), sonst nach Alter und Vorsicht */
+export function progressionOf(p: Profile, today: string, cautious = false): Progression {
+  const own = p.progression;
+  if (own && own.buildWeeks > 0) return { buildWeeks: Math.max(2, Math.min(4, Math.round(own.buildWeeks))), incPct: Math.max(3, Math.min(10, own.incPct || 10)) };
+  return isMinor(p, today) || cautious ? { buildWeeks: 2, incPct: 8 } : { buildWeeks: 3, incPct: 10 };
 }
 
 /* Schlafbedarf nach Alter (Empfehlungen der Schlafmedizin): Jugendliche mehr, weil sie noch wachsen. */

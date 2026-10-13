@@ -4,7 +4,7 @@
    Teamsport-Tage berücksichtigt, Kraft vorhanden wenn gewählt, alle Ziele berücksichtigt, Distanz passt zur
    Beschreibung, höchstens +10 % pro Woche (unter 18 +8 %), keine zwei harten Tage hintereinander. */
 import type { Profile, SportKey } from './profile';
-import { isMinor } from './profile';
+import { isMinor, progressionOf } from './profile';
 import type { Goal } from './goals';
 import { addDays } from './core';
 import { validateWeeks, isIntense } from './rules';
@@ -105,7 +105,7 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
   // Harte Regeln der Person (Tage, Orte, Zeiträume, Tagesgrenzen)
   hardViolations(weeks, rules).forEach(v => out.push({ rule: 'constraint', date: v.date, msg: v.msg }));
   // Umfang und harte Tage
-  validateWeeks(weeks, { minor }).forEach(v => out.push({ rule: v.rule as CheckRule, week: v.week, date: v.date, msg: v.msg }));
+  validateWeeks(weeks, { minor, maxIncPct: progressionOf(profile, today).incPct }).forEach(v => out.push({ rule: v.rule as CheckRule, week: v.week, date: v.date, msg: v.msg }));
   return out;
 }
 

@@ -46,6 +46,10 @@ export interface Spec {
   stage?: { ladder: 'swim' | 'swimBreast' | 'runwalk'; n: number } | null;
   /** ohne Distanz (Rolle, Kraft, Teamsport) */
   noDistance?: boolean;
+  /** Kraft: Körperbereich */
+  area?: 'lower' | 'upper' | 'core';
+  /** wann (z. B. „Morgens vor der Schule, höchstens 40 min.“) */
+  when?: string;
 }
 
 /* ---------- Tempo je Zone ---------- */
@@ -145,7 +149,7 @@ function stepText(spec: Spec, s: Step): string {
 const PART: Record<Step['part'], string> = { warm: 'Aufwärmen', main: 'Hauptteil', cool: 'Ausklang' };
 
 export function describe(spec: Spec): string {
-  const L: string[] = [];
+  const L: string[] = spec.when ? [spec.when] : [];
   if (spec.sport === 'strength') {
     const w = spec.steps.find(s => s.part === 'warm');
     if (w) L.push(`Aufwärmen: ${w.min} min ${w.note || 'locker bewegen (Seilspringen, Kniebeugen ohne Gewicht, Armkreisen)'}`);
@@ -187,7 +191,7 @@ export function title(spec: Spec): string {
     case 'brick': return `Koppeltraining Rad + Lauf ${t.min} min`;
     case 'recovery': return spec.sport === 'run' ? `Lockerer Lauf ${t.min} min` : `Lockere Runde ${t.min} min${where}`;
     case 'test': return spec.title || 'Test';
-    case 'strength': return `Kraft ${t.min} min`;
+    case 'strength': return spec.area ? `Kraft ${AREA_LABEL[spec.area]} ${t.min} min` : `Kraft ${t.min} min`;
     default: return spec.sport === 'run' ? `Lockerer Lauf ${t.min} min` : spec.sport === 'bike' ? `Lockere Ausfahrt ${t.min} min${where}` : `${t.min} min`;
   }
 }
@@ -202,6 +206,7 @@ export function build(spec: Spec): any {
   if (spec.sport === 'swim') { const zs = Math.max(...spec.steps.filter(x => x.part === 'main').map(x => x.zone || 2)); s.zone = `Zone ${zs}`; }
   if (spec.kind === 'intervals' || spec.kind === 'threshold' || spec.kind === 'test' || spec.kind === 'css' || spec.kind === 'game' || spec.kind === 'race') s.hard = true;
   if (spec.stage) s.stage = spec.stage;
+  if (spec.area) s.area = spec.area;
   return s;
 }
 
@@ -296,11 +301,13 @@ export function runLadderStart(continuousMin: number | null | undefined): number
   if (continuousMin == null || continuousMin >= 30) return null;
   return continuousMin < 3 ? 0 : continuousMin < 5 ? 1 : continuousMin < 8 ? 2 : continuousMin < 12 ? 3 : continuousMin < 15 ? 4 : continuousMin < 20 ? 5 : 6;
 }
-export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number }, why?: string): Spec {
+export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean }, why?: string): Spec {
   const L = stage.ladder === 'swimBreast' ? SWIM_BREAST_LADDER : SWIM_LADDER;
   const st = L[Math.min(stage.n, L.length - 1)] as any;
+  // wer Brust kann: Brust zum Einschwimmen und zwischendurch für die Ausdauer, Kraul in kurzen Stücken mit Technik
+  const br = stage.ladder === 'swim' && stage.breast && stage.n <= 4;
   return { sport: 'swim', kind: 'swimlearn', ctx, stage, why, tip: st.tip + ' Die nächste Stufe kommt, sobald diese klappt.',
-    steps: [S('warm', { m: st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' ? 'breast' : 'easy' }), ...st.main.map((x: Step) => ({ ...x })), S('cool', { m: 100, zone: 1, mode: 'easy' })] };
+    steps: [S('warm', { m: br ? 200 : st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' || br ? 'breast' : 'easy' }), ...st.main.map((x: Step) => ({ ...x })), ...(br ? [S('main', { reps: 2, m: 100, zone: 2, mode: 'breast', restSec: 30, note: 'ruhig, für die Ausdauer im Wasser' })] : []), S('cool', { m: 100, zone: 1, mode: br ? 'breast' : 'easy' })] };
 }
 export function runWalk(ctx: PaceCtx, n: number, why?: string): Spec {
   const st = RUNWALK_LADDER[Math.min(n, RUNWALK_LADDER.length - 1)];
@@ -318,6 +325,23 @@ const LIB: Record<Focus, Exercise[]> = {
   team: [{ name: 'Kopenhagen-Adduktoren', sets: 3, reps: '20-30 s je Seite', note: 'schützt die Leiste' }, { name: 'Nordic Hamstring (mit Partner oder Fußhalt)', sets: 3, reps: '5' }],
   general: [{ name: 'Kniebeuge', sets: 3, reps: '10' }, { name: 'Liegestütz', sets: 3, reps: '8-12' }, { name: 'Rudern mit Band', sets: 3, reps: '12' }, { name: 'Hüftbrücke', sets: 3, reps: '12' }, { name: 'Unterarmstütz', sets: 3, reps: '40 s' }]
 };
+/* Kraft nach Körperbereich (Ober-/Unterkörper an festen Tagen) */
+const AREA: Record<'lower' | 'upper' | 'core', Exercise[]> = {
+  lower: [{ name: 'Kniebeuge', sets: 3, reps: '10' }, { name: 'Ausfallschritte', sets: 3, reps: '8 je Bein' }, { name: 'Hüftbrücke einbeinig', sets: 3, reps: '10 je Bein' }, { name: 'Wadenheben einbeinig', sets: 3, reps: '12 je Bein', note: 'langsam ablassen' }, { name: 'Kopenhagen-Adduktoren', sets: 3, reps: '20-30 s je Seite', note: 'schützt die Leiste' }, { name: 'Nordic Hamstring (mit Fußhalt)', sets: 2, reps: '5' }],
+  upper: [{ name: 'Liegestütz', sets: 3, reps: '8-12' }, { name: 'Rudern mit Band oder Kurzhantel', sets: 3, reps: '12' }, { name: 'Klimmzug (mit Band) oder Latzug', sets: 3, reps: '5-8' }, { name: 'Außenrotation mit Band', sets: 3, reps: '15', note: 'Schulter schützen, wichtig fürs Kraulen' }, { name: 'Y-T-W auf dem Bauch', sets: 2, reps: '8' }, { name: 'Unterarmstütz', sets: 3, reps: '40 s' }],
+  core: [{ name: 'Unterarmstütz', sets: 3, reps: '40 s' }, { name: 'Seitstütz', sets: 3, reps: '30 s je Seite' }, { name: 'Dead Bug', sets: 3, reps: '10 je Seite' }, { name: 'Superman (Rückenstrecker)', sets: 3, reps: '12' }]
+};
+export const AREA_LABEL: Record<'lower' | 'upper' | 'core', string> = { lower: 'Unterkörper', upper: 'Oberkörper', core: 'Rumpf' };
+export function strengthArea(area: 'lower' | 'upper' | 'core', o: { light?: boolean; knee?: boolean; back?: boolean; shoulder?: boolean; why?: string } = {}): Spec {
+  let ex = AREA[area].map(e => ({ ...e }));
+  if (o.knee) ex = ex.map(e => /Kniebeuge|Ausfallschritt/.test(e.name) ? { ...e, name: e.name + ' (nur so tief, wie es schmerzfrei geht)' } : e);
+  if (o.back) ex = ex.filter(e => !/Kreuzheben|Nordic/.test(e.name));
+  if (o.shoulder) ex = ex.filter(e => !/Liegestütz|Y-T-W|Klimmzug/.test(e.name));
+  if (o.light) ex = ex.map(e => ({ ...e, sets: Math.max(1, e.sets - 1), note: [e.note, 'leichter als sonst'].filter(Boolean).join(', ') }));
+  const sets = ex.reduce((a, e) => a + e.sets, 0);
+  const mainMin = Math.max(15, Math.min(40, Math.round(sets * 1.3 / 5) * 5));
+  return { sport: 'strength', kind: 'strength', ctx: {}, exercises: ex, why: o.why, area, steps: [S('warm', { min: 5 }), S('main', { min: mainMin })] } as Spec;
+}
 /* Krafteinheit passend zu den Sportarten. light: Erholungswoche oder Tapering (weniger Sätze). */
 export function strengthSession(sports: string[], o: { light?: boolean; minutes?: number; back?: boolean; knee?: boolean; shoulder?: boolean; why?: string; variant?: number } = {}): Spec {
   const pick: Exercise[] = [];

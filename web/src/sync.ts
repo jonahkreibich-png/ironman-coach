@@ -281,7 +281,9 @@ export async function setupFirst(setupCode?: string) {
   const res = await api('POST', '/api/setup', { name: deviceName(), ...(setupCode ? { setupCode: setupCode.trim() } : {}) }, true);
   // Betreiber (Nutzer 1): vorhandene Daten dieses Geräts sind seine (alte App), außer sie gehören erkennbar jemand anderem
   prepareDevice(res.userId ?? 1, true);
-  connected(res, true);
+  // Ein Gerät ohne eigene Daten (z. B. nach dem Umzug auf eine neue Adresse) darf nur Lücken füllen:
+  // sonst würden seine leeren Standard-Einstellungen die echten auf dem Server überschreiben (Auftrag 7)
+  connected(res, hasLocalData());
   remember(res);
   await syncNow(); if (!planChanged) rebaseline();
   return res;

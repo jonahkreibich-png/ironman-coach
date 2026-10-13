@@ -10,7 +10,7 @@ import { isGame, isIntervals, plannedLoad, addDays, illnessAt, returnStageActive
 export function isIntense(s: any): boolean { return !!s && !s.cancelled && (isIntervals(s) || isGame(s) || !!s.hard || /test\b|koppel|wettkampf/i.test(s.title || '')); }
 
 export interface Violation { rule: 'volume' | 'runVolume' | 'hardDays' | 'illness' | 'age' | 'hardCount' | 'format'; week?: number; date?: string; msg: string }
-export interface RuleCtx { minor?: boolean; age?: number | null; illness?: any[]; today?: string; maxHardPerWeek?: number }
+export interface RuleCtx { minor?: boolean; age?: number | null; illness?: any[]; today?: string; maxHardPerWeek?: number; /** eigener Aufbau-Rhythmus (profile.progressionOf), höchstens 10 */ maxIncPct?: number }
 
 export function weekMinutes(w: any, sport?: string): number {
   return (w.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport !== 'rest' && !s.cancelled && (!sport || s.sport === sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || (s.sport === 'football' ? 75 : 0)), 0), 0);
@@ -22,7 +22,7 @@ export function weekLoad(w: any): number {
 /* Prüft eine Folge von Wochen. prevWeeks: Wochen davor (für den Vergleich der ersten Woche). */
 export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] = []): Violation[] {
   const out: Violation[] = [];
-  const maxInc = ctx.minor ? 1.08 : 1.10;
+  const maxInc = ctx.maxIncPct ? 1 + Math.min(10, ctx.maxIncPct) / 100 : ctx.minor ? 1.08 : 1.10;
   const all = [...prevWeeks, ...weeks];
   const firstNew = prevWeeks.length;
   // Umfang: gegen die letzte normale Woche (nach einer Erholungswoche zählt die Woche davor)

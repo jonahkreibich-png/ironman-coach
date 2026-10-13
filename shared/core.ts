@@ -278,6 +278,25 @@ function ownLoadSeries(state, weeks, upto) {
   return out;
 }
 
+/* Belastung für die Planung: Fitness (CTL) und Müdigkeit (ATL) aus intervals.icu, sonst aus den eigenen Einheiten.
+   Nach einer Krankheit zählt zusätzlich die Fitness vor der Krankheit (der Einbruch durch die Pause ist keine echte Formänderung). */
+function loadBaseline(state, weeks, today) {
+  const tr = (state.trend || []).filter(p => p && p.date <= today && num(p.ctl) != null && p.ctl > 0).sort((a, b) => a.date.localeCompare(b.date));
+  let ctl = null, atl = null, source = null;
+  const last = tr[tr.length - 1];
+  if (last && last.date >= addDays(today, -7)) { ctl = last.ctl; atl = num(last.atl); source = 'intervals.icu'; }
+  else {
+    const own = ownLoadSeries(state, weeks || [], today);
+    const o = own[own.length - 1];
+    if (o && o.ctl > 0) { ctl = o.ctl; atl = o.atl; source = 'eigene Einheiten'; }
+  }
+  const ill = (state.illnessPeriods || []).filter(p => p && p.start && p.start <= today && (!p.end || p.end >= addDays(today, -21))).sort((a, b) => b.start.localeCompare(a.start))[0] || null;
+  let preIllnessCtl = null;
+  // Median der 14 Tage davor (ein einzelner Spitzenwert soll den Wiedereinstieg nicht hochtreiben)
+  if (ill) { const before = tr.filter(p => p.date < ill.start && p.date >= addDays(ill.start, -14)).map(p => p.ctl).sort((a, b) => a - b); if (before.length) preIllnessCtl = before[Math.floor((before.length - 1) / 2)]; }
+  return { ctl, atl, source, preIllnessCtl, illness: ill ? { start: ill.start, end: ill.end || null } : null };
+}
+
 /* ---------- Hilfen für Anpassungen ---------- */
 function returnStageActive(illness, date) {
   const ended = (illness || []).filter(p => p && p.end && p.end < date).sort((a, b) => b.end.localeCompare(a.end))[0];
@@ -454,9 +473,9 @@ function stageSession(s, n) {
     const L = s.stage.ladder === 'swimBreast' ? W.SWIM_BREAST_LADDER : W.SWIM_LADDER;
     if (n >= L.length) {
       // Brust-Weg fertig → Kraul-Weg ab Stufe 2, Kraul-Weg fertig → normales Schwimmen
-      if (s.stage.ladder === 'swimBreast') spec = W.swimLearn(ctx, { ladder: 'swim', n: 2 }, why);
+      if (s.stage.ladder === 'swimBreast') spec = W.swimLearn(ctx, { ladder: 'swim', n: 2, breast: true }, why);
       else spec = W.swimSession(ctx, 'endurance', [{ part: 'main', reps: 3, m: 400, zone: 2, mode: 'crawl', restSec: 30 }]);
-    } else spec = W.swimLearn(ctx, { ladder: s.stage.ladder, n }, why);
+    } else spec = W.swimLearn(ctx, { ...s.stage, n }, why);
   }
   if (tip && !spec.tip) spec.tip = tip;
   const b = W.build(spec);
@@ -685,6 +704,6 @@ export {
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
-  dailyLoads, ownLoadSeries, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
+  dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
   isLocked, stageVerdict, stageSession
 };

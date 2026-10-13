@@ -4,7 +4,8 @@ import { STATE, PLAN, HAS_PLAN, PLAN_KEY, readPlan, profile } from '../store';
 import { esc, todayStr, addDays, fmtDate } from '../util';
 import { t, hours } from '../../../shared/i18n';
 import { on, onChange, sec, select, field, armed, more, empty, pill } from '../kit';
-import { generatePlan, transitionPlan, weekMinutes, type GenResult } from '../../../shared/plangen';
+import { generatePlan, transitionPlan, continuationOf, weekMinutes, type GenResult } from '../../../shared/plangen';
+import * as C from '../../../shared/core';
 import { D } from '../data';
 import { goalLabel } from './profil';
 import { nav } from '../nav';
@@ -55,7 +56,8 @@ on('gen-run', () => {
   const d = D(); const goal = d.goals.find(g => g.id === GOAL_ID); if (!goal) return;
   const p = profile();
   try {
-    RES = generatePlan({ profile: p, goal: { ...goal, date: goal.date || addDays(d.today, 84) }, today: d.today, currentWeeklyHours: recentHours(), needTests: TESTS ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined, maxWeeks: WEEKS || undefined });
+    const old = HAS_PLAN ? readPlan() : null;
+    RES = generatePlan({ profile: p, goal: { ...goal, date: goal.date || addDays(d.today, 84) }, today: d.today, currentWeeklyHours: recentHours(), continueFrom: old ? continuationOf(old, d.today) : null, load: C.loadBaseline(STATE, PLAN.weeks, d.today), needTests: TESTS ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined, maxWeeks: WEEKS || undefined });
   } catch (e: any) { toast(e.message); return; }
   nav.rerender();
 });
