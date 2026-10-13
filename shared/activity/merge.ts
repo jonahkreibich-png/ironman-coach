@@ -5,6 +5,7 @@
    - Doppelte Einheiten (gleicher Tag und Sport, Start ±30 min) werden zusammengeführt, die Quelle mit Vorrang gewinnt.
    - Automatisch übernommene Einheiten werden der geplanten Einheit zugeordnet und abgehakt. */
 import type { Activity, Source } from './analyze';
+import { splitsFromLaps } from '../fields';
 
 export type MetricGroup = 'workouts' | 'sleep' | 'hrv' | 'restingHR' | 'temp' | 'spo2' | 'breath' | 'load' | 'weight';
 export const DEFAULT_PRIORITY: Record<MetricGroup, Source[]> = {
@@ -25,7 +26,7 @@ export const FIELD_GROUP: Record<string, MetricGroup> = {
 };
 export const SOURCE_LABEL: Record<string, string> = {
   healthfit: 'HealthFit', file: 'Datei', shortcut: 'Kurzbefehl', intervals: 'intervals.icu', oura: 'Oura', whoop: 'WHOOP', polar: 'Polar',
-  withings: 'Withings', fitbit: 'Fitbit', suunto: 'Suunto', coros: 'COROS', wahoo: 'Wahoo', zepp: 'Zepp', healthkit: 'Apple Health', manual: 'von Hand'
+  withings: 'Withings', fitbit: 'Fitbit', suunto: 'Suunto', coros: 'COROS', wahoo: 'Wahoo', zepp: 'Zepp', healthkit: 'Apple Health', manual: 'von Hand', note: 'aus deiner Notiz'
 };
 
 export function priorityOf(settings: any, group: MetricGroup): Source[] {
@@ -121,11 +122,24 @@ export function mergeActivities(a: Activity, b: Activity, settings: any): Activi
 }
 
 /* Was eine Aufzeichnung in die Felder einer Einheit schreibt (gleiche Namen wie bisher in der App) */
-export function metricsFromActivity(a: Activity): Record<string, string> {
-  const m: Record<string, string> = {};
+export function metricsFromActivity(a: Activity): Record<string, any> {
+  const m: Record<string, any> = {};
   const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
   if (a.min != null) m.min = String(a.min);
   if (a.avgHr != null) m.hr = String(a.avgHr);
+  // Felder statt Notizen (Auftrag 7)
+  if (a.maxHr != null && a.sport !== 'swim') m.maxHr = String(a.maxHr);
+  if ((a.sport === 'run' || a.sport === 'bike') && a.decouplingPct != null) m.decoupling = String(a.decouplingPct);
+  if ((a.sport === 'run' || a.sport === 'bike') && a.avgCadence) m.cadence = String(a.avgCadence);
+  if (a.sport === 'bike' && a.maxCadence) m.maxCadence = String(a.maxCadence);
+  if (a.sport === 'bike' && a.maxPower) m.maxPower = String(a.maxPower);
+  if (a.sport === 'bike') m.indoor = a.indoor ? 'in' : 'out';
+  if (a.sport === 'run') { const sp = a.splits && a.splits.length ? a.splits : splitsFromLaps(a.laps || []); if (sp.length) m.splits = sp; }
+  if (a.sport === 'swim' && a.swim) {
+    if (a.swim.longestContinuousM) m.longestCrawl = String(a.swim.longestContinuousM);
+    const bs = a.swim.byStroke || {}; const tot = Object.values(bs).reduce((x: number, y: any) => x + (y || 0), 0) as number;
+    if (tot > 0 && bs.freestyle != null) m.crawlShare = String(Math.round(bs.freestyle / tot * 100));
+  }
   if (a.sport === 'swim') {
     if (a.km != null) m.meters = String(Math.round(a.km * 1000));
     if (a.swim && a.swim.pace100) m.pace100 = mmss(a.swim.pace100);
@@ -208,36 +222,39 @@ function defaultTitle(a: Activity): string {
   return ({ run: 'Lauf', bike: 'Radfahrt', swim: 'Schwimmen', strength: 'Kraft', football: 'Teamsport', walk: 'Gehen', multi: 'Multisport', other: 'Training' } as any)[a.sport] || 'Training';
 }
 /* Werte einer Aufzeichnung in die Einheit schreiben. Felder, die von Hand geändert wurden (metricsManual), bleiben. */
-export function applyToSession(st: any, a: Activity, metrics: Record<string, string>): any {
+export function applyToSession(st: any, a: Activity, metrics: Record<string, any>): any {
   const out = { completed: true, notes: '', ...st };
   out.completed = true; out.skipped = false;
   out.activityId = a.id;
   out.source = a.source; out.sources = a.sources;
   const man = out.metricsManual || {};
   out.metrics = { ...(out.metrics || {}) };
-  for (const [k, v] of Object.entries(metrics)) if (!man[k]) out.metrics[k] = v;
+  out.metricsSrc = { ...(out.metricsSrc || {}) };
+  for (const [k, v] of Object.entries(metrics)) if (!man[k]) { out.metrics[k] = v; out.metricsSrc[k] = a.source; }
   out.metricsAuto = metrics;
   return out;
 }
-function applyToCustom(c: any, a: Activity, metrics: Record<string, string>): any {
+function applyToCustom(c: any, a: Activity, metrics: Record<string, any>): any {
   const out = { ...c, activityId: a.id, source: a.source, sources: a.sources };
   const man = out.metricsManual || {};
   out.metrics = { ...(out.metrics || {}) };
-  for (const [k, v] of Object.entries(metrics)) if (!man[k]) out.metrics[k] = v;
+  out.metricsSrc = { ...(out.metricsSrc || {}) };
+  for (const [k, v] of Object.entries(metrics)) if (!man[k]) { out.metrics[k] = v; out.metricsSrc[k] = a.source; }
   out.metricsAuto = metrics;
   if (out.plannedMinutes == null && a.min != null) out.plannedMinutes = a.min;
   if (out.plannedKm == null && a.km != null) out.plannedKm = a.km;
   return out;
 }
 /* Korrektur einer Einheit von Hand und Zurücksetzen */
-export function setSessionMetricManual(st: any, key: string, value: string): any {
-  const out = { ...st, metrics: { ...(st.metrics || {}) }, metricsManual: { ...(st.metricsManual || {}) } };
-  if (value === '' || value == null) { delete out.metrics[key]; if (out.metricsAuto && out.metricsAuto[key] != null) out.metricsManual[key] = true; else delete out.metricsManual[key]; }
-  else { out.metrics[key] = value; if (out.metricsAuto) out.metricsManual[key] = true; }
+export function setSessionMetricManual(st: any, key: string, value: any): any {
+  const out = { ...st, metrics: { ...(st.metrics || {}) }, metricsManual: { ...(st.metricsManual || {}) }, metricsSrc: { ...(st.metricsSrc || {}) } };
+  if (value === '' || value == null) { delete out.metrics[key]; delete out.metricsSrc[key]; if (out.metricsAuto && out.metricsAuto[key] != null) out.metricsManual[key] = true; else delete out.metricsManual[key]; }
+  else { out.metrics[key] = value; out.metricsSrc[key] = 'manual'; if (out.metricsAuto) out.metricsManual[key] = true; }
   return out;
 }
 export function resetSessionMetrics(st: any): any {
-  const out = { ...st, metrics: { ...(st.metrics || {}), ...(st.metricsAuto || {}) }, metricsManual: {} };
+  const src = { ...(st.metricsSrc || {}) }; Object.keys(st.metricsAuto || {}).forEach(k => { src[k] = st.source || src[k]; });
+  const out = { ...st, metrics: { ...(st.metrics || {}), ...(st.metricsAuto || {}) }, metricsManual: {}, metricsSrc: src };
   return out;
 }
 

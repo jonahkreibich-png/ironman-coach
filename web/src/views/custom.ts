@@ -5,6 +5,7 @@ import { t } from '../../../shared/i18n';
 import { on, onChange, openSheet, closeSheet, field, select, armed, srcBadge } from '../kit';
 import { activityDetails } from './session';
 import { nav } from '../nav';
+import { fieldsBlock } from './fieldsui';
 import { toast } from '../toast';
 
 let CUR: { id: string | null; date: string } = { id: null, date: '' };
@@ -23,9 +24,8 @@ function viewSheet(): string {
   const act = w.activityId ? (STATE.activities || {})[w.activityId] : null;
   const m = w.metrics || {};
   return `<div class="stack"><div class="hint">${esc(t('sport.' + w.sport))} · ${dowShort(CUR.date)} ${fmtDate(CUR.date)} ${srcBadge(w.source)}</div>
-    <div class="fgrid">${field('cw-min', t('m.min'), m.min ?? w.plannedMinutes ?? '', { inputmode: 'decimal', data: 'data-ch="custom-metric" data-k="min"' })}${field('cw-km', t('m.km'), m.km ?? w.plannedKm ?? '', { inputmode: 'decimal', data: 'data-ch="custom-metric" data-k="km"' })}${field('cw-hr', t('m.hr'), m.hr ?? '', { inputmode: 'numeric', data: 'data-ch="custom-metric" data-k="hr"' })}</div>
+    ${fieldsBlock({ kind: 'custom', id: w.id, date: CUR.date, sport: w.sport })}
     ${act ? activityDetails(act) : ''}
-    <div class="fld"><label for="cw-desc">${esc(t('sess.notes'))}</label><textarea class="inp" id="cw-desc" rows="2" data-ch="custom-desc">${esc(w.description || '')}</textarea></div>
     <button class="btn danger" data-act="custom-remove">${esc(t('plan.removeExtra'))}</button></div>`;
 }
 on('custom-add', el => { CUR = { id: null, date: el.dataset.date! }; openSheet(t('plan.addExtra'), addSheet); });

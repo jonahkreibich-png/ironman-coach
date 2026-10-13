@@ -3,6 +3,7 @@
    Werte, die früher automatisch kamen, merkt sich der Datensatz in _icu. Nur die dürfen aktualisiert werden. */
 import { decryptJson } from './http';
 import { type Env, berlinDate, addDaysStr, getRecord, getRecords, putRecords, getMeta, setMeta } from './store';
+import { fieldsFromIcu } from '../../shared/fields';
 
 const SPORT_MAP = {
   run: ['Run', 'TrailRun', 'VirtualRun', 'Treadmill'],
@@ -113,7 +114,8 @@ export function activityMetrics(a, sport) {
     if (sport === 'run' && min) m.pace = secToPace(min * 60 / (dist / 1000));
     if (sport === 'bike') m.speed = r1(isNum(a.average_speed) && a.average_speed > 0 ? a.average_speed * 3.6 : (dist / 1000) / (min / 60));
   }
-  return m;
+  // weitere Felder (Auftrag 7): max. Puls, Kadenz, Watt, Entkopplung, Effizienz, drinnen/draußen
+  return { ...fieldsFromIcu(a, sport), ...m };
 }
 function planSessionsByDate(plan) {
   const map: any = {};
@@ -122,9 +124,9 @@ function planSessionsByDate(plan) {
   })));
   return map;
 }
-function fillEmpty(target, src) {
+function fillEmpty(target, src, srcMap?) {
   let changed = false;
-  for (const [k, v] of Object.entries(src)) if (empty(target[k]) && !empty(v)) { target[k] = v; changed = true; }
+  for (const [k, v] of Object.entries(src)) if (empty(target[k]) && !empty(v)) { target[k] = v; changed = true; if (srcMap) srcMap[k] = 'intervals'; }
   return changed;
 }
 
@@ -191,8 +193,8 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
       const cand = (byDate[date] || []).find(s => s.sport === sport && !usedThisRun.has(s.id) && !((sessRecs[s.id] || {}).skipped));
       if (cand) {
         const st = Object.assign({ completed: false, notes: '' }, sessRecs[cand.id] || {});
-        st.metrics = Object.assign({}, st.metrics || {});
-        fillEmpty(st.metrics, metrics);
+        st.metrics = Object.assign({}, st.metrics || {}); st.metricsSrc = Object.assign({}, st.metricsSrc || {});
+        fillEmpty(st.metrics, metrics, st.metricsSrc);
         st.completed = true;
         if (empty(st.rpe) && isNum(a.icu_rpe) && a.icu_rpe > 0) st.rpe = String(a.icu_rpe);
         Object.assign(st, extra);
@@ -204,8 +206,8 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
                  (manual = Object.values(customsByKey).find(c => c && c.date === date && c.sport === sport && !c.icuId && !usedCustom.has(c.id)))) {
         // Selbst eingetragene Extra-Einheit desselben Tages und Sports: nur ergänzen, nicht doppelt anlegen
         const c = Object.assign({}, manual);
-        c.metrics = Object.assign({}, c.metrics || {});
-        fillEmpty(c.metrics, metrics);
+        c.metrics = Object.assign({}, c.metrics || {}); c.metricsSrc = Object.assign({}, c.metricsSrc || {});
+        fillEmpty(c.metrics, metrics, c.metricsSrc);
         if (empty(c.plannedMinutes) && metrics.min) c.plannedMinutes = metrics.min;
         Object.assign(c, extra);
         usedCustom.add(c.id);
@@ -217,7 +219,7 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
         const w = Object.assign({
           id: key, date, sport, title: a.name || 'Aktivität', description: '',
           plannedMinutes: metrics.min || null, plannedKm: metrics.km != null ? metrics.km : (metrics.meters ? r2(metrics.meters / 1000) : null),
-          metrics, auto: true
+          metrics, metricsSrc: Object.fromEntries(Object.keys(metrics).map(k => [k, 'intervals'])), auto: true
         }, extra);
         changes.push({ kind: 'custom', key, data: w, updatedAt: t });
         linked[id] = { kind: 'custom', key, date };

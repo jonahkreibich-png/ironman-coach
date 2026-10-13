@@ -310,7 +310,7 @@ const PAIN_NAMES: Record<string, string> = { leist: 'Leiste', knie: 'Knie', achi
 function painFlag(state, weeks, date) {
   const from = addDays(date, -6);
   const texts = [];
-  planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); }); });
+  planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); if (st && st.deviation) texts.push(st.deviation); }); });
   Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.description) texts.push(w.description); }); });
   (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
   Object.values(state.weekNotes || {}).forEach(t => { if (t) texts.push(String(t)); });
@@ -452,7 +452,7 @@ function stageVerdict(s, st, act): { ok: boolean; why: string } {
   const rpe = toNum(st.rpe), min = toNum(m.min);
   if (/abgebrochen|nicht geschafft|zu schwer/i.test(st.notes || '')) return { ok: false, why: 'laut Notiz zu schwer' };
   if (rpe != null && rpe >= 9) return { ok: false, why: 'RPE ' + rpe + ' (sehr hart)' };
-  const longest = act && act.swim && act.swim.longestContinuousM;
+  const longest = (act && act.swim && act.swim.longestContinuousM) || toNum(m.longestCrawl);
   if (s.stage.ladder !== 'runwalk' && longest) {
     const need = Math.max(...((s.spec && s.spec.steps) || []).filter(x => x.mode === 'crawl').map(x => x.m || 0), 0);
     if (need && longest >= need) return { ok: true, why: longest + ' m am Stück gemessen' };

@@ -6,6 +6,7 @@ import { type Env, berlinParts, getRecord, getRecords, putRecords, getMeta, setM
 import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../../shared/coach/engine';
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
+import { migrateNotes } from '../../shared/fields';
 
 export async function loadState(env: Env, uid: number): Promise<any> {
   const [planRec, settingsRec, profileRec, sessions, customs, trend, illness, weekNotes, adjustments, nutrition, activities, coachMsgs, coachNotes, goals] = await Promise.all([
@@ -24,6 +25,8 @@ export async function loadState(env: Env, uid: number): Promise<any> {
     illnessPeriods: Object.values(illness).filter(Boolean),
     settings: sdata.settings || {}, nutritionProfile: sdata.nutritionProfile || null
   };
+  // Werte aus alten Notizen für Engine und Analyse lesen (nur im Speicher; gespeichert wird es von der App)
+  try { migrateNotes(state, (plan && plan.weeks) || []); } catch (e) { /* weiter ohne */ }
   const today = berlinParts().date;
   const profile = mergeProfile(profileRec && profileRec.data, profileFromLegacy({ ...state, planWeeks: (plan && plan.weeks) || [] }, today), today);
   let goalList: Goal[] = Object.values(goals).filter(Boolean);

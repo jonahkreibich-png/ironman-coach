@@ -275,11 +275,11 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
     out.push({
       id: 'sess-' + id, source: (s && s.source) || 'manual', sources: [(s && s.source) || 'manual'], sport: sport as any, date, startMs: Date.parse(date + 'T12:00:00Z'),
       indoor: false, min: min != null ? Math.round(min) : null, elapsedMin: null, km: sport === 'swim' ? (meters ? meters / 1000 : null) : km,
-      avgHr: hr, maxHr: null, avgPower: num(m.power), speedKmh: sp && sport !== 'swim' ? Math.round(sp * 36) / 10 : null, paceSecKm: sport === 'run' ? paceSec : null,
-      ascentM: null, kcal: null, tempC: num(s && s.temp), hrZones: null, decouplingPct: null,
+      avgHr: hr, maxHr: num(m.maxHr), avgPower: num(m.power), avgCadence: num(m.cadence), speedKmh: sp && sport !== 'swim' ? Math.round(sp * 36) / 10 : null, paceSecKm: sport === 'run' ? paceSec : null,
+      ascentM: null, kcal: null, tempC: num(s && s.temp), hrZones: null, decouplingPct: num(m.decoupling),
       efficiency: sp && hr ? Math.round(sp * 60 / hr * 100) / 100 : null,
       laps: [], intervals: isIntervals({ sport, title, zone: (s && s.zone) || '' }) ? { count: 2, workSec: 0, avgHrWork: null, hrDriftPct: null, dropPct: null, recoveryHrDrop: null, lapsHr: [] } : null,
-      swim: sport === 'swim' ? { poolLengthM: 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: null, strokeRate: num(m.rate) } : null
+      swim: sport === 'swim' ? { poolLengthM: 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), strokeRate: num(m.rate) } : null
     } as Activity);
     void lthr;
   };

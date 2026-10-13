@@ -9,6 +9,7 @@ import { on, onChange, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, s
 import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
+import { fieldsBlock } from './fieldsui';
 import { toast } from '../toast';
 import { SPORT_COLOR } from '../icons';
 
@@ -80,21 +81,10 @@ function sessionSheet(id: string): string {
       <button class="btn ghost" data-act="sess-skip" data-sid="${esc(id)}" aria-pressed="${!!st.skipped}">${esc(st.skipped ? t('sess.unskip') : t('sess.skip'))}</button></div>`;
   }
   if (st.skipped) h += field('f-skipReason', t('sess.skipReason'), st.skipReason || '', { data: `data-sf="skipReason" data-sid="${esc(id)}"`, wide: true });
-  if (st.completed || status === 'missed' || status === 'open') {
-    h += `<div class="card flat tight"><div class="spread"><div class="lbl">${esc(t('sess.data'))} ${st.source ? srcBadge(st.source) : ''}</div>${Object.keys(man).length && Object.keys(auto).length ? `<button class="link" data-act="sess-reset" data-sid="${esc(id)}">${esc(t('common.resetOriginal'))}</button>` : ''}</div>
-      <div class="fgrid">${fields.map(([k, lk, ph]) => ph
-        ? timeField('sm-' + k, t(lk) + (man[k] ? ' ✎' : ''), paceSecOf((st.metrics || {})[k]), 'ms', `data-sm="${k}" data-sid="${esc(id)}"`)
-        : `<div class="fld"><label for="sm-${k}">${esc(t(lk))} ${man[k] ? srcBadge('manual') : ''}</label><input class="inp" id="sm-${k}" type="text" inputmode="decimal" data-sm="${k}" data-sid="${esc(id)}" value="${esc((st.metrics || {})[k] ?? '')}" placeholder="${esc(auto[k] ?? '')}"></div>`).join('')}</div>
-      ${!st.source ? `<div class="hint">${esc(t('sess.dataHint'))}</div>` : ''}</div>`;
-  }
+  // Felder statt Notizfeld (Auftrag 7): Werte je Sportart mit Quelle, RPE, Gefühl, Abweichung, optionale Notiz
+  if (s.sport !== 'rest' && (st.completed || status === 'missed' || status === 'open' || status === 'skipped')) h += fieldsBlock({ kind: 'session', id, date: s.date, sport: s.sport, planned: s });
   if (act) h += activityDetails(act);
-  if (s.sport !== 'rest') {
-    h += more(t('sess.more'), `
-      <div class="fgrid">${field('f-rpe', t('sess.rpe'), st.rpe ?? '', { inputmode: 'numeric', data: `data-sf="rpe" data-sid="${esc(id)}"`, placeholder: '1-10' })}
-      ${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>
-      <div class="hint">${esc(t('sess.rpeHint'))}</div>`);
-    h += `<div class="fld"><label for="f-notes">${esc(t('sess.notes'))}</label><textarea class="inp" id="f-notes" rows="3" data-sf="notes" data-sid="${esc(id)}" placeholder="${esc(t('sess.notesPh'))}">${esc(st.notes || '')}</textarea></div>`;
-  }
+  if (s.sport !== 'rest') h += more(t('sess.time'), `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>`);
   return h + '</div>';
 }
 export function activityDetails(a: any): string {

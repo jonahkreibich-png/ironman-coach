@@ -102,8 +102,8 @@ test('A7: Pace bei einer Einheit mit getrennten Feldern', async ({ page }) => {
   const run = page.locator('[data-act="sess-open"]').filter({ hasText: /Lauf/ }).first();
   const sid = await run.getAttribute('data-sid');
   await run.click();
-  if (!(await page.locator('#sm-pace-m').count())) await page.locator('#sheetPanel [data-act="sess-toggle"]').first().click();
-  await fill(page, '#sm-pace-m', '5'); await fill(page, '#sm-pace-s', '30');
+  if (!(await page.locator('#fd-pace-m').count())) await page.locator('#sheetPanel [data-act="sess-toggle"]').first().click();
+  await fill(page, '#fd-pace-m', '5'); await fill(page, '#fd-pace-s', '30');
   await expect.poll(async () => ((await stored(page)).sessions[sid!] || {}).metrics?.pace).toBe('5:30');
 });
 

@@ -48,8 +48,8 @@ test.describe('Grundfunktionen', () => {
     const sid = await open.getAttribute('data-sid');
     await open.click();
     await expect(page.locator('#sheet')).toBeVisible();
-    await expect(page.locator('#sheetPanel')).toContainText('Gemessen');
-    await page.fill('#sm-min', '95'); await page.locator('#sm-min').blur();
+    await expect(page.locator('#sheetPanel')).toContainText('Werte');
+    await page.fill('#fd-min', '95'); await page.locator('#fd-min').blur();
     await expect.poll(async () => ((await stored(page)).sessions[sid!] || {}).metrics?.min).toBe('95');
     await page.locator('#sheetPanel [data-act="sheet-close"]').first().click();
     await expect(page.locator('#sheet')).toBeHidden();

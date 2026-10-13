@@ -47,6 +47,9 @@ export interface Activity {
   intervals: IntervalOut | null;
   swim: SwimOut | null;
   rpe?: number | null;
+  /** Kadenz (Laufen: Schritte pro Minute, Rad: Umdrehungen), max. Leistung, Splits je km (Auftrag 7) */
+  avgCadence?: number | null; maxCadence?: number | null; maxPower?: number | null;
+  splits?: { km: number; pace: string; hr: number | null }[];
   /** Herkunft einzelner Werte und Korrekturen von Hand */
   manual?: Record<string, any>;
   /** Zuordnung zur geplanten Einheit */
@@ -126,6 +129,22 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   const swim = sport === 'swim' ? swimStats(raw) : null;
 
   const km = dist != null ? (sport === 'swim' ? r2(dist / 1000) : r2(dist / 1000)) : null;
+  // Kadenz: Laufuhren speichern Schritte eines Fußes, also doppelt
+  const cads = recs.map(r => r.cad).filter((x): x is number => x != null && x > 0);
+  const cadF = sport === 'run' && cads.length && avg(cads)! < 120 ? 2 : 1;
+  const avgCadence = cads.length ? Math.round(avg(cads)! * cadF) : null;
+  const maxCadence = cads.length ? Math.round(Math.max(...cads) * cadF) : null;
+  const pw = recs.map(r => r.power).filter((x): x is number => x != null && x > 0);
+  const maxPower = sport === 'bike' && pw.length ? Math.max(...pw) : null;
+  // Splits je km aus der Strecke (Pace und Ø-Puls je Kilometer)
+  const splits: { km: number; pace: string; hr: number | null }[] = [];
+  if (sport === 'run' && recs.some(r => r.dist != null)) {
+    let next = 1000, startT = recs[0].t, hrs: number[] = [];
+    for (const r of recs) {
+      if (r.hr != null && r.hr > 30) hrs.push(r.hr);
+      if (r.dist != null && r.dist >= next) { const sec = r.t - startT; splits.push({ km: next / 1000, pace: Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0'), hr: hrs.length ? Math.round(avg(hrs)!) : null }); startT = r.t; hrs = []; next += 1000; if (splits.length >= 50) break; }
+    }
+  }
   return {
     id: o.id || activityId(o.source, raw.startMs, sport),
     source: o.source, sources: [o.source],
@@ -140,6 +159,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
     ascentM: T.ascentM, kcal: T.kcal,
     tempC: temps.length ? r1(avg(temps)!) : null,
     hrZones, decouplingPct, efficiency,
+    avgCadence, maxCadence, maxPower, splits: splits.length ? splits : undefined,
     laps, intervals, swim,
     hasStreams: recs.length > 0,
     createdAt: Date.now()

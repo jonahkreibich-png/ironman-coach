@@ -6,6 +6,7 @@ import { STORAGE } from './config';
 import { type Profile, profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { type Goal, goalFromPlanMeta } from '../../shared/goals';
 import { setLang, setUnits } from '../../shared/i18n';
+import { migrateNotes } from '../../shared/fields';
 
 export const PLAN_KEY = STORAGE.plan;
 export const LS_KEY = STORAGE.state;
@@ -216,3 +217,5 @@ export function scrubLegacyDefaults(): boolean {
   void changed; return true; // beim ersten Lauf immer speichern (Merker legacyScrubbed)
 }
 { const a = scrubLegacyDefaults(); const b = ensureProfileAndGoals(); if (a || b) saveState(); }
+/* Einmalig je Einheit: Werte aus alten Notizen in die Felder übertragen (Auftrag 7). Die Notiz bleibt. */
+{ try { if (migrateNotes(STATE, BASE_WEEKS)) saveState(); } catch (e) { /* nie den Start verhindern */ } }

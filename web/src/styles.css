@@ -385,3 +385,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .vol-bar { width: 100%; max-width: 34px; background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); border-radius: 7px 7px 3px 3px; position: relative; }
 .vol-bar i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 7px 7px 3px 3px; }
 .vol-col .xs { font-variant-numeric: tabular-nums; }
+/* Felder einer Einheit (Auftrag 7) */
+.rpe-row { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.rpe-row .chip { min-width: 0; padding: 8px 0; justify-content: center; text-align: center; }
+.splits { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.split-row, .ex-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.split-row .inp.sm { flex: 1 1 70px; width: 0; }
+.split-row b { flex: 0 0 3em; }
+.ex-row { margin-bottom: 6px; }
+.ex-row .ex-name { flex: 1 1 100%; }
+.ex-row .inp.sm:not(.ex-name) { flex: 1 1 52px; width: 0; }

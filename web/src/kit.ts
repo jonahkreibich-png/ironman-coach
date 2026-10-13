@@ -27,7 +27,7 @@ export function li(o: { act?: string; data?: Record<string, string>; icon?: stri
 export function srcBadge(src?: string | null): string {
   if (!src) return '';
   const label = SOURCE_LABEL[src] || src;
-  const short = src === 'manual' ? '✎' : label.replace(/[^A-Za-zÄÖÜ]/g, '').slice(0, 2).toUpperCase();
+  const short = src === 'manual' ? '✎' : src === 'note' ? 'Notiz' : label.replace(/[^A-Za-zÄÖÜ]/g, '').slice(0, 2).toUpperCase();
   return `<span class="src ${src === 'manual' ? 'manual' : ''}" title="${esc(t('src.from', { s: label }))}" aria-label="${esc(t('src.from', { s: label }))}">${esc(short)}</span>`;
 }
 export function sportIc(sport: string): string { return `<span class="ic" style="--c:${SPORT_COLOR[sport] || 'var(--rest)'}">${sportIcon(sport)}</span>`; }
