@@ -28,7 +28,7 @@ test('A: Papas Satz → App zeigt, was sie verstanden hat → Läufe nur noch Sa
   // Auftrag 6: erst vorgemerkt, Vorschau zeigt die Folgen, dann übernehmen
   await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bchg\b/);
   await page.locator('[data-act="stage-apply"]').click();
-  await expect(page.locator('[data-stage-preview]')).toContainText(/Laufen von \S+ auf (Sa|So)\b/);
+  await expect(page.locator('[data-stage-preview]')).toContainText(/Laufen von \S+ auf (Sa|So)(?![a-z])/);
   await page.locator('[data-act="stage-confirm"]').click();
   await expect(page.locator('[data-replanned]')).toBeVisible({ timeout: 5000 });
   // ab heute (Mi 14.10.) kein Lauf mehr außer Sa/So

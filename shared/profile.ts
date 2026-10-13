@@ -213,7 +213,17 @@ export function profileFromLegacy(state: any, today: string): Profile {
   const seen = new Set<string>();
   ((state && state.planWeeks) || []).forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((x: any) => { if (x && x.sport && x.sport !== 'rest') seen.add(x.sport); })));
   if (seen.size) p.sports = (['swim', 'bike', 'run', 'strength', 'football'] as SportKey[]).filter(k => seen.has(k));
-  if (seen.has('football')) p.teamSportName = 'Fußball';
+  if (seen.has('football')) {
+    p.teamSportName = 'Fußball';
+    // Termine aus dem bisherigen Plan übernehmen (Training/Spiel je Wochentag), damit sie beim Neuplanen nicht verschwinden
+    const tr = new Map<number, number>(), gm = new Map<number, number>();
+    ((state && state.planWeeks) || []).forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((x: any) => {
+      if (!x || x.sport !== 'football') return; const dow = new Date(d.date + 'T12:00:00Z').getUTCDay();
+      const m = /spiel|match/i.test(x.title || '') ? gm : tr; m.set(dow, (m.get(dow) || 0) + 1);
+    })));
+    const often = (m: Map<number, number>) => [...m.entries()].filter(([, n]) => n >= 2).map(([d]) => d).sort();
+    if (tr.size || gm.size) p.teamSport = { name: 'Fußball', trainingDays: often(tr), trainingMinutes: 90, gameDays: often(gm), gameMinutes: 90, seasonFrom: null, seasonTo: null };
+  }
   return withEstimates(p, today);
 }
 
