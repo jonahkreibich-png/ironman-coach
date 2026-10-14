@@ -14,7 +14,9 @@ const mid = (r: [number, number]) => (r[0] + r[1]) / 2;
 
 /** Was von Woche zu Woche weitergetragen wird */
 export interface PatternState { longRun: number; longBike: number; swim: number; keyWeeks: number; strideWeeks: number; brickWeeks: number; lastTestMon: string | null;
-  /** Laufminuten der letzten Aufbauwoche: Laufen steigt höchstens um inc */ runRef?: number | null }
+  /** Laufminuten der letzten Aufbauwoche: Laufen steigt höchstens um inc */ runRef?: number | null;
+  /** tatsächlich geplanter Umfang der letzten Aufbauwoche (Minuten): Erholung und Tapering richten sich danach */ buildOwn?: number | null;
+  /** Schwellen-Leiter in der wettkampfspezifischen Phase */ thrWeeks?: number }
 export interface PatternWeekIn {
   mon: string; dates: string[]; recovery: boolean; entry: boolean;
   /** eigenes Training dieser Woche (Minuten, ohne Teamsport) */
@@ -22,6 +24,8 @@ export interface PatternWeekIn {
   run: W.PaceCtx; bikeOut: W.PaceCtx; bikeIn: W.PaceCtx; swim: W.PaceCtx;
   swimStage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean } | null;
   /** erlaubte Steigerung pro Woche (z. B. 1.1) */ inc?: number;
+  /** Phase der Woche im Makrozyklus und Obergrenzen der langen Einheiten (Distanz des nächsten Ziels, Jahreszeit, Alter) */
+  phase?: 'base' | 'build' | 'specific' | 'taper' | 'race'; caps?: { run: number; bikeOut: number; swim: number };
   /** 400 m Kraul am Stück geschafft: CSS-Test statt Kraul-Check */
   crawl400: boolean;
   strength: { knee?: boolean; back?: boolean; shoulder?: boolean };
@@ -43,16 +47,22 @@ export function testsFor(p: WeekPattern, mon: string, recovery: boolean, st: Pat
 
 export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState): PatternItem[] {
   const t = inp.target;
+  // Erholung, Tapering und Wettkampfwoche: vom tatsächlich erreichten Umfang der letzten Aufbauwoche aus (nicht vom Ziel-Umfang)
+  if (!t && st.buildOwn) { const f = inp.phase === 'race' ? 0.5 : inp.phase === 'taper' ? 0.65 : inp.recovery ? 0.65 : 0; if (f) inp = { ...inp, ownMin: Math.min(inp.ownMin, Math.round(st.buildOwn * f)) }; }
   const slots = p.slots.filter(sl => !sl.from || inp.dates[(sl.dow + 6) % 7] >= sl.from);
   const dateOf = (sl: PatternSlot) => inp.dates[(sl.dow + 6) % 7];
   const lrMax = p.longRunMax || 999, lrStep = p.longRunStep || 10;
   const ladder = p.ssLadder && p.ssLadder.length ? p.ssLadder : SS_LADDER;
   const rec = inp.recovery;
   // Ziele der langen Einheiten
-  const longRun = t && t.longRun ? r5(mid(t.longRun)) : rec ? r5(st.longRun * 0.65) : Math.min(lrMax, st.longRun + lrStep);
+  const ph = inp.phase || 'base';
+  const capRun = Math.min(lrMax, inp.caps ? inp.caps.run : 999), capBike = inp.caps ? inp.caps.bikeOut : 999;
+  const longRun = t && t.longRun ? r5(mid(t.longRun)) : ph === 'race' ? r5(Math.min(40, st.longRun * 0.4)) : ph === 'taper' ? r5(st.longRun * 0.6) : rec ? r5(st.longRun * 0.65) : Math.min(capRun, st.longRun + lrStep);
   // lange Ausfahrt ohne Vorgabe: höchstens +15 min pro Woche, vorerst nicht über 4 h
-  const longBikeR: [number, number] = t && t.longBike ? t.longBike : rec ? [r5(st.longBike * 0.6), r5(st.longBike * 0.6)] : [Math.min(240, st.longBike), Math.min(240, st.longBike + 15)];
-  const swimMin = t && t.swim ? r5(mid(t.swim)) : rec ? 40 : st.swim;
+  const lb = (f: number): [number, number] => [r5(Math.min(capBike, st.longBike) * f), r5(Math.min(capBike, st.longBike) * f)];
+  const longBikeR: [number, number] = t && t.longBike ? t.longBike : ph === 'race' ? lb(0.4) : ph === 'taper' ? lb(0.6) : rec ? lb(0.6) : [Math.min(capBike, st.longBike), Math.min(capBike, st.longBike + 15)];
+  // Schwimmen wird mit dem Können und dem Ziel länger (bis zur Obergrenze), in Erholung und Tapering kürzer
+  const swimMin = t && t.swim ? r5(mid(t.swim)) : rec || ph === 'taper' || ph === 'race' ? 40 : Math.min(inp.caps ? inp.caps.swim : 60, st.swim + 5);
   const swimDays = slots.filter(sl => sl.role === 'swim').map(sl => sl.dow);
   const bikeTestDow = inp.tests.has('bike') ? (slots.find(sl => sl.sport === 'bike' && sl.role !== 'long') || { dow: -1 }).dow : -1;
   const out: (PatternItem & { slot: PatternSlot; adj?: [number, number]; make?: (min: number) => W.Spec; min?: number })[] = [];
@@ -69,7 +79,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       }
       const make = (min: number) => inp.swimStage ? W.swimLearn(inp.swim, { ...inp.swimStage, breast: inp.swimStage.breast }, inp.swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : 'Kraul-Technik in kurzen Stücken, Brust für die Ausdauer im Wasser.', min)
         : swimEndurance(inp.swim, min, first);
-      out.push({ dow: sl.dow, slot: sl, s: null, make, min: swimMin, adj: t && t.swim ? undefined : [40, 60] });
+      out.push({ dow: sl.dow, slot: sl, s: null, make, min: swimMin, adj: t && t.swim ? undefined : rec || ph === 'taper' || ph === 'race' ? [30, 40] : [40, inp.caps ? inp.caps.swim : 60] });
     } else if (sl.role === 'lower' || sl.role === 'upper') {
       const area = sl.role;
       // Tag vor dem Radtest: Unterkörper nur leicht (2 Sätze, nichts Explosives)
@@ -80,13 +90,18 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       if (easy) spec.tip = 'Morgen ist der Radtest: nur 2 Sätze, nichts Explosives.';
       out.push({ dow: sl.dow, slot: sl, s: null, strength: true, make: () => spec });
     } else if (sl.sport === 'bike' && sl.role === 'long') {
-      out.push({ dow: sl.dow, slot: sl, s: null, long: true, make: (min) => W.bikeLong(inp.bikeOut, min), min: r5(mid(longBikeR)), adj: longBikeR });
+      out.push({ dow: sl.dow, slot: sl, s: null, long: true, make: (min) => { const sp = W.bikeLong(inp.bikeOut, min); if (ph === 'specific' && !rec && min >= 90) { sp.steps[1].note = 'darin 2×15 min im Wettkampftempo (obere Zone 3), alle 20-30 min essen und trinken'; sp.why = 'Wettkampftempo auf müden Beinen üben.'; } return sp; }, min: r5(mid(longBikeR)), adj: longBikeR });
     } else if (sl.sport === 'bike') {
       if (sl.dow === bikeTestDow) { out.push({ dow: sl.dow, slot: sl, s: null, test: true, hard: true, make: () => W.bikeTest({ ...inp.bikeOut, indoor: false, bikeName: null }) }); continue; }
       const range = sl.min || [50, 75];
-      const key = sl.role === 'key' && !rec && !inp.entry && !!sl.keyFrom && date >= sl.keyFrom;
-      if (key) {
-        const [reps, m] = ladder[Math.min(ladder.length - 1, st.keyWeeks)];
+      const key = sl.role === 'key' && !rec && !inp.entry && ph !== 'race' && (!sl.keyFrom || date >= sl.keyFrom);
+      if (key && ph === 'specific') {
+        const THR: [number, number][] = [[4, 6], [3, 8], [3, 10], [2, 15], [3, 12]];
+        const [reps, m] = THR[Math.min(THR.length - 1, st.thrWeeks || 0)];
+        out.push({ dow: sl.dow, slot: sl, s: null, hard: true, make: (min) => { const sp = W.bikeIntervals(inp.bikeIn, reps, m, 4, Math.max(3, Math.round(m / 2))); sp.why = 'Schwelle (Zone 4) bringt das Wettkampftempo: kurz vor dem Ziel wichtiger als lange Sweet-Spot-Intervalle.'; const extra = Math.max(0, min - W.totals(sp).min); if (extra >= 5) sp.steps[sp.steps.length - 1].min = (sp.steps[sp.steps.length - 1].min || 10) + Math.round(extra / 5) * 5; return sp; }, min: 70, adj: [60, 90] });
+      } else if (key) {
+        // im Tapering kürzer (zwei Stufen zurück), die Intensität bleibt
+        const [reps, m] = ladder[Math.max(0, Math.min(ladder.length - 1, st.keyWeeks) - (ph === 'taper' ? 2 : 0))];
         const core = reps * m + (reps - 1) * (m >= 15 ? 5 : 4) + 25;
         out.push({ dow: sl.dow, slot: sl, s: null, hard: true, make: (min) => { const sp = W.bikeSweetSpot(inp.bikeIn, reps, m, min); sp.why = 'Sweet Spot macht dich auf dem Rad stärker, ohne so müde zu machen wie Schwellen-Intervalle.'; return sp; }, min: Math.max(core, range[0]), adj: [core, 90] });
       } else out.push({ dow: sl.dow, slot: sl, s: null, make: (min) => W.bikeEasy(inp.bikeOut, min), min: rec ? range[0] : r5(mid(range)), adj: rec ? [range[0], range[1]] : [range[0], 90] });
@@ -94,9 +109,9 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       if (inp.tests.has('run')) { out.push({ dow: sl.dow, slot: sl, s: null, test: true, hard: true, make: () => W.runTest(inp.run) }); continue; }
       out.push({ dow: sl.dow, slot: sl, s: null, long: true, make: (min) => W.runLong(inp.run, min), min: longRun });
     } else if (sl.sport === 'run' && sl.role === 'brick') {
-      if (rec) continue;
-      const min = st.brickWeeks > 0 ? 15 : 10;
-      out.push({ dow: sl.dow, slot: sl, s: null, make: () => { const sp = W.runEasy(inp.run, min); sp.title = `Koppellauf ${min} min (direkt nach dem Rad)`; sp.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.'; sp.tip = 'Nur wenn du gut erholt bist (Ampel grün). Sonst weglassen, das ist kein Problem.'; return sp; } });
+      if (rec || ph === 'taper' || ph === 'race') continue;
+      const min = ph === 'specific' ? 20 : st.brickWeeks > 0 ? 15 : 10;
+      out.push({ dow: sl.dow, slot: sl, s: null, make: () => { const sp = W.runEasy(inp.run, min); if (ph === 'specific') sp.steps[0].note = 'die mittleren 10 min im Wettkampftempo'; sp.title = `Koppellauf ${min} min (direkt nach dem Rad)`; sp.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.'; sp.tip = 'Nur wenn du gut erholt bist (Ampel grün). Sonst weglassen, das ist kein Problem.'; return sp; } });
     } else if (sl.sport === 'run') {
       const range = sl.min || [40, 50];
       const strides = !rec && !!sl.stridesFrom && date >= sl.stridesFrom ? (st.strideWeeks > 0 ? 6 : 4) : 0;
@@ -147,6 +162,8 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
     if (items.some(x => /^Sweet Spot/.test(x.s.title || ''))) n.keyWeeks++;
     if (items.some(x => x.s.sport === 'run' && /Steigerungsläufe/.test(x.s.description || ''))) n.strideWeeks++;
     if (items.some(x => /^Koppellauf/.test(x.s.title || ''))) n.brickWeeks++;
+    if (items.some(x => /^Rad (Schwelle|-Intervalle)/.test(x.s.title || ''))) n.thrWeeks = (n.thrWeeks || 0) + 1;
+    n.buildOwn = items.filter(x => !['football', 'rest'].includes(x.s.sport) && !x.s.race).reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.buildOwn;
     n.runRef = items.filter(x => x.s.sport === 'run').reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.runRef;
   }
   if (tests.size) n.lastTestMon = mon;

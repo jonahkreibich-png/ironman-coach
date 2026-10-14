@@ -46,14 +46,16 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
   // Umfang: gegen die letzte normale Woche (nach einer Erholungswoche zählt die Woche davor)
   for (let i = Math.max(1, firstNew); i < all.length; i++) {
     const w = all[i];
-    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || (all[j].races || []).length)) j--;
+    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
     // Wiedereinstieg nach Krankheit: niedriger als die Woche davor, keine Steigerung zu prüfen
     if (w.entry) continue;
     const ref = all[j];
     // eigenes Training (Teamsport ist ein fester Termin und steigt nicht)
     const refMin = ownWeekMinutes(ref), cur = ownWeekMinutes(w);
     if (refMin >= 60 && cur > refMin * maxInc + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
-    const refRun = weekMinutes(ref, 'run'), curRun = weekMinutes(w, 'run');
+    // Laufumfang ohne Wettkampf (der Wettkampf selbst ist keine Steigerung)
+    const runOf = (x: any) => (x.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport === 'run' && !s.race && !s.cancelled).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
+    const refRun = runOf(ref), curRun = runOf(w);
     if (refRun >= 40 && curRun > refRun * maxInc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });
   }
   // Harte Tage

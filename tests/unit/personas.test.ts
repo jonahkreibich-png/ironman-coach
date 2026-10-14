@@ -29,7 +29,7 @@ describe.each(PERSONAS.map(p => [p.id, p] as const))('Test-Person %s', (_id, p) 
     const issues = checkPlan(weeks, r.profile, r.goals, today);
     expect(issues).toEqual([]);
     // jede Woche sagt, worauf sie hinarbeitet
-    weeks.forEach((w: any) => expect(w.headline).toMatch(/^Woche \d+ von \d+ → /));
+    weeks.forEach((w: any) => expect(w.headline).toMatch(/^Woche \d+ von \d+ · (Grundlage|Aufbau|Wettkampfspezifisch|Tapering|Wettkampf) → /));
     // jede Einheit: Titel, Dauer, Distanz und Beschreibung aus denselben Zahlen, mit Warum
     for (const s of all(weeks).filter((x: any) => x.sport !== 'rest' && !x.race && x.sport !== 'football')) {
       expect(checkSession(s)).toEqual([]);
@@ -82,7 +82,7 @@ describe('Besonderheiten der Personen', () => {
     const near = s.filter((x: any) => !x.race && x.date >= '2026-11-10' && x.date <= '2026-11-17');
     expect(near.some(isIntense)).toBe(false);
     weeks.filter((w: any) => !w.races.length && !w.isRecoveryWeek).forEach((w: any) => expect(w.days.flatMap((d: any) => d.sessions).filter((x: any) => x.sport === 'run').length).toBe(4));
-    expect(weeks[0].headline).toBe('Woche 1 von 9 → Halbmarathon');
+    expect(weeks[0].headline).toBe('Woche 1 von 9 · Aufbau → 10-km-Rennen'); // Phase und nächstes Ziel (Auftrag 9)
   });
   test('Einsteigerin: Brust plus Kraul-Technik, Lauf-Geh-Wechsel, kein Schwimmen im Winter', () => {
     const r = applyOnboarding(PERSONAS.find(x => x.id === 'einsteiger-sprint')!.answers, today);

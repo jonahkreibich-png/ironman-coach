@@ -6,7 +6,7 @@
 import { HR_ZONES, POWER_ZONES } from './sports';
 
 export type WSport = 'run' | 'bike' | 'swim' | 'strength' | 'football';
-export type StrokeMode = 'crawl' | 'breast' | 'drill' | 'kick' | 'mixed' | 'easy';
+export type StrokeMode = 'crawl' | 'breast' | 'drill' | 'kick' | 'mixed' | 'easy' | 'pull';
 export interface Step {
   part: 'warm' | 'main' | 'cool';
   /** Wiederholungen (1 = durchgehend) */
@@ -43,7 +43,7 @@ export interface Spec {
   title?: string;
   why?: string; tip?: string;
   /** Lernstufe (Kraul lernen, Lauf-Geh-Wechsel) */
-  stage?: { ladder: 'swim' | 'swimBreast' | 'runwalk'; n: number } | null;
+  stage?: { ladder: 'swim' | 'swimBreast' | 'runwalk'; n: number; breast?: boolean; pull?: number | null } | null;
   /** ohne Distanz (Rolle, Kraft, Teamsport) */
   noDistance?: boolean;
   /** Kraft: Körperbereich */
@@ -76,6 +76,7 @@ export function swimPace(ctx: PaceCtx, zone: number, mode: StrokeMode = 'crawl')
   if (mode === 'breast') return breast + (zone <= 1 ? 10 : 0);
   if (mode === 'drill' || mode === 'kick') return Math.max((ctx.css ? ctx.css + 25 : breast + 15), 120);
   if (mode === 'easy' || mode === 'mixed') return ctx.css ? ctx.css + 15 : breast;
+  if (mode === 'pull') return ctx.css ? ctx.css + (SWIM_PLUS[zone] ?? 8) + 3 : Math.max(breast, 170);
   return ctx.css ? ctx.css + (SWIM_PLUS[zone] ?? 8) : Math.max(breast, 170);
 }
 const mmss = (sec: number) => { sec = Math.round(sec); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
@@ -135,12 +136,12 @@ export function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
   }
   return `Z${zone}${parts.length ? ': ' + parts.join(', ') : ''}`;
 }
-const STROKE: Record<StrokeMode, string> = { crawl: 'Kraul', breast: 'Brust', drill: 'Technikübungen', kick: 'Beinschlag mit Brett', mixed: 'Lage nach Wahl', easy: 'locker, Lage nach Wahl' };
+const STROKE: Record<StrokeMode, string> = { crawl: 'Kraul', breast: 'Brust', drill: 'Technikübungen', kick: 'Beinschlag mit Brett', mixed: 'Lage nach Wahl', easy: 'locker, Lage nach Wahl', pull: 'Kraul mit Pull Buoy' };
 export function stepText(spec: Spec, s: Step): string {
   const reps = s.reps || 1; const z = s.zone || 2;
   if (spec.sport === 'swim') {
     const what = `${reps > 1 ? `${reps}×${s.m} m` : `${s.m} m`} ${STROKE[s.mode || 'crawl']}`;
-    return `${what}${s.mode === 'crawl' || s.mode === 'breast' ? ` (${intensity(spec, z, s.mode)})` : ''}${reps > 1 && s.restSec ? `, ${s.restSec} s Pause am Rand` : ''}${s.note ? '. ' + s.note : ''}`;
+    return `${what}${s.mode === 'crawl' || s.mode === 'breast' || s.mode === 'pull' ? ` (${intensity(spec, z, s.mode)})` : ''}${reps > 1 && s.restSec ? `, ${s.restSec} s Pause am Rand` : ''}${s.note ? '. ' + s.note : ''}`;
   }
   if (s.walkOnly) return `${s.min} min ${s.note || 'zügig gehen'}`;
   if (s.walkMin) return `${reps}× (${s.min} min locker laufen + ${s.walkMin} min zügig gehen), laufen ${intensity(spec, z)}${s.note ? ', ' + s.note : ''}`;
@@ -182,7 +183,7 @@ export function title(spec: Spec): string {
   const where = spec.sport === 'bike' && spec.ctx.indoor ? ' (Rolle)' : spec.sport === 'bike' && spec.ctx.bikeName ? ` (${spec.ctx.bikeName})` : '';
   switch (spec.kind) {
     case 'runwalk': return `Lauf-Geh-Wechsel ${m0.reps}× (${m0.min} + ${m0.walkMin} min)`;
-    case 'swimlearn': return spec.stage && spec.stage.ladder === 'swimBreast' ? `Schwimmen: Brust und Kraul-Technik (${thousands((t.km || 0) * 1000)} m)` : `Schwimmen: Kraul lernen, Stufe ${(spec.stage?.n ?? 0) + 1} (${thousands((t.km || 0) * 1000)} m)`;
+    case 'swimlearn': return spec.stage && spec.stage.ladder === 'swimBreast' ? `Schwimmen: Brust und Kraul-Technik (${thousands((t.km || 0) * 1000)} m)` : `Schwimmen: Kraul lernen, Stufe ${(spec.stage?.n ?? 0) + 1}: ${SWIM_LADDER[Math.min(spec.stage?.n ?? 0, SWIM_LADDER.length - 1)].label} (${thousands((t.km || 0) * 1000)} m)`;
     case 'technique': return `Schwimmen Technik ${thousands((t.km || 0) * 1000)} m`;
     case 'css': return `Schwimmen ${m0.reps}×${m0.m} m zügig`;
     case 'endurance': return spec.sport === 'swim' ? `Schwimmen Ausdauer ${thousands((t.km || 0) * 1000)} m` : `Ausdauer ${t.min} min`;
@@ -280,7 +281,7 @@ export function swimSession(ctx: PaceCtx, kind: Kind, mainSets: Step[], warmM = 
 export const SWIM_LADDER: { label: string; main: Step[]; warm?: number; tip: string }[] = [
   { label: 'Wassergewöhnung und Atmung', warm: 100, main: [S('main', { reps: 10, m: 25, zone: 1, mode: 'drill', restSec: 30, note: 'Gleiten in Bauchlage, ins Wasser ausatmen (Blubbern), seitlich einatmen' }), S('main', { reps: 4, m: 25, zone: 1, mode: 'kick', restSec: 30 })], tip: 'Ins Wasser ausatmen, nur kurz seitlich einatmen. Lieber langsam und ruhig als schnell.' },
   { label: 'Kraul-Technik mit Brett', main: [S('main', { reps: 8, m: 25, zone: 1, mode: 'kick', restSec: 30, note: 'Beinschlag aus der Hüfte' }), S('main', { reps: 8, m: 25, zone: 1, mode: 'drill', restSec: 30, note: 'Abschlagschwimmen mit Brett, Seitatmung' })], tip: 'Kopf ruhig, Blick zum Boden, gleichmäßig ausatmen.' },
-  { label: 'Kurze Kraul-Strecken', main: [S('main', { reps: 6, m: 25, zone: 1, mode: 'drill', restSec: 20 }), S('main', { reps: 10, m: 25, zone: 2, mode: 'crawl', restSec: 30 })], tip: 'Nach jeder Bahn Pause, bis der Atem ruhig ist.' },
+  { label: '25-m-Stücke Kraul', main: [S('main', { reps: 6, m: 25, zone: 1, mode: 'drill', restSec: 20 }), S('main', { reps: 10, m: 25, zone: 2, mode: 'crawl', restSec: 30 })], tip: 'Nach jeder Bahn Pause, bis der Atem ruhig ist.' },
   { label: '50-m-Stücke Kraul', main: [S('main', { reps: 4, m: 25, zone: 1, mode: 'drill', restSec: 20 }), S('main', { reps: 8, m: 50, zone: 2, mode: 'crawl', restSec: 30 })], tip: 'Alle 3 Züge atmen, beide Seiten üben.' },
   { label: '100-m-Stücke Kraul', main: [S('main', { reps: 4, m: 25, zone: 1, mode: 'drill', restSec: 20 }), S('main', { reps: 6, m: 100, zone: 2, mode: 'crawl', restSec: 30 })], tip: 'Gleichmäßig bleiben, nicht schneller werden.' },
   { label: '200-m-Stücke Kraul', main: [S('main', { reps: 4, m: 200, zone: 2, mode: 'crawl', restSec: 30 })], tip: 'Lange Arme, ruhig ausatmen.' },
@@ -314,16 +315,37 @@ export function runLadderStart(continuousMin: number | null | undefined): number
   if (continuousMin == null || continuousMin >= 30) return null;
   return continuousMin < 3 ? 0 : continuousMin < 5 ? 1 : continuousMin < 8 ? 2 : continuousMin < 12 ? 3 : continuousMin < 15 ? 4 : continuousMin < 20 ? 5 : 6;
 }
-export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean }, why?: string, fillMin?: number): Spec {
+/* Anteil Brust beim Auffüllen je Stufe (Kraul-Weg): je weiter, desto mehr Kraul */
+const BREAST_SHARE = [0.8, 0.7, 0.6, 0.5, 0.35, 0.2, 0, 0];
+export const SWIM_STAGE_M = [0, 0, 25, 50, 100, 200, 400, 800];
+export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean; pull?: number | null }, why?: string, fillMin?: number): Spec {
   const L = stage.ladder === 'swimBreast' ? SWIM_BREAST_LADDER : SWIM_LADDER;
-  const st = L[Math.min(stage.n, L.length - 1)] as any;
-  // wer Brust kann: Brust zum Einschwimmen und zwischendurch für die Ausdauer, Kraul in kurzen Stücken mit Technik
-  const br = !!(stage.ladder === 'swim' && stage.breast && stage.n <= 4) || (!!fillMin && stage.ladder === 'swimBreast');
+  const n = Math.min(stage.n, L.length - 1);
+  const st = L[n] as any;
+  // wer Brust kann: Brust zum Einschwimmen und für die Ausdauer, Kraul in Stücken so lang wie die Stufe
+  const br = !!(stage.ladder === 'swim' && stage.breast && stage.n <= 5) || (!!fillMin && stage.ladder === 'swimBreast');
   const endu = S('main', { reps: 2, m: 100, zone: 2, mode: 'breast', restSec: 30, note: 'ruhig, für die Ausdauer im Wasser' });
-  const spec: Spec = { sport: 'swim', kind: 'swimlearn', ctx, stage, why, tip: st.tip + ' Die nächste Stufe kommt, sobald diese klappt.',
-    steps: [S('warm', { m: br ? 200 : st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' || br ? 'breast' : 'easy' }), ...st.main.map((x: Step) => ({ ...x })), ...(br ? [endu] : []), S('cool', { m: 100, zone: 1, mode: br ? 'breast' : 'easy' })] };
-  // länger schwimmen (z. B. 45-55 min): mehr Brust-Ausdauer in 100-m-Stücken, die Kraul-Stücke bleiben so kurz wie die Stufe
-  if (fillMin && br) { spec.fillMin = fillMin; for (let k = 0; k < 30 && totals(spec).min + 3 <= fillMin; k++) endu.reps = (endu.reps || 1) + 1; }
+  const crawlStep = st.main.find((x: Step) => x.mode === 'crawl');
+  // Pull Buoy: Kraul-Arme und Atmung über die Strecke, die mit Pull Buoy schon geht (höchstens doppelt so lang wie die Stufe)
+  const stageLen = SWIM_STAGE_M[n] || 25;
+  const pullM = stage.ladder === 'swim' && stage.pull && stage.pull > stageLen && n >= 2 && n <= 5 ? Math.min(Math.floor(stage.pull / 25) * 25, stageLen * 2) : 0;
+  const pull = pullM ? S('main', { reps: 4, m: pullM, zone: 2, mode: 'pull', restSec: 30, note: 'Beine ruhig, lange Züge, gleichmäßig ausatmen' }) : null;
+  const spec: Spec = { sport: 'swim', kind: 'swimlearn', ctx, stage: { ...stage }, why,
+    tip: st.tip + ' Am Ende trägst du die längste Strecke Kraul am Stück ein (und mit Pull Buoy): Danach stuft die App dich passend ein.',
+    steps: [S('warm', { m: br ? 200 : st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' || br ? 'breast' : 'easy' }), ...st.main.map((x: Step) => ({ ...x })), ...(pull ? [pull] : []), ...(br ? [endu] : []), S('cool', { m: 100, zone: 1, mode: br ? 'breast' : 'easy' })] };
+  // länger schwimmen: auffüllen mit Brust und Kraul/Pull Buoy im Verhältnis der Stufe (Kraul-Stücke so lang wie die Stufe)
+  if (fillMin) {
+    spec.fillMin = fillMin;
+    const share = stage.ladder === 'swimBreast' ? 0.7 : br ? BREAST_SHARE[n] : 0;
+    const crawlFill = pull || (spec.steps.find(x => x.part === 'main' && x.mode === 'crawl' && x !== crawlStep) as Step) || crawlStep;
+    const meters = (mode: StrokeMode[]) => spec.steps.filter(x => x.part === 'main' && mode.includes(x.mode || 'crawl')).reduce((a, x) => a + (x.reps || 1) * (x.m || 0), 0);
+    for (let k = 0; k < 40 && totals(spec).min + 3 <= fillMin; k++) {
+      const b = meters(['breast']), c = meters(['crawl', 'pull']);
+      if (share > 0 && (b / Math.max(1, b + c) < share || !crawlFill)) { if (!spec.steps.includes(endu)) spec.steps.splice(spec.steps.length - 1, 0, endu); else endu.reps = (endu.reps || 1) + 1; }
+      else if (crawlFill) crawlFill.reps = (crawlFill.reps || 1) + 1;
+      else break;
+    }
+  }
   return spec;
 }
 /* Schwimmtest (Kraul-Check) zu Beginn der Einheit, danach Technik wie gewohnt. Ab 400 m Kraul am Stück: CSS-Test (swimTest). */

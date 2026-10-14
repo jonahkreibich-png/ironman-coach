@@ -7,6 +7,9 @@ import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../.
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
 import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/fields';
+import { swimBests, swimSkillUpdate } from '../../shared/swimskill';
+import { refreshFuture, trendThresholds } from '../../shared/refresh';
+import { mainGoal } from '../../shared/goals';
 import { analyze, type Trigger } from '../../shared/coach/analysis';
 import { extendPlan } from '../../shared/replan';
 
@@ -111,7 +114,37 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
     const sRec = await getRecord(env, uid, 'settings', 'main'); const sd = (sRec && sRec.data) || {};
     changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t }, updatedAt: t });
     if (tu.settings && Object.keys(tu.settings).length) changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), ...tu.settings } }, updatedAt: t + 1 });
-    changes.push({ kind: 'coachMsg', key: 'msg-test-' + tu.sessionId, data: { id: 'msg-test-' + tu.sessionId, at: t, date: tu.date, kind: 'info', from: 'coach', title: tu.title, text: tu.text, important: true }, updatedAt: t + 2 });
+    // alle kommenden Einheiten mit den neuen Zonen, Beispiel vorher/nachher
+    const day = opts.date || berlinParts().date;
+    const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day) : { weeks: [], changed: 0, example: null };
+    if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 }); }
+    const more = rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '';
+    changes.push({ kind: 'coachMsg', key: 'msg-test-' + tu.sessionId, data: { id: 'msg-test-' + tu.sessionId, at: t, date: tu.date, kind: 'info', from: 'coach', title: tu.title, text: tu.text + more, important: true }, updatedAt: t + 2 });
+  } else if (L.plan) {
+    // klarer Trend aus den Uhrdaten (ohne Test): Zonen anpassen, alle kommenden Einheiten neu rechnen
+    const day = opts.date || berlinParts().date;
+    let tr: any = null; try { tr = trendThresholds(L.state, L.baseWeeks, L.profile, mainGoal(L.goals || [], day), day); } catch (e) { tr = null; }
+    if (tr) {
+      L.profile = { ...L.profile, thresholds: { ...L.profile.thresholds, ...tr.thresholds } }; L.state.profile = L.profile;
+      const sRec = await getRecord(env, uid, 'settings', 'main'); const sd = (sRec && sRec.data) || {};
+      changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t }, updatedAt: t });
+      if (Object.keys(tr.settings).length) changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), ...tr.settings } }, updatedAt: t + 1 });
+      const rf = refreshFuture(L.plan.weeks || [], L.profile, day);
+      if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 }); }
+      changes.push({ kind: 'coachMsg', key: 'msg-trend-' + day, data: { id: 'msg-trend-' + day, at: t, date: day, kind: 'info', from: 'coach', title: 'Zonen aus deinen Uhrdaten aktualisiert', important: true,
+        text: tr.text + (rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '') + ' Ändern kannst du die Werte unter Mehr → Einstellungen.' }, updatedAt: t + 2 });
+    }
+  }
+  // Schwimmen: neue Bestwerte → Können eintragen und alle kommenden Schwimmeinheiten neu stufen
+  {
+    const day = opts.date || berlinParts().date;
+    const su = swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, swimBests(L.state, L.baseWeeks, day), t);
+    if (su) {
+      L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...su.skills } }; L.state.profile = L.profile;
+      changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 3 }, updatedAt: t + 3 });
+      su.adjustments.forEach((a, i) => { const x = { ...a, createdAt: t + i, date: day }; L.state.adjustments[a.id] = x; changes.push({ kind: 'adjust', key: a.id, data: x, updatedAt: t + 4 + i }); });
+      changes.push({ kind: 'coachMsg', key: 'msg-swim-' + t, data: { id: 'msg-swim-' + t, at: t, date: day, kind: 'adjust', from: 'coach', title: 'Schwimm-Stufe aktualisiert', text: su.text, important: true }, updatedAt: t + 5 });
+    }
   }
   const ctx = engineCtx(L, opts.date);
   const r = analyze(ctx, trigger);

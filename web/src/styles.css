@@ -409,3 +409,28 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .row.nowrap > .btn { flex-shrink: 0; }
 .pill { flex-shrink: 0; max-width: 100%; }
 .rl-r .pill { white-space: nowrap; }
+
+/* Zeitleiste (Auftrag 9) */
+.tl .t { margin: 2px 0 var(--s2); }
+.tl-bar { position: relative; height: 18px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; margin-top: 6px; }
+.tl-seg { position: absolute; top: 0; bottom: 0; }
+.tl-base, .tl-key i.tl-base { background: var(--info); opacity: .55; }
+.tl-build, .tl-key i.tl-build { background: var(--good); opacity: .75; }
+.tl-specific, .tl-key i.tl-specific { background: var(--warn); }
+.tl-taper, .tl-key i.tl-taper { background: var(--strength); }
+.tl-race, .tl-key i.tl-race { background: var(--accent); }
+.tl-goal { position: absolute; top: 2px; bottom: 2px; width: 3px; margin-left: -1px; background: var(--ink); border-radius: 2px; }
+.tl-goal.ph { background: transparent; border-left: 2px dashed var(--ink); }
+.tl-goal.a { width: 5px; margin-left: -2px; }
+.tl-now { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+.tl-years { position: relative; height: 16px; font-size: var(--t-xs); color: var(--ink-3); }
+.tl-year { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--t-xs); color: var(--ink-2); margin: 4px 0; }
+.tl-key { display: inline-flex; align-items: center; gap: 4px; }
+.tl-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.tl-goals { list-style: none; margin: 4px 0; padding: 0; }
+.tl-li { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: var(--t-sm); min-width: 0; }
+.tl-li .grow { min-width: 0; overflow-wrap: anywhere; }
+.tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); flex-shrink: 0; }
+.tl-dot.ph { background: transparent; border: 2px dashed var(--ink); }
+.tl-dot.a { background: var(--accent); }

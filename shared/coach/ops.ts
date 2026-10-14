@@ -12,8 +12,9 @@ export type Op =
   | { op: 'add-rules'; rules: Rule[]; text: string }
   | { op: 'goal'; goal: Goal }
   | { op: 'freq'; sport: string; n: number }
-  | { op: 'replan'; reason: string };
-export interface Undo { adj: string[]; illness: string[]; illnessEnd?: { id: string; prev: string | null }; rules: string[]; note?: string; goal?: { id: string; prev: Goal | null }; freq?: { sport: string; prev: any } }
+  | { op: 'replan'; reason: string }
+  | { op: 'swim-skill'; skills: Record<string, any> };
+export interface Undo { skills?: any; adj: string[]; illness: string[]; illnessEnd?: { id: string; prev: string | null }; rules: string[]; note?: string; goal?: { id: string; prev: Goal | null }; freq?: { sport: string; prev: any } }
 export interface OpStore { state: any; profile: Profile; goals: Record<string, Goal>; saveProfile(p: Profile): void }
 export interface Applied { undo: Undo; summary: string[]; replan: string | null; adjChanged: boolean }
 
@@ -56,6 +57,11 @@ export function applyOps(store: OpStore, ops: Op[], now: number, today: string):
       const p = { ...store.profile }; undo.freq = { sport: o.sport, prev: (p.freq || {})[o.sport as 'run'] ?? null };
       p.freq = { ...(p.freq || {}), [o.sport]: [o.n, o.n] }; store.saveProfile(p); store.profile = p;
     }
+    if (o.op === 'swim-skill') {
+      const p = { ...store.profile }; undo.skills = { ...(p.skills || {}) };
+      p.skills = { ...(p.skills || {}), ...o.skills }; store.saveProfile(p); store.profile = p;
+      summary.push('Schwimmen: ' + (o.skills.swimCrawlM ? o.skills.swimCrawlM + ' m Kraul am Stück' : '') + (o.skills.swimPullM ? ', ' + o.skills.swimPullM + ' m mit Pull Buoy' : ''));
+    }
     if (o.op === 'replan') replan = o.reason;
   });
   return { undo, summary, replan, adjChanged };
@@ -66,8 +72,9 @@ export function undoOps(store: OpStore, u: Undo): void {
   u.adj.forEach(id => { if (st.adjustments && st.adjustments[id]) st.adjustments[id] = { ...st.adjustments[id], undone: true }; });
   if (u.illness.length) st.illnessPeriods = (st.illnessPeriods || []).filter((p: any) => !u.illness.includes(p.id));
   if (u.illnessEnd) { const p = (st.illnessPeriods || []).find((x: any) => x.id === u.illnessEnd!.id); if (p) p.end = u.illnessEnd.prev; }
-  if (u.rules.length || u.note || u.freq) {
+  if (u.rules.length || u.note || u.freq || u.skills) {
     const p = { ...store.profile };
+    if (u.skills) p.skills = u.skills;
     if (u.rules.length) p.rules = (p.rules || []).filter(r => !u.rules.includes(r.id));
     if (u.note) p.notes = (p.notes || []).filter(n => n !== u.note);
     if (u.freq) { const f: any = { ...(p.freq || {}) }; if (u.freq.prev) f[u.freq.sport] = u.freq.prev; else delete f[u.freq.sport]; p.freq = f; }

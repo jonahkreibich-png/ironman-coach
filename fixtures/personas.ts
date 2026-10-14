@@ -1,4 +1,4 @@
-/* Sechs erfundene Test-Personen (Auftrag 4, Nr. 6 aus Auftrag 5): Antworten auf den kompletten Fragebogen.
+/* Zehn erfundene Test-Personen (Auftrag 4, Nr. 6 aus Auftrag 5, vier neue aus Auftrag 9): Antworten auf den kompletten Fragebogen.
    Keine echten Personen, keine echten Daten. Stichtag der Tests: 2026-10-14 (Mittwoch). */
 export const PERSONA_TODAY = '2026-10-14';
 const ALL = { 0: 3, 1: 1, 2: 2, 3: 2, 4: 2, 5: 1, 6: 3 };
@@ -76,6 +76,52 @@ export const PERSONAS: { id: string; label: string; answers: Record<string, any>
       dayLoad: { 0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 3 }, timeOfDay: 'morning', weeklyHours: 7, maxDayHours: 3,
       freq: { swim: [1, 2], bike: [2, 2], run: [3, 3], strength: [1, 1] },
       notes: ['kann mittwochs nicht laufen, nur Samstag oder Sonntag', 'Schwimmbad nur donnerstags', 'dienstags gar nichts'], wantTests: false
+    }
+  },
+  {
+    id: 'marathon-anfaenger', label: 'Marathon-Anfänger: erster Marathon in einem Jahr, läuft erst 20 min am Stück',
+    answers: {
+      goals: [{ id: 'g-mar', type: 'run_marathon', name: 'Erster Marathon', date: '2027-10-10', priority: 'A' }, { id: 'g-hm2', type: 'run_half', name: 'Halbmarathon', date: null, priority: 'B' }],
+      birthYear: 1994, sex: 'm', heightCm: 182, weightKg: 86, injuries: 'keine', medical: false,
+      sports: ['run', 'strength'], experienceYears: 0, weeklyHoursNow: 2.5, runContinuousMin: 20,
+      teamYes: false,
+      dayLoad: { 0: 3, 1: 1, 2: 2, 3: 0, 4: 2, 5: 0, 6: 2 }, timeOfDay: 'evening', weeklyHours: 6, maxDayHours: 3,
+      freq: { run: [3, 4], strength: [1, 1] }, notes: [], wantTests: false
+    }
+  },
+  {
+    id: 'rad-event', label: 'Rad-Event 180 km in den Alpen, Wattmessung, Rolle im Winter',
+    answers: {
+      goals: [{ id: 'g-rad', type: 'bike_event', name: 'Alpen-Radmarathon 180 km', date: '2027-07-04', priority: 'A', legs: [{ sport: 'bike', km: 180 }] }],
+      birthYear: 1980, sex: 'f', heightCm: 172, weightKg: 63, injuries: 'keine', medical: false,
+      sports: ['bike', 'strength'], experienceYears: 6, weeklyHoursNow: 7, bikeLongestMin: 240, bikes: ['road', 'trainer'], powerMeter: true,
+      teamYes: false,
+      dayLoad: { 0: 3, 1: 0, 2: 2, 3: 2, 4: 2, 5: 0, 6: 3 }, timeOfDay: 'evening', weeklyHours: 10, maxDayHours: 6,
+      freq: { bike: [4, 4], strength: [1, 2] }, notes: [], wantTests: false
+    }
+  },
+  {
+    id: 'olympisch-erfahren', label: 'Olympisch-Erfahrene: Olympische Distanz (A), Sprint (B) und 10 km (C), Wattmessung',
+    answers: {
+      goals: [{ id: 'g-ol', type: 'tri_olympic', name: 'Olympische Distanz', date: '2027-07-11', priority: 'A', targetTime: '2:25:00' }, { id: 'g-sp', type: 'tri_sprint', name: 'Sprint-Triathlon', date: '2027-06-06', priority: 'B' }, { id: 'g-10', type: 'run_10k', name: 'Stadtlauf 10 km', date: '2027-04-18', priority: 'C' }],
+      birthYear: 1990, sex: 'f', heightCm: 166, weightKg: 57, injuries: 'keine', medical: false,
+      sports: ['swim', 'bike', 'run', 'strength'], experienceYears: 6, weeklyHoursNow: 8, bests: { run10k: '0:44:00', swim400: '7:10' },
+      swimCrawl: 'yes', swimCrawlM: 1500, runContinuousMin: 100, bikeLongestMin: 180, bikes: ['road', 'trainer'], powerMeter: true,
+      teamYes: false,
+      dayLoad: ALL, timeOfDay: 'morning', weeklyHours: 10, maxDayHours: 3.5,
+      freq: { swim: [2, 3], bike: [2, 3], run: [3, 3], strength: [1, 1] }, notes: [], wantTests: false
+    }
+  },
+  {
+    id: 'langdistanz-profi', label: 'Langdistanz-Profi: Ironman in 10 Monaten, Mitteldistanz ohne Datum, 15 h pro Woche',
+    answers: {
+      goals: [{ id: 'g-im', type: 'tri_long', name: 'Ironman', date: '2027-08-29', priority: 'A', targetTime: '9:45:00' }, { id: 'g-70', type: 'tri_middle', name: 'Mitteldistanz', date: null, priority: 'B' }],
+      birthYear: 1990, sex: 'm', heightCm: 180, weightKg: 70, injuries: 'keine', medical: false,
+      sports: ['swim', 'bike', 'run', 'strength'], experienceYears: 12, weeklyHoursNow: 15, bests: { run10k: '0:35:30', swim400: '5:30' },
+      swimCrawl: 'yes', swimCrawlM: 4000, runContinuousMin: 180, bikeLongestMin: 360, bikes: ['road', 'tt', 'trainer'], powerMeter: true,
+      teamYes: false,
+      dayLoad: { 0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3 }, timeOfDay: 'morning', weeklyHours: 20, maxDayHours: 7,
+      freq: { swim: [3, 3], bike: [3, 4], run: [3, 4], strength: [1, 1] }, notes: [], wantTests: false
     }
   }
 ];

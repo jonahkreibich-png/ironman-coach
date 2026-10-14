@@ -37,3 +37,19 @@ test('Testfelder erscheinen nur beim Test (Radtest: Ø-Puls und Ø-Watt der 20 m
   await expect(page.locator('#sheetPanel [data-fields="bike"]')).toBeVisible();
   await expect(page.locator('#sheetPanel #fd-testHr')).toHaveCount(0);
 });
+
+test('Plan: Zeitleiste mit Phasen und Zielen, Platzhalter gekennzeichnet (Auftrag 9)', async ({ page }) => {
+  await seed(page, { extra: d => {
+    d.plan.meta.timeline = { from: '2026-10-19', to: '2029-09-16', segments: [
+      { phase: 'base', from: '2026-10-19', to: '2027-02-21', goalId: 's' }, { phase: 'build', from: '2027-02-22', to: '2027-05-09', goalId: 's' }, { phase: 'specific', from: '2027-05-10', to: '2027-06-06', goalId: 's' }, { phase: 'race', from: '2027-06-07', to: '2027-06-13', goalId: 's' },
+      { phase: 'base', from: '2027-06-14', to: '2029-05-31', goalId: 'A' }, { phase: 'taper', from: '2029-06-01', to: '2029-09-08', goalId: 'A' }, { phase: 'race', from: '2029-09-09', to: '2029-09-16', goalId: 'A' }],
+      goals: [{ id: 's', name: 'Sprint-Triathlon', date: '2027-06-13', priority: 'C', placeholder: true }, { id: 'A', name: 'Ironman', date: '2029-09-15', priority: 'A' }] };
+  } });
+  await open(page, '/?go=plan');
+  const tl = page.locator('[data-timeline]');
+  await expect(tl).toBeVisible();
+  await expect(tl.locator('.tl-seg')).toHaveCount(7);
+  await expect(tl).toContainText('Sprint-Triathlon');
+  await expect(tl).toContainText('Platzhalter');
+  await expect(tl.locator('[data-tl-now]')).toContainText(/Jetzt: /);
+});

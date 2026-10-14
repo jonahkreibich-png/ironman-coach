@@ -17,6 +17,7 @@ import { GOALS, mainGoal, type Goal, type GoalType } from '../goals';
 import { isMinor } from '../profile';
 import type { Op } from './ops';
 import { explainDay, explainWanted, limitIn } from './explain';
+import { parseSwimSkill, swimSkillUpdate } from '../swimskill';
 
 export interface Opt { label: string; say: string }
 export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
@@ -318,6 +319,13 @@ function verbOf(t: string[]): Verb | null {
 }
 function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Reply | null {
   const j = toks.join(' ');
+  // Schwimmen: „ich schaffe jetzt 100 m Kraul am Stück“ → eintragen und alle kommenden Schwimmeinheiten neu stufen
+  const sw = parseSwimSkill(raw);
+  if (sw) {
+    const u = swimSkillUpdate(ctx.profile, ctx.baseWeeks, ctx.state.adjustments || {}, ctx.today, sw, ctx.now, 'Coach-Chat');
+    if (!u) return { intent: 'swim-skill', text: `Das ist schon eingetragen: ${(ctx.profile.skills || {}).swimCrawlM || 0} m Kraul am Stück${(ctx.profile.skills || {}).swimPullM ? `, ${(ctx.profile.skills || {}).swimPullM} m mit Pull Buoy` : ''}. Deine Schwimmeinheiten passen schon dazu.` };
+    return apply('swim-skill', [{ op: 'swim-skill', skills: u.skills }, ...(u.adjustments.length ? [{ op: 'adjust', adj: u.adjustments } as Op] : [])], 'Super! ' + u.text);
+  }
   const illNow = C.illnessAt(ctx.state.illnessPeriods, ctx.today);
   // Gesund / krank
   if (has(toks, ['wieder gesund', 'wieder fit', 'symptomfrei', 'nicht mehr krank', 'bin gesund', 'geht wieder', 'gesund'])) {

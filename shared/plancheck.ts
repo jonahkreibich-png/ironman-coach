@@ -42,7 +42,8 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
       const cap = dayCap(profile, dow);
       if (own > cap + 5 && !list.some((s: any) => s.race)) out.push({ rule: 'dayTime', week: w.weekNumber, date: d.date, msg: `${d.date}: ${own} min geplant, angegeben sind höchstens ${cap} min.` });
       for (const s of list) {
-        if (!s.race && !s.replaces) count[s.sport as SportKey] = (count[s.sport as SportKey] || 0) + 1;
+        // Koppellauf gehört zur Radeinheit und zählt nicht als eigener Lauf
+        if (!s.race && !s.replaces && !/^(Koppellauf|Wechsel-Lauf)/.test(s.title || '')) count[s.sport as SportKey] = (count[s.sport as SportKey] || 0) + 1;
         // Können
         const spec: W.Spec | undefined = s.spec;
         if (s.sport === 'swim' && spec) {

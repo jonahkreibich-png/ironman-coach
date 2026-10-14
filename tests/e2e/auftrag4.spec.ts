@@ -63,7 +63,7 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
   await page.waitForURL(/go=plan|\/$/);
   await expect(tab(page, 'plan')).toBeVisible();
   await tab(page, 'plan').click();
-  await expect(page.locator('[data-week-head]')).toContainText(/Woche 1 von \d+ → Radmarathon 150 km/);
+  await expect(page.locator('[data-week-head]')).toContainText(/Woche 1 von \d+ · (Grundlage|Aufbau) → (Radmarathon 150 km|10 km)/);
   const plan = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_plan') || 'null'));
   const all = plan.weeks.slice(0, 4).flatMap((w: any) => w.days.flatMap((d: any) => d.sessions));
   expect(all.some((s: any) => s.sport === 'swim')).toBe(false);

@@ -620,6 +620,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     const v = stageVerdict(last.s, state.sessions[last.s.id], (state.activities || {})[(state.sessions[last.s.id] || {}).activityId]);
     let target = v.ok ? last.s.stage.n + 1 : last.s.stage.n;
     // Kraul-Check in den letzten 3 Wochen: die Stufe passt zur längsten Strecke am Stück (nie länger als das, was schon geht)
+    if (ladder === 'swim') { const skm = toNum(((state.profile || {}).skills || {}).swimCrawlM); const sn = skm ? (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: skm }) || { n: 99 }).n : 0; if (sn > target && sn < 99) target = sn; }
     if (ladder === 'swim') { const ck = lastCrawlCheck(state, weeks, date); if (ck) { const n = (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: ck.m }) || { n: target }).n; if (n > target) { target = n; v.why = `Kraul-Check: ${ck.m} m am Stück`; } } }
     nextSessions.filter(s => s.stage && s.stage.ladder === ladder && !s.cancelled && s.stage.n !== target).forEach(s => {
       const built = stageSession(s, target); if (!built) return;

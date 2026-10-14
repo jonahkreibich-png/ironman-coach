@@ -43,7 +43,7 @@ describe('Plan geht weiter (kein Neustart)', () => {
     expect(plan.weeks.slice(0, 5)).toEqual(oldPlan().weeks);
     expect(w6.weekNumber).toBe(6);
     expect(w6.label).toBe('Woche 6');
-    expect(w6.headline).toMatch(/^Woche 6 · Block 2, Woche 1 → Ironman/);
+    expect(w6.headline).toMatch(/^Woche 6 · Block 2, Woche 1 · Grundlage → /);
     expect(plan.meta.blockName).toMatch(/^Block 2/);
     expect(plan.meta.previousBlock).toBe('Block 1 · Grundlage');
   });
@@ -124,10 +124,12 @@ describe('Fragebogen bei vorhandenem Plan', () => {
     const own = w6.days.reduce((a: number, d: any) => a + d.sessions.filter((s: any) => ['swim', 'bike', 'run'].includes(s.sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
     expect(own).toBeGreaterThan(1.2 * 60 * 1.5);
   });
-  test('Ziele ohne Termin werden nicht als Wettkampf eingeplant, stehen aber als Weg in der Erklärung', () => {
+  test('Ziele ohne Termin bekommen einen Platzhalter-Termin (Auftrag 9), klar gekennzeichnet', () => {
     const races = C.planDays(r.gen!.plan.weeks).flatMap((d: any) => d.sessions.filter((s: any) => s.race));
-    expect(races).toEqual([]);
-    expect(r.gen!.plan.meta.explain.join(' ')).toMatch(/Dein Weg: Sprint-Triathlon → Ironman/);
+    expect(races.map((s: any) => s.title)).toEqual(['Sprint-Triathlon (Platzhalter)']);
+    expect(races[0].description).toMatch(/Platzhalter/);
+    expect(r.gen!.plan.meta.explain.join(' ')).toMatch(/Dein Weg: Sprint-Triathlon 13\.6\.27 \(Platzhalter\) → Ironman 15\.9\.29/);
+    expect(r.gen!.plan.meta.timeline.goals.find((g: any) => g.name === 'Sprint-Triathlon')).toMatchObject({ date: '2027-06-13', placeholder: true });
   });
   test('alle Test-Personen: zweiter Fragebogen setzt den ersten Plan fort', () => {
     for (const p of PERSONAS) {
@@ -172,7 +174,9 @@ describe('Bausteine', () => {
     const g = generatePlan({ profile, goals, today });
     expect(g.plan.weeks.length).toBe(26);
     expect(g.plan.meta.totalWeeks).toBeGreaterThan(150);
-    expect(g.plan.weeks.every((w: any) => w.phase === 'base')).toBe(true);
+    // Grundlage zuerst, bei sehr langem Weg Zwischenzyklen (Grundlage → Aufbau), keine endlose Grundlage
+    expect(g.plan.weeks.slice(0, 10).every((w: any) => w.phase === 'base')).toBe(true);
+    expect(g.plan.meta.timeline.segments.some((x: any) => x.phase === 'specific')).toBe(true);
     expect(C.planDays(g.plan.weeks).some((d: any) => d.sessions.some((s: any) => s.race))).toBe(false);
   });
 });

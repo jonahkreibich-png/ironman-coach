@@ -32,6 +32,9 @@ function data(state: State) {
     const msgs: any = {};
     for (let i = 0; i < 30; i++) msgs['m' + i] = { id: 'm' + i, at: Date.parse(TODAY + 'T06:00:00Z') - i * 3600e3, date: TODAY, kind: i % 3 ? 'answer' : 'adjust', from: i % 2 ? 'coach' : 'user', title: i % 2 ? 'Plan angepasst: ' + LONG : undefined, text: `${LONG} ${'Wort '.repeat(30)} https://example.com/${LONG}`, actions: i === 1 ? [{ label: 'Ja, ' + LONG, kind: 'say', payload: 'x' }] : [] };
     demo.coachMsgs = msgs;
+    // Auftrag 9: Zeitleiste mit vielen Phasen, langen Zielnamen und Platzhaltern
+    demo.plan.meta.timeline = { from: TODAY, to: '2029-09-16', segments: [['base', '2026-10-19', '2027-02-21', 's'], ['build', '2027-02-22', '2027-05-09', 's'], ['specific', '2027-05-10', '2027-06-06', 's'], ['race', '2027-06-07', '2027-06-13', 's'], ['build', '2027-06-14', '2027-08-15', 'o'], ['taper', '2027-08-16', '2027-08-22', 'o'], ['race', '2027-08-23', '2027-08-29', 'o'], ['base', '2027-08-30', '2029-08-31', 'A'], ['race', '2029-09-01', '2029-09-16', 'A']].map(([phase, from, to, goalId]) => ({ phase, from, to, goalId })),
+      goals: [{ id: 's', name: 'Sprint-Triathlon ' + LONG, date: '2027-06-13', priority: 'C', placeholder: true }, { id: 'o', name: 'Olympische Distanz am See mit sehr langem Namen', date: '2027-08-29', priority: 'B', placeholder: true }, { id: 'A', name: 'Langdistanz ' + LONG, date: '2029-09-15', priority: 'A' }] };
     // Auftrag 7: langer Plan (über 60 Wochen, wie nach dem Fragebogen mit Ziel in 3 Jahren). Daran ragte „Umfang pro Woche“ heraus.
     const ws = demo.plan.weeks; const last = ws[ws.length - 1];
     const add = (d: string, n: number) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };

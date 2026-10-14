@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '2.5.0', items: [
+    'Oben im Plan siehst du jetzt deine Zeitleiste: Phasen und Ziele bis zum Hauptziel. Ziele ohne Datum bekommen einen Platzhalter-Termin.',
+    'Der Plan arbeitet in Zyklen auf deine Zwischenziele hin: Grundlage, Aufbau, wettkampfspezifisch, Tapering, Wettkampf, Erholung.',
+    'Schwimmen: Trag nach jeder Einheit die längste Strecke Kraul am Stück ein (oder sag dem Coach „ich schaffe jetzt 100 m Kraul am Stück“). Alle kommenden Schwimmeinheiten passen sich an.'
+  ] },
   { version: '2.4.0', items: [
     'Unter jeder Woche im Plan steht jetzt der Umfang und die Steigerung zur letzten Aufbauwoche.',
     'Neue Tests: Radtest (20 min, drinnen oder draußen) und Schwimmtest (Kraul-Check). Die App übernimmt die Werte automatisch in Zonen, Watt und Technik-Stufe.',

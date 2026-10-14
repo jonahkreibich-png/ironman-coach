@@ -34,7 +34,7 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'min', label: 'Dauer', unit: 'min', kind: 'num' }, { key: 'meters', label: 'Distanz', unit: 'm', kind: 'num' },
     { key: 'pace100', label: 'Ø Pace Kraul', unit: '/100 m', kind: 'pace', ph: '2:30' }, { key: 'spl', label: 'Züge pro Bahn', kind: 'num' },
     { key: 'rate', label: 'Züge pro Minute', kind: 'num' }, { key: 'dps', label: 'Meter pro Zug', unit: 'm', kind: 'num' },
-    { key: 'longestCrawl', label: 'längste Strecke Kraul am Stück', unit: 'm', kind: 'num' }, { key: 'crawlShare', label: 'Anteil Kraul (Rest Brust)', unit: '%', kind: 'num' },
+    { key: 'longestCrawl', label: 'längste Strecke Kraul am Stück', unit: 'm', kind: 'num' }, { key: 'longestPull', label: 'längste Strecke mit Pull Buoy am Stück', unit: 'm', kind: 'num' }, { key: 'crawlShare', label: 'Anteil Kraul (Rest Brust)', unit: '%', kind: 'num' },
     { key: 'technique', label: 'Technik-Schwerpunkt oder -Problem', kind: 'text', ph: 'z. B. Atmung, Beine sinken ab' },
     { key: 'crawl25', label: 'Test: Ø Zeit pro 25 m Kraul', kind: 'pace', ph: '0:35', test: true }, { key: 'breast200', label: 'Test: 200 m Brust', unit: 'min', kind: 'pace', ph: '4:10', test: true },
     { key: 'css400', label: 'Test: 400 m Kraul', unit: 'min', kind: 'pace', ph: '8:30', test: true }, { key: 'css200', label: 'Test: 200 m Kraul', unit: 'min', kind: 'pace', ph: '4:05', test: true }
