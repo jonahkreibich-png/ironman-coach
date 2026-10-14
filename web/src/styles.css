@@ -404,3 +404,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .sees-list { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
 .sees-list li { overflow-wrap: anywhere; }
 .sees-list li.tone-bad b { color: var(--bad); } .sees-list li.tone-warn b { color: var(--warn); } .sees-list li.tone-good b { color: var(--good); }
+/* Zahlen und kurze Knöpfe nie mitten im Wort umbrechen (Auftrag 7: „0/10“, „Verlauf“) */
+.big { white-space: nowrap; }
+.row.nowrap > .btn { flex-shrink: 0; }
+.pill { flex-shrink: 0; max-width: 100%; }
+.rl-r .pill { white-space: nowrap; }

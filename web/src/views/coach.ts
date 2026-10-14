@@ -72,7 +72,7 @@ export function renderCoach(): string {
   const last = lastMsgId();
   const open = all.filter(m => isOpen(m)).sort((a, b) => b.at - a.at).slice(0, 3);
   let h = nowCard(open) + seesCard();
-  h += `<div class="spread" style="margin:var(--s3) 0"><span class="xs muted">${esc(ai.active ? t('coach.aiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
+  h += `<div class="spread" style="margin:var(--s3) 0;flex-wrap:wrap;gap:6px"><span class="xs muted" style="flex:1 1 160px">${esc(ai.active ? t('coach.aiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
   h += `<div class="feed">${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : empty(t('coach.empty'))}</div>`;
   const dlg = STATE.chatDialog || {};
   const quick = quickOptions(D().engine, dlg).slice(0, 5);

@@ -46,7 +46,15 @@ const keys = new Set(rows.map(r => r.kind + '\u0000' + r.key));
 const old = q('SELECT kind, key FROM records WHERE user_id = 1 AND deleted = 0').filter(r => !keys.has(r.kind + '\u0000' + r.key));
 let rev = base; const out = [];
 for (const r of old) out.push(`UPDATE records SET deleted = 1, data = NULL, updated_at = ${now}, rev = ${++rev} WHERE user_id = 1 AND kind = ${s(r.kind)} AND key = ${s(r.key)};`);
-for (const r of rows) out.push(`INSERT OR REPLACE INTO records (user_id, kind, key, data, updated_at, deleted, rev, src) VALUES (1, ${s(r.kind)}, ${s(r.key)}, ${s(r.data)}, ${s(r.updated_at)}, ${r.deleted ? 1 : 0}, ${++rev}, ${s(r.src)});`);
+// große Datensätze (z. B. ein langer Plan) in Stücken, D1 erlaubt höchstens 100 KB pro Anweisung
+out.push('CREATE TABLE IF NOT EXISTS tmp_copy (k INTEGER NOT NULL, i INTEGER NOT NULL, part TEXT NOT NULL);', 'DELETE FROM tmp_copy;');
+rows.forEach((r, n) => {
+  const data = r.data == null ? null : String(r.data);
+  if (data == null || data.length < 40000) { out.push(`INSERT OR REPLACE INTO records (user_id, kind, key, data, updated_at, deleted, rev, src) VALUES (1, ${s(r.kind)}, ${s(r.key)}, ${s(data)}, ${s(r.updated_at)}, ${r.deleted ? 1 : 0}, ${++rev}, ${s(r.src)});`); return; }
+  for (let i = 0, k = 0; i < data.length; i += 40000, k++) out.push(`INSERT INTO tmp_copy (k, i, part) VALUES (${n}, ${k}, ${s(data.slice(i, i + 40000))});`);
+  out.push(`INSERT OR REPLACE INTO records (user_id, kind, key, data, updated_at, deleted, rev, src) VALUES (1, ${s(r.kind)}, ${s(r.key)}, (SELECT group_concat(part, '') FROM (SELECT part FROM tmp_copy WHERE k = ${n} ORDER BY i)), ${s(r.updated_at)}, ${r.deleted ? 1 : 0}, ${++rev}, ${s(r.src)});`);
+});
+out.push('DROP TABLE tmp_copy;');
 out.push(`UPDATE meta SET v = '${rev}' WHERE k = 'rev';`);
 out.push(`INSERT INTO user_meta (user_id, k, v) VALUES (1, 'reset_at', '${now}') ON CONFLICT (user_id, k) DO UPDATE SET v = excluded.v;`);
 fs.writeFileSync('data-export/kopie-in-test.sql', out.join('\n') + '\n');

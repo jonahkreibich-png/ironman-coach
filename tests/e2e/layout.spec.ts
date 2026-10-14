@@ -80,6 +80,22 @@ async function overflow(page: Page): Promise<string[]> {
         const cr = card.getBoundingClientRect();
         if (r.bottom > cr.bottom + 2 || r.top < cr.top - 2 || r.right > cr.right + 2 || r.left < cr.left - 2) out.push(`${desc(el)} ragt aus seiner Karte (${Math.round(r.top)}..${Math.round(r.bottom)} statt ${Math.round(cr.top)}..${Math.round(cr.bottom)})`);
       }
+      // Auftrag 7: Wörter in Knöpfen, Chips, Pillen und großen Zahlen nicht mitten im Wort umbrechen („Ver-lau-f“, „0/ 10“)
+      if (el.matches('.btn, .chip, .pill, .big') && (el.textContent || '').trim()) {
+        // jedes Wort einzeln: liegt es auf zwei Zeilen, ist es mitten im Wort umgebrochen (Kunstwörter über 24 Zeichen dürfen das)
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let broken = false;
+        for (let n = walker.nextNode(); n && !broken; n = walker.nextNode()) {
+          const txt = n.textContent || '';
+          for (const m of txt.matchAll(/\S+/g)) {
+            if (m[0].length > 24) continue;
+            const r = document.createRange(); r.setStart(n, m.index!); r.setEnd(n, m.index! + m[0].length);
+            const tops = new Set(Array.from(r.getClientRects()).filter(x => x.width > 0).map(x => Math.round(x.top)));
+            if (tops.size > 1) { broken = true; break; }
+          }
+        }
+        if (broken) out.push(`${desc(el)} bricht mitten im Wort um`);
+      }
       // Text, der abgeschnitten wird, ohne „…“
       if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && el.scrollWidth > el.clientWidth + 2 && cs.textOverflow !== 'ellipsis' && el.children.length === 0 && (el.textContent || '').trim()) out.push(`${desc(el)} schneidet Text ab`);
     }

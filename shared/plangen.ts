@@ -544,7 +544,7 @@ export function generatePlan(inp: GenInput): GenResult {
       weekNumber: wn, label: 'Woche ' + wn, headline, ...blk, target: { goalId: A.id, name: A.name, weeks: nTotal, n: wi + 1 }, races,
       startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || undefined,
       phase: ph.phase, focus: ph.recovery ? 'Erholung: weniger Umfang, Körper verarbeitet das Training' : focusText(ph.phase, GOALS[A.type].group),
-      important: weekImportant(ph, otherRaces, wi, inp, runStage, swimStage), days
+      important: weekImportant(ph, otherRaces, wi, inp, runStage, swimStage, afterIllness), days
     });
   });
 
@@ -624,9 +624,9 @@ function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity) {
 function focusText(p: Phase, group: string): string {
   return ({ base: 'Grundlage: viel locker, Technik, Kraft', build: 'Aufbau: Intervalle dazu, lange Einheiten wachsen', specific: group === 'tri' ? 'Wettkampfnah: Koppeltraining und Renntempo' : 'Wettkampfnah: Renntempo üben', taper: 'Tapering: weniger Umfang, kurz und knackig', race: 'Wettkampfwoche: frisch werden' } as Record<Phase, string>)[p];
 }
-function weekImportant(ph: { phase: Phase; recovery: boolean }, races: any[], wi: number, inp: GenInput, runStage: number | null, swimStage: any): string {
+function weekImportant(ph: { phase: Phase; recovery: boolean }, races: any[], wi: number, inp: GenInput, runStage: number | null, swimStage: any, after = false): string {
   if (races.length) return races.map(r => r.priority === 'C' ? `${r.name} ist ein Trainingswettkampf: zügig, aber nicht am Limit.` : `${r.name}: die Tage davor ruhiger, danach 2-3 Tage locker.`).join(' ');
-  if (wi <= 1 && inp.needTests) return 'Die Tests diese Woche ersetzen die geschätzten Werte durch echte.';
+  if (wi <= 1 && inp.needTests) return wi === 0 && after ? 'Erste Woche nach der Krankheit: alles locker. Der Test am Ende der Woche bringt deine Zonen auf den neuen Stand.' : 'Der Test diese Woche bringt deine Zonen auf den neuen Stand.';
   if (ph.recovery) return 'Weniger ist diese Woche mehr: der Körper wird in der Pause stärker.';
   if (runStage != null || swimStage) return 'Die Lernstufen steigen erst, wenn die aktuelle Stufe klappt. Trag deine Einheiten ein oder lass sie von der Uhr übernehmen.';
   return ({ base: 'Viel locker, die harte Einheit kontrolliert.', build: 'Die harten Einheiten zählen: ausgeruht hingehen.', specific: 'Renntempo üben und gut erholen.', taper: 'Weniger Umfang, die Frische kommt.', race: 'Frisch bleiben, nichts Neues ausprobieren.' } as Record<Phase, string>)[ph.phase];
