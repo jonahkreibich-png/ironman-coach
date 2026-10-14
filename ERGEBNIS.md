@@ -234,3 +234,10 @@ Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) · [SPAETER.md](SPAETE
 - **Zonen:** Nach Tests und bei klaren Trends aus der Uhr bekommen alle kommenden Einheiten die neuen Vorgaben, der Coach zeigt ein Beispiel vorher/nachher.
 - **Zeitleiste** oben im Plan mit Phasen, Zielen und „Jetzt“.
 - Geprüft mit 10 Test-Personen (4 neu: Marathon-Anfänger, Rad-Event, Olympisch-Erfahrene, Langdistanz-Profi): 1033 Unit- und Server-Tests, 123 E2E-Tests inkl. Layout. Erst stamio-test mit deinen Daten, dann echte App (Sicherung `data-export/prod-vor-auftrag9.sql`). Version 2.5.0.
+
+## Auftrag 10: Wochenkopf und Feinschliff (14.10.)
+- **Fehler im Plan-Tab behoben:** Die rechte Spalte im Wochenkopf („3/11 · 6,8 h“) durfte schrumpfen und ihr Text lief aus der Karte. Jetzt schrumpft sie nie, die Steigerung steht klein in einer eigenen Zeile links („+9 % zur letzten Aufbauwoche“).
+- **Warum der Test es nicht fand:** Er prüfte nur die aktuelle Woche und nur Element-Kästen, nicht Text, der über seinen Kasten hinausläuft. Jetzt prüft er alle Wochen eines echten langen Plans (Einstieg, Tests, Erholung, Platzhalter, Zeitleiste) und überlaufenden Text. Dabei auch die Prognose-Zeitspanne im Fortschritt behoben.
+- **Abwechslung (für alle):** Rad Sweet Spot/Kraftausdauer → Schwelle/Over-Unders → VO2max bzw. Wettkampftempo je Ziel; Lauf Hügelsprints/Fahrtspiel → Schwelle → Wettkampftempo (bei dir im langen Lauf am Sonntag, weil Do zwischen Mi-Rad und Fr-Spiel liegt); lange Ausfahrt und Schwimmen mit wechselndem Schwerpunkt, kürzere Pausen = mehr Meter. Höchstens 3 gleiche Schlüsseleinheiten in Folge.
+- **Nach Wettkämpfen:** Sprint 3, Olympisch 5, Mittel 10, Lang 14 lockere Tage.
+- Geprüft mit allen 10 Test-Personen und dem festen Wochenaufbau: keine 4 gleichen Wochen in Folge, passende Intensität je Phase, keine harte Regel verletzt. 1091 Unit- und Server-Tests, 133 E2E-Tests. Erst stamio-test, dann echte App (Sicherung `data-export/prod-vor-auftrag10b.sql`). Version 2.6.0.
