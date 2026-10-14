@@ -5,7 +5,7 @@
 import { type Env, berlinDate, addDaysStr, putRecords, getRecords } from './store';
 import { HttpError, encryptJson, decryptJson, randomToken, sha256, readJson, b64url } from './http';
 import type { Auth } from './auth';
-import { ingest, type IngestStats } from './ingest';
+import { ingest, type IngestStats, type Protect } from './ingest';
 import { parseFit } from '../../shared/activity/fit';
 import { parseActivityFile } from '../../shared/activity/xml';
 import { upgradeLegacyPoint, bestAuto } from '../../shared/activity/merge';
@@ -42,6 +42,15 @@ async function saveConn(env: Env, uid: number, p: string, fields: Partial<Conn> 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, provider) DO UPDATE SET status = excluded.status, token_enc = excluded.token_enc, expires_at = excluded.expires_at,
     scope = excluded.scope, account = excluded.account, cursor = excluded.cursor, last_sync_at = excluded.last_sync_at, last_ok_at = excluded.last_ok_at, last_error = excluded.last_error, stats = excluded.stats`)
     .bind(uid, p, row.status, row.token_enc, row.expires_at, row.scope, row.account, row.cursor, row.last_sync_at, row.last_ok_at, row.last_error, row.stats, (cur && cur.created_at) || Date.now()).run();
+}
+
+/* Zeitpunkt des Verbindens: was davor war, ändert diese Quelle nicht (siehe ingest) */
+async function protectOf(env: Env, uid: number, p: string): Promise<Protect | null> {
+  const c = await getConn(env, uid, p);
+  if (!c) return null;
+  const st = c.stats ? JSON.parse(c.stats) : {};
+  const at = st.since || c.created_at;
+  return at ? { at, day: berlinDate(at) } : null;
 }
 
 /* ---------- OAuth ---------- */
@@ -95,7 +104,10 @@ export async function oauthCallback(env: Env, p: ProviderId, url: URL): Promise<
     const tok = await tokenRequest(env, p, params);
     let account = tok.account_id || tok.x_user_id || tok.userid || tok.user_id || null;
     if (p === 'polar') await polarRegister(env, tok, row.user_id);
-    await saveConn(env, row.user_id, p, { status: 'connected', token: tok, expires_at: tok.expires_in ? Date.now() + tok.expires_in * 1000 : null, account: account != null ? String(account) : null, last_error: null, scope: tok.scope || null });
+    const prev = await getConn(env, row.user_id, p);
+    const prevStats = prev && prev.stats ? JSON.parse(prev.stats) : {};
+    const since = prev && prev.status !== 'disconnected' && prevStats.since ? prevStats.since : Date.now();
+    await saveConn(env, row.user_id, p, { stats: JSON.stringify({ ...prevStats, since }), status: 'connected', token: tok, expires_at: tok.expires_in ? Date.now() + tok.expires_in * 1000 : null, account: account != null ? String(account) : null, last_error: null, scope: tok.scope || null });
     try { await syncProvider(env, row.user_id, p, { initial: true }); } catch (e) { /* erster Abruf darf scheitern, Status zeigt es */ }
     return back('verbunden=' + p);
   } catch (e) { return back('fehler=' + encodeURIComponent((e as Error).message)); }
@@ -155,7 +167,7 @@ async function syncOura(env: Env, uid: number, days: number): Promise<IngestStat
   for (const r of readiness) if (r.day && r.temperature_deviation != null) T(r.day).bodyTemp = Math.round(r.temperature_deviation * 100) / 100;
   for (const r of spo2) if (r.day && r.spo2_percentage && r.spo2_percentage.average) T(r.day).spo2 = r1(r.spo2_percentage.average);
   for (const r of daily) if (r.day && r.score) T(r.day).sleepQuality = Math.round(r.score / 10);
-  return ingest(env, uid, { source: 'oura', trend });
+  return ingest(env, uid, { source: 'oura', trend }, { protect: await protectOf(env, uid, 'oura') });
 }
 
 const WHOOP_SPORT: Record<string, string> = { running: 'run', cycling: 'bike', swimming: 'swim', 'weightlifting': 'strength', 'functional fitness': 'strength', soccer: 'football', walking: 'walk', 'spin': 'bike' };
@@ -187,7 +199,7 @@ async function syncWhoop(env: Env, uid: number, days: number): Promise<IngestSta
     if (r.score.spo2_percentage) t.spo2 = r1(r.score.spo2_percentage);
   }
   const raw: RawActivity[] = work.filter((w: any) => w.score_state === 'SCORED' && w.start && w.end).map((w: any) => simpleRaw(WHOOP_SPORT[String(w.sport_name || '').toLowerCase()] || 'other', Date.parse(w.start), (Date.parse(w.end) - Date.parse(w.start)) / 1000, w.score.distance_meter, w.score.average_heart_rate, w.score.max_heart_rate, w.score.altitude_gain_meter, w.score.kilojoule ? Math.round(w.score.kilojoule / 4.184) : null, 'api'));
-  return ingest(env, uid, { source: 'whoop', trend, raw });
+  return ingest(env, uid, { source: 'whoop', trend, raw }, { protect: await protectOf(env, uid, 'whoop') });
 }
 
 /* Aufzeichnung ohne Verlauf (nur Summen) */
@@ -221,7 +233,7 @@ async function syncPolar(env: Env, uid: number): Promise<IngestStats> {
   const sl = await api(env, uid, 'polar', `${B}/v3/users/sleep`).then(jsonOf).then(j => j.nights || []).catch(rethrowAuth([]));
   for (const s of sl) { const t = trend[s.date] = trend[s.date] || {}; const tot = (s.light_sleep || 0) + (s.deep_sleep || 0) + (s.rem_sleep || 0); if (tot) t.sleepHours = r1(tot / 3600); if (s.deep_sleep != null) t.deepSleep = Math.round(s.deep_sleep / 60); if (s.rem_sleep != null) t.remSleep = Math.round(s.rem_sleep / 60); if (s.sleep_score) t.sleepQuality = Math.round(s.sleep_score / 10); }
   await saveConn(env, uid, 'polar', { cursor: JSON.stringify([...seen].slice(-200)) });
-  return ingest(env, uid, { source: 'polar', trend, raw });
+  return ingest(env, uid, { source: 'polar', trend, raw }, { protect: await protectOf(env, uid, 'polar') });
 }
 
 async function syncWithings(env: Env, uid: number, days: number): Promise<IngestStats> {
@@ -244,7 +256,7 @@ async function syncWithings(env: Env, uid: number, days: number): Promise<Ingest
     if (x.sleep_latency != null) t.sleepLatency = Math.round(x.sleep_latency / 60);
     if (x.sleep_score) t.sleepQuality = Math.round(x.sleep_score / 10);
   }
-  return ingest(env, uid, { source: 'withings', trend, weights });
+  return ingest(env, uid, { source: 'withings', trend, weights }, { protect: await protectOf(env, uid, 'withings') });
 }
 
 /* Dropbox: neue .fit/.gpx/.tcx-Dateien im HealthFit-Ordner (über Cursor nur Neues) */
@@ -262,8 +274,9 @@ async function syncDropbox(env: Env, uid: number): Promise<IngestStats> {
     if (!res.has_more) break;
     res = await post('/2/files/list_folder/continue', { cursor: res.cursor });
   }
-  // Beim ersten Mal nur die letzten 6 Wochen übernehmen
-  const since = Date.now() - 42 * 86400000;
+  // Beim ersten Mal nur die letzten 6 Wochen ansehen, und nie Dateien von vor dem Verbinden (die Tage davor bleiben, wie sie waren)
+  const prot = await protectOf(env, uid, 'dropbox');
+  const since = Math.max(Date.now() - 42 * 86400000, prot ? prot.at - 6 * 3600000 : 0);
   const pick = files.filter(f => Date.parse(f.client_modified || f.server_modified || '') >= since).slice(-60);
   const raw: RawActivity[] = [];
   const errors: string[] = [];
@@ -273,7 +286,7 @@ async function syncDropbox(env: Env, uid: number): Promise<IngestStats> {
     try { raw.push(parseActivityFile(f.name, new Uint8Array(await r.arrayBuffer()), parseFit)); } catch (e) { errors.push(f.name); }
   }
   await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify({ ...meta, folder, lastFiles: pick.length, errors: errors.slice(0, 5) }) });
-  return ingest(env, uid, { source: 'healthfit', raw });
+  return ingest(env, uid, { source: 'healthfit', raw }, { protect: await protectOf(env, uid, 'dropbox') });
 }
 
 export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: { initial?: boolean } = {}): Promise<IngestStats> {

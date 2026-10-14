@@ -221,7 +221,7 @@ export function ingestActivity(ctx: IngestCtx, incoming: Activity): IngestResult
 function defaultTitle(a: Activity): string {
   return ({ run: 'Lauf', bike: 'Radfahrt', swim: 'Schwimmen', strength: 'Kraft', football: 'Teamsport', walk: 'Gehen', multi: 'Multisport', other: 'Training' } as any)[a.sport] || 'Training';
 }
-/* Werte einer Aufzeichnung in die Einheit schreiben. Felder, die von Hand geändert wurden (metricsManual), bleiben. */
+/* Werte einer Aufzeichnung in die Einheit schreiben. Felder, die von Hand eingetragen oder geändert wurden (metricsManual oder Quelle „von Hand“), bleiben. */
 export function applyToSession(st: any, a: Activity, metrics: Record<string, any>): any {
   const out = { completed: true, notes: '', ...st };
   out.completed = true; out.skipped = false;
@@ -230,7 +230,7 @@ export function applyToSession(st: any, a: Activity, metrics: Record<string, any
   const man = out.metricsManual || {};
   out.metrics = { ...(out.metrics || {}) };
   out.metricsSrc = { ...(out.metricsSrc || {}) };
-  for (const [k, v] of Object.entries(metrics)) if (!man[k]) { out.metrics[k] = v; out.metricsSrc[k] = a.source; }
+  for (const [k, v] of Object.entries(metrics)) if (!man[k] && out.metricsSrc[k] !== 'manual') { out.metrics[k] = v; out.metricsSrc[k] = a.source; }
   out.metricsAuto = metrics;
   return out;
 }
@@ -239,7 +239,7 @@ function applyToCustom(c: any, a: Activity, metrics: Record<string, any>): any {
   const man = out.metricsManual || {};
   out.metrics = { ...(out.metrics || {}) };
   out.metricsSrc = { ...(out.metricsSrc || {}) };
-  for (const [k, v] of Object.entries(metrics)) if (!man[k]) { out.metrics[k] = v; out.metricsSrc[k] = a.source; }
+  for (const [k, v] of Object.entries(metrics)) if (!man[k] && out.metricsSrc[k] !== 'manual') { out.metrics[k] = v; out.metricsSrc[k] = a.source; }
   out.metricsAuto = metrics;
   if (out.plannedMinutes == null && a.min != null) out.plannedMinutes = a.min;
   if (out.plannedKm == null && a.km != null) out.plannedKm = a.km;

@@ -35,7 +35,10 @@ async function setupUser(extra: any = {}) {
   ] }, A.token);
   return { env, token: A.token };
 }
-async function connectViaOAuth(env: any, token: string, p: string, tokenBody: any) {
+/* since: seit wann die Verbindung besteht. Standard: schon länger (erneutes Anmelden), damit die Daten der letzten Tage übernommen werden.
+   null = ganz neu verbinden (dann bleibt alles vor dem Verbinden, wie es war). */
+async function connectViaOAuth(env: any, token: string, p: string, tokenBody: any, since: number | null = Date.now() - 3 * 86400000) {
+  if (since != null) env.DB.db.prepare("INSERT INTO connections (user_id, provider, status, stats, created_at) VALUES (1, ?, 'reauth', ?, ?)").run(p, JSON.stringify({ since }), since);
   routes.push([new RegExp(p === 'oura' ? 'api.ouraring.com/oauth/token' : p === 'dropbox' ? 'api.dropboxapi.com/oauth2/token' : p === 'whoop' ? 'oauth2/token' : p === 'withings' ? 'wbsapi.withings.net/v2/oauth2' : 'polarremote.com'), () => tokenBody]);
   const s = await call(env, 'POST', `/api/connect/${p}/start`, {}, token);
   expect(s.status).toBe(200);
@@ -122,6 +125,48 @@ describe('Dropbox (HealthFit)', () => {
     expect(calls.some(c => c.endsWith('/list_folder/continue'))).toBe(true);
     const ch = await idx.fetch(new Request('https://app.test/api/hooks/dropbox?challenge=xyz'), env, {});
     expect(await ch.text()).toBe('xyz');
+  });
+});
+
+describe('Neue Verbindung ändert nichts Vergangenes', () => {
+  test('Oura und Dropbox neu verbinden: Tage davor bleiben wie sie waren, heute nur Lücken füllen, neue Einheiten kommen an, Werte von Hand bleiben', async () => {
+    const { env, token } = await setupUser();
+    const old = add(today, -10);
+    await call(env, 'POST', '/api/sync', { since: 0, changes: [
+      { kind: 'trend', key: old, data: { date: old, hrv: 70, restingHR: 50, _src: { hrv: 'intervals', restingHR: 'intervals' }, _auto: { hrv: { intervals: 70 }, restingHR: { intervals: 50 } }, _manual: {} }, updatedAt: 2 },
+      { kind: 'trend', key: today, data: { date: today, hrv: 65, _src: { hrv: 'intervals' }, _auto: { hrv: { intervals: 65 } }, _manual: {} }, updatedAt: 2 },
+      { kind: 'session', key: 'run-1', data: { completed: true, metrics: { min: '50', hr: '150', pace: '5:40' }, metricsSrc: { min: 'intervals', hr: 'intervals', pace: 'manual' } }, updatedAt: 2 }
+    ] }, token);
+    const before = Object.fromEntries((await records(env, token)).map((r: any) => [r.kind + '|' + r.key, JSON.stringify(r.data)]));
+    // Oura liefert die letzten 4 Wochen, Dropbox eine alte Datei von gestern
+    routes.push([/usercollection\/sleep/, () => ({ data: [old, yday, today].map(day => ({ day, type: 'long_sleep', total_sleep_duration: 28800, average_hrv: 40, lowest_heart_rate: 60 })) })]);
+    routes.push([/usercollection/, () => ({ data: [] })]);
+    await connectViaOAuth(env, token, 'oura', { access_token: 'AT', expires_in: 86400 }, null);
+    const yFit = intervalFit(`${yday}T16:00:00Z`, 'run', { warm: 300, reps: [{ sec: 120, speed: 4, hr: 170, restSec: 60, restHr: 130 }], cool: 300, easySpeed: 3, easyHr: 140 });
+    routes.push([/files\/list_folder$/, () => ({ entries: [{ '.tag': 'file', name: 'Lauf.fit', path_lower: '/apps/healthfit/lauf.fit', client_modified: `${yday}T17:00:00Z` }], cursor: 'C1', has_more: false })]);
+    routes.push([/files\/download/, () => new Response(yFit)]);
+    await connectViaOAuth(env, token, 'dropbox', { access_token: 'DT', expires_in: 14400, account_id: 'dbid:B' }, null);
+    let recs = await records(env, token);
+    const after = Object.fromEntries(recs.map((r: any) => [r.kind + '|' + r.key, r.data]));
+    for (const k of [`trend|${old}`, `trend|${yday}`, 'session|run-1', 'session|swim-1']) expect(JSON.stringify(after[k])).toBe(before[k]);
+    expect(recs.some((r: any) => r.kind === 'activity')).toBe(false);
+    expect(calls.some(c => c.endsWith('/files/download'))).toBe(false);
+    // heute: vorhandener Wert bleibt, leere Werte werden gefüllt
+    expect(after[`trend|${today}`]).toMatchObject({ hrv: 65, restingHR: 60, sleepHours: 8 });
+    // nach dem Verbinden: neue Einheit kommt an
+    const now = Date.now();
+    env.DB.db.prepare("UPDATE connections SET stats = ?, cursor = NULL WHERE provider = 'dropbox'").run(JSON.stringify({ since: now - 2 * 3600000 }));
+    const tFit = intervalFit(new Date(now - 3600000).toISOString(), 'run', { warm: 300, reps: [{ sec: 120, speed: 4, hr: 170, restSec: 60, restHr: 130 }], cool: 300, easySpeed: 3, easyHr: 140 });
+    routes.unshift([/files\/list_folder$/, () => ({ entries: [{ '.tag': 'file', name: 'Neu.fit', path_lower: '/apps/healthfit/neu.fit', client_modified: new Date(now).toISOString() }], cursor: 'C2', has_more: false })]);
+    routes.unshift([/files\/download/, () => new Response(tFit)]);
+    expect((await call(env, 'POST', '/api/connect/dropbox/sync', {}, token)).status).toBe(200);
+    recs = await records(env, token);
+    expect(recs.filter((r: any) => r.kind === 'activity').length).toBe(1);
+  });
+  test('Einheit mit Werten von Hand: neue Aufzeichnung überschreibt sie nicht', async () => {
+    const { applyToSession } = await import('../../shared/activity/merge');
+    const st = applyToSession({ completed: true, metrics: { pace: '5:40', hr: '150' }, metricsSrc: { pace: 'manual', hr: 'intervals' } }, { id: 'a', source: 'healthfit', sources: ['healthfit'] } as any, { pace: '5:20', hr: '155' });
+    expect(st.metrics).toMatchObject({ pace: '5:40', hr: '155' });
   });
 });
 
