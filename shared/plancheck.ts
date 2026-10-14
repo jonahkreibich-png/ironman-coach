@@ -79,7 +79,7 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
       // Kraft nicht direkt vor harten Tagen
       if (list.some((s: any) => s.sport === 'strength')) {
         const next = (w.days || []).find((x: any) => x.date === addDays(d.date, 1)) || (weeks[wi + 1] && weeks[wi + 1].days[0].date === addDays(d.date, 1) ? weeks[wi + 1].days[0] : null);
-        if (next && next.sessions.some((s: any) => s && !s.cancelled && (s.race || /spiel/i.test(s.title || '') || isIntense(s)))) out.push({ rule: 'strength', week: w.weekNumber, date: d.date, msg: `${d.date}: Kraft direkt vor einem harten Tag.` });
+        if (next && next.sessions.some((s: any) => s && !s.cancelled && (s.race || (s.sport === 'football' && /spiel/i.test(s.title || '')) || isIntense(s)))) out.push({ rule: 'strength', week: w.weekNumber, date: d.date, msg: `${d.date}: Kraft direkt vor einem harten Tag.` });
       }
     }
     // Häufigkeit je Sportart

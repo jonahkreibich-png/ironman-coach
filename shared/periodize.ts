@@ -55,6 +55,10 @@ export function placeholders(goals: Goal[], A: Goal | null, today: string, fitne
   return out;
 }
 
+/* Lockere Tage nach einem Wettkampf je Distanz */
+export function easyAfterDays(t: GoalType): number {
+  return ({ tri_supersprint: 3, tri_sprint: 3, aquathlon: 3, run_5k: 3, swim_goal: 2, tri_olympic: 5, duathlon: 5, run_10k: 4, run_half: 5, bike_event: 5, tri_middle: 10, run_marathon: 14, tri_long: 14, fitness: 2 } as Record<GoalType, number>)[t] ?? 3;
+}
 /* Wochen je Phase vor einem Ziel (ideal); bei wenig Zeit wird anteilig gekürzt */
 const SPEC_W: Partial<Record<GoalType, number>> = { run_5k: 3, run_10k: 4, run_half: 6, run_marathon: 8, tri_supersprint: 3, tri_sprint: 4, tri_olympic: 6, tri_middle: 8, tri_long: 10, duathlon: 4, aquathlon: 3, bike_event: 6, swim_goal: 3, fitness: 0 };
 const BUILD_W: Partial<Record<GoalType, number>> = { run_5k: 4, run_10k: 5, run_half: 6, run_marathon: 8, tri_supersprint: 4, tri_sprint: 5, tri_olympic: 6, tri_middle: 8, tri_long: 10, duathlon: 5, aquathlon: 4, bike_event: 6, swim_goal: 4, fitness: 0 };
@@ -101,7 +105,9 @@ export function macroPhases(start: string, nTotal: number, anchors: Anchor[], re
     });
     s = e + 1;
     // nach einem B-Wettkampf: 1 Woche Erholung, dann der nächste Zyklus
-    if (a.priority === 'B' && s < nTotal) { const nx = list.find(x => x.date > a.date) || a; out.push({ phase: 'base', recovery: true, goalId: nx.id, goalType: nx.type, goalName: nx.name, priority: nx.priority, afterRace: true }); s++; since = 0; }
+    // nach dem Wettkampf locker: B mindestens 1 Woche, nach Mittel-/Langdistanz und Marathon 1-2 Wochen (auch nach C)
+    const recW = a.priority === 'A' ? 0 : Math.max(a.priority === 'B' ? 1 : 0, Math.round(easyAfterDays(a.type) / 7));
+    for (let k = 0; k < recW && s < nTotal; k++) { const nx = list.find(x => x.date > a.date) || a; out.push({ phase: 'base', recovery: true, goalId: nx.id, goalType: nx.type, goalName: nx.name, priority: nx.priority, afterRace: true }); s++; since = 0; }
   }
   // nach dem letzten Ziel (falls die Wochen weiterlaufen): Grundlage
   const last = list[list.length - 1];
@@ -132,7 +138,7 @@ export interface Caps { run: number; bike: number; swim: number; why: string[] }
 /* Zwischenziel auf dem Weg zu einem größeren A-Ziel: die langen Einheiten dürfen bis zur „mittleren“ Distanz der Sportart wachsen
    (Triathlon: Olympisch, Laufen: Halbmarathon), nie über die Grenzen des A-Ziels */
 const LIFT: Record<string, GoalType> = { tri: 'tri_olympic', run: 'run_half', other: 'tri_olympic' };
-export function capsFor(goal: GoalType, date: string, o: { age?: number | null; indoor?: boolean; runEasySecKm?: number | null; swimLearning?: boolean; bikeKm?: number | null; aGoal?: GoalType | null } = {}): Caps {
+export function capsFor(goal: GoalType, date: string, o: { age?: number | null; indoor?: boolean; runEasySecKm?: number | null; swimLearning?: boolean; bikeKm?: number | null; aGoal?: GoalType | null; phase?: MPhase } = {}): Caps {
   const why: string[] = [];
   let run = RUN_CAP[goal] ?? 80, bike = BIKE_CAP[goal] ?? 150;
   if (o.aGoal && DIST_RANK[o.aGoal] > DIST_RANK[goal]) {
@@ -146,6 +152,8 @@ export function capsFor(goal: GoalType, date: string, o: { age?: number | null; 
   if ([11, 12, 1, 2].includes(month)) { const w = o.indoor ? 120 : 150; if (bike > w) { bike = w; why.push(o.indoor ? 'Winter drinnen: höchstens 2 h' : 'Winter: höchstens 2:30 h'); } }
   else if (o.indoor && bike > 150) { bike = 150; why.push('drinnen höchstens 2:30 h'); }
   if (o.age != null && o.age < 18) { if (run > 120) { run = 120; why.push('unter 18: langer Lauf höchstens 2 h'); } if (bike > 240) { bike = 240; why.push('unter 18: Rad höchstens 4 h'); } }
-  const swim = o.swimLearning ? 55 : SWIM_CAP[goal] ?? 60;
+  // Schwimmen wächst mit der Phase: Grundlage 70 %, Aufbau 85 %, spezifisch 100 % der Obergrenze (mindestens 45 min)
+  const pf = o.phase ? ({ base: 0.7, build: 0.85, specific: 1, taper: 0.7, race: 0.5 } as Record<MPhase, number>)[o.phase] : 1;
+  const swim = o.swimLearning ? 55 : Math.max(45, Math.round((SWIM_CAP[goal] ?? 60) * pf / 5) * 5);
   return { run, bike, swim, why };
 }

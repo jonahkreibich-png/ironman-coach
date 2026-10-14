@@ -96,18 +96,21 @@ describe('Aufbau einer normalen Woche', () => {
     expect(titles(W('2026-11-02'), 3)[0]).toMatch(/^Sweet Spot 3×8/);
     expect(titles(W('2026-11-09'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
     expect(titles(W('2026-11-16'), 3)[0]).toMatch(/^Sweet Spot 3×12/);
-    expect(titles(W('2026-11-23'), 3)[0]).toMatch(/^Sweet Spot 2×20/);
+    // Abwechslung: nach zwei Sweet-Spot-Wochen Kraftausdauer, dann Sweet Spot weiter (2×20)
+    expect(titles(W('2026-11-23'), 3)[0]).toMatch(/^Rad Kraftausdauer/);
+    expect(titles(W('2026-11-30'), 3)[0]).toMatch(/^Sweet Spot 2×20/);
     for (const w of future.slice(0, 12)) expect(day(w, 3).sessions.find((s: any) => s.sport === 'bike').plannedMinutes).toBeLessThanOrEqual(90);
   });
   test('Do Lauf 40-50 min Zone 2, ab Woche 8 mit 4-6 Steigerungsläufen', () => {
     for (const w of future.slice(0, 12)) {
       const run = day(w, 4).sessions.find((s: any) => s.sport === 'run');
-      expect(run.zone).toBe('Zone 2');
+      // Grundlage: im Wechsel Hügelsprints, Fahrtspiel, Steigerungen (locker, höchstens kurz Zone 3)
+      expect(['Zone 2', 'Zone 3']).toContain(run.zone); expect(run.hard).toBeFalsy();
       if (!w.isRecoveryWeek) { expect(run.plannedMinutes).toBeGreaterThanOrEqual(40); expect(run.plannedMinutes).toBeLessThanOrEqual(50); }
     }
     expect(day(W('2026-10-19'), 4).sessions[0].description).not.toMatch(/Steigerungsläufe/);
-    expect(day(W('2026-11-02'), 4).sessions[0].description).toMatch(/4 Steigerungsläufe/);
-    expect(day(W('2026-11-16'), 4).sessions[0].description).toMatch(/6 Steigerungsläufe/);
+    expect(day(W('2026-11-02'), 4).sessions[0].description).toMatch(/Steigerungsläufe|Hügelsprints|zügig/);
+    expect(day(W('2026-11-16'), 4).sessions[0].description).toMatch(/Steigerungsläufe|Hügelsprints|zügig/);
   });
   test('Sa Koppellauf 10-15 min ab Woche 10, nur wenn gut erholt, nicht in Erholungswochen', () => {
     const brick = (w: any) => day(w, 6).sessions.find((s: any) => /Koppellauf/.test(s.title));

@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '2.6.0', items: [
+    'Mehr Abwechslung: Die Schlüsseleinheiten steigern sich (Sweet Spot, Kraftausdauer, Schwelle, Over-Unders, VO2max), die lange Ausfahrt und das Schwimmen haben jede Woche einen anderen Schwerpunkt.',
+    'Laufen mit Qualität: in der Grundlage Hügelsprints und Fahrtspiel, im Aufbau Schwelle, vor dem Wettkampf Wettkampftempo.',
+    'Nach jedem Wettkampf erst ein paar lockere Tage, je nach Distanz. Im Plan ragt der Wochenkopf nicht mehr heraus.'
+  ] },
   { version: '2.5.0', items: [
     'Oben im Plan siehst du jetzt deine Zeitleiste: Phasen und Ziele bis zum Hauptziel. Ziele ohne Datum bekommen einen Platzhalter-Termin.',
     'Der Plan arbeitet in Zyklen auf deine Zwischenziele hin: Grundlage, Aufbau, wettkampfspezifisch, Tapering, Wettkampf, Erholung.',

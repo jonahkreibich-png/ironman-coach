@@ -120,7 +120,7 @@ export const PERSONAS: { id: string; label: string; answers: Record<string, any>
       sports: ['swim', 'bike', 'run', 'strength'], experienceYears: 12, weeklyHoursNow: 15, bests: { run10k: '0:35:30', swim400: '5:30' },
       swimCrawl: 'yes', swimCrawlM: 4000, runContinuousMin: 180, bikeLongestMin: 360, bikes: ['road', 'tt', 'trainer'], powerMeter: true,
       teamYes: false,
-      dayLoad: { 0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3 }, timeOfDay: 'morning', weeklyHours: 20, maxDayHours: 7,
+      dayLoad: { 0: 3, 1: 3, 2: 3, 3: 3, 4: 3, 5: 3, 6: 3 }, timeOfDay: 'morning', weeklyHours: 20, maxDayHours: 7,
       freq: { swim: [3, 3], bike: [3, 4], run: [3, 4], strength: [1, 1] }, notes: [], wantTests: false
     }
   }

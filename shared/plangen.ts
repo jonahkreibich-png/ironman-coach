@@ -18,7 +18,8 @@ import { tipFor } from './considerations';
 import { rulesOf, effectsOf, evaluate, allowedHard, dayLimit, prefers, describe as ruleText, daysText, SPORT_NAME, type Rule, type Effects, type RuleSport } from './constraints';
 import { parseFor } from './ruleparse';
 import * as WP from './weekpattern';
-import { placeholders, macroPhases, timelineOf, capsFor, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
+import * as K from './keysessions';
+import { placeholders, macroPhases, timelineOf, capsFor, easyAfterDays, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
 
 export type Phase = 'base' | 'build' | 'specific' | 'taper' | 'race';
 export interface GenInput {
@@ -243,7 +244,7 @@ export function generatePlan(inp: GenInput): GenResult {
   const wantStrength = profile.sports.includes('strength') || freqOf(profile, 'strength')[0] > 0;
   if (wantStrength && !sports.includes('strength')) sports.push('strength');
   if (!wantStrength) sports = sports.filter(s => s !== 'strength');
-  const runAllowed = (inp.runIntervalsAllowed ?? !minor) && !eff.runEasyOnly;
+  const runAllowed = (inp.runIntervalsAllowed ?? true) && !eff.runEasyOnly;
   const pc = (indoor: boolean, name: string | null) => paceCtx(profile, indoor, name, today);
   const ts = profile.teamSport || null;
   // Lernstufen
@@ -318,6 +319,8 @@ export function generatePlan(inp: GenInput): GenResult {
   const idp = 'g' + today.replace(/-/g, '').slice(2) + 'w';
   let prevSundayHard = false, prevSundayStrength = false;
   let lastLR: number | null = cont && cont.lastLongRun ? cont.lastLongRun : null;
+  const gq: { bikeN: Record<string, number>; runQN: Record<string, number> } = { bikeN: {}, runQN: {} };
+  const blockWeekOf = (wi: number) => { let k = 0; for (let i = wi - 1; i >= 0 && !phases[i].recovery; i--) k++; return k; };
   // Fester Wochenaufbau: Stand der langen Einheiten, der Sweet-Spot-Leiter und des letzten Tests
   const weeksSince = (from: string | undefined) => from && from < start ? Math.floor(daysBetween(from, start) / 7) : 0;
   const keySlot = pat ? pat.slots.find(x => x.role === 'key' && x.keyFrom) : null;
@@ -345,7 +348,7 @@ export function generatePlan(inp: GenInput): GenResult {
       for (const g of allGoals) {
         const d = daysBetween(g.date!, date); // >0: nach dem Rennen
         if (g.priority !== 'C' && d < 0 && d >= -(g.priority === 'A' ? 3 : 4)) { noHard = true; cap = Math.round(cap * 0.7); }
-        if (g.priority !== 'C' && d > 0 && d <= (g.priority === 'A' ? 4 : 3)) { noHard = true; cap = Math.min(cap, 45); }
+        if (d > 0 && d <= easyAfterDays(g.type)) { noHard = true; cap = Math.min(cap, d <= 2 ? 45 : 60); }
         if (g.priority === 'C' && d === -1) noHard = true;
       }
       return { i, date, dow, cap, used: 0, items: [] as Cand[], team: tsOn && ts!.trainingDays.includes(dow), game: tsOn && ts!.gameDays.includes(dow), race: raceOn[date] || null, noHard,
@@ -385,9 +388,13 @@ export function generatePlan(inp: GenInput): GenResult {
       if (!tg && inp.needTests && wi <= 1) { if (wi === 0 && inp.needTests.run) tests.add('run'); if (wi === 0 && inp.needTests.swim) tests.add('swim'); if (wi === 1 && inp.needTests.bike) tests.add('bike'); }
       const cOut = bikeChoice(profile, false, month, eff), cIn = bikeChoice(profile, true, month, eff);
       const sgP = segGoal(wi);
+      // lockere Tage nach einem Wettkampf (Sprint 3, Olympisch 5, Mittel 10, Lang/Marathon 14 Tage)
+      const easyDates = dates.filter(d => goals.some(g => g.date && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type)));
       const items = WP.patternWeek(pat, { mon, dates, recovery: ph.recovery, entry: entryWeek[wi], ownMin: ownVols[wi], target: tg, tests, phase: ph.phase,
+        goalType: sgP.goalType, minor: (ageOf(profile, mon) ?? 30) < 18, easyDates,
+        hardDows: slots.filter(x => x.game || x.race).map(x => x.dow),
         caps: { run: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), runEasySecKm: profile.thresholds.thresholdPaceRunSec ? profile.thresholds.thresholdPaceRunSec * 1.2 : null, swimLearning: !!swimStage }).run,
-          bikeOut: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor: cOut0.indoor }).bike, swim: capsFor(sgP.goalType, mon, { swimLearning: !!swimStage }).swim },
+          bikeOut: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor: cOut0.indoor }).bike, swim: capsFor(sgP.goalType, mon, { swimLearning: !!swimStage, phase: ph.phase as any }).swim },
         run: pc(false, null), bikeOut: pc(cOut.indoor, cOut.name), bikeIn: pc(cIn.indoor, cIn.name), swim: pc(false, null), swimStage: swimStage as any, inc: 1 + prog.incPct / 100,
         crawl400: !swimStage || ((profile.skills || {}).swimCrawlM || 0) >= 400, strength: { knee: eff.strengthKnee, back: eff.strengthBack, shoulder: eff.strengthShoulder }, goalName: A.name }, pst);
       for (const it of items) {
@@ -412,11 +419,13 @@ export function generatePlan(inp: GenInput): GenResult {
     // 2) Einheiten der Woche erzeugen
     const share = weekShare(allGoals, mon, sports);
     const hardOk = !ph.recovery && ph.phase !== 'race';
-    let hardLeft = ph.recovery || ph.phase === 'race' ? 0 : ph.phase === 'base' ? 1 : ph.phase === 'taper' ? 1 : 2;
+    // harte Einheiten pro Woche: Grundlage 1 (Rad), Aufbau/spezifisch 3 (Rad, Lauf, Schwimmen; unter 18: 2), Tapering 1
+    let hardLeft = ph.recovery || ph.phase === 'race' ? 0 : ph.phase === 'base' ? 1 : ph.phase === 'taper' ? 1 : 3;
     if (minor) hardLeft = Math.min(hardLeft, 2);
     // erste Woche nach einer Krankheit: nichts Hartes (ein Test am Ende der Woche ist die Ausnahme)
     if (wi === 0 && afterIllness) hardLeft = 0;
-    hardLeft -= slots.filter(sl => sl.game || (sl.race && sl.race.priority === 'C')).length; // Spiel und C-Rennen zählen als harte Einheit
+    // Spiel und C-Rennen zählen in Grundlage und Tapering als harte Einheit; im Aufbau/spezifisch ist das Kontingent für Intervall-Einheiten (Abstand gilt trotzdem)
+    if (ph.phase === 'base' || ph.phase === 'taper') hardLeft -= slots.filter(sl => sl.game || (sl.race && sl.race.priority === 'C')).length;
     const target = A;
     const whyBase = (sport: string, kind: string) => {
       const goalName = target.name;
@@ -431,7 +440,7 @@ export function generatePlan(inp: GenInput): GenResult {
     // Obergrenzen der langen Einheiten: Distanz des Ziels dieses Zyklus, Jahreszeit (drinnen/draußen), Alter (Auftrag 9)
     const sg = segGoal(wi);
     const sgGoal = goals.find(g => g.id === sg.goalId);
-    const capsW = (indoor: boolean) => capsFor(sg.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor, runEasySecKm: profile.thresholds.thresholdPaceRunSec ? profile.thresholds.thresholdPaceRunSec * 1.2 : null, swimLearning: !!swimStage,
+    const capsW = (indoor: boolean) => capsFor(sg.goalType, mon, { aGoal: A.type, phase: ph.phase as any, age: ageOf(profile, mon), indoor, runEasySecKm: profile.thresholds.thresholdPaceRunSec ? profile.thresholds.thresholdPaceRunSec * 1.2 : null, swimLearning: !!swimStage,
       bikeKm: sgGoal && sg.goalType === 'bike_event' ? (legsOf(sgGoal).find(l => l.sport === 'bike') || { km: 0 }).km : null });
     const tip = (sport: string) => tipFor(sport, rules) || (age != null && age >= 50 ? 'Länger aufwärmen, Gelenke freuen sich.' : undefined);
     const add = (spec: W.Spec, o: Partial<Cand> = {}) => {
@@ -442,7 +451,8 @@ export function generatePlan(inp: GenInput): GenResult {
       cands.push({ s, hard: !!s.hard, prio: s.sport === 'swim' || s.stage ? 3 : 5, ...o });
     };
     const swimBlocked = !!eff.noSwim || !!(eff.noSwimMonths && eff.noSwimMonths.includes(month)) || !slots.some(sl => sl.pool && sl.cap > 0);
-    for (const sport of sports) {
+    // Reihenfolge der Schlüsseleinheiten: Rad, Lauf, dann Schwimmen
+    for (const sport of [...sports].sort((a, b) => ['bike', 'run', 'swim', 'strength'].indexOf(a) - ['bike', 'run', 'swim', 'strength'].indexOf(b))) {
       if (sport === 'strength') continue;
       const [fmin, fmax] = freqOf(profile, sport);
       let mins = endurance * (share[sport] || 0) * (sport === 'run' && eff.runVolume ? eff.runVolume : 1) * (sport === 'swim' && eff.swimVolume ? eff.swimVolume : 1);
@@ -472,31 +482,37 @@ export function generatePlan(inp: GenInput): GenResult {
         let rest = mins; let left = n;
         // langer Lauf höchstens +10 min pro Woche
         if (n >= 2 && ph.phase !== 'race') { const L = Math.max(30, Math.min(longCap, lastLR != null ? lastLR + 10 : 999, rest * (n === 2 ? 0.55 : 0.4))); add(W.runLong(ctx, L), { long: true, prio: 1 }); rest -= L; left--; }
-        if (hardOk && hardLeft > 0 && runAllowed && left >= 1 && ph.phase !== 'base' && n >= 2) {
-          const spec = keyRun(ctx, target.type, ph.phase, wi); add(spec, { hard: true, prio: 2, easy: W.runEasy(ctx, Math.min(60, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--;
+        // Qualitätslauf: Aufbau Schwelle, spezifisch Wettkampftempo je Ziel-Distanz (unter 18 nie Zone 5)
+        const rq = hardOk && hardLeft > 0 && runAllowed && left >= 1 && n >= 2 ? K.runQualityStep(ph.phase, sg.goalType, gq.runQN[ph.phase] || 0, (ageOf(profile, mon) ?? 30) < 18) : null;
+        if (rq) {
+          const spec = K.runQuality(ctx, rq); add(spec, { hard: true, prio: 2, easy: W.runEasy(ctx, Math.min(60, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--; gq.runQN[ph.phase] = (gq.runQN[ph.phase] || 0) + 1;
         }
-        for (let k = 0; k < left; k++) { const m = Math.max(25, Math.min(cap ?? 60, 60, rest / Math.max(1, left - k))); add(W.runEasy(ctx, m, { strides: ph.phase === 'base' && k === 0 && !eff.runEasyOnly })); rest -= m; }
+        // Grundlage: ein lockerer Lauf mit Hügelsprints, Fahrtspiel oder Steigerungen (im Wechsel)
+        for (let k = 0; k < left; k++) { const m = Math.max(25, Math.min(cap ?? 60, 60, rest / Math.max(1, left - k))); add(ph.phase === 'base' && k === 0 && !eff.runEasyOnly && !ph.recovery ? K.runBaseVariant(ctx, m, wi) : W.runEasy(ctx, m, { strides: ph.phase === 'base' && k === 0 && !eff.runEasyOnly })); rest -= m; }
       }
       if (sport === 'bike') {
         const cap = abilityCap(profile, 'bike', wi);
         let rest = mins; let left = n;
-        if (n >= 1 && ph.phase !== 'race') { const c = bikeChoice(profile, false, month, eff); const longCap = Math.min(capsW(c.indoor).bike, cap ?? 999, ph.phase === 'taper' ? 75 : 999); const L = Math.max(45, Math.min(longCap, rest * (n === 1 ? 1 : 0.5))); add(W.bikeLong(pc(c.indoor, c.name), L), { long: true, prio: 1 }); rest -= L; left--; }
+        if (n >= 1 && ph.phase !== 'race') { const c = bikeChoice(profile, false, month, eff); const longCap = Math.min(capsW(c.indoor).bike, cap ?? 999, ph.phase === 'taper' ? 75 : 999); const L = Math.max(45, Math.min(longCap, rest * (n === 1 ? 1 : 0.5))); add(K.bikeLongVariant(W.bikeLong(pc(c.indoor, c.name), L), wi, ph.phase), { long: true, prio: 1 }); rest -= L; left--; }
         if (hardOk && hardLeft > 0 && left >= 1) {
           const c = bikeChoice(profile, true, month, eff);
-          const step = [[3, 8], [3, 10], [3, 12], [2, 15], [2, 20]][Math.min(4, Math.floor(wi / 3))];
-          const spec = ph.phase === 'base' ? W.bikeIntervals(pc(c.indoor, c.name), step[0], step[1], 3, 5) : W.bikeIntervals(pc(c.indoor, c.name), step[0], step[1], 4, 5);
+          // Fortschritt je Phase: Sweet Spot/Kraftausdauer → Schwelle/Over-Unders → je Ziel VO2max, Schwelle, Wettkampftempo
+          const spec = K.bikeKey(pc(c.indoor, c.name), ph.phase, sg.goalType, gq.bikeN[ph.phase] || 0);
+          gq.bikeN[ph.phase] = (gq.bikeN[ph.phase] || 0) + 1;
           add(spec, { hard: true, prio: 2, easy: W.bikeEasy(pc(c.indoor, c.name), Math.min(90, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--;
         }
         for (let k = 0; k < left; k++) { const c = bikeChoice(profile, false, month, eff); const m = Math.max(30, Math.min(cap ?? 90, 90, rest / Math.max(1, left - k))); add(W.bikeEasy(pc(c.indoor, c.name), m)); rest -= m; }
       }
       if (sport === 'swim') {
         const ctx = pc(false, null);
-        if (swimStage) { for (let k = 0; k < n; k++) add(W.swimLearn(ctx, swimStage, swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : `Kraul lernen, damit du ${target.name} entspannt schwimmen kannst.`)); continue; }
+        // Schwerpunkt je Woche (Technik, Pull Buoy, zügige Bahnen), kürzere Pausen im Block, Freiwasser in der spezifischen Phase
+        if (swimStage) { for (let k = 0; k < n; k++) add(K.swimVariant(W.swimLearn(ctx, swimStage, swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : `Kraul lernen, damit du ${target.name} entspannt schwimmen kannst.`), wi + k, blockWeekOf(wi), ph.phase)); continue; }
         const per = Math.max(25, Math.min(capsW(false).swim, mins / n));
         for (let k = 0; k < n; k++) {
           const hard = hardOk && hardLeft > 0 && k === 1 && ph.phase !== 'base';
           const kind: W.Kind = k === 0 ? 'technique' : hard ? 'css' : 'endurance';
-          add(swimByMinutes(ctx, kind, per, ph.phase), { hard });
+          const sw = swimByMinutes(ctx, kind, per, ph.phase);
+          add(kind === 'css' ? sw : K.fitSwim(K.swimVariant(sw, wi + k, blockWeekOf(wi), ph.phase), per), { hard });
           if (hard) hardLeft--;
         }
       }
@@ -568,6 +584,12 @@ export function generatePlan(inp: GenInput): GenResult {
       };
       const score = (i: number) => {
         const sl = slots[i]; let sc = sl.cap - sl.used;
+        // harte Einheit so legen, dass für die nächste harte Einheit noch ein Tag mit Abstand bleibt (z. B. Rad Di, Lauf Do)
+        if (c.hard && order.slice(order.indexOf(c) + 1).some(x => x.hard)) {
+          const free = [...Array(7).keys()].filter(j => Math.abs(j - i) >= 2 && slots[j].cap >= 40 && !slots[j].race && !slots[j].game && !slots[j].team && !slots[j].noHard
+            && !isHardDay(j - 1) && !isHardDay(j + 1) && !(j > 0 && slots[j - 1].game) && Math.abs(j - i) !== 1).length;
+          sc += Math.min(2, free) * 120;
+        }
         // Test nach einer Krankheit möglichst spät in der Woche
         if (c.test && afterIllness && wi === 0) sc += i * 120;
         if (c.long) sc += sl.dow === 0 || sl.dow === 6 ? 300 : 0;
@@ -651,7 +673,7 @@ export function generatePlan(inp: GenInput): GenResult {
     if (ph.recovery) { blockNo++; blockWeek = 0; }
     weeks.push({
       weekNumber: wn, label: 'Woche ' + wn, headline, ...blk, target: { goalId: A.id, name: A.name, weeks: nTotal, n: wi + 1 }, races,
-      startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || undefined,
+      startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || dates.some(d => goals.some(g => g.date && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type))) || undefined,
       entry: entryWeek[wi] || undefined, vorgabe: pat && WP.targetFor(pat, mon) ? true : undefined,
       phase: ph.phase, focus: ph.recovery ? 'Erholung: weniger Umfang, Körper verarbeitet das Training' : entryWeek[wi] ? 'Wiedereinstieg: locker, Umfang steigt in Stufen' : focusText(ph.phase, GOALS[A.type].group),
       important: patImportant || weekImportant(ph, otherRaces, wi, inp, runStage, swimStage, afterIllness), days
@@ -689,7 +711,7 @@ export function generatePlan(inp: GenInput): GenResult {
   if (way.length > 1 || placed.length) explain.push(`Dein Weg: ${way.map(g => `${g.name} ${fmtD(g.date!)}${String(g.date).slice(2, 4)}${(g as any).placeholder ? ' (Platzhalter)' : ''}`).join(' → ')}.${placed.length ? ' Platzhalter richten sich nach Reihenfolge, Saison und deiner Form. Trag das echte Datum beim Ziel ein, dann plant die App neu.' : ''}`);
   explain.splice(1, 0, `Zyklen: ${cycleText(macro, start)}`);
   const plan = {
-    meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? !minor, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}) },
+    meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? true, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}) },
     weeks: shown, keyDates,
     zonePercents: HR_ZONES.map(z => ({ zone: z.zone, label: z.label, low: z.low, high: z.high }))
   };
