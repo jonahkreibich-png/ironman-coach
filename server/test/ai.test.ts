@@ -117,7 +117,7 @@ describe('Sicherheit vor der KI', () => {
     await chat(env, T, 'Wie viel soll ich diese Woche trainieren?');
     const sys = requests[0].system[0].text;
     expect(sys).toMatch(/minderjährig: keine Gewichtsziele/);
-    expect(requests[0].model).toBe('claude-opus-5-5');
+    expect(requests[0].model).toBe('claude-sonnet-5-5');
     expect(requests[0].fallbacks).toBe('default');
     expect(requests[0].tool_choice).toEqual({ type: 'auto' });
   });
@@ -234,23 +234,23 @@ describe('Auftrag 7: KI-Coach bereit für den echten Schlüssel', () => {
     const rows = JSON.parse(requests[2].messages[requests[2].messages.length - 1].content[0].content);
     if (dow(today) >= 3 || dow(today) === 0) expect(rows.find((x: any) => x.cadence === 164 || x.decoupling === 3.1)).toBeTruthy();
   });
-  test('Anfrage: Opus 5.5 mit Aufwand „medium“, Fallbacks, Cache für System und Verlauf', async () => {
+  test('Anfrage: Sonnet 5.5 mit Aufwand „medium“, Fallbacks, Cache für System und Verlauf', async () => {
     mock([text('Hallo!')]);
     const { env, T } = await user();
     await chat(env, T, 'Hallo');
     const q = requests[0];
-    expect(q.model).toBe('claude-opus-5-5');
+    expect(q.model).toBe('claude-sonnet-5-5');
     expect(q.output_config.effort).toBe('medium');
     expect(q.cache_control).toEqual({ type: 'ephemeral' });
     expect(q.betas).toEqual(['server-side-fallback-2026-07-01']); expect(q.fallbacks).toBe('default');
     expect(q.tool_choice).toEqual({ type: 'auto' });
     expect(q.tools.map((x: any) => x.name)).toEqual(expect.arrayContaining(['explain_day', 'get_analysis', 'modify_session', 'add_rule']));
   });
-  test('Kosten: Cache lesen 0,20 $ pro Mio. Tokens bei Opus 5.5 (nicht 0,40)', async () => {
+  test('Kosten: Cache lesen 0,10 $ pro Mio. Tokens bei Sonnet 5.5', async () => {
     mock([() => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'x' }], usage: { input_tokens: 0, cache_read_input_tokens: 1_000_000, output_tokens: 0 } })]);
     const { env, T } = await user({ budget: 20 });
     await chat(env, T, 'Hallo');
     const row: any = await env.DB.prepare('SELECT cost_micro FROM ai_usage').first();
-    expect(row.cost_micro).toBeGreaterThanOrEqual(200000); expect(row.cost_micro).toBeLessThan(201000); // dazu nur Cent-Bruchteile fürs Umformulieren
+    expect(row.cost_micro).toBeGreaterThanOrEqual(100000); expect(row.cost_micro).toBeLessThan(101000); // dazu nur Cent-Bruchteile fürs Umformulieren
   });
 });

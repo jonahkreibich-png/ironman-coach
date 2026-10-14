@@ -6,15 +6,15 @@ Nur das, was du selbst tun musst.
 
 Ohne Schlüssel funktioniert alles weiter mit dem Regel-Coach (kostenlos). Mit Schlüssel formuliert Claude frei, die Regeln und Zahlen bleiben dieselben.
 
-**Was es kostet** (Schätzung mit deinen echten Daten, Opus 5.5 für Gespräche, Haiku 5.5 für kurze Texte):
+**Was es kostet** (Schätzung mit deinen echten Daten, Sonnet 5.5 für Gespräche, Haiku 5.5 für kurze Texte):
 
 | Nutzung | pro Monat |
 |---|---|
-| 1 Frage pro Tag | ca. 2 $ |
-| 3 Fragen pro Tag | ca. 6 $ |
-| 8 Fragen pro Tag | ca. 15 $ |
+| 1 Frage pro Tag | ca. 1,50 $ |
+| 3 Fragen pro Tag | ca. 4 $ |
+| 8 Fragen pro Tag | ca. 9 $ |
 
-Eine Frage kostet etwa 6 Cent. Mitteilungen umformulieren, Regeln lesen und Essensfotos kosten zusammen unter 30 Cent im Monat. Die App hört beim Monatsbudget auf (einstellbar 2, 5, 10 oder 20 $) und antwortet dann wieder kostenlos mit dem Regel-Coach.
+Eine Frage kostet etwa 3 bis 4 Cent, halb so viel wie mit Opus. Mitteilungen umformulieren, Regeln lesen und Essensfotos kosten zusammen unter 30 Cent im Monat. Die App hört beim Monatsbudget auf (einstellbar 2, 5, 10 oder 20 $) und antwortet dann wieder kostenlos mit dem Regel-Coach.
 
 **In 3 Schritten:**
 

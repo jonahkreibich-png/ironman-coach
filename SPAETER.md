@@ -15,7 +15,7 @@ Regel 7: Es wurde nichts gekauft und nichts verursacht laufende Kosten. Alles hi
 
 ## KI-Kosten genauer
 
-Preise (Stand Oktober 2026, pro Million Tokens): starkes Modell `claude-opus-5-5` 4 $ Eingabe / 20 $ Ausgabe, Routine-Modell `claude-haiku-5-5` 0,10 $ / 0,50 $.
+Preise (Stand Oktober 2026, pro Million Tokens): Gesprächs-Modell `claude-sonnet-5-5` 2 $ Eingabe / 10 $ Ausgabe (vorher Opus 5.5 mit 4 $ / 20 $), Routine-Modell `claude-haiku-5-5` 0,10 $ / 0,50 $.
 Die App nimmt das starke Modell nur für echte Gespräche (Chat, Planänderungen), sonst das Routine-Modell.
 
 | Nutzung pro Monat | Rechnung | Kosten |

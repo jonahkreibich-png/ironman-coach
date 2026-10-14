@@ -27,14 +27,15 @@ export function aiSafeCtx(ctx: EngineCtx): EngineCtx {
   return { ...ctx, state: { ...ctx.state, trend, activities: acts } };
 }
 
-/* Stärkstes Modell für Gespräche und Wochenplanung, günstiges Modell für Routine (Briefings, Kommentare, Essensfotos) */
-export const MODELS = { strong: 'claude-opus-5-5', routine: 'claude-haiku-5-5' } as const;
+/* Gespräche und Wochenplanung: Sonnet 5.5 (halb so teuer wie Opus 5.5, reicht fürs Coaching); günstiges Modell für Routine (Briefings, Kommentare, Essensfotos) */
+export const MODELS = { strong: 'claude-sonnet-5-5', routine: 'claude-haiku-5-5' } as const;
 /* US-Dollar pro 1 Mio. Tokens (Stand Oktober 2026): Eingabe, Ausgabe (inkl. Denken), Cache lesen, Cache schreiben (5 min) */
 export const PRICES: Record<string, { in: number; out: number; cacheRead: number; cacheWrite: number }> = {
+  'claude-sonnet-5-5': { in: 2, out: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   'claude-opus-5-5': { in: 4, out: 20, cacheRead: 0.2, cacheWrite: 5 },
   'claude-haiku-5-5': { in: 0.1, out: 0.5, cacheRead: 0.01, cacheWrite: 0.125 }
 };
-/* Aufwand: Gespräche „medium“ (Standard von Opus 5.5, reicht fürs Coaching), Routine „low“ (Haiku 5.5 denkt sonst mit und verbraucht die Ausgabe) */
+/* Aufwand: Gespräche „medium“ (Empfehlung für Chat bei Sonnet 5.5, dessen Standard wäre „high“), Routine „low“ (Haiku 5.5 denkt sonst mit und verbraucht die Ausgabe) */
 export const EFFORT = { chat: 'medium', routine: 'low' } as const;
 
 /* Austauschbar für Tests (Mock ohne echte Aufrufe) */

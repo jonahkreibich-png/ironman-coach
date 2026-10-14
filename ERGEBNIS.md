@@ -213,3 +213,4 @@ Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) · [SPAETER.md](SPAETE
 - Schlüssel für Oura und Dropbox sind in der echten App gesetzt.
 - Neu: Eine neue Verbindung ändert nichts Vergangenes. Tage vor dem Verbinden bleiben, wie sie waren; am Tag des Verbindens werden nur leere Werte gefüllt; Einheiten zählen ab dem Verbinden. Werte von Hand überschreibt keine Uhr mehr (Entscheidung 102).
 - Oura war schon vorher verbunden und hatte 28 alte Tage ergänzt (u. a. Ruhepuls 8.10. 80 → 86, Schlaf 12.10. 7,2 → 7,1 h). Diese Tage sind wieder genau wie vorher (Backup `data-export/prod-vor-verbindungsschutz.sql`). Heute bleibt mit den Oura-Werten.
+- KI-Coach für Gespräche jetzt mit Sonnet 5.5 statt Opus 5.5: etwa 3-4 Cent pro Frage, 1,50-9 $ im Monat (FUER-JONAH.md, Entscheidung 103).
