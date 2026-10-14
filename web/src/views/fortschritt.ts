@@ -25,7 +25,7 @@ export function renderFortschritt(): string {
   // Prognose
   const p = d.prognosis;
   if (d.goal && p) {
-    h += sec(t('prog.prognosis'), `<div class="card">${p.ok && p.total ? `<div class="lbl">${esc(d.goal.name)}</div><div class="big">${fmtDuration(p.total.low)} – ${fmtDuration(p.total.high)}</div><div class="xs muted">${esc(t('prog.confidence', { c: p.confidence }))}</div>
+    h += sec(t('prog.prognosis'), `<div class="card">${p.ok && p.total ? `<div class="lbl">${esc(d.goal.name)}</div><div class="big" data-range><span class="nowrap-part">${fmtDuration(p.total.low)} –</span> <span class="nowrap-part">${fmtDuration(p.total.high)}</span></div><div class="xs muted">${esc(t('prog.confidence', { c: p.confidence }))}</div>
       ${(p.parts || []).map(x => `<div class="kv"><span class="muted">${esc(x.label)}</span><b class="num">${fmtDuration(x.low)} – ${fmtDuration(x.high)}</b></div>`).join('')}
       ${p.improve ? `<div class="banner info">${esc(p.improve)}</div>` : ''}
       ${p.runDistances && d.goal.type.startsWith('run') ? more(t('prog.otherDistances'), p.runDistances.map(x => `<div class="kv"><span class="muted">${esc(x.label)}</span><b class="num">${fmtDuration(x.best)}</b></div>`).join('')) : ''}`

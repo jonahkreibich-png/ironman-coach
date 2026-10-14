@@ -36,12 +36,13 @@ export function renderPlan(): string {
   // Umfang und Steigerung zur letzten Aufbauwoche (eigenes Training ohne Teamsport)
   const vol = weekVolume(PLAN.weeks, UI.planWeek);
   const volH = (Math.round(vol.min / 6) / 10).toString().replace('.', ',');
-  const volTxt = vol.pct == null ? t('plan.volume', { h: volH }) : t('plan.volumeVs', { h: volH, p: (vol.pct > 0 ? '+' : vol.pct < 0 ? '−' : '±') + Math.abs(vol.pct) });
+  // Prozent zur letzten Aufbauwoche: eigene kleine Zeile links (rechts bleibt kurz „3/11 · 6,8 h“)
+  const volTxt = vol.pct == null ? '' : t('plan.volumeVs', { h: volH, p: (vol.pct > 0 ? '+' : vol.pct < 0 ? '−' : '±') + Math.abs(vol.pct) });
   let h = renderTimeline(PLAN.meta && PLAN.meta.timeline, today);
   h += explain.length ? `<div class="card plan-explain" style="margin-bottom:var(--s3)">${more(t('plan.explain'), explain.map(s => `<p class="small">${esc(s)}</p>`).join(''), false)}</div>` : '';
   h += `<div class="chips" role="tablist">${PLAN.weeks.map((x: any, i: number) => `<button class="chip ${i === UI.planWeek ? 'on' : ''}" data-act="plan-week" data-i="${i}" role="tab" aria-selected="${i === UI.planWeek}">${esc(t('plan.weekShort', { n: x.weekNumber }))}${i === cw ? ' ●' : ''}</button>`).join('')}</div>
-    <div class="card" style="margin-top:var(--s3)"><div class="spread"><div><div class="lbl">${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div>${w.headline ? `<div class="week-head" data-week-head>${esc(w.headline)}</div>` : ''}<div class="t" style="font-weight:${w.headline ? 400 : 600}">${esc(w.focus || '')}</div><div class="small" data-week-volume>${esc(volTxt)}</div>${w.important ? `<div class="hint" style="margin-top:4px"><b>${esc(t('plan.thisWeek'))}:</b> ${esc(w.important)}</div>` : ''}</div>
-      <div style="text-align:right"><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(weekMinutes(w) / 60))}</div></div></div></div>`;
+    <div class="card" style="margin-top:var(--s3)"><div class="spread wk-head"><div class="wk-l"><div class="lbl">${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div>${w.headline ? `<div class="week-head" data-week-head>${esc(w.headline)}</div>` : ''}<div class="t" style="font-weight:${w.headline ? 400 : 600}">${esc(w.focus || '')}</div>${volTxt ? `<div class="xs muted" data-week-volume>${esc(volTxt)}</div>` : ''}${w.important ? `<div class="hint" style="margin-top:4px"><b>${esc(t('plan.thisWeek'))}:</b> ${esc(w.important)}</div>` : ''}</div>
+      <div class="wk-r" data-week-count><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(vol.min / 60))}</div></div></div></div>`;
   h += editBar(w);
   for (const d of w.days) {
     const isToday = d.date === today;

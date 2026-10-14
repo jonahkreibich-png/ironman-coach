@@ -2,16 +2,15 @@
 import { test, expect } from '@playwright/test';
 import { seed, open, TODAY } from './helpers';
 
-test('Plan: jede Woche zeigt „Umfang X h (+Y % zur letzten Aufbauwoche)“', async ({ page }) => {
+test('Plan: Wochenkopf rechts kurz „erledigt/geplant · Stunden“, Steigerung als eigene Zeile links', async ({ page }) => {
   await seed(page);
   await open(page, '/?go=plan');
-  const vol = page.locator('[data-week-volume]');
-  await expect(vol).toBeVisible();
-  await expect(vol).toContainText(/^Umfang \d+(,\d)? h/);
-  // eine spätere Woche hat eine Bezugswoche
+  await expect(page.locator('[data-week-count]')).toContainText(/\d+\/\d+/);
+  await expect(page.locator('[data-week-count]')).toContainText(/\d+(,\d)? h/);
   const chips = page.locator('[data-act="plan-week"]');
   await chips.nth(Math.min(2, (await chips.count()) - 1)).click();
-  await expect(page.locator('[data-week-volume]')).toContainText(/Umfang \d+(,\d)? h \([+−±]\d+ % zur letzten Aufbauwoche\)/);
+  await expect(page.locator('[data-week-volume]')).toHaveText(/^[+−±]\d+ % zur letzten Aufbauwoche$/);
+  await expect(page.locator('[data-week-count]')).not.toContainText('%');
 });
 
 test('Testfelder erscheinen nur beim Test (Radtest: Ø-Puls und Ø-Watt der 20 min)', async ({ page }) => {

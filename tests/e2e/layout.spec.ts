@@ -102,6 +102,18 @@ async function overflow(page: Page): Promise<string[]> {
       // Text, der abgeschnitten wird, ohne „…“
       if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && el.scrollWidth > el.clientWidth + 2 && cs.textOverflow !== 'ellipsis' && el.children.length === 0 && (el.textContent || '').trim()) out.push(`${desc(el)} schneidet Text ab`);
     }
+    // Auftrag 10: Text darf nicht über seinen eigenen Kasten hinauslaufen (geschrumpfte Spalte mit nicht umbrechendem Text)
+    const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const par = n.parentElement; if (!par || !(n.textContent || '').trim()) continue;
+      const pcs = getComputedStyle(par); if (pcs.display === 'none' || pcs.visibility === 'hidden' || par.closest('[hidden]')) continue;
+      const pd = par.closest('details'); if (pd && !(pd as HTMLDetailsElement).open && !par.closest('summary')) continue;
+      // eigener Scroll-Kasten oder bewusst abgeschnitten (mit „…“ eigener Test oben)
+      if (scroller(par) || pcs.overflowX !== 'visible') continue;
+      const pr = par.getBoundingClientRect(); if (pr.width < 1) continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      for (const b of Array.from(rg.getClientRects())) if (b.width > 0 && (b.right > pr.right + 2 || b.right > W + 1)) { out.push(`${desc(par)} Text läuft aus seinem Kasten (${Math.round(b.right)} > ${Math.round(pr.right)})`); break; }
+    }
     return [...new Set(out)].slice(0, 15);
   });
 }
@@ -170,3 +182,37 @@ for (const [wname, w] of WIDTHS) test(`${wname} px: Tab-Beschriftungen einzeilig
   const cut = await page.locator('.tab span').evaluateAll(els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
   expect(cut).toEqual([]);
 });
+
+/* Auftrag 10: ALLE Wochen eines echten, langen Plans (Einstieg, Tests, Erholung, Platzhalter-Ziele, Zeitleiste, Prozent-Zusatz),
+   nicht nur die aktuelle Woche. Daran ragte „±Y % zur letzten Aufbauwoche“ ab Woche 6 aus dem Wochenkopf. Dazu lange Texte. */
+import { patternPlan } from '../../fixtures/pattern-person';
+for (const [wname, w] of WIDTHS) {
+  for (const dark of [false, true]) {
+    test(`${wname} px, ${dark ? 'dunkel' : 'hell'}: Plan, alle Wochen mit echten Zusätzen`, async ({ page }) => {
+      test.setTimeout(180000);
+      await page.setViewportSize({ width: w, height: 760 });
+      const demo = makeDemo(TODAY);
+      const plan = patternPlan(true).plan;
+      // ein langer Zielname und eine lange Beschreibung in einer späteren Woche
+      plan.meta.timeline.goals[0].name += ' am Baggersee ' + LONG;
+      plan.weeks[plan.weeks.length - 3].focus = 'Erholungswoche ' + LONG + ' mit sehr langer Beschreibung, die umbrechen muss';
+      const st: any = { ...demo, goals: {} }; delete st.plan;
+      await page.addInitScript(([p, s]) => { if (sessionStorage.getItem('__keep')) return; localStorage.clear(); localStorage.setItem('ec_ui', JSON.stringify({ seenRelease: '9.9.9' })); localStorage.setItem('ec_plan', p as string); localStorage.setItem('ec_state_v2', s as string); sessionStorage.setItem('__keep', '1'); }, [JSON.stringify(plan), JSON.stringify(st)]);
+      await page.clock.setFixedTime(new Date(`${TODAY}T07:30:00+02:00`));
+      await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
+      await page.goto('/?go=plan');
+      await expect(page.locator('[data-timeline]')).toBeVisible();
+      const problems: string[] = [];
+      const n = await page.locator('[data-act="plan-week"]').count();
+      expect(n).toBe(plan.weeks.length);
+      for (let i = 0; i < n; i++) {
+        await page.evaluate(k => (document.querySelectorAll('[data-act="plan-week"]')[k] as HTMLElement).click(), i);
+        await page.waitForTimeout(20);
+        (await overflow(page)).forEach(p => problems.push(`Woche ${plan.weeks[i].weekNumber}: ${p}`));
+      }
+      // eine Schwimmeinheit (Stufe, Pull Buoy) und ein Test im Sheet
+      for (const sel of ['[data-act="sess-open"]']) { const b = page.locator(sel).first(); if (await b.count()) { await b.click(); await page.waitForTimeout(40); (await overflow(page)).forEach(p => problems.push(`Sheet: ${p}`)); await page.keyboard.press('Escape'); } }
+      expect(problems).toEqual([]);
+    });
+  }
+}

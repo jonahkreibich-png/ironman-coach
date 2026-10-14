@@ -434,3 +434,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); flex-shrink: 0; }
 .tl-dot.ph { background: transparent; border: 2px dashed var(--ink); }
 .tl-dot.a { background: var(--accent); }
+
+/* Wochenkopf im Plan (Auftrag 10): links darf umbrechen, rechts nie und schrumpft nie */
+.wk-head { align-items: flex-start; gap: var(--s2); }
+.wk-l { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.wk-r { flex: 0 0 auto; text-align: right; white-space: nowrap; }
+.big[data-range] { white-space: normal; }
+.nowrap-part { white-space: nowrap; }

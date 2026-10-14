@@ -367,7 +367,7 @@ export const de: Record<string, string> = {
   'tl.title': 'Dein Weg', 'tl.now': 'Jetzt: {p} bis {d}', 'tl.toward': ' → {g}', 'tl.next': ', danach {p}', 'tl.placeholder': 'Platzhalter', 'tl.aria': 'Zeitleiste mit Phasen und Zielen',
   'tl.base': 'Grundlage', 'tl.build': 'Aufbau', 'tl.specific': 'Wettkampfspezifisch', 'tl.taper': 'Tapering', 'tl.race': 'Wettkampf',
   'tl.phHint': 'Platzhalter-Termine richten sich nach Reihenfolge, Saison und deiner Form. Trag das echte Datum beim Ziel ein (Mehr → Profil und Ziele), dann plant die App neu.',
-  'plan.volume': 'Umfang {h} h', 'plan.volumeVs': 'Umfang {h} h ({p} % zur letzten Aufbauwoche)',
+  'plan.volume': 'Umfang {h} h', 'plan.volumeVs': '{p} % zur letzten Aufbauwoche',
   'conn.viaIcu': 'über intervals.icu', 'conn.viaIcuShort': 'kommt über intervals.icu', 'conn.partnerShort': 'über intervals.icu verbinden (3 Schritte)',
   'conn.notConfiguredShort': 'noch nicht freigeschaltet, Alternative antippen', 'conn.notReady': 'noch nicht frei',
   'conn.serverKeys': 'Server-Schlüssel', 'conn.serverKeysAside': 'nur für dich als Betreiber', 'conn.serverKeysHint': 'Diese App-Schlüssel der Anbieter braucht der Server. Anleitung: FUER-JONAH.md, Abschnitt Verbindungen.',
