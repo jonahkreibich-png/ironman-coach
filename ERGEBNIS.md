@@ -214,3 +214,13 @@ Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) · [SPAETER.md](SPAETE
 - Neu: Eine neue Verbindung ändert nichts Vergangenes. Tage vor dem Verbinden bleiben, wie sie waren; am Tag des Verbindens werden nur leere Werte gefüllt; Einheiten zählen ab dem Verbinden. Werte von Hand überschreibt keine Uhr mehr (Entscheidung 102).
 - Oura war schon vorher verbunden und hatte 28 alte Tage ergänzt (u. a. Ruhepuls 8.10. 80 → 86, Schlaf 12.10. 7,2 → 7,1 h). Diese Tage sind wieder genau wie vorher (Backup `data-export/prod-vor-verbindungsschutz.sql`). Heute bleibt mit den Oura-Werten.
 - KI-Coach für Gespräche jetzt mit Sonnet 5.5 statt Opus 5.5: etwa 3-4 Cent pro Frage, 1,50-9 $ im Monat (FUER-JONAH.md, Entscheidung 103).
+
+## Auftrag 8: Plan individuell, mehr Umfang (14.10.)
+- **Ursache:** Umfang aus der CTL (zu niedrig, weil viele Einheiten fehlten), dazu −15 % wegen der Erkältung und der 70-%-Deckel. Woche 4 war wegen der Erkältung komplett „ausgelassen“.
+- **Neue Regel für alle:** Start auf Höhe der letzten Aufbauwoche; erledigt zählt nur, wenn abgehakt und ohne Krankheit; CTL nur als Grenze, wenn sie vollständig ist. Nach Krankheit in Stufen (72 %, 90 %, 100 %). Kein 70-%-Deckel. Steigerung am eigenen Training gemessen.
+- **Dein Plan ab 19.10.** (Woche 5 unverändert): fester Wochenaufbau wie vorgegeben, Umfang 6,3 / 7,3 / 8,2 / 5,8 (Erholung) / 8,8 / 9,3 / 9,6 / 6,3 h (Erholung + Tests), danach im gleichen Muster (Woche 14-16: 10,1-10,6 h). Langer Lauf 65 → 75 → 85 → 90 → 95 → höchstens 100 min, Sweet Spot ab Woche 8 (3×8, 3×12, 2×20), Koppellauf ab Woche 10, Steigerungsläufe ab Woche 8.
+- **Tests:** Lauf So 25.10., Kraul-Check Di 27.10., Rad Mi 28.10.; wieder 8., 9. und 13.12., dann alle 8 Wochen. Werte werden automatisch übernommen (Lauf, Rad mit/ohne Watt, Schwimmen; ab 400 m Kraul am Stück CSS-Test).
+- **Anzeige:** Unter jeder Woche „Umfang X h (±Y % zur letzten Aufbauwoche)“.
+- **Sicherheit:** Ampel kürzt einzelne Tage, der Coach schlägt leichtere Wochen vor, der Grundplan bleibt. Keine harte Regel verletzt (Schwimmbad nur Di/Sa/So, morgens höchstens 40 min, keine Beine am Spieltag oder davor).
+- **Hinweis:** Morgens optional Rad geht nur als Hinweis (Rad ist laut deinem Raster Mo, Di, Do verboten). Die Wochen liegen meist 0,1-0,4 h unter deiner Tabelle, weil der Donnerstagslauf bei 50 min und das Rad am Mittwoch bei 90 min bleiben und Laufen höchstens +10 % pro Woche steigt.
+- Getestet: 795 Unit- und Server-Tests, 121 E2E-Tests. Erst stamio-test mit Kopie deiner Daten, dann echte App (Sicherung `data-export/prod-vor-auftrag8.sql`). Version 2.4.0.
