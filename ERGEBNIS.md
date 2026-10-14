@@ -208,3 +208,8 @@ Weitere Dokumente: [VERBINDUNGEN.md](VERBINDUNGEN.md) · [ENTSCHEIDUNGEN.md](ENT
 Wenn alles passt: **„Freigeben“** an Claude. Danach: neue Datenbank aus einer frischen Kopie, echte Adresse https://stamio.pages.dev, dann ziehst du dein iPhone um (FUER-JONAH.md 12). Die alte App bleibt 4 Wochen als Rückfall.
 
 Weitere Dokumente: [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) · [SPAETER.md](SPAETER.md) · [NAMEN.md](NAMEN.md)
+
+## Oura und Dropbox (14.10.)
+- Schlüssel für Oura und Dropbox sind in der echten App gesetzt.
+- Neu: Eine neue Verbindung ändert nichts Vergangenes. Tage vor dem Verbinden bleiben, wie sie waren; am Tag des Verbindens werden nur leere Werte gefüllt; Einheiten zählen ab dem Verbinden. Werte von Hand überschreibt keine Uhr mehr (Entscheidung 102).
+- Oura war schon vorher verbunden und hatte 28 alte Tage ergänzt (u. a. Ruhepuls 8.10. 80 → 86, Schlaf 12.10. 7,2 → 7,1 h). Diese Tage sind wieder genau wie vorher (Backup `data-export/prod-vor-verbindungsschutz.sql`). Heute bleibt mit den Oura-Werten.
