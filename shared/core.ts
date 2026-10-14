@@ -564,6 +564,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   if (pct > 0 && pain) { pct = 0; why = painLabel(pain) + ' über 2/10: diese Woche keine Steigerung'; }
   if (pct > 0 && (returnStageActive(illness, addDays(date, 1)))) { pct = 0; why = 'Nach Krankheit gilt der Stufenplan'; }
   if (next.isRecoveryWeek) { pct = 0; why = 'Erholungswoche aus dem Plan bleibt bestehen'; }
+  if (next.entry && pct < 0 && S.sick) { pct = 0; why = 'Nach der Krankheit ist die nächste Woche schon als Wiedereinstieg geplant (weniger Umfang, nichts Hartes)'; }
   if (meta.pattern && !S.sick && pct !== 0) { pct = 0; why = 'Fester Wochenplan: der Umfang bleibt. Die Ampel kürzt einzelne Tage, der Coach schlägt bei Bedarf eine leichtere Woche vor'; }
   pct = Math.max(-20, Math.min(10, pct));
 

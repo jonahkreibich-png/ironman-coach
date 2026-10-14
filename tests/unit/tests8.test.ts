@@ -117,3 +117,13 @@ describe('Wochen-Engine beim festen Wochenaufbau', () => {
     expect(a.reason).toMatch(/Kraul-Check: 100 m am Stück/);
   });
 });
+
+test('Krankheit diese Woche, nächste Woche ist schon Wiedereinstieg: nicht noch einmal kürzen', () => {
+  const mon = '2026-10-19';
+  const wk = (m: string, n: number, extra: any = {}) => ({ weekNumber: n, startDate: m, endDate: C.addDays(m, 6), ...extra, days: [0, 1, 2, 3, 4, 5, 6].map(k => ({ date: C.addDays(m, k), sessions: [{ id: `s${n}-${k}`, sport: 'run', title: 'Lockerer Lauf 40 min', plannedMinutes: 40, zone: 'Zone 2' }] })) });
+  const weeks = [wk('2026-10-12', 5, { isRecoveryWeek: true }), wk(mon, 6, { entry: true })];
+  const state = { sessions: {}, trend: [], illnessPeriods: [{ id: 'i', start: '2026-10-07', end: '2026-10-12' }], adjustments: {}, customWorkouts: {}, activities: {}, profile: prof };
+  const r = C.weeklyAdjustments(state, weeks, '2026-10-18', { planMeta: { pattern: true } });
+  expect(r.adjustments.filter((a: any) => /-vol-/.test(a.id))).toEqual([]);
+  expect(r.adjustments.find((a: any) => /summary/.test(a.id)).reason).toMatch(/Wiedereinstieg/);
+});
