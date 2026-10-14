@@ -68,3 +68,16 @@ test('Lauftest erledigt (Werte von Uhr oder Hand) → Server übernimmt die Zone
   expect(recs.find((r: any) => r.kind === 'settings').data.settings.lthrRun).toBe(173);
   expect(recs.some((r: any) => r.kind === 'coachMsg' && r.data.title === 'Zonen aktualisiert')).toBe(true);
 });
+test('Radtest erledigt (Testfelder) → Server übernimmt Schwellenpuls Rad und FTP, mit Mitteilung (Auftrag 8)', async () => {
+  const env: any = makeEnv({ SETUP_CODE: 'code-1234-abcd-xyz' });
+  const T = (await call(env, 'POST', '/api/setup', { name: 'Test', setupCode: 'code-1234-abcd-xyz' })).data.token;
+  const day = add(today, -1);
+  await call(env, 'POST', '/api/sync', { since: 0, changes: [
+    { kind: 'plan', key: 'main', data: { meta: {}, weeks: [{ weekNumber: 1, startDate: day, days: [{ date: day, sessions: [{ id: 'bt1', sport: 'bike', title: 'Radtest 20 min', plannedMinutes: 70 }] }] }] }, updatedAt: 1 },
+    { kind: 'profile', key: 'main', data: { birthYear: 2009, sports: ['bike'], thresholds: { lthrRun: 170, lthrBike: 169, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28 } }, updatedAt: 1 }] }, T);
+  await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'session', key: 'bt1', data: { completed: true, metrics: { testHr: '174', testPower: '250' } }, updatedAt: Date.now() }] }, T);
+  const recs = await records(env, T);
+  expect(recs.find((r: any) => r.kind === 'profile').data.thresholds).toMatchObject({ lthrBike: 174, ftp: 238 });
+  expect(recs.find((r: any) => r.kind === 'settings').data.settings.lthrBike).toBe(174);
+  expect(recs.some((r: any) => r.kind === 'coachMsg' && r.data.title === 'Rad-Zonen aktualisiert')).toBe(true);
+});

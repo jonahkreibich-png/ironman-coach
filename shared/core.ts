@@ -355,7 +355,7 @@ function ladderVerdict(s, st, act, lthrBike): { result: 'up' | 'stay' | 'fail'; 
   }
   return { result: 'stay', why: 'keine Messdaten und keine RPE' };
 }
-function isSweetSpot(s) { return !!s && s.sport === 'bike' && !/^(Zone 2|Locker) statt/.test(s.title || '') && /sweet/i.test((s.title || '') + ' ' + (s.zone || '')); }
+function isSweetSpot(s) { return !!s && s.sport === 'bike' && !s.pattern && !/^(Zone 2|Locker) statt/.test(s.title || '') && /sweet/i.test((s.title || '') + ' ' + (s.zone || '')); }
 const round5 = x => Math.max(5, Math.round(x / 5) * 5);
 const r1 = x => Math.round(x * 10) / 10;
 const DOW_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -475,11 +475,30 @@ function stageSession(s, n) {
       // Brust-Weg fertig → Kraul-Weg ab Stufe 2, Kraul-Weg fertig → normales Schwimmen
       if (s.stage.ladder === 'swimBreast') spec = W.swimLearn(ctx, { ladder: 'swim', n: 2, breast: true }, why);
       else spec = W.swimSession(ctx, 'endurance', [{ part: 'main', reps: 3, m: 400, zone: 2, mode: 'crawl', restSec: 30 }]);
-    } else spec = W.swimLearn(ctx, { ...s.stage, n }, why);
+    } else spec = W.swimLearn(ctx, { ...s.stage, n }, why, s.spec && s.spec.fillMin);
   }
   if (tip && !spec.tip) spec.tip = tip;
   const b = W.build(spec);
   return { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, stage: b.stage || null, zone: b.zone };
+}
+
+/* Längste Strecke Kraul am Stück (Uhr oder Feld) der letzten 8 Wochen */
+function longestCrawl(state, weeks, date) {
+  let best = toNum(((state.profile || {}).skills || {}).swimCrawlM) || 0;
+  planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -56)).forEach(d => d.sessions.filter(s => s.sport === 'swim').forEach(s => {
+    const st = (state.sessions || {})[s.id]; if (!st || !st.completed) return;
+    const act = st.activityId ? (state.activities || {})[st.activityId] : null;
+    best = Math.max(best, (act && act.swim && act.swim.longestContinuousM) || 0, toNum((st.metrics || {}).longestCrawl) || 0);
+  }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > addDays(date, -56)) (l || []).forEach(c => { if (c && c.sport === 'swim') best = Math.max(best, toNum((c.metrics || {}).longestCrawl) || 0); }); });
+  return best;
+}
+function lastCrawlCheck(state, weeks, date) {
+  const done = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -21)).flatMap(d => d.sessions.filter(s => /Kraul-Check/.test(s.title || '') && sessDone(state, s)).map(s => ({ s, date: d.date }))).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  if (!done) return null;
+  const st = state.sessions[done.s.id] || {}; const act = st.activityId ? (state.activities || {})[st.activityId] : null;
+  const m = (act && act.swim && act.swim.longestContinuousM) || toNum((st.metrics || {}).longestCrawl);
+  return m ? { m, date: done.date } : null;
 }
 
 /* ---------- Wöchentlich (Sonntag 18 Uhr) für die nächste Woche ---------- */
@@ -545,6 +564,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   if (pct > 0 && pain) { pct = 0; why = painLabel(pain) + ' über 2/10: diese Woche keine Steigerung'; }
   if (pct > 0 && (returnStageActive(illness, addDays(date, 1)))) { pct = 0; why = 'Nach Krankheit gilt der Stufenplan'; }
   if (next.isRecoveryWeek) { pct = 0; why = 'Erholungswoche aus dem Plan bleibt bestehen'; }
+  if (meta.pattern && !S.sick && pct !== 0) { pct = 0; why = 'Fester Wochenplan: der Umfang bleibt. Die Ampel kürzt einzelne Tage, der Coach schlägt bei Bedarf eine leichtere Woche vor'; }
   pct = Math.max(-20, Math.min(10, pct));
 
   const nextSessions = planDays([next]).flatMap(d => d.sessions.map(s => Object.assign({}, s, { date: d.date })));
@@ -597,13 +617,23 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
       .sort((a, b) => a.date.localeCompare(b.date));
     const last = done[done.length - 1]; if (!last) continue;
     const v = stageVerdict(last.s, state.sessions[last.s.id], (state.activities || {})[(state.sessions[last.s.id] || {}).activityId]);
-    const target = v.ok ? last.s.stage.n + 1 : last.s.stage.n;
+    let target = v.ok ? last.s.stage.n + 1 : last.s.stage.n;
+    // Kraul-Check in den letzten 3 Wochen: die Stufe passt zur längsten Strecke am Stück (nie länger als das, was schon geht)
+    if (ladder === 'swim') { const ck = lastCrawlCheck(state, weeks, date); if (ck) { const n = (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: ck.m }) || { n: target }).n; if (n > target) { target = n; v.why = `Kraul-Check: ${ck.m} m am Stück`; } } }
     nextSessions.filter(s => s.stage && s.stage.ladder === ladder && !s.cancelled && s.stage.n !== target).forEach(s => {
       const built = stageSession(s, target); if (!built) return;
       push({ id: `${group}-stage-${s.id}`, type: 'modify', sessionId: s.id, set: built, what: `${s.title} → ${built.title}`, reason: (v.ok ? 'Letzte Stufe hat geklappt (' : 'Stufe wiederholen (') + v.why + ')' });
     });
     stageWhy.push((v.ok ? 'nächste Stufe: ' : 'Stufe bleibt: ') + v.why);
   }
+
+  // Schwimmtest: ab 400 m Kraul am Stück wird aus dem Kraul-Check der CSS-Test (400 m + 200 m)
+  const crawlBest = longestCrawl(state, weeks, date);
+  if (crawlBest >= 400) nextSessions.filter(s => s.sport === 'swim' && /Kraul-Check/.test(s.title || '') && !s.cancelled).forEach(s => {
+    const b = W.build(W.swimTest((s.spec && s.spec.ctx) || {}));
+    push({ id: `${group}-css-${s.id}`, type: 'modify', sessionId: s.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, hard: true },
+      what: `${s.title} → ${b.title}`, reason: `Du schaffst ${crawlBest} m Kraul am Stück: jetzt der Test für deine Schwimm-Schwelle (CSS)` });
+  });
 
   // Schutzregeln für die nächste Woche
   nextSessions.forEach(s => {

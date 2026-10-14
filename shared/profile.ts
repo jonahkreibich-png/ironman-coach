@@ -17,6 +17,10 @@ export interface Thresholds {
   lthrRun: number; lthrBike: number; maxHr?: number | null;
   thresholdPaceRunSec: number; thresholdSpeedBikeKmh: number;
   ftp?: number | null; cssSec?: number | null;
+  /** Brust: Sekunden pro 100 m (aus dem Schwimmtest, 200 m Brust auf Zeit) */
+  breast100Sec?: number | null;
+  /** Kraul: Ø Sekunden pro 25 m locker-zügig (Schwimmtest) */
+  crawl25Sec?: number | null;
   /** aerobe Schwelle (Puls), Obergrenze für lockere Einheiten; [von, bis] */
   aetHr?: [number, number] | null;
   /** VO2max (ml/kg/min), z. B. von der Uhr */
@@ -32,6 +36,17 @@ export interface Progression { buildWeeks: number; incPct: number }
 export interface StrengthPlan { lower: number[]; upper: number[]; core?: number[] }
 /** Morgens vor Schule/Arbeit: an diesen Tagen nur kurze Einheiten am Morgen (ohne Schwimmbad), längere am Nachmittag */
 export interface MorningSlot { days: number[]; maxMin: number; noPool: boolean; /** z. B. „vor der Schule“ */ label?: string }
+/** Fester Wochenaufbau (Auftrag 8): an diesen Tagen diese Einheiten. role: long = lange Einheit, key = ab keyFrom Schlüsseleinheit
+    (Sweet Spot), easy = locker, swim = Kraul-Technik + Brust-Ausdauer, lower/upper = Kraft, brick = Koppellauf nach der langen Ausfahrt. */
+export interface PatternSlot { dow: number; sport: 'swim' | 'bike' | 'run' | 'strength'; role: 'long' | 'key' | 'easy' | 'swim' | 'lower' | 'upper' | 'brick';
+  /** Minuten von … bis */ min?: [number, number]; /** erst ab diesem Datum */ from?: string; /** Schlüsseleinheit ab */ keyFrom?: string; /** Steigerungsläufe ab */ stridesFrom?: string }
+/** Vorgabe für eine Woche (Montag): eigenes Training ohne Teamsport in Stunden, lange Einheiten und Schwimmen in Minuten */
+export interface WeekTarget { start: string; hours: number; longRun?: [number, number]; longBike?: [number, number]; swim?: [number, number];
+  recovery?: boolean; /** Wiedereinstieg (zählt nicht als Bezug für die Steigerung) */ entry?: boolean; tests?: ('run' | 'swim' | 'bike')[] }
+export interface WeekPattern { slots: PatternSlot[]; targets?: WeekTarget[];
+  /** langer Lauf: höchstens so lang und höchstens so viel länger pro Woche */ longRunMax?: number; longRunStep?: number;
+  /** Tests nach der letzten Vorgabe alle so viele Wochen (in der Erholungswoche) */ testEveryWeeks?: number;
+  /** Sweet-Spot-Leiter [Wiederholungen, Minuten] */ ssLadder?: [number, number][] }
 /** Zeit pro Wochentag: 0 kein Training, 1 kurz (bis 45 min), 2 mittel (bis 90 min), 3 lang (mehr als 90 min) */
 export type DayLoad = 0 | 1 | 2 | 3;
 export const DAYLOAD_MIN: Record<DayLoad, number> = { 0: 0, 1: 45, 2: 90, 3: 180 };
@@ -68,6 +83,8 @@ export interface Profile {
   teamSportName: string;
   thresholds: Thresholds;
   weeklyHours: number;
+  /** Wochenlimit gilt inklusive Teamsport (sonst nur eigenes Training) */
+  budgetInclTeam?: boolean;
   maxDayHours: number;
   /** alte Form: verfügbare Zeitfenster je Wochentag 0=So … 6=Sa (neu: dayLoad) */
   availability: Record<number, DayWindow[]>;
@@ -101,6 +118,8 @@ export interface Profile {
   /** eigener Aufbau-Rhythmus (sonst: Erwachsene 3+1 mit +10 %, Jugendliche 2+1 mit +8 %) */
   progression?: Progression | null;
   strengthPlan?: StrengthPlan | null;
+  /** fester Wochenaufbau mit Wochenvorgaben (statt freier Verteilung) */
+  weekPattern?: WeekPattern | null;
   morning?: MorningSlot | null;
   /** langfristiges Lauf-Ziel für die Effizienz, z. B. 4:30/km bei Puls 120 */
   runGoal?: { paceSec: number; hr: number } | null;
@@ -145,7 +164,7 @@ export function thresholdPaceFromBest(km: number, sec: number): number {
 const BEST_KM: [keyof Bests, number][] = [['run10k', 10], ['runHalf', 21.0975], ['run5k', 5], ['runMarathon', 42.195]];
 
 /* Geschätzte Schwellen. Jeder Wert sagt, woher er kommt. */
-export function estimateThresholds(p: Partial<Profile>, today: string): { values: Required<Omit<Thresholds, 'estimated' | 'ftp' | 'cssSec' | 'aetHr' | 'vo2max' | 'source'>> & { ftp: number | null; cssSec: number | null }; basis: Partial<Record<ThresholdKey, string>> } {
+export function estimateThresholds(p: Partial<Profile>, today: string): { values: Required<Omit<Thresholds, 'estimated' | 'ftp' | 'cssSec' | 'aetHr' | 'vo2max' | 'source' | 'breast100Sec' | 'crawl25Sec'>> & { ftp: number | null; cssSec: number | null }; basis: Partial<Record<ThresholdKey, string>> } {
   const age = (p.birthYear ? +today.slice(0, 4) - p.birthYear : null);
   const basis: Partial<Record<ThresholdKey, string>> = {};
   const maxHr = Math.round(208 - 0.7 * (age ?? 35));

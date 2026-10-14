@@ -60,7 +60,9 @@ function exercisesHtml(tg: Target, list: any, st: any): string {
 /* Der ganze Block: Werte je Sportart, berechnete Angaben, RPE, Gefühl, Abweichung, Notiz */
 export function fieldsBlock(tg: Target): string {
   const st = rec(tg) || {};
-  const defs = SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }];
+  // Testfelder nur bei Tests (Lauftest, Radtest, Schwimmtest)
+  const isTest = /test/i.test(String((tg.planned && tg.planned.title) || ''));
+  const defs = (SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }]).filter(f => !f.test || isTest);
   const main = defs.filter(f => !f.more), extra = defs.filter(f => f.more);
   const prof = profile();
   const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds);

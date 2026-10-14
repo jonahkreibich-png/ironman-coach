@@ -364,6 +364,7 @@ export const de: Record<string, string> = {
   'ob.understoodTitle': 'Das habe ich verstanden', 'ob.understoodHint': 'Stimmt alles? Mit „Ändern“ springst du zur passenden Frage. Erst danach wird dein Plan gebaut.',
   'ob.change': 'Ändern', 'ob.buildPlan': 'Stimmt so, Plan erstellen', 'ob.dropped': 'Nicht alles passte in deine Zeit: {list}',
   'plan.explain': 'So ist dein Plan aufgebaut', 'plan.thisWeek': 'Diese Woche wichtig',
+  'plan.volume': 'Umfang {h} h', 'plan.volumeVs': 'Umfang {h} h ({p} % zur letzten Aufbauwoche)',
   'conn.viaIcu': 'über intervals.icu', 'conn.viaIcuShort': 'kommt über intervals.icu', 'conn.partnerShort': 'über intervals.icu verbinden (3 Schritte)',
   'conn.notConfiguredShort': 'noch nicht freigeschaltet, Alternative antippen', 'conn.notReady': 'noch nicht frei',
   'conn.serverKeys': 'Server-Schlüssel', 'conn.serverKeysAside': 'nur für dich als Betreiber', 'conn.serverKeysHint': 'Diese App-Schlüssel der Anbieter braucht der Server. Anleitung: FUER-JONAH.md, Abschnitt Verbindungen.',

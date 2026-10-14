@@ -57,7 +57,7 @@ on('gen-run', () => {
   const p = profile();
   try {
     const old = HAS_PLAN ? readPlan() : null;
-    RES = generatePlan({ profile: p, goal: { ...goal, date: goal.date || addDays(d.today, 84) }, today: d.today, currentWeeklyHours: recentHours(), continueFrom: old ? continuationOf(old, d.today) : null, load: C.loadBaseline(STATE, PLAN.weeks, d.today), needTests: TESTS ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined, maxWeeks: WEEKS || undefined });
+    RES = generatePlan({ profile: p, goal: { ...goal, date: goal.date || addDays(d.today, 84) }, today: d.today, currentWeeklyHours: recentHours(), continueFrom: old ? continuationOf(old, d.today, STATE) : null, load: C.loadBaseline(STATE, PLAN.weeks, d.today), needTests: TESTS ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined, maxWeeks: WEEKS || undefined });
   } catch (e: any) { toast(e.message); return; }
   nav.rerender();
 });

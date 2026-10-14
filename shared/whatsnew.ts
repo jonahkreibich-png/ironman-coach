@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '2.4.0', items: [
+    'Unter jeder Woche im Plan steht jetzt der Umfang und die Steigerung zur letzten Aufbauwoche.',
+    'Neue Tests: Radtest (20 min, drinnen oder draußen) und Schwimmtest (Kraul-Check). Die App übernimmt die Werte automatisch in Zonen, Watt und Technik-Stufe.',
+    'Der Plan knüpft an deine letzte Aufbauwoche an und steigt danach Woche für Woche.'
+  ] },
   { version: '2.3.0', items: [
     'Felder statt Notizfeld: Bei jeder Einheit trägst du Werte direkt ein (Pace, Puls, Kadenz, Watt, Schwimm-Technik …). Uhr und intervals.icu füllen sie automatisch, alte Notizen sind schon übertragen.',
     'Frag den Coach „Was genau soll ich heute machen?“: Er erklärt die Einheit Schritt für Schritt mit deinen Pulswerten. Unter Coach siehst du außerdem, was der Coach gerade in deinen Daten sieht.',

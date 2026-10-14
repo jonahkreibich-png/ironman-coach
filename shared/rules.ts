@@ -7,13 +7,31 @@
 import { isGame, isIntervals, plannedLoad, addDays, illnessAt, returnStageActive } from './core';
 
 /* Hart = Intensität (Intervalle, Tests, Spiel, Koppeltraining im Renntempo). Lange lockere Einheiten zählen nicht als hart. */
-export function isIntense(s: any): boolean { return !!s && !s.cancelled && (isIntervals(s) || isGame(s) || !!s.hard || /test\b|koppel|wettkampf/i.test(s.title || '')); }
+export function isIntense(s: any): boolean {
+  if (!s || s.cancelled) return false;
+  if (/Kraul-Check/i.test(s.title || '') && !s.hard) return false;
+  if (/koppel/i.test(s.title || '') && (s.plannedMinutes || 0) <= 20 && !s.hard) return false;
+  return isIntervals(s) || isGame(s) || !!s.hard || /test\b|koppel|wettkampf/i.test(s.title || '');
+}
 
 export interface Violation { rule: 'volume' | 'runVolume' | 'hardDays' | 'illness' | 'age' | 'hardCount' | 'format'; week?: number; date?: string; msg: string }
 export interface RuleCtx { minor?: boolean; age?: number | null; illness?: any[]; today?: string; maxHardPerWeek?: number; /** eigener Aufbau-Rhythmus (profile.progressionOf), höchstens 10 */ maxIncPct?: number }
 
 export function weekMinutes(w: any, sport?: string): number {
   return (w.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport !== 'rest' && !s.cancelled && (!sport || s.sport === sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || (s.sport === 'football' ? 75 : 0)), 0), 0);
+}
+/* eigenes Training einer Woche: ohne Teamsport und Wettkämpfe (feste Termine, die nicht „steigen“) */
+export function ownWeekMinutes(w: any): number {
+  return (w.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport !== 'rest' && s.sport !== 'football' && !s.race && !s.cancelled).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
+}
+/* Umfang einer Woche (eigenes Training) und Veränderung zur letzten Aufbauwoche davor (nicht Erholung) */
+export function weekVolume(weeks: any[], i: number): { min: number; refMin: number | null; pct: number | null; refWeek: number | null } {
+  const w = weeks[i]; if (!w) return { min: 0, refMin: null, pct: null, refWeek: null };
+  const min = ownWeekMinutes(w);
+  let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || ownWeekMinutes(weeks[j]) <= 0)) j--;
+  if (j < 0) return { min, refMin: null, pct: null, refWeek: null };
+  const refMin = ownWeekMinutes(weeks[j]);
+  return { min, refMin, pct: Math.round((min / refMin - 1) * 100), refWeek: weeks[j].weekNumber ?? null };
 }
 export function weekLoad(w: any): number {
   return (w.days || []).reduce((a: number, d: any) => a + (d.sessions || []).reduce((b: number, s: any) => b + plannedLoad(s), 0), 0);
@@ -28,9 +46,12 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
   // Umfang: gegen die letzte normale Woche (nach einer Erholungswoche zählt die Woche davor)
   for (let i = Math.max(1, firstNew); i < all.length; i++) {
     const w = all[i];
-    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced)) j--;
+    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || (all[j].races || []).length)) j--;
+    // Wiedereinstieg nach Krankheit: niedriger als die Woche davor, keine Steigerung zu prüfen
+    if (w.entry) continue;
     const ref = all[j];
-    const refMin = weekMinutes(ref), cur = weekMinutes(w);
+    // eigenes Training (Teamsport ist ein fester Termin und steigt nicht)
+    const refMin = ownWeekMinutes(ref), cur = ownWeekMinutes(w);
     if (refMin >= 60 && cur > refMin * maxInc + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
     const refRun = weekMinutes(ref, 'run'), curRun = weekMinutes(w, 'run');
     if (refRun >= 40 && curRun > refRun * maxInc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });

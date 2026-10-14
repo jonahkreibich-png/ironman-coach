@@ -14,7 +14,7 @@ export function replanPlan(old: any, profile: Profile, goals: Goal[], today: str
   const stages = o.stages || {};
   const eff = C.applyAdjustments(old.weeks || [], o.adjustments || {});
   const load = o.state ? C.loadBaseline({ ...o.state, adjustments: o.adjustments || o.state.adjustments }, eff, today) : null;
-  const gen = generatePlan({ profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, continueFrom: continuationOf(old, today), needTests: o.needTests,
+  const gen = generatePlan({ profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, continueFrom: continuationOf(old, today, o.state ? { ...o.state, adjustments: o.adjustments || o.state.adjustments } : undefined), needTests: o.needTests,
     stages: { swim: stages.swim === undefined ? undefined as any : stages.swim, runwalk: stages.runwalk === undefined ? undefined as any : stages.runwalk } });
   const next = transitionPlan(old, gen.plan, today);
   const locked = C.planDays(eff).flatMap((d: any) => d.sessions.filter((s: any) => s.locked && d.date > today).map((s: any) => ({ s, date: d.date })));

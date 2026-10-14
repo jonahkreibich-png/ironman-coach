@@ -50,6 +50,8 @@ export interface Spec {
   area?: 'lower' | 'upper' | 'core';
   /** wann (z. B. „Morgens vor der Schule, höchstens 40 min.“) */
   when?: string;
+  /** Lernstufe mit Brust-Ausdauer bis zu dieser Dauer aufgefüllt (bleibt beim Stufenwechsel) */
+  fillMin?: number;
 }
 
 /* ---------- Tempo je Zone ---------- */
@@ -243,8 +245,9 @@ export function rebuildScaled(session: any, f: number): any {
 /* ---------- Bausteine ---------- */
 const S = (part: Step['part'], o: Omit<Step, 'part'>): Step => ({ part, ...o });
 const r5 = (x: number) => Math.max(5, Math.round(x / 5) * 5);
-export function runEasy(ctx: PaceCtx, min: number, o: { strides?: boolean; kind?: Kind } = {}): Spec {
-  return { sport: 'run', kind: o.kind || 'easy', ctx, steps: [S('main', { min: r5(min), zone: 2, note: o.strides ? 'am Ende 4 kurze Steigerungen über 15 s' : undefined })] };
+export function runEasy(ctx: PaceCtx, min: number, o: { strides?: boolean | number; kind?: Kind } = {}): Spec {
+  const n = o.strides === true ? 4 : o.strides || 0;
+  return { sport: 'run', kind: o.kind || 'easy', ctx, steps: [S('main', { min: r5(min), zone: 2, note: n ? (o.strides === true ? 'am Ende 4 kurze Steigerungen über 15 s' : `am Ende ${n} Steigerungsläufe über 15-20 s, dazwischen locker gehen`) : undefined })] };
 }
 export function runLong(ctx: PaceCtx, min: number): Spec { return { sport: 'run', kind: 'long', ctx, steps: [S('warm', { min: 10, zone: 1 }), S('main', { min: r5(min - 10), zone: 2 })] }; }
 export function runIntervals(ctx: PaceCtx, reps: number, min: number, rest: number, zone = 4): Spec {
@@ -257,6 +260,16 @@ export function bikeEasy(ctx: PaceCtx, min: number, kind: Kind = 'easy'): Spec {
 export function bikeLong(ctx: PaceCtx, min: number): Spec { return { sport: 'bike', kind: 'long', ctx, steps: [S('warm', { min: 15, zone: 1 }), S('main', { min: r5(min - 15), zone: 2, note: 'alle 20-30 min essen und trinken' })], noDistance: !!ctx.indoor }; }
 export function bikeIntervals(ctx: PaceCtx, reps: number, min: number, zone: number, rest: number): Spec {
   return { sport: 'bike', kind: zone >= 4 ? 'threshold' : zone === 3 ? 'tempo' : 'intervals', ctx, steps: [S('warm', { min: 15, zone: 1, note: 'mit 3 kurzen Antritten' }), S('main', { reps, min, zone, restMin: rest }), S('cool', { min: 10, zone: 1 })], noDistance: !!ctx.indoor };
+}
+/* Sweet Spot (Zone 3, knapp unter der Schwelle): Ein- und Ausrollen füllen bis zur gewünschten Dauer */
+export function bikeSweetSpot(ctx: PaceCtx, reps: number, min: number, total?: number): Spec {
+  const rest = min >= 15 ? 5 : 4;
+  const core = reps * min + (reps - 1) * rest;
+  const extra = total ? Math.max(0, r5(total) - core - 25) : 0;
+  const addWarm = Math.round(extra / 2 / 5) * 5;
+  const warm = 15 + addWarm, cool = 10 + Math.max(0, extra - addWarm);
+  return { sport: 'bike', kind: 'tempo', ctx, title: `Sweet Spot ${reps}×${min} min${ctx.indoor ? ' (Rolle)' : ''}`, noDistance: !!ctx.indoor,
+    steps: [S('warm', { min: warm, zone: 1, note: 'mit 3 kurzen Antritten' }), S('main', { reps, min, zone: 3, restMin: rest, note: 'gleichmäßig im oberen Bereich von Zone 3 (Sweet Spot), Trittfrequenz 85-95' }), S('cool', { min: cool, zone: cool > 15 ? 2 : 1, note: cool > 15 ? 'locker in Zone 2 ausfahren' : undefined })] };
 }
 export function swimSession(ctx: PaceCtx, kind: Kind, mainSets: Step[], warmM = 200, coolM = 100, warmMode: StrokeMode = 'easy'): Spec {
   return { sport: 'swim', kind, ctx, steps: [S('warm', { m: warmM, zone: 1, mode: warmMode }), ...mainSets, S('cool', { m: coolM, zone: 1, mode: 'easy' })] };
@@ -301,13 +314,31 @@ export function runLadderStart(continuousMin: number | null | undefined): number
   if (continuousMin == null || continuousMin >= 30) return null;
   return continuousMin < 3 ? 0 : continuousMin < 5 ? 1 : continuousMin < 8 ? 2 : continuousMin < 12 ? 3 : continuousMin < 15 ? 4 : continuousMin < 20 ? 5 : 6;
 }
-export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean }, why?: string): Spec {
+export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean }, why?: string, fillMin?: number): Spec {
   const L = stage.ladder === 'swimBreast' ? SWIM_BREAST_LADDER : SWIM_LADDER;
   const st = L[Math.min(stage.n, L.length - 1)] as any;
   // wer Brust kann: Brust zum Einschwimmen und zwischendurch für die Ausdauer, Kraul in kurzen Stücken mit Technik
-  const br = stage.ladder === 'swim' && stage.breast && stage.n <= 4;
-  return { sport: 'swim', kind: 'swimlearn', ctx, stage, why, tip: st.tip + ' Die nächste Stufe kommt, sobald diese klappt.',
-    steps: [S('warm', { m: br ? 200 : st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' || br ? 'breast' : 'easy' }), ...st.main.map((x: Step) => ({ ...x })), ...(br ? [S('main', { reps: 2, m: 100, zone: 2, mode: 'breast', restSec: 30, note: 'ruhig, für die Ausdauer im Wasser' })] : []), S('cool', { m: 100, zone: 1, mode: br ? 'breast' : 'easy' })] };
+  const br = !!(stage.ladder === 'swim' && stage.breast && stage.n <= 4) || (!!fillMin && stage.ladder === 'swimBreast');
+  const endu = S('main', { reps: 2, m: 100, zone: 2, mode: 'breast', restSec: 30, note: 'ruhig, für die Ausdauer im Wasser' });
+  const spec: Spec = { sport: 'swim', kind: 'swimlearn', ctx, stage, why, tip: st.tip + ' Die nächste Stufe kommt, sobald diese klappt.',
+    steps: [S('warm', { m: br ? 200 : st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' || br ? 'breast' : 'easy' }), ...st.main.map((x: Step) => ({ ...x })), ...(br ? [endu] : []), S('cool', { m: 100, zone: 1, mode: br ? 'breast' : 'easy' })] };
+  // länger schwimmen (z. B. 45-55 min): mehr Brust-Ausdauer in 100-m-Stücken, die Kraul-Stücke bleiben so kurz wie die Stufe
+  if (fillMin && br) { spec.fillMin = fillMin; for (let k = 0; k < 30 && totals(spec).min + 3 <= fillMin; k++) endu.reps = (endu.reps || 1) + 1; }
+  return spec;
+}
+/* Schwimmtest (Kraul-Check) zu Beginn der Einheit, danach Technik wie gewohnt. Ab 400 m Kraul am Stück: CSS-Test (swimTest). */
+export function swimCheck(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean } | null, fillMin?: number): Spec {
+  const tech = stage ? swimLearn(ctx, { ...stage, breast: true }).steps.filter(x => x.part === 'main' && x.mode !== 'breast') : [S('main', { reps: 6, m: 25, zone: 1, mode: 'drill', restSec: 20 })];
+  const spec: Spec = { sport: 'swim', kind: 'test', title: 'Schwimmtest: Kraul-Check', ctx,
+    why: 'Zeigt, wie weit du am Stück kraulen kannst und wie effizient. Daraus kommen Schwimm-Score und Technik-Stufe.',
+    tip: 'Werte direkt nach dem Test eintragen: längste Strecke Kraul am Stück, Ø Zeit und Züge pro 25-m-Bahn, Zeit für 200 m Brust.',
+    steps: [S('warm', { m: 200, zone: 1, mode: 'breast', note: 'einschwimmen' }),
+      S('main', { reps: 1, m: 50, zone: 2, mode: 'crawl', note: '(a) Kraul so weit wie möglich am Stück, ruhig atmen. Strecke merken' }),
+      S('main', { reps: 4, m: 25, zone: 3, mode: 'crawl', restSec: 30, note: '(b) locker-zügig, Zeit und Züge pro Bahn merken' }),
+      S('main', { reps: 1, m: 200, zone: 3, mode: 'breast', note: '(c) 200 m Brust auf Zeit' }),
+      ...tech.map(x => ({ ...x, note: x.note ? 'danach Technik: ' + x.note : 'danach Technik' })), S('cool', { m: 100, zone: 1, mode: 'breast' })] };
+  if (fillMin) for (let k = 0; k < 10 && totals(spec).min + 4 <= fillMin; k++) spec.steps.splice(spec.steps.length - 1, 0, S('main', { reps: 1, m: 100, zone: 2, mode: 'breast', note: 'ruhig' }));
+  return spec;
 }
 export function runWalk(ctx: PaceCtx, n: number, why?: string): Spec {
   const st = RUNWALK_LADDER[Math.min(n, RUNWALK_LADDER.length - 1)];
@@ -332,14 +363,16 @@ const AREA: Record<'lower' | 'upper' | 'core', Exercise[]> = {
   core: [{ name: 'Unterarmstütz', sets: 3, reps: '40 s' }, { name: 'Seitstütz', sets: 3, reps: '30 s je Seite' }, { name: 'Dead Bug', sets: 3, reps: '10 je Seite' }, { name: 'Superman (Rückenstrecker)', sets: 3, reps: '12' }]
 };
 export const AREA_LABEL: Record<'lower' | 'upper' | 'core', string> = { lower: 'Unterkörper', upper: 'Oberkörper', core: 'Rumpf' };
-export function strengthArea(area: 'lower' | 'upper' | 'core', o: { light?: boolean; knee?: boolean; back?: boolean; shoulder?: boolean; why?: string } = {}): Spec {
+export function strengthArea(area: 'lower' | 'upper' | 'core', o: { light?: boolean; knee?: boolean; back?: boolean; shoulder?: boolean; why?: string; minutes?: number; easy?: boolean } = {}): Spec {
   let ex = AREA[area].map(e => ({ ...e }));
+  // am Tag vor einem Test: 2 Sätze, nichts Explosives
+  if (o.easy) ex = ex.filter(e => !/Nordic|Sprung/.test(e.name)).map(e => ({ ...e, sets: Math.min(2, e.sets), note: [e.note, 'leicht, nichts Explosives'].filter(Boolean).join(', ') }));
   if (o.knee) ex = ex.map(e => /Kniebeuge|Ausfallschritt/.test(e.name) ? { ...e, name: e.name + ' (nur so tief, wie es schmerzfrei geht)' } : e);
   if (o.back) ex = ex.filter(e => !/Kreuzheben|Nordic/.test(e.name));
   if (o.shoulder) ex = ex.filter(e => !/Liegestütz|Y-T-W|Klimmzug/.test(e.name));
   if (o.light) ex = ex.map(e => ({ ...e, sets: Math.max(1, e.sets - 1), note: [e.note, 'leichter als sonst'].filter(Boolean).join(', ') }));
   const sets = ex.reduce((a, e) => a + e.sets, 0);
-  const mainMin = Math.max(15, Math.min(40, Math.round(sets * 1.3 / 5) * 5));
+  const mainMin = o.minutes ? Math.max(10, r5(o.minutes - 5)) : Math.max(15, Math.min(40, Math.round(sets * 1.3 / 5) * 5));
   return { sport: 'strength', kind: 'strength', ctx: {}, exercises: ex, why: o.why, area, steps: [S('warm', { min: 5 }), S('main', { min: mainMin })] } as Spec;
 }
 /* Krafteinheit passend zu den Sportarten. light: Erholungswoche oder Tapering (weniger Sätze). */
@@ -361,6 +394,9 @@ export function strengthSession(sports: string[], o: { light?: boolean; minutes?
 }
 
 /* ---------- Tests ---------- */
-export function runTest(ctx: PaceCtx): Spec { return { sport: 'run', kind: 'test', title: 'Lauftest 30 min', ctx, why: 'Daraus berechnet die App deine echten Zonen statt der Schätzung.', steps: [S('warm', { min: 15, zone: 1, note: 'mit 3 Steigerungen' }), S('main', { min: 30, zone: 4, note: 'so schnell, wie du es gleichmäßig 30 min halten kannst. Ø-Puls der letzten 20 min = Schwellenpuls, Pace = Schwellen-Pace' }), S('cool', { min: 10, zone: 1 })] }; }
-export function bikeTest(ctx: PaceCtx): Spec { return { sport: 'bike', kind: 'test', title: 'Radtest 20 min', ctx, noDistance: true, why: 'Daraus berechnet die App deine echten Zonen statt der Schätzung.', steps: [S('warm', { min: 20, zone: 1, note: 'mit 3 kurzen Antritten' }), S('main', { min: 20, zone: 4, note: 'volle, gleichmäßige Leistung. 95 % der Ø-Leistung = FTP, Ø-Puls ≈ Schwellenpuls' }), S('cool', { min: 10, zone: 1 })] }; }
+export function runTest(ctx: PaceCtx): Spec { return { sport: 'run', kind: 'test', title: 'Lauftest 30 min', ctx, why: 'Daraus berechnet die App deine echten Zonen statt der Schätzung.', tip: 'Möglichst flache Strecke ohne Ampeln. Liefert die Uhr keine Runde für die 30 min, Ø-Puls der letzten 20 min und Ø-Pace selbst eintragen.', steps: [S('warm', { min: 15, zone: 1, note: 'einlaufen, mit 3 Steigerungen' }), S('main', { min: 30, zone: 4, note: 'so schnell, wie du es gleichmäßig 30 min halten kannst. Ø-Puls der letzten 20 min = Schwellenpuls, Ø-Pace = Schwellen-Pace' }), S('cool', { min: 10, zone: 1, note: 'auslaufen' })] }; }
+export function bikeTest(ctx: PaceCtx): Spec { return { sport: 'bike', kind: 'test', title: 'Radtest 20 min', ctx, noDistance: true, why: 'Daraus berechnet die App deine Rad-Zonen: Ø-Puls der 20 min = Schwellenpuls Rad, mit Wattmessung FTP = 95 % der Ø-Watt.',
+  tip: 'Drinnen oder draußen, wie du willst. Draußen eine gleichmäßige Strecke ohne Stopps (flach oder ein langer Anstieg). Ohne Wattmessung zählt nur der Puls.',
+  steps: [S('warm', { min: 20, zone: 1, note: 'einfahren mit 3×1 min zügig' }), S('warm', { min: 5, zone: 1, note: 'locker' }), S('warm', { min: 5, zone: 4, note: 'hart' }), S('warm', { min: 10, zone: 1, note: 'locker' }),
+    S('main', { min: 20, zone: 4, note: 'maximal gleichmäßig, nicht zu schnell anfangen' }), S('cool', { min: 10, zone: 1, note: 'ausfahren' })] }; }
 export function swimTest(ctx: PaceCtx): Spec { return { sport: 'swim', kind: 'test', title: 'Schwimmtest 400/200 m', ctx, why: 'Daraus berechnet die App deine Schwimm-Schwelle (CSS).', steps: [S('warm', { m: 300, zone: 1, mode: 'easy' }), S('main', { reps: 1, m: 400, zone: 4, mode: 'crawl', note: 'so schnell wie gleichmäßig möglich' }), S('main', { reps: 1, m: 200, zone: 4, mode: 'crawl', note: 'nach 5 min Pause, wieder voll' }), S('cool', { m: 100, zone: 1, mode: 'easy' })] }; }

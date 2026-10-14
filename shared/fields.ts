@@ -6,7 +6,7 @@
 import * as C from './core';
 
 export type FieldKind = 'num' | 'pace' | 'text' | 'select' | 'splits' | 'exercises';
-export interface FieldDef { key: string; label: string; unit?: string; kind: FieldKind; options?: [string, string][]; ph?: string; more?: boolean }
+export interface FieldDef { key: string; label: string; unit?: string; kind: FieldKind; options?: [string, string][]; ph?: string; more?: boolean; /** nur bei Tests */ test?: boolean }
 export interface Split { km: number; pace: string; hr: number | null }
 export interface ExerciseDone { name: string; sets: number | null; reps: string; kg: number | null }
 
@@ -17,7 +17,8 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'decoupling', label: 'aerobe Entkopplung', unit: '%', kind: 'num' }, { key: 'efficiency', label: 'aerobe Effizienz', kind: 'num' },
     { key: 'cadence', label: 'Kadenz', unit: 'spm', kind: 'num' }, { key: 'vertRatio', label: 'vertikales Verhältnis', unit: '%', kind: 'num', more: true },
     { key: 'vo2max', label: 'VO2max', kind: 'num', more: true }, { key: 'cardioRecovery', label: 'Cardio-Erholung', unit: 'bpm', kind: 'num', more: true },
-    { key: 'splits', label: 'Splits je km', kind: 'splits', more: true }
+    { key: 'splits', label: 'Splits je km', kind: 'splits', more: true },
+    { key: 'testHr', label: 'Test: Ø Puls der letzten 20 min', unit: 'bpm', kind: 'num', test: true }, { key: 'testPace', label: 'Test: Ø Pace der 30 min', unit: '/km', kind: 'pace', ph: '4:40', test: true }
   ],
   bike: [
     { key: 'min', label: 'Dauer', unit: 'min', kind: 'num' }, { key: 'km', label: 'Distanz', unit: 'km', kind: 'num' },
@@ -26,14 +27,17 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'hr', label: 'Ø Puls', unit: 'bpm', kind: 'num' }, { key: 'maxHr', label: 'max. Puls', unit: 'bpm', kind: 'num' },
     { key: 'indoor', label: 'Wo', kind: 'select', options: [['', '–'], ['in', 'drinnen (Smart Trainer)'], ['out', 'draußen']] },
     { key: 'bikeType', label: 'Rad', kind: 'select', options: [['', '–'], ['gravel', 'Gravelbike'], ['road', 'Rennrad'], ['mtb', 'Mountainbike'], ['other', 'anderes']] },
-    { key: 'speed', label: 'Ø Tempo', unit: 'km/h', kind: 'num', more: true }
+    { key: 'speed', label: 'Ø Tempo', unit: 'km/h', kind: 'num', more: true },
+    { key: 'testHr', label: 'Test: Ø Puls der 20 min', unit: 'bpm', kind: 'num', test: true }, { key: 'testPower', label: 'Test: Ø Watt der 20 min (falls gemessen)', unit: 'W', kind: 'num', test: true }
   ],
   swim: [
     { key: 'min', label: 'Dauer', unit: 'min', kind: 'num' }, { key: 'meters', label: 'Distanz', unit: 'm', kind: 'num' },
     { key: 'pace100', label: 'Ø Pace Kraul', unit: '/100 m', kind: 'pace', ph: '2:30' }, { key: 'spl', label: 'Züge pro Bahn', kind: 'num' },
     { key: 'rate', label: 'Züge pro Minute', kind: 'num' }, { key: 'dps', label: 'Meter pro Zug', unit: 'm', kind: 'num' },
     { key: 'longestCrawl', label: 'längste Strecke Kraul am Stück', unit: 'm', kind: 'num' }, { key: 'crawlShare', label: 'Anteil Kraul (Rest Brust)', unit: '%', kind: 'num' },
-    { key: 'technique', label: 'Technik-Schwerpunkt oder -Problem', kind: 'text', ph: 'z. B. Atmung, Beine sinken ab' }
+    { key: 'technique', label: 'Technik-Schwerpunkt oder -Problem', kind: 'text', ph: 'z. B. Atmung, Beine sinken ab' },
+    { key: 'crawl25', label: 'Test: Ø Zeit pro 25 m Kraul', kind: 'pace', ph: '0:35', test: true }, { key: 'breast200', label: 'Test: 200 m Brust', unit: 'min', kind: 'pace', ph: '4:10', test: true },
+    { key: 'css400', label: 'Test: 400 m Kraul', unit: 'min', kind: 'pace', ph: '8:30', test: true }, { key: 'css200', label: 'Test: 200 m Kraul', unit: 'min', kind: 'pace', ph: '4:05', test: true }
   ],
   strength: [
     { key: 'area', label: 'Bereich', kind: 'select', options: [['', '–'], ['upper', 'Oberkörper'], ['lower', 'Unterkörper'], ['core', 'Rumpf'], ['full', 'Ganzkörper']] },
@@ -199,36 +203,84 @@ export function migrateNotes(state: any, weeks: any[]): number {
   return n;
 }
 
-/* ---------- Nach dem Schwellentest: Zonen automatisch aktualisieren (Auftrag 7) ----------
-   Ein erledigter Lauftest der letzten 21 Tage, der noch nicht übernommen wurde. Aus der Uhr: die Belastungsrunde von 20-35 min
-   (Ø-Puls × 1,01, weil der Puls der letzten 20 Minuten etwas höher liegt als der Schnitt); sonst die eingetragenen Werte (Ø-Puls, Ø-Pace
-   des Tests). Nur plausible Werte (Puls 85-110 % und Pace 75-125 % der bisherigen Werte); die aerobe Schwelle wächst im gleichen Verhältnis. */
-export interface TestUpdate { sessionId: string; date: string; lthrRun: number; thresholdPaceRunSec: number | null; aetHr: [number, number] | null; text: string }
+/* ---------- Nach einem Test: Zonen, Pace und Watt automatisch aktualisieren (Auftrag 7 und 8) ----------
+   Ein erledigter Test der letzten 21 Tage, der noch nicht übernommen wurde. Nur plausible Werte; jeder Test nur einmal.
+   - Lauf: Belastungsrunde von 20-35 min von der Uhr (Ø-Puls × 1,01, der Puls der letzten 20 min liegt etwas höher), sonst die Testfelder
+     (Ø-Puls der letzten 20 min, Ø-Pace), sonst Ø-Puls und Ø-Pace der Einheit. Puls 85-110 %, Pace 75-125 % der bisherigen Werte.
+     Die aerobe Schwelle wächst im gleichen Verhältnis.
+   - Rad: 20-min-Runde von der Uhr oder die Testfelder. Schwellenpuls Rad = Ø-Puls der 20 min, mit Wattmessung FTP = 95 % der Ø-Watt.
+     Ohne Watt werden die Rad-Zonen nur über den Puls gesetzt.
+   - Schwimmen (Kraul-Check): längste Strecke Kraul am Stück (Können und Lernstufe), Ø Zeit pro 25 m Kraul, Brust-Tempo aus 200 m Brust.
+     CSS-Test: Schwimm-Schwelle = (Zeit 400 m − Zeit 200 m) / 2 pro 100 m. */
+export type TestSportKey = 'run' | 'bike' | 'swim';
+export interface TestUpdate { sport: TestSportKey; sessionId: string; date: string; thresholds: Record<string, any>; skills?: Record<string, any>; settings?: Record<string, any>; text: string; title: string;
+  /** Lauf (wie bisher) */ lthrRun?: number; thresholdPaceRunSec?: number | null; aetHr?: [number, number] | null }
+const secOf = (v: any): number | null => { const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v == null ? '' : v).trim()); return m ? +m[1] * 60 + +m[2] : null; };
 export function runTestUpdate(state: any, weeks: any[], profile: any, today: string): TestUpdate | null {
   const th = profile.thresholds || {}; const applied: string[] = profile.appliedTests || [];
+  const when = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}.`;
   for (const d of C.planDays(weeks).filter((x: any) => x.date <= today && x.date >= C.addDays(today, -21)).reverse()) {
     for (const s of d.sessions) {
-      if (s.sport !== 'run' || !/test/i.test(s.title || '') || applied.includes(s.id)) continue;
+      if (!/test/i.test(s.title || '') || applied.includes(s.id) || !['run', 'bike', 'swim'].includes(s.sport)) continue;
       const st = (state.sessions || {})[s.id]; if (!st || !st.completed) continue;
+      const m = st.metrics || {};
       const act = st.activityId ? (state.activities || {})[st.activityId] : null;
-      let hr: number | null = null, pace: number | null = null;
-      const lap = act && (act.laps || []).filter((l: any) => l.sec >= 1200 && l.sec <= 2100 && l.avgHr && l.kind !== 'rest').sort((a: any, b: any) => (b.avgHr || 0) - (a.avgHr || 0))[0];
-      if (lap) { hr = Math.round(lap.avgHr * 1.01); pace = lap.m ? Math.round(lap.sec * 1000 / lap.m) : null; }
-      else { const f = fieldsOf(st, 'run'); hr = f.hr; pace = f.paceSec; }
-      if (!hr) continue;
-      const okHr = !th.lthrRun || (hr >= th.lthrRun * 0.85 && hr <= th.lthrRun * 1.1);
-      const okPace = pace == null || !th.thresholdPaceRunSec || (pace >= th.thresholdPaceRunSec * 0.75 && pace <= th.thresholdPaceRunSec * 1.25);
-      if (!okHr || !okPace) continue;
-      const k = th.lthrRun ? hr / th.lthrRun : 1;
-      const aet: [number, number] | null = th.aetHr ? [Math.round(th.aetHr[0] * k), Math.round(th.aetHr[1] * k)] : null;
-      const parts = [`Schwellenpuls ${th.lthrRun || '–'} → ${hr}`, pace ? `Schwellen-Pace ${th.thresholdPaceRunSec ? mmss(th.thresholdPaceRunSec) : '–'} → ${mmss(pace)}/km` : '', aet ? `aerobe Schwelle ${th.aetHr[0]}-${th.aetHr[1]} → ${aet[0]}-${aet[1]}` : ''].filter(Boolean);
-      return { sessionId: s.id, date: d.date, lthrRun: hr, thresholdPaceRunSec: pace, aetHr: aet, text: `Aus deinem ${s.title} (${d.date.slice(8)}.${d.date.slice(5, 7)}.): ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit. Ändern kannst du die Werte unter Mehr → Einstellungen.` };
+      const laps = ((act && act.laps) || []).filter((l: any) => l.kind !== 'rest');
+      if (s.sport === 'run') {
+        let hr: number | null = null, pace: number | null = null;
+        const lap = laps.filter((l: any) => l.sec >= 1200 && l.sec <= 2100 && l.avgHr).sort((a: any, b: any) => (b.avgHr || 0) - (a.avgHr || 0))[0];
+        if (lap) { hr = Math.round(lap.avgHr * 1.01); pace = lap.m ? Math.round(lap.sec * 1000 / lap.m) : null; }
+        else if (num(m.testHr)) { hr = num(m.testHr); pace = secOf(m.testPace); }
+        else { const f = fieldsOf(st, 'run'); hr = f.hr; pace = f.paceSec; }
+        if (!hr) continue;
+        const okHr = !th.lthrRun || (hr >= th.lthrRun * 0.85 && hr <= th.lthrRun * 1.1);
+        const okPace = pace == null || !th.thresholdPaceRunSec || (pace >= th.thresholdPaceRunSec * 0.75 && pace <= th.thresholdPaceRunSec * 1.25);
+        if (!okHr || !okPace) continue;
+        const k = th.lthrRun ? hr / th.lthrRun : 1;
+        const aet: [number, number] | null = th.aetHr ? [Math.round(th.aetHr[0] * k), Math.round(th.aetHr[1] * k)] : null;
+        const parts = [`Schwellenpuls ${th.lthrRun || '–'} → ${hr}`, pace ? `Schwellen-Pace ${th.thresholdPaceRunSec ? mmss(th.thresholdPaceRunSec) : '–'} → ${mmss(pace)}/km` : '', aet ? `aerobe Schwelle ${th.aetHr[0]}-${th.aetHr[1]} → ${aet[0]}-${aet[1]}` : ''].filter(Boolean);
+        return { sport: 'run', sessionId: s.id, date: d.date, lthrRun: hr, thresholdPaceRunSec: pace, aetHr: aet, title: 'Zonen aktualisiert',
+          thresholds: { lthrRun: hr, ...(pace ? { thresholdPaceRunSec: pace } : {}), ...(aet ? { aetHr: aet } : {}) }, settings: { lthrRun: hr, ...(pace ? { thresholdPaceRunSec: pace } : {}) },
+          text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit. Ändern kannst du die Werte unter Mehr → Einstellungen.` };
+      }
+      if (s.sport === 'bike') {
+        let hr: number | null = null, watt: number | null = null;
+        const lap = laps.filter((l: any) => l.sec >= 1080 && l.sec <= 1380 && l.avgHr).sort((a: any, b: any) => (b.avgHr || 0) - (a.avgHr || 0))[0];
+        if (lap) { hr = Math.round(lap.avgHr); watt = lap.power || null; }
+        if (num(m.testHr)) hr = num(m.testHr);
+        if (num(m.testPower)) watt = num(m.testPower);
+        if (!hr) continue;
+        if (th.lthrBike && (hr < th.lthrBike * 0.85 || hr > th.lthrBike * 1.1)) continue;
+        const ftp = watt && watt > 50 && watt < 600 ? Math.round(watt * 0.95) : null;
+        const parts = [`Schwellenpuls Rad ${th.lthrBike || '–'} → ${hr}`, ftp ? `FTP ${th.ftp || '–'} → ${ftp} W` : 'ohne Wattmessung: Rad-Zonen über den Puls'];
+        return { sport: 'bike', sessionId: s.id, date: d.date, title: 'Rad-Zonen aktualisiert', thresholds: { lthrBike: hr, ...(ftp ? { ftp } : {}) }, settings: { lthrBike: hr },
+          text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Die Rad-Einheiten rechnen ab jetzt damit${ftp ? ', die Sweet-Spot-Intervalle auch mit Watt' : ''}.` };
+      }
+      // Schwimmen
+      const longest = (act && act.swim && act.swim.longestContinuousM) || num(m.longestCrawl);
+      const t400 = secOf(m.css400), t200 = secOf(m.css200);
+      if (t400 && t200 && t400 > t200) {
+        const css = Math.round((t400 - t200) / 2);
+        if (css < 60 || css > 240) continue;
+        return { sport: 'swim', sessionId: s.id, date: d.date, title: 'Schwimm-Schwelle aktualisiert', thresholds: { cssSec: css }, skills: { swimCrawl: 'yes', swimCrawlM: Math.max(400, profile.skills && profile.skills.swimCrawlM || 0) },
+          text: `Aus deinem ${s.title} (${when(d.date)}): Schwimm-Schwelle (CSS) ${th.cssSec ? mmss(th.cssSec) : '–'} → ${mmss(css)}/100 m. Die Schwimm-Einheiten rechnen ab jetzt damit.` };
+      }
+      const c25 = secOf(m.crawl25), b200 = secOf(m.breast200);
+      if (!longest && !c25 && !b200) continue;
+      const t: Record<string, any> = {}; const sk: Record<string, any> = {}; const parts: string[] = [];
+      if (longest) { sk.swimCrawlM = Math.max(longest, (profile.skills && profile.skills.swimCrawlM) || 0); sk.swimCrawl = longest >= 400 ? 'yes' : 'some'; parts.push(`Kraul am Stück: ${longest} m${longest >= 400 ? ' (ab jetzt CSS-Test statt Kraul-Check)' : ''}`); }
+      if (c25 && c25 >= 12 && c25 <= 90) { t.crawl25Sec = c25; parts.push(`25 m Kraul in Ø ${mmss(c25)}${num(m.spl) ? ` mit ${num(m.spl)} Zügen` : ''}`); }
+      if (b200 && b200 >= 150 && b200 <= 600) { t.breast100Sec = Math.round(b200 / 2); parts.push(`Brust-Tempo ${mmss(Math.round(b200 / 2))}/100 m`); }
+      return { sport: 'swim', sessionId: s.id, date: d.date, title: 'Schwimmtest ausgewertet', thresholds: t, skills: sk,
+        text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Schwimm-Score und Technik-Stufe richten sich danach.` };
     }
   }
   return null;
 }
 export function applyTestUpdate(profile: any, u: TestUpdate): any {
-  const th = { ...profile.thresholds, lthrRun: u.lthrRun, ...(u.thresholdPaceRunSec ? { thresholdPaceRunSec: u.thresholdPaceRunSec } : {}), ...(u.aetHr ? { aetHr: u.aetHr } : {}), source: `Lauftest ${u.date.slice(8)}.${u.date.slice(5, 7)}.` };
-  th.estimated = (th.estimated || []).filter((k: string) => k !== 'lthrRun' && k !== 'thresholdPaceRunSec');
-  return { ...profile, thresholds: th, appliedTests: [...(profile.appliedTests || []), u.sessionId] };
+  const label = { run: 'Lauftest', bike: 'Radtest', swim: 'Schwimmtest' }[u.sport || 'run'];
+  const th = { ...profile.thresholds, ...(u.thresholds || {}), ...(u.sport === 'swim' ? {} : { source: `${label} ${u.date.slice(8)}.${u.date.slice(5, 7)}.` }) };
+  const done = Object.keys(u.thresholds || {});
+  th.estimated = (th.estimated || []).filter((k: string) => !done.includes(k));
+  return { ...profile, thresholds: th, ...(u.skills && Object.keys(u.skills).length ? { skills: { ...(profile.skills || {}), ...u.skills } } : {}), appliedTests: [...(profile.appliedTests || []), u.sessionId] };
 }

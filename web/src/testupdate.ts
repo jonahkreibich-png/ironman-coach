@@ -11,7 +11,7 @@ export function checkTestResult(): boolean {
   if (!u) return false;
   saveProfile(applyTestUpdate(profile(), u));
   const id = 'msg-test-' + u.sessionId;
-  STATE.coachMsgs[id] = { id, at: Date.now(), date: todayStr(), kind: 'info', from: 'coach', title: 'Zonen aktualisiert', text: u.text, unread: true, important: true };
-  invalidate(); toast('Zonen aus dem Lauftest übernommen');
+  STATE.coachMsgs[id] = { id, at: Date.now(), date: todayStr(), kind: 'info', from: 'coach', title: u.title, text: u.text, unread: true, important: true };
+  invalidate(); toast(u.sport === 'swim' ? 'Schwimmtest ausgewertet' : u.sport === 'bike' ? 'Rad-Zonen aus dem Test übernommen' : 'Zonen aus dem Lauftest übernommen');
   return true;
 }

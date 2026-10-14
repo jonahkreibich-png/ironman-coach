@@ -110,8 +110,8 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
     L.profile = applyTestUpdate(L.profile, tu); L.state.profile = L.profile;
     const sRec = await getRecord(env, uid, 'settings', 'main'); const sd = (sRec && sRec.data) || {};
     changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t }, updatedAt: t });
-    changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), lthrRun: L.profile.thresholds.lthrRun, thresholdPaceRunSec: L.profile.thresholds.thresholdPaceRunSec } }, updatedAt: t + 1 });
-    changes.push({ kind: 'coachMsg', key: 'msg-test-' + tu.sessionId, data: { id: 'msg-test-' + tu.sessionId, at: t, date: tu.date, kind: 'info', from: 'coach', title: 'Zonen aktualisiert', text: tu.text, important: true }, updatedAt: t + 2 });
+    if (tu.settings && Object.keys(tu.settings).length) changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), ...tu.settings } }, updatedAt: t + 1 });
+    changes.push({ kind: 'coachMsg', key: 'msg-test-' + tu.sessionId, data: { id: 'msg-test-' + tu.sessionId, at: t, date: tu.date, kind: 'info', from: 'coach', title: tu.title, text: tu.text, important: true }, updatedAt: t + 2 });
   }
   const ctx = engineCtx(L, opts.date);
   const r = analyze(ctx, trigger);

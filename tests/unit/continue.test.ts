@@ -17,7 +17,7 @@ function oldPlan() {
   const weeks = [0, 1, 2, 3, 4].map(i => {
     const mon = addDays('2026-09-14', i * 7);
     return { weekNumber: i + 1, label: 'Woche ' + (i + 1), startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: i === 4, focus: 'alt', days: [0, 1, 2, 3, 4, 5, 6].map(k => ({ date: addDays(mon, k), sessions: [
-      k === 1 ? { id: `w${i + 1}-tue-swim`, sport: 'swim', title: 'Kraultechnik', plannedMinutes: 40 } : k === 3 ? { id: `w${i + 1}-thu-run`, sport: 'run', title: 'Lockerer Lauf', plannedMinutes: 35, zone: 'Zone 2' } : k === 5 ? { id: `w${i + 1}-sat-bike`, sport: 'bike', title: 'Grundlagenfahrt', plannedMinutes: 60, zone: 'Zone 2' } : { id: `w${i + 1}-${k}-rest`, sport: 'rest', title: 'Ruhetag' }] })) };
+      k === 1 ? { id: `w${i + 1}-tue-swim`, sport: 'swim', title: 'Kraultechnik', plannedMinutes: 50 } : k === 3 ? { id: `w${i + 1}-thu-run`, sport: 'run', title: 'Lockerer Lauf', plannedMinutes: 60, zone: 'Zone 2' } : k === 5 ? { id: `w${i + 1}-sat-bike`, sport: 'bike', title: 'Grundlagenfahrt', plannedMinutes: 120, zone: 'Zone 2' } : { id: `w${i + 1}-${k}-rest`, sport: 'rest', title: 'Ruhetag' }] })) };
   });
   return { meta: { event: 'Ironman', eventDate: '2029-09-15', blockName: 'Block 1 · Grundlage', baseScores: { swim: 22, bike: 45, run: 62, strength: 52 }, scoreCalibration: { version: 2, date: '2026-10-03', scores: { swim: 30, bike: 48, run: 64, strength: 52 } } },
     weeks, seedMetrics: [{ date: '2026-09-01', sport: 'run', km: 5, min: 32, hr: 150 }], seedTrend: [{ date: '2026-09-01', ctl: 30 }], zonePercents: [], keyDates: [] };
@@ -63,12 +63,31 @@ describe('Plan geht weiter (kein Neustart)', () => {
     expect(sportScores(inp(plan)).map(s => s.score)).toEqual(sportScores(inp(oldPlan())).map(s => s.score));
     expect(sportScores(inp(plan)).find(s => s.sport === 'run')!.score).toBeGreaterThan(40);
   });
-  test('Umfang aus der Belastung: CTL vor der Krankheit, 15 % weniger zum Wiedereinstieg', () => {
+  test('Umfang aus der letzten Aufbauwoche (Auftrag 8): erledigt statt geplant, wenn abgehakt und deutlich weniger; nach Krankheit in Stufen', () => {
     const own = (w: any) => w.days.reduce((a: number, d: any) => a + d.sessions.filter((s: any) => ['swim', 'bike', 'run'].includes(s.sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
-    const target = ctlToWeekMin(32) * 0.85;
-    expect(own(w6)).toBeGreaterThan(target * 0.6);
-    expect(own(w6)).toBeLessThan(target * 1.35);
-    expect(plan.meta.explain.join(' ')).toMatch(/CTL 32 vor der Krankheit/);
+    // Woche 4 (5.-11.10.): krank vom 7. bis 10.10. → ausgelassen heißt nicht „zu viel“, es zählt der Plan (230 min)
+    const c = continuationOf(oldPlan(), today, st)!;
+    expect(c).toMatchObject({ lastNormalMin: 230, lastNormalTracked: false, lastNormalDoneMin: 80 });
+    const base = 230;
+    const [a, b, d] = ['2026-10-19', '2026-10-26', '2026-11-02'].map(m => plan.weeks.find((w: any) => w.startDate === m));
+    expect(a.entry).toBe(true); expect(b.entry).toBe(true); expect(d.entry).toBeUndefined();
+    expect(own(a)).toBeLessThan(own(d));
+    expect(own(d)).toBeGreaterThan(base * 0.6); expect(own(d)).toBeLessThan(base * 1.4);
+    const ex = plan.meta.explain.join(' ');
+    expect(ex).toMatch(/auf Höhe deiner letzten Aufbauwoche \(3,8 h\)/);
+    expect(ex).toMatch(/in Stufen: erst etwa 72 %, dann 90 %, dann wieder 100 %/);
+    // ohne Krankheit in der Woche: abgehakt (2 von 3) und deutlich weniger erledigt → das Erledigte zählt (mindestens 60 % des Plans)
+    const healthy = { ...st, illnessPeriods: [{ id: 'ill-x', start: '2026-09-01', end: '2026-09-03' }] };
+    expect(continuationOf(oldPlan(), today, healthy)).toMatchObject({ lastNormalTracked: true, lastNormalDoneMin: 80 });
+    const r3 = replanPlan(oldPlan(), profile, goals, today, { state: healthy, adjustments: {} })!;
+    expect(r3.plan.meta.explain.join(' ')).toMatch(/wie in deiner letzten Aufbauwoche erledigt \(2,3 h von 3,8 h\)/);
+    void ctlToWeekMin;
+  });
+  test('CTL zählt nicht, wenn Einheiten in den Daten fehlen (CTL viel niedriger als das Training)', () => {
+    const low = { ...state(), trend: state().trend.map((p: any) => ({ ...p, ctl: 8, atl: 8 })) };
+    const full = { ...low, sessions: { ...low.sessions, 'w4-sat-bike': { completed: true, metrics: { min: '120' } }, 'w4-thu-run': { completed: true, metrics: { min: '60' } }, 'w4-tue-swim': { completed: true, metrics: { min: '50' } } } };
+    const r2 = replanPlan(oldPlan(), profile, goals, today, { state: full, adjustments: {} })!;
+    expect(r2.plan.meta.explain.join(' ')).toMatch(/auf Höhe deiner letzten Aufbauwoche \(3,8 h\).*nicht alle Einheiten in den Daten/);
   });
   test('erste Woche nach der Krankheit: nichts Hartes außer dem Schwellentest, der liegt am Ende der Woche', () => {
     const hard = w6.days.flatMap((d: any) => d.sessions.filter((s: any) => s.hard && s.sport !== 'football').map((s: any) => ({ s, date: d.date })));
