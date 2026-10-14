@@ -15,6 +15,8 @@
 
 Getestet: 757 Unit- und Server-Tests, 117 E2E-Tests (Chromium und WebKit), Layout 320-430 px und 130 % Zoom hell/dunkel. Erst in der Test-App mit einer Kopie deiner Daten, dann in der echten App (vorher gesichert). Version 2.3.0.
 
+Beim nächsten Öffnen lädt die App einmal neu und zeigt Woche 6 als „Block 2, Woche 1“. Läuft live seit 14.10. (Sicherung vorher in data-export/). Der Code liegt im Zweig entwicklung; hochladen zu GitHub (main) war hier nicht erlaubt und ist für die App nicht nötig.
+
 ## Freigabe (13.10.2026)
 
 **Deine echte App hat jetzt diese Adresse: https://coach-app-efc7.pages.dev**
