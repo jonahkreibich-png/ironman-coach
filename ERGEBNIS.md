@@ -1,5 +1,20 @@
 # Ergebnis
 
+## Auftrag 7 (13./14.10.2026)
+
+**Dein Plan geht weiter.** Block 1 endet mit Woche 5 (Erholung bis 18.10.). Ab 19.10. Block 2: Woche 6 = Block 2, Woche 1, locker nach der Erkältung (ca. 4 h eigenes Training, Umfang aus deiner Fitness vor der Erkältung, CTL 32, minus 15 %), Lauftest am Sonntag 25.10., danach 3 Wochen +10 % und 1 Woche Erholung. Scores sind zurück (Schwimmen 33, Rad 50, Laufen 68, Kraft 44 statt 25/37/35/44), dazu Verlauf, Kalibrierung und deine echten Schwellen (LTHR 170). Erledigte Einheiten und Morgenwerte waren nie weg.
+
+| Punkt | Was |
+|---|---|
+| **1** Umfang ragt heraus | Ursache: das Diagramm zeichnete alle 65 Wochen, die Balken brachen um und ragten aus der Karte. Jetzt 12 Wochen rund um heute. Der Layout-Test prüft zusätzlich „ragt aus seiner Karte“ und „Wort mitten umgebrochen“ (dabei noch „Verlauf/Notizen“ im Coach und „0/10“ im Plan gefunden und behoben). |
+| **2** Plan geht weiter | Ursachen: der neue Plan ersetzte Kalibrierung und Verlauf, zählte neu ab „Woche 1“, nahm 1,2 h aus dem Fragebogen statt deiner Belastung, und beim Umzug hat das leere iPhone deine Schwellen überschrieben. Alles behoben, mit Tests. Regel für alle: Fragebogen und Profiländerung setzen fort. Dein Profil ist vollständig eingetragen (17 J., 184 cm, 73 kg, Ironman 2029, Weg Sprint → Olympisch → Halb-Ironman, LTHR 170, aerobe Schwelle 150-155, VO2max 57,5, Schwimmbad Di + Wochenende, morgens max. 40 min ohne Bad, Fußball Mo/Fr bis Okt. 2027, Kraft Di Unterkörper / Fr Oberkörper, Mobility täglich, Lauf-Ziel 4:30/km bei Puls 120, 3+1 mit +10 %). Nach dem Lauftest übernimmt die App Schwellenpuls, Schwellen-Pace und aerobe Schwelle automatisch (von der Uhr oder aus deinen Feldern) und sagt dir im Coach, was sich geändert hat. |
+| **3** Felder statt Notizfeld | Jede Sportart hat ihre Felder (Lauf mit Splits, Kadenz, Entkopplung …, Rad mit Watt/Trittfrequenz/drinnen/Rad, Schwimmen mit Zügen, Kraul am Stück, Technik, Kraft mit Übungen × Sätze × Gewicht, Fußball). Für alle: RPE, Gefühl, „geplant vs. gemacht“, Notiz optional. Uhr/HealthFit und intervals.icu füllen automatisch mit Quelle, du kannst alles ändern. Pulszone („Zone 3 statt 2“) und CTL/ATL/TSB des Tages werden berechnet. Deine alten Notizen stehen jetzt in den Feldern (Quelle „Notiz“), die Notizen selbst bleiben. |
+| **4** Coach erklärt den Tag | „Was genau soll ich heute/morgen/am Samstag … machen?“ → Schritte mit Metern, Wiederholungen, Pausen und deinen Pulswerten, passend zu Woche, Krankheit und Ampel. Bei Wiedereinstieg, schlechten Werten oder „ich hab nur 20 min“ schlägt er eine Änderung vor und ändert nach „Ja“. Der Ablauf steht auch im Plan (Einheit antippen). Ohne KI, 50+ Testfragen. |
+| **5** KI-Coach | Bereit für den Schlüssel: neue Werkzeuge (Tag erklären, Analyse, alle Felder), harte Regeln über die Regel-Engine, Monatsbudget. Korrigiert: Cache-Preise, Haiku-Antworten konnten leer bleiben. Kosten etwa 6 Cent pro Frage (2-15 $ im Monat), 3 Schritte in [FUER-JONAH.md](FUER-JONAH.md). |
+| **6** Analyse-Coach | Läuft auf dem Server morgens, nach jeder neuen Einheit (auch aus intervals.icu ohne App) und sonntags. Erkennt z. B. „aerobe Effizienz steigt“, „3 lockere Läufe mit zu hohem Puls“, „Ermüdung steigt“, Belastung (ACWR), Schlaf, Schwimm-Technik. Kleine Änderungen automatisch mit Rückgängig, größere als Vorschlag. Unter Coach: „Was der Coach gerade sieht“ mit 3 Punkten. 30 Tests mit deinen echten Daten. |
+
+Getestet: 757 Unit- und Server-Tests, 117 E2E-Tests (Chromium und WebKit), Layout 320-430 px und 130 % Zoom hell/dunkel. Erst in der Test-App mit einer Kopie deiner Daten, dann in der echten App (vorher gesichert). Version 2.3.0.
+
 ## Freigabe (13.10.2026)
 
 **Deine echte App hat jetzt diese Adresse: https://coach-app-efc7.pages.dev**

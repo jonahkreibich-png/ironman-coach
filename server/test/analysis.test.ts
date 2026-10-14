@@ -54,3 +54,17 @@ test('Analyse auf Abruf (/api/coach/analysis) und sonntags in der Wochenplanung'
   expect(r.status).toBe(200);
   expect((await records(env, T)).some((x: any) => x.kind === 'coachMsg' && x.data.title === 'Was der Coach gerade sieht')).toBe(true);
 });
+test('Lauftest erledigt (Werte von Uhr oder Hand) → Server übernimmt die Zonen ins Profil, mit Mitteilung', async () => {
+  const env: any = makeEnv({ SETUP_CODE: 'code-1234-abcd-xyz' });
+  const T = (await call(env, 'POST', '/api/setup', { name: 'Test', setupCode: 'code-1234-abcd-xyz' })).data.token;
+  const day = add(today, -1);
+  await call(env, 'POST', '/api/sync', { since: 0, changes: [
+    { kind: 'plan', key: 'main', data: { meta: {}, weeks: [{ weekNumber: 1, startDate: day, days: [{ date: day, sessions: [{ id: 'test1', sport: 'run', title: 'Lauftest 30 min', plannedMinutes: 55 }] }] }] }, updatedAt: 1 },
+    { kind: 'profile', key: 'main', data: { birthYear: 2009, sports: ['run'], thresholds: { lthrRun: 170, lthrBike: 169, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28, aetHr: [150, 155] } }, updatedAt: 1 }] }, T);
+  await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'session', key: 'test1', data: { completed: true, metrics: { hr: '173', pace: '5:28' } }, updatedAt: Date.now() }] }, T);
+  const recs = await records(env, T);
+  const prof = recs.find((r: any) => r.kind === 'profile').data;
+  expect(prof.thresholds).toMatchObject({ lthrRun: 173, thresholdPaceRunSec: 328, aetHr: [153, 158] });
+  expect(recs.find((r: any) => r.kind === 'settings').data.settings.lthrRun).toBe(173);
+  expect(recs.some((r: any) => r.kind === 'coachMsg' && r.data.title === 'Zonen aktualisiert')).toBe(true);
+});

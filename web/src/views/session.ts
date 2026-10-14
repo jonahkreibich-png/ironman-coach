@@ -10,6 +10,7 @@ import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
 import { fieldsBlock } from './fieldsui';
+import { checkTestResult } from '../testupdate';
 import { structureOf } from '../../../shared/coach/explain';
 import { toast } from '../toast';
 import { SPORT_COLOR } from '../icons';
@@ -133,6 +134,7 @@ on('sess-toggle', el => {
   if (st.completed) st.skipped = false;
   saveState(); nav.rerender(); refreshSheet();
   if (st.completed) toast(t('sess.toastDone'));
+  if (st.completed && checkTestResult()) { saveState(); nav.rerender(); }
 });
 on('sess-skip', el => {
   const st = ensureSess(el.dataset.sid!);

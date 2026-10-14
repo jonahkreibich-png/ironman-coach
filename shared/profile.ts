@@ -108,6 +108,8 @@ export interface Profile {
   devices?: string[];
   /** kurze Sätze für Plan und Coach (Schwächen, Schwerpunkte, Ausblick) */
   focus?: string[];
+  /** Tests, deren Werte schon in die Schwellen übernommen wurden (Einheiten-IDs) */
+  appliedTests?: string[];
   /** Antworten aus dem Onboarding (frei) */
   answers?: Record<string, any>;
   updatedAt?: number;

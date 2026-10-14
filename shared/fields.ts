@@ -198,3 +198,37 @@ export function migrateNotes(state: any, weeks: any[]): number {
   for (const list of Object.values(state.customWorkouts || {}) as any[][]) for (const w of list || []) if (apply(w, w.sport, w.description)) n++;
   return n;
 }
+
+/* ---------- Nach dem Schwellentest: Zonen automatisch aktualisieren (Auftrag 7) ----------
+   Ein erledigter Lauftest der letzten 21 Tage, der noch nicht übernommen wurde. Aus der Uhr: die Belastungsrunde von 20-35 min
+   (Ø-Puls × 1,01, weil der Puls der letzten 20 Minuten etwas höher liegt als der Schnitt); sonst die eingetragenen Werte (Ø-Puls, Ø-Pace
+   des Tests). Nur plausible Werte (Puls 85-110 % und Pace 75-125 % der bisherigen Werte); die aerobe Schwelle wächst im gleichen Verhältnis. */
+export interface TestUpdate { sessionId: string; date: string; lthrRun: number; thresholdPaceRunSec: number | null; aetHr: [number, number] | null; text: string }
+export function runTestUpdate(state: any, weeks: any[], profile: any, today: string): TestUpdate | null {
+  const th = profile.thresholds || {}; const applied: string[] = profile.appliedTests || [];
+  for (const d of C.planDays(weeks).filter((x: any) => x.date <= today && x.date >= C.addDays(today, -21)).reverse()) {
+    for (const s of d.sessions) {
+      if (s.sport !== 'run' || !/test/i.test(s.title || '') || applied.includes(s.id)) continue;
+      const st = (state.sessions || {})[s.id]; if (!st || !st.completed) continue;
+      const act = st.activityId ? (state.activities || {})[st.activityId] : null;
+      let hr: number | null = null, pace: number | null = null;
+      const lap = act && (act.laps || []).filter((l: any) => l.sec >= 1200 && l.sec <= 2100 && l.avgHr && l.kind !== 'rest').sort((a: any, b: any) => (b.avgHr || 0) - (a.avgHr || 0))[0];
+      if (lap) { hr = Math.round(lap.avgHr * 1.01); pace = lap.m ? Math.round(lap.sec * 1000 / lap.m) : null; }
+      else { const f = fieldsOf(st, 'run'); hr = f.hr; pace = f.paceSec; }
+      if (!hr) continue;
+      const okHr = !th.lthrRun || (hr >= th.lthrRun * 0.85 && hr <= th.lthrRun * 1.1);
+      const okPace = pace == null || !th.thresholdPaceRunSec || (pace >= th.thresholdPaceRunSec * 0.75 && pace <= th.thresholdPaceRunSec * 1.25);
+      if (!okHr || !okPace) continue;
+      const k = th.lthrRun ? hr / th.lthrRun : 1;
+      const aet: [number, number] | null = th.aetHr ? [Math.round(th.aetHr[0] * k), Math.round(th.aetHr[1] * k)] : null;
+      const parts = [`Schwellenpuls ${th.lthrRun || '–'} → ${hr}`, pace ? `Schwellen-Pace ${th.thresholdPaceRunSec ? mmss(th.thresholdPaceRunSec) : '–'} → ${mmss(pace)}/km` : '', aet ? `aerobe Schwelle ${th.aetHr[0]}-${th.aetHr[1]} → ${aet[0]}-${aet[1]}` : ''].filter(Boolean);
+      return { sessionId: s.id, date: d.date, lthrRun: hr, thresholdPaceRunSec: pace, aetHr: aet, text: `Aus deinem ${s.title} (${d.date.slice(8)}.${d.date.slice(5, 7)}.): ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit. Ändern kannst du die Werte unter Mehr → Einstellungen.` };
+    }
+  }
+  return null;
+}
+export function applyTestUpdate(profile: any, u: TestUpdate): any {
+  const th = { ...profile.thresholds, lthrRun: u.lthrRun, ...(u.thresholdPaceRunSec ? { thresholdPaceRunSec: u.thresholdPaceRunSec } : {}), ...(u.aetHr ? { aetHr: u.aetHr } : {}), source: `Lauftest ${u.date.slice(8)}.${u.date.slice(5, 7)}.` };
+  th.estimated = (th.estimated || []).filter((k: string) => k !== 'lthrRun' && k !== 'thresholdPaceRunSec');
+  return { ...profile, thresholds: th, appliedTests: [...(profile.appliedTests || []), u.sessionId] };
+}

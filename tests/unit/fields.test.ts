@@ -109,3 +109,25 @@ describe('automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung', ()
     expect(fieldsOf({ rpe: '6', feel: '4', deviation: 'verkürzt', metrics: {} }, 'run')).toMatchObject({ rpe: 6, feel: 4, deviation: 'verkürzt' });
   });
 });
+
+import { runTestUpdate, applyTestUpdate } from '../../shared/fields';
+describe('nach dem Schwellentest: Zonen automatisch aktualisieren', () => {
+  const weeks = [{ days: [{ date: '2026-10-25', sessions: [{ id: 't1', sport: 'run', title: 'Lauftest 30 min', plannedMinutes: 55 }] }] }];
+  const prof: any = { thresholds: { lthrRun: 170, thresholdPaceRunSec: 339, aetHr: [150, 155], estimated: ['maxHr'] } };
+  test('eingetragene Werte des Tests (Ø-Puls, Ø-Pace) → neue Schwellen und aerobe Schwelle im gleichen Verhältnis', () => {
+    const st = { sessions: { t1: { completed: true, metrics: { hr: '174', pace: '5:25' } } } };
+    const u = runTestUpdate(st, weeks, prof, '2026-10-25')!;
+    expect(u).toMatchObject({ lthrRun: 174, thresholdPaceRunSec: 325, aetHr: [154, 159] });
+    const p2 = applyTestUpdate(prof, u);
+    expect(p2.thresholds).toMatchObject({ lthrRun: 174, thresholdPaceRunSec: 325, source: 'Lauftest 25.10.' });
+    expect(runTestUpdate(st, weeks, p2, '2026-10-25')).toBe(null); // nur einmal
+  });
+  test('von der Uhr: Belastungsrunde von 30 min (Ø-Puls × 1,01)', () => {
+    const st = { sessions: { t1: { completed: true, activityId: 'a', metrics: { hr: '160' } } }, activities: { a: { laps: [{ sec: 900, m: 2300, avgHr: 140, kind: 'warmup' }, { sec: 1800, m: 5500, avgHr: 171, kind: 'work' }, { sec: 600, m: 1400, avgHr: 145, kind: 'cooldown' }] } } };
+    expect(runTestUpdate(st, weeks, prof, '2026-10-26')).toMatchObject({ lthrRun: 173, thresholdPaceRunSec: 327 });
+  });
+  test('unplausible Werte (z. B. lockerer Puls) werden nicht übernommen, ohne erledigten Test nichts', () => {
+    expect(runTestUpdate({ sessions: { t1: { completed: true, metrics: { hr: '120', pace: '7:30' } } } }, weeks, prof, '2026-10-25')).toBe(null);
+    expect(runTestUpdate({ sessions: {} }, weeks, prof, '2026-10-25')).toBe(null);
+  });
+});

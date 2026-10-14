@@ -6,7 +6,7 @@ import { type Env, berlinParts, getRecord, getRecords, putRecords, getMeta, setM
 import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../../shared/coach/engine';
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
-import { migrateNotes } from '../../shared/fields';
+import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/fields';
 import { analyze, type Trigger } from '../../shared/coach/analysis';
 import { extendPlan } from '../../shared/replan';
 
@@ -102,10 +102,20 @@ export async function runWeekly(env: Env, uid: number, opts?: any): Promise<any>
 export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts: { L?: any; date?: string; rephrase?: (m: CoachMsg) => Promise<CoachMsg> } = {}): Promise<any> {
   const L = opts.L || await loadState(env, uid);
   if (!L.plan) return { skipped: 'kein Plan' };
+  const t = Date.now();
+  const changes: Change[] = [];
+  // Schwellentest erledigt (z. B. von der Uhr): Zonen automatisch übernehmen, mit Mitteilung
+  const tu = runTestUpdate(L.state, C.applyAdjustments(L.baseWeeks, L.state.adjustments || {}), L.profile, opts.date || berlinParts().date);
+  if (tu) {
+    L.profile = applyTestUpdate(L.profile, tu); L.state.profile = L.profile;
+    const sRec = await getRecord(env, uid, 'settings', 'main'); const sd = (sRec && sRec.data) || {};
+    changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t }, updatedAt: t });
+    changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), lthrRun: L.profile.thresholds.lthrRun, thresholdPaceRunSec: L.profile.thresholds.thresholdPaceRunSec } }, updatedAt: t + 1 });
+    changes.push({ kind: 'coachMsg', key: 'msg-test-' + tu.sessionId, data: { id: 'msg-test-' + tu.sessionId, at: t, date: tu.date, kind: 'info', from: 'coach', title: 'Zonen aktualisiert', text: tu.text, important: true }, updatedAt: t + 2 });
+  }
   const ctx = engineCtx(L, opts.date);
   const r = analyze(ctx, trigger);
-  const t = Date.now();
-  const changes: Change[] = r.auto.map((a, i) => ({ kind: 'adjust', key: a.id, data: a, updatedAt: t + i }));
+  r.auto.forEach((a, i) => changes.push({ kind: 'adjust', key: a.id, data: a, updatedAt: t + 10 + i }));
   const msgs: CoachMsg[] = [];
   for (const m of r.messages) msgs.push(opts.rephrase && m.kind !== 'proposal' && m.kind !== 'adjust' ? await opts.rephrase(m) : m);
   msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));

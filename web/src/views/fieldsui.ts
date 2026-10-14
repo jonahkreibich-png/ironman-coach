@@ -9,6 +9,7 @@ import { SPORT_FIELDS, FEEL, zoneVerdict, loadOn, type FieldDef } from '../../..
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
 import { toast } from '../toast';
+import { checkTestResult } from '../testupdate';
 import * as C from '../../../shared/core';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
@@ -86,6 +87,7 @@ onChange('fd', el => {
   if (el.dataset.pace || el.dataset.tf) { const s = readTime(el); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } v = s ? secToMmss(s) : ''; }
   put(tg, setSessionMetricManual(st, k, v));
   saveSoon(); if (el.tagName === 'SELECT' || k === 'hr') refreshSheet(); nav.rerender();
+  if ((k === 'hr' || k === 'pace') && checkTestResult()) { saveState(); refreshSheet(); nav.rerender(); }
 });
 onChange('fd-top', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st[el.dataset.k!] = (el as HTMLInputElement).value; saveSoon(); });
 on('fd-rpe', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st.rpe = String(st.rpe) === el.dataset.v ? '' : el.dataset.v; redraw(); });
