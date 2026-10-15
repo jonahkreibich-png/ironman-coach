@@ -1,5 +1,21 @@
 # Ergebnis
 
+## Auftrag 12: Zonen, Coach, Scores, Prognose (15.10.)
+
+Live in der echten App (Version 2.8.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-release12.sql`, `test-vor-auftrag12.sql`. Daten wurden nicht verändert.
+
+| Punkt | Was |
+|---|---|
+| **1** Rad-Tempozonen | km/h-Zonen je Rad (Rennrad, Gravel, drinnen virtuell), z. B. „Z2: 26–29 km/h flach“. Unter Einstellungen → Zonen und in jeder Rad-Einheit nach Puls/Watt, mit Hinweis auf Wind und Steigung. Neu nach dem Radtest (Feld „Ø Tempo der 20 min“) und aus lockeren flachen Fahrten. |
+| **2** Coach bewertet | „Wie war mein Lauf/Training/Schwimmen gestern/meine Woche?“, „Vergleich mit letzter Woche“, auch „na wie wars beim radeln“ oder „wie wa mein trainig“. Antwort in 3 Teilen: Gut (mit Zahlen), Besser (mit Grund), Nächste Tage. Vergleicht mit Vorgabe und ähnlichen früheren Einheiten, nutzt Zonen, Entkopplung, Splits, Kadenz, Züge, RPE, Gefühl, Morgenwerte. Fehlt etwas: „Es fehlen …“ plus Knopf „Werte eintragen“. Kommt automatisch nach jeder erledigten Einheit (Einstellungen: ausführlich/kurz/aus). 91 Testfragen (Jonahs Daten und 10 Test-Personen). |
+| **3** Chat-Design | „Coach schreibt …“ mit drei Punkten, dann Wort für Wort (30–60 Wörter/s), Antippen zeigt alles, Knöpfe danach, mitscrollen außer beim Hochscrollen, ohne Animation bei „Bewegung reduzieren“. Mit KI-Schlüssel echter Strom vom Server. Browser-Test hell/dunkel. |
+| **4** Scores | Feste Skala (20 Einsteiger, 50 solider Hobbysportler, 70 stark, 85 Spitzenamateur, 100 Elite), nach Alter/Geschlecht bereinigt, kein Abschneiden. Statt „Ziel“: „Für dein Ziel nötig: 5:57/km, du bist schon 18 s schneller ✓ · Nächstes Etappenziel: 5:29/km“ (+ Wunschzeit), als Balken mit Strichen. „Warum?“ zeigt gezählte Einheiten, Sicherheit und was am meisten bringt („Kraul am Stück auf 100 m → +2“). Erreichte Etappenziele meldet der Coach. |
+| **5** Prognose | „Wenn du heute starten würdest“ und „Erwartet am …“, je Disziplin Bereich und wahrscheinlichster Wert. Immer da, ohne Test breiter mit Test-Hinweis; Schwimmen auch aus 25-m-Zeit oder mit Brust. Ausdauer über Riegel-Exponent (1,06–1,15), Rad-Physik mit Watt, Abschlag nach dem Rad je Koppeltraining, Strecke (Höhenmeter, Freiwasser, Neopren, Temperatur) beim Ziel. Nach dem Rennen Zeiten je Disziplin eintragen → persönlicher Korrekturfaktor. Pacing-Plan mit Puls/Watt/km/h/Pace. |
+
+Jonah heute (15.10.): Laufen 42, Rad 41, Schwimmen 20, Kraft 45. Ironman-Prognose heute etwa 14:45 h (sicher ankommen ist realistisch), Olympisch etwa 3:17 h. Am meisten bringen längere lockere Läufe und Kraul am Stück.
+
+Geprüft mit bekannten Beispielen (10 km 47 min → Halbmarathon 1:43, typische Olympische Distanz 2:20–2:45) und allen Test-Personen. Tests: 1278 Unit- und Server-Tests, 149 Browser-Tests (Chromium und WebKit). Code auf `entwicklung` gepusht. Entscheidungen 138–148.
+
 ## Auftrag 11: Fehler aus Papas Test, neue Nutzer (15.10.)
 
 Live in der echten App (Version 2.7.0), vorher in stamio-test geprüft. Sicherungen in `data-export/` (`prod-vor-release11.sql`, `test-vor-auftrag11.sql`).
