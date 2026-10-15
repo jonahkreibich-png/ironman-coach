@@ -14,6 +14,7 @@ import { addDays } from './core';
 import { validateWeeks, weekMinutes, ownWeekMinutes, goalAllowed, type Violation } from './rules';
 import { HR_ZONES } from './sports';
 import * as W from './workouts';
+import { speedFor, kindFromName } from './bikespeed';
 import { tipFor } from './considerations';
 import { rulesOf, effectsOf, evaluate, allowedHard, dayLimit, prefers, describe as ruleText, daysText, SPORT_NAME, type Rule, type Effects, type RuleSport } from './constraints';
 import { parseFor } from './ruleparse';
@@ -172,7 +173,7 @@ export function freqOf(p: Profile, sport: SportKey): [number, number] {
 export function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, today: string): W.PaceCtx {
   const th = p.thresholds; const age = ageOf(p, today) ?? 35;
   const pos = (v: any) => (typeof v === 'number' && v > 0 ? v : null);
-  return { runThrSec: pos(th.thresholdPaceRunSec), lthrRun: pos(th.lthrRun), lthrBike: pos(th.lthrBike), bikeKmh: pos(th.thresholdSpeedBikeKmh), ftp: p.powerMeter ? pos(th.ftp) : null, css: pos(th.cssSec), breast100: pos(th.breast100Sec) || 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0), indoor, bikeName,
+  return { runThrSec: pos(th.thresholdPaceRunSec), lthrRun: pos(th.lthrRun), lthrBike: pos(th.lthrBike), bikeKmh: pos(th.thresholdSpeedBikeKmh) ? speedFor(p, kindFromName(bikeName, indoor)) : null, ftp: p.powerMeter ? pos(th.ftp) : null, css: pos(th.cssSec), breast100: pos(th.breast100Sec) || 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0), indoor, bikeName,
     pool: (p.skills || {}).poolM === 50 ? 50 : 25 };
 }
 const BIKE_LABEL: Record<string, string> = { road: 'Rennrad', gravel: 'Gravelbike', mtb: 'Mountainbike', tt: 'Zeitfahrrad', trekking: 'Trekkingrad', ebike: 'E-Bike', trainer: 'Rolle', spin: 'Indoor-Bike' };

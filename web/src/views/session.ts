@@ -1,6 +1,7 @@
 /* Einheit: Ansicht und Bearbeiten im Sheet, Abhaken. Werte von der Uhr tragen ihre Quelle,
    Korrekturen von Hand gelten ab dann, „Auf Original zurücksetzen“ holt die Werte der Uhr zurück. */
 import * as C from '../../../shared/core';
+import { reviewSoon } from '../review';
 import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
@@ -133,7 +134,7 @@ on('sess-toggle', el => {
   st.completed = !st.completed;
   if (st.completed) st.skipped = false;
   saveState(); nav.rerender(); refreshSheet();
-  if (st.completed) toast(t('sess.toastDone'));
+  if (st.completed) { toast(t('sess.toastDone')); const ss = SESS_BY_ID[el.dataset.sid!]; if (ss) reviewSoon(el.dataset.sid!, ss.date, 400); }
   if (st.completed && checkTestResult()) { saveState(); nav.rerender(); }
   if (st.completed && checkSwimSkill()) { saveState(); nav.rerender(); }
 });

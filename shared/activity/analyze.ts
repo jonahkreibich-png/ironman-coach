@@ -57,6 +57,8 @@ export interface Activity {
   /** wird nach dem Zusammenführen ersetzt durch die Aktivität mit Vorrang */
   mergedInto?: string | null;
   hasStreams?: boolean;
+  /** Rad-Art (road, gravel, mtb …), falls bekannt (Feld der Einheit oder Name) */
+  bikeType?: string | null;
   createdAt?: number;
 }
 

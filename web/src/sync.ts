@@ -154,6 +154,22 @@ async function api(method, path, body?, noAuth?) {
   return data;
 }
 
+/* Antwort als Strom lesen (Auftrag 12, KI-Coach): jede Zeile ist ein JSON-Objekt. Liefert das letzte Objekt („done“ oder „error“). */
+export async function apiStream(path: string, body: any, onLine: (o: any) => void): Promise<any> {
+  if (!AUTH) throw Object.assign(new Error(t('sync.notConnected')), { status: 0 });
+  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, Authorization: 'Bearer ' + AUTH.token }, body: JSON.stringify(body) });
+  if (!res.ok || !res.body) { let d: any = null; try { d = await res.json(); } catch (e) {} throw Object.assign(new Error((d && d.error) || ('Fehler ' + res.status)), { status: res.status }); }
+  const rd = res.body.getReader(); const dec = new TextDecoder(); let buf = ''; let last: any = null;
+  for (;;) {
+    const { value, done } = await rd.read();
+    if (value) buf += dec.decode(value, { stream: true });
+    let i: number;
+    while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (!line) continue; try { last = JSON.parse(line); onLine(last); } catch (e) { /* halbe Zeile */ } }
+    if (done) break;
+  }
+  return last;
+}
+
 let STATUS = 'idle'; // idle | syncing | ok | offline | error
 /* Nach jedem erfolgreichen Abgleich (z. B. Ausgang für Meldungen leeren) */
 const SYNCED: (() => void)[] = [];

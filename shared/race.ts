@@ -54,7 +54,8 @@ export function pacingPlan(goal: Goal, prog: Prognosis | null, thr: { lthrRun: n
       const f = long ? [0.68, 0.75] : [0.78, 0.86];
       const hr = [Math.round(thr.lthrBike * (long ? 0.8 : 0.86)), Math.round(thr.lthrBike * (long ? 0.86 : 0.92))];
       out.push({ leg: 'Rad', part: 'erste 20 min', target: `Puls ${hr[0] - 5}-${hr[0]}${thr.ftp ? `, ${Math.round(thr.ftp * f[0])} W` : ''}`, hint: 'Bewusst ruhig, der Puls ist nach dem Schwimmen noch hoch.' });
-      out.push({ leg: 'Rad', part: 'Hauptteil', target: `Puls ${hr[0]}-${hr[1]}${thr.ftp ? `, ${Math.round(thr.ftp * f[0])}-${Math.round(thr.ftp * f[1])} W` : ''}`, hint: 'Bergauf nicht überziehen, bergab treten. Alle 20 min essen.' });
+      const pb = prog && prog.bike; const w = pb && pb.watts ? `, ${Math.round(pb.watts * 0.97)}-${Math.round(pb.watts * 1.03)} W` : thr.ftp ? `, ${Math.round(thr.ftp * f[0])}-${Math.round(thr.ftp * f[1])} W` : '';
+      out.push({ leg: 'Rad', part: 'Hauptteil', target: `Puls ${hr[0]}-${hr[1]}${w}${pb ? `, Ø etwa ${String(pb.kmh).replace('.', ',')} km/h` : ''}`, hint: 'Bergauf nicht überziehen, bergab treten. Alle 20 min essen. Das Tempo hängt von Wind und Strecke ab, Puls und Watt gehen vor.' });
     }
     if (l.sport === 'run') {
       const total = pred ? pred.best : null;

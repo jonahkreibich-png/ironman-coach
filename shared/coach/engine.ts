@@ -9,6 +9,7 @@ import { mainGoal } from '../goals';
 import { T, pick, de, mmss, joinDe, dowName } from './texts';
 import { checkData, type SafetyHit } from './safety';
 import { underEatingCheck } from '../nutrition';
+import { doneItems, autoReview, type Done } from './review';
 
 export interface CoachMsg {
   id: string; at: number; date: string;
@@ -172,9 +173,22 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     const byId: Record<string, any> = {};
     C.planDays(weeks).forEach((d: any) => d.sessions.forEach((s: any) => { byId[s.id] = { ...s, date: d.date }; }));
     const acts = Object.values(ctx.state.activities || {}).filter((a: any) => a && !a.mergedInto && (!ev.activityIds || ev.activityIds.includes(a.id)) && a.date >= C.addDays(today, -2)) as any[];
+    // Auftrag 12: Bewertung in 3 Teilen (Einstellung „Bewertung nach jeder Einheit“: ausführlich, kurz oder aus)
+    const mode = ((ctx.state.settings || {}).coachReview || 'full') as 'full' | 'short' | 'off';
+    const seen = new Set<string>();
     for (const a of acts) {
       const s = a.sessionId ? byId[a.sessionId] : null;
-      push(msg(ctx, { id: 'msg-sess-' + a.id, date: a.date, kind: 'session', title: s ? s.title : (a.name || 'Einheit'), text: sessionComment(ctx, a, s), refs: { activityId: a.id, sessionId: a.sessionId || undefined } }));
+      if (mode === 'off') continue;
+      const key = a.sessionId || a.id; seen.add(key);
+      const d: Done = doneItems(ctx, a.date, a.date).find(x => x.key === key || (x.act && x.act.id === a.id)) || { key, date: a.date, sport: a.sport, title: s ? s.title : (a.name || 'Einheit'), planned: s, st: (ctx.state.sessions || {})[key] || {}, act: a, custom: !s };
+      let text: string; try { text = autoReview(ctx, d, mode); } catch (e) { text = sessionComment(ctx, a, s); }
+      push(msg(ctx, { id: 'msg-review-' + key, date: a.date, kind: 'session', title: 'Bewertung: ' + (s ? s.title : (a.name || 'Einheit')), text, refs: { activityId: a.id, sessionId: a.sessionId || undefined } }));
+    }
+    // von Hand abgehakte Einheiten ohne Aufzeichnung (heute und gestern)
+    if (mode !== 'off') for (const d of doneItems(ctx, C.addDays(today, -1), today)) {
+      if (d.act || seen.has(d.key)) continue;
+      let text: string; try { text = autoReview(ctx, d, mode); } catch (e) { continue; }
+      push(msg(ctx, { id: 'msg-review-' + d.key, date: d.date, kind: 'session', title: 'Bewertung: ' + d.title, text, refs: { sessionId: d.custom ? undefined : d.key } }));
     }
   }
 

@@ -145,8 +145,12 @@ export const de: Record<string, string> = {
   'prog.volumeHint': 'Diese Woche {d} h von {p} h geplant. Hell = geplant, kräftig = erledigt.',
   'prog.milestones': 'Meilensteine', 'prog.noMilestones': 'Noch keine Meilensteine.', 'prog.msPh': 'z. B. erstes Mal 2 km am Stück gekrault',
   'prog.msEmpty': 'Schreib kurz, was du geschafft hast.', 'prog.msSaved': 'Meilenstein gespeichert',
-  'prog.measured': '{m} Messungen · Sicherheit {c} %', 'prog.why': 'Warum dieser Wert?', 'prog.target': 'Ziel',
-  'prog.scoreHint': 'Der Score kommt nur aus Messdaten (Pace, Leistung, Puls, Umfang) im Vergleich zu dem, was dein Ziel braucht. Eine manuelle Korrektur gibt es unter Einstellungen.',
+  'prog.measured': '{m} Messungen · Sicherheit {c} %', 'prog.why': 'Warum dieser Wert?', 'prog.target': 'Ziel', 'prog.good': 'Gut ist:',
+  'prog.scale': 'Skala: 50 = solider Hobbysportler', 'prog.scaleHint': 'Feste Skala je Sportart: 20 Einsteiger, 50 solider Hobbysportler, 70 stark, 85 Spitzenamateur, 100 Elite. Bereinigt nach Alter und Geschlecht, nach oben offen.',
+  'prog.gains': 'Was am meisten bringt', 'prog.counted': 'Diese Einheiten zählen', 'prog.byHand': 'von Hand', 'prog.noProg': 'Für dieses Ziel gibt es keine Zeit-Prognose.',
+  'prog.ifToday': 'Wenn du heute starten würdest', 'prog.expectedAt': 'Erwartet am {d}', 'prog.today': 'heute', 'prog.assumptions': 'So ist gerechnet',
+  'prog.courseHint': 'Höhenmeter, Freiwasser, Neopren und Temperatur trägst du beim Ziel ein (Mehr → Profil und Ziele). Nach dem Rennen dein Ergebnis eintragen, dann lernt die Prognose dazu.',
+  'prog.scoreHint': 'Der Score kommt aus Messdaten (Pace, Leistung, Puls, Umfang) und deinen Tests, jede neue Einheit rechnet ihn neu. Die Striche zeigen „Für dein Ziel nötig“, „Nächstes Etappenziel“ und „Wunschzeit“. Eine manuelle Korrektur gibt es unter Einstellungen.',
 
   /* ---------- Wettkampf ---------- */
   'race.today': 'Heute: {name}!', 'race.inDays': '{name} in {n} Tagen', 'race.open': 'Wettkampf-Modus öffnen', 'race.enterResult': '{name}: Ergebnis eintragen',
@@ -155,7 +159,8 @@ export const de: Record<string, string> = {
   'race.pacing': 'Pacing-Plan', 'race.fuel': 'Verpflegung', 'race.carbs': 'Kohlenhydrate', 'race.fluid': 'Trinken', 'race.sodium': 'Natrium',
   'race.before': 'Vor dem Start', 'race.schedule': 'Zeitplan unterwegs', 'race.packing': 'Packliste', 'race.packed': '{a} von {b} eingepackt',
   'race.yourTime': 'Deine Zeit (h:mm:ss)', 'race.place': 'Platz (optional)', 'race.howWasIt': 'Wie war es?', 'race.recovery': 'Erholung',
-  'race.dayN': 'Tag {n}', 'race.saved': 'Ergebnis gespeichert. Glückwunsch!',
+  'race.dayN': 'Tag {n}', 'chat.writing': 'Coach schreibt …', 'chat.tapAll': 'Antippen zeigt alles', 'set.review': 'Bewertung nach jeder Einheit', 'set.reviewFull': 'Ausführlich', 'set.reviewShort': 'Kurz', 'set.reviewOff': 'Aus', 'set.reviewHint': 'Nach jeder erledigten Einheit schreibt der Coach, was gut war, was besser geht und was das für die nächsten Tage heißt. Fragen wie „Wie war mein Lauf?“ gehen immer.', 'goal.course': 'Strecke (optional, für die Prognose)', 'goal.bikeAscent': 'Höhenmeter Rad', 'goal.runAscent': 'Höhenmeter Laufen', 'goal.swimVenue': 'Schwimmen im', 'goal.open': 'Freiwasser', 'goal.pool': 'Becken', 'goal.wetsuit': 'Neopren', 'goal.unknown': 'weiß nicht', 'goal.temp': 'erwartete Temperatur (°C)', 'goal.courseHint': 'Neopren macht schneller, Freiwasser ohne Wenden langsamer, über 20 °C wird es vor allem beim Laufen langsamer.', 'race.splits': 'Zeiten je Disziplin (optional)', 'race.split.swim': 'Schwimmen', 'race.split.bike': 'Rad', 'race.split.run': 'Laufen', 'race.predShort': 'Prognose',
+  'race.splitsHint': 'Mit den Zeiten je Disziplin lernt die Prognose, wo sie bei dir zu schnell oder zu langsam rechnet.', 'race.saved': 'Ergebnis gespeichert. Glückwunsch!',
 
   /* ---------- Profil und Ziele ---------- */
   'prof.goals': 'Ziele', 'prof.goalsAside': 'A = Hauptziel', 'prof.main': 'Hauptziel', 'prof.inDays': 'in {n} Tagen', 'prof.noGoals': 'Noch kein Ziel.',
@@ -235,7 +240,7 @@ export const de: Record<string, string> = {
   'set.look': 'Darstellung', 'set.theme': 'Farbschema', 'set.system': 'System', 'set.light': 'Hell', 'set.dark': 'Dunkel',
   'set.heuteVariant': 'Startseite „Heute“', 'set.variantA': 'Antwort-Karte', 'set.variantB': 'Tages-Feed',
   'set.zones': 'Zonen und Schwellen', 'set.zonesAside': 'nach einem Test anpassen', 'set.lthrRun': 'Schwellenpuls Laufen', 'set.paceRun': 'Schwellen-Pace (min/km)',
-  'set.lthrBike': 'Schwellenpuls Rad', 'set.ftp': 'FTP (Watt)', 'set.speedBike': 'Schwelle Rad (km/h)', 'set.css': 'CSS Schwimmen (min/100 m)', 'set.maxHr': 'Maximalpuls',
+  'set.lthrBike': 'Schwellenpuls Rad', 'set.ftp': 'FTP (Watt)', 'set.speedBike': 'Schwelle Rad (km/h)', 'set.bikeSpeed': 'Schwellen-Tempo {bike} (km/h, flach)', 'set.derivedShort': '(abgeleitet)', 'set.speedZones': 'Rad-Tempo flach (km/h), nur als Anhalt', 'set.speedIndoor': 'Drinnen gilt die virtuelle Geschwindigkeit der App (z. B. Zwift).', 'set.css': 'CSS Schwimmen (min/100 m)', 'set.maxHr': 'Maximalpuls',
   'set.zonesHint': 'Passt Pace oder Leistung, aber der Puls ist hoch, war es ein schwerer Tag und kein Rückschritt. Nach einem Test oder neuen Messwerten hier anpassen.',
   'set.outOfRange': 'Dieser Wert ist unrealistisch. Bitte prüfen.',
   'set.notify': 'Mitteilungen', 'set.notifyNeedSync': 'Mitteilungen kommen von deinem Server. Richte zuerst den Sync ein.',

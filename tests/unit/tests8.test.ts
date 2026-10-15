@@ -51,7 +51,7 @@ describe('Schwimmtest', () => {
   });
   test('Testfelder nur bei Tests, mit Zeiten im Format mm:ss', () => {
     expect(SPORT_FIELDS.swim.filter(f => f.test).map(f => f.key)).toEqual(['crawl25', 'breast200', 'css400', 'css200']);
-    expect(SPORT_FIELDS.bike.filter(f => f.test).map(f => f.key)).toEqual(['testHr', 'testPower']);
+    expect(SPORT_FIELDS.bike.filter(f => f.test).map(f => f.key)).toEqual(['testHr', 'testPower', 'testSpeed']);
     expect(SPORT_FIELDS.run.filter(f => f.test).map(f => f.key)).toEqual(['testHr', 'testPace']);
   });
 });

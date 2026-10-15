@@ -203,7 +203,8 @@ describe('Einheiten-Kommentare und Wochenrückblick', () => {
     const a = act({ id: 'x1', sessionId: 'w2-mi', sport: 'bike', km: 30, speedKmh: 30 });
     const out = runEngine(ctx({ state: { activities: { x1: a } } }), { type: 'activity', activityIds: ['x1'] });
     const m = out.messages.find(x => x.kind === 'session')!;
-    expect(m.title).toBe('Sweet-Spot 3×8'); clean(m.text);
+    // Auftrag 12: Bewertung in 3 Teilen statt kurzem Kommentar
+    expect(m.title).toBe('Bewertung: Sweet-Spot 3×8'); clean(m.text); expect(m.text).toMatch(/Gut:[\s\S]*Besser:[\s\S]*Nächste Tage:/);
   });
   test('30 Wochenrückblick am Sonntag: Umsetzung, Ampel, nächste Woche mit Stunden', () => {
     const c = ctx({ today: '2026-10-18' });

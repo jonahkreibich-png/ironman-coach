@@ -13,18 +13,78 @@ import { applyOps, undoOps, type Op } from '../../../shared/coach/ops';
 import { arrangeFeed, searchMsgs, isOpen } from '../../../shared/coach/feed';
 import { nav } from '../nav';
 import { toast } from '../toast';
-import { aiState, apiCall, syncNow } from '../sync';
+import { aiState, apiCall, apiStream, syncNow } from '../sync';
 import { propose } from './planedit';
 import { replanFuture } from '../replan';
 import { fixConflict } from './rules';
 import * as C from '../../../shared/core';
 import { analyze } from '../../../shared/coach/analysis';
+import { openSession } from './session';
 
 const time = (ms: number) => { const d = new Date(ms); return `${dowShort(d.toISOString().slice(0, 10))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 export const keepDays = () => [3, 7, 14].includes(+((STATE.settings || {}).coachKeepDays)) ? +STATE.settings.coachKeepDays : 7;
 const lastMsgId = () => { const l = Object.values(STATE.coachMsgs || {}).filter((m: any) => m && !m.deleted).sort((a: any, b: any) => a.at - b.at) as any[]; return l.length ? l[l.length - 1].id : null; };
 
+/* ---------- Schreiben wie im echten Chat (Auftrag 12) ----------
+   Erst kurz „Coach schreibt …“ mit drei Punkten, dann baut sich der Text Wort für Wort auf (30-60 Wörter pro Sekunde, lange Antworten
+   schneller). Antippen zeigt sofort alles. Knöpfe und Vorschläge erst danach. Automatisch mitscrollen, außer man hat selbst hochgescrollt.
+   „Bewegung reduzieren“: ohne Animation. Mit KI-Coach kommt der Text als echter Strom vom Server. */
+interface Typing { words: string[]; ms: number; wps: number }
+const TICK = 40;
+const TYPING: Record<string, Typing> = {};
+let STREAM: { text: string } | null = null;
+let ticker: any = null;
+const DOTS_MS = 550;
+export const reducedMotion = () => { try { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } };
+const nearBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 140;
+const toBottom = () => window.scrollTo(0, document.documentElement.scrollHeight);
+export function typeMsg(id: string, text: string) {
+  if (reducedMotion() || !text) return;
+  const words = String(text).split(/(\s+)/);
+  const n = words.filter(w => w.trim()).length;
+  TYPING[id] = { words, ms: -DOTS_MS, wps: Math.min(60, 30 + n / 6) };
+  if (!ticker) ticker = setInterval(tick, TICK);
+}
+const shownWords = (ty: Typing) => Math.max(0, Math.floor(ty.ms / 1000 * ty.wps));
+function partial(ty: Typing): string { let k = shownWords(ty), out = ''; for (const w of ty.words) { if (w.trim()) { if (k <= 0) break; k--; } out += w; } return out; }
+const isTyping = (id: string) => !!TYPING[id];
+function finishTyping(id: string) { delete TYPING[id]; if (!Object.keys(TYPING).length && !STREAM && ticker) { clearInterval(ticker); ticker = null; } }
+function tick() {
+  const follow = nearBottom();
+  let ended = false;
+  for (const [id, ty] of Object.entries(TYPING)) {
+    ty.ms += TICK;
+    const el = document.querySelector(`[data-msg="${id}"]`) as HTMLElement | null;
+    const total = ty.words.filter(w => w.trim()).length;
+    if (shownWords(ty) >= total) { finishTyping(id); ended = true; continue; }
+    if (!el) continue;
+    const mt = el.querySelector('.mt') as HTMLElement | null; const dots = el.querySelector('.dots') as HTMLElement | null;
+    if (ty.ms < 0) continue;
+    if (dots) dots.remove();
+    if (mt) mt.textContent = partial(ty);
+  }
+  if (ended) nav.rerender();
+  if (follow) toBottom();
+}
+const dotsHtml = () => `<span class="dots" aria-label="${esc(t('chat.writing'))}"><span class="xs muted">${esc(t('chat.writing'))}</span> <i></i><i></i><i></i></span>`;
+function streamHtml(): string {
+  if (!STREAM) return '';
+  return `<div class="msg coach typing" data-stream aria-live="polite">${STREAM.text ? '' : dotsHtml()}<span class="mt">${esc(STREAM.text)}</span></div>`;
+}
+function streamUpdate() {
+  const follow = nearBottom();
+  const el = document.querySelector('[data-stream]') as HTMLElement | null; if (!el || !STREAM) return;
+  if (STREAM.text) { const d = el.querySelector('.dots'); if (d) d.remove(); }
+  const mt = el.querySelector('.mt'); if (mt) mt.textContent = STREAM.text;
+  if (follow) toBottom();
+}
+on('typing-skip', el => { const id = el.dataset.msg!; if (TYPING[id]) { finishTyping(id); nav.rerender(); } });
+
 function msgHtml(m: any, latest: boolean): string {
+  if (isTyping(m.id)) {
+    const ty = TYPING[m.id]; const before = ty.ms < 0;
+    return `<div class="msg coach typing" data-msg="${esc(m.id)}" data-act="typing-skip" role="button" tabindex="0" aria-live="polite" title="${esc(t('chat.tapAll'))}">${before ? dotsHtml() : ''}<span class="mt">${esc(before ? '' : partial(ty))}</span></div>`;
+  }
   const cls = m.from === 'user' ? 'user' : `coach ${m.kind === 'warning' ? 'warning' : m.kind === 'adjust' ? 'adjust' : m.kind === 'proposal' || m.kind === 'proposal-local' ? 'proposal' : ''}`;
   const head = m.from !== 'user' && m.title ? `<div class="h">${m.kind === 'warning' ? ic('info') : m.kind === 'adjust' ? ic('calendar') : m.from === 'ai' ? ic('wand') : ''}${esc(m.title)}</div>` : '';
   const prop = m.kind === 'proposal' && m.proposal ? (m.proposal.status === 'open'
@@ -39,7 +99,7 @@ function msgHtml(m: any, latest: boolean): string {
   const undo = m.undo && !m.undone ? `<div class="row" style="margin-top:6px"><button class="btn ghost sm" data-act="chat-undo" data-id="${esc(m.id)}">${ic('back')} ${esc(t('chat.undo'))}</button></div>` : m.undone ? `<div class="xs muted" style="margin-top:6px">${esc(t('chat.undone'))}</div>` : '';
   const sugg = (m.suggestions || []).length && latest ? `<div class="suggest">${m.suggestions.map((s: string) => `<button class="chip" data-act="chat-say" data-text="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '';
   const pin = m.from !== 'user' ? `<button class="msg-pin ${m.pinned ? 'on' : ''}" data-act="chat-pin" data-id="${esc(m.id)}" aria-label="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}" title="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}">${ic('flag')}</button>` : '';
-  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}${esc(m.text)}${prop}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
+  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(m.text)}</span>${prop}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
 }
 
 /* Was der Coach gerade sieht (Auftrag 7): die 3 wichtigsten Erkenntnisse der Analyse mit Begründung und Tipp.
@@ -73,7 +133,7 @@ export function renderCoach(): string {
   const open = all.filter(m => isOpen(m)).sort((a, b) => b.at - a.at).slice(0, 3);
   let h = nowCard(open) + seesCard();
   h += `<div class="spread" style="margin:var(--s3) 0;flex-wrap:wrap;gap:6px"><span class="xs muted" style="flex:1 1 160px">${esc(ai.active ? t('coach.aiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
-  h += `<div class="feed">${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : empty(t('coach.empty'))}</div>`;
+  h += `<div class="feed">${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : STREAM ? '' : empty(t('coach.empty'))}${streamHtml()}</div>`;
   const dlg = STATE.chatDialog || {};
   const quick = quickOptions(D().engine, dlg).slice(0, 5);
   h += `<div class="chips quick" style="margin:var(--s3) 0 var(--s2)" data-quick>${quick.map(q => `<button class="chip" data-act="chat-say" data-text="${esc(q.say)}">${esc(q.label)}</button>`).join('')}</div>`;
@@ -107,8 +167,21 @@ export async function ask(text: string, el?: HTMLButtonElement) {
     const userMsg = { id: `msg-u-${now}`, at: now, date: todayStr(), kind: 'user', from: 'user', text };
     if (aiState().active && !(STATE.chatDialog && STATE.chatDialog.pending)) {
       if (el) el.disabled = true;
-      try { const r = await apiCall('POST', '/api/coach/chat', { text }); addMsgs(r.messages || []); if (r.applied) await syncNow(); return; }
-      catch (e) { /* ohne Verbindung oder ohne Budget: lokal antworten */ } finally { if (el) el.disabled = false; }
+      // Frage sofort zeigen, Antwort als Strom (Auftrag 12); ohne Strom die bisherige Anfrage
+      STATE.coachMsgs[userMsg.id] = userMsg; STREAM = { text: '' }; nav.rerender(); toBottom();
+      try {
+        let last: any = null;
+        try { last = await apiStream('/api/coach/chat/stream', { text }, o => { if (!STREAM) return; if (o.t === 'delta') { STREAM.text += o.text; streamUpdate(); } else if (o.t === 'reset') { STREAM.text = ''; streamUpdate(); } }); }
+        catch (e: any) { if (e && e.status && e.status !== 404) throw e; last = null; }
+        if (!last) { const r = await apiCall('POST', '/api/coach/chat', { text }); last = { t: 'done', ...r }; }
+        if (last.t !== 'done') throw new Error(last.error || 'Fehler');
+        const streamed = !!(STREAM && STREAM.text); STREAM = null; delete STATE.coachMsgs[userMsg.id];
+        const ms = (last.messages || []) as any[];
+        // schon gestreamte KI-Antwort sofort ganz zeigen, alles andere (Hinweise, Vorschläge, Antwort ohne Strom) tippt sich auf
+        ms.filter(m => m.from !== 'user').forEach(m => { if (!(streamed && /^msg-ai-/.test(m.id))) typeMsg(m.id, m.text); });
+        addMsgs(ms); if (last.applied) await syncNow(); return;
+      }
+      catch (e) { STREAM = null; delete STATE.coachMsgs[userMsg.id]; /* ohne Verbindung oder ohne Budget: lokal antworten */ } finally { if (el) el.disabled = false; }
     }
     const d = D();
     const { reply, dialog } = converse(d.engine, STATE.chatDialog || {}, text, { scores: d.scores, prognosis: d.prognosis });
@@ -116,6 +189,7 @@ export async function ask(text: string, el?: HTMLButtonElement) {
     const msg: any = { id: `msg-a-${now}`, at: now + 1, date: todayStr(), kind: reply.intent === 'safety' ? 'warning' : 'answer', from: 'coach', chat: true, intent: reply.intent, text: reply.text, options: reply.options || [], suggestions: reply.suggestions || [], pendingOpen: !!reply.pending };
     if ((reply as any).go) msg.options = [{ label: t('chat.open'), say: '', go: (reply as any).go }, ...msg.options];
     if (reply.apply && reply.apply.length) { const r = runOps(reply.apply); msg.undo = r.undo; }
+    typeMsg(msg.id, msg.text);
     addMsgs([userMsg, msg]);
   } finally { busy = false; }
 }
@@ -126,7 +200,7 @@ on('coach-send', async el => {
 on('chat-say', el => ask(el.dataset.text || ''));
 on('chat-opt', el => {
   const m = STATE.coachMsgs[el.dataset.id!]; const o: any = m && (m.options || [])[+el.dataset.i!]; if (!o) return;
-  if (o.go) { STATE.coachMsgs[m.id] = { ...m, answered: true }; saveState(); nav.go(String(o.go)); return; }
+  if (o.go) { STATE.coachMsgs[m.id] = { ...m, answered: true }; saveState(); const g = String(o.go); if (g.startsWith('session:')) { openSession(g.slice(8)); return; } nav.go(g); return; }
   ask(o.say || o.label);
 });
 on('chat-undo', el => {

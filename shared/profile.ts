@@ -31,6 +31,8 @@ export interface Thresholds {
   source?: string;
   /** zuletzt aus einem Trend der Uhrdaten aktualisiert (Datum) */
   trendAt?: string | null;
+  /** Schwellen-Geschwindigkeit flach je Rad (km/h), aus Test, Trend oder von Hand (Auftrag 12); fehlende werden abgeleitet */
+  bikeSpeeds?: Partial<Record<'road' | 'gravel' | 'indoor', number | null>> | null;
 }
 /** Aufbau: so viele Wochen steigern, dann eine Erholungswoche; Steigerung pro Woche in Prozent */
 export interface Progression { buildWeeks: number; incPct: number }
@@ -172,7 +174,7 @@ export function thresholdPaceFromBest(km: number, sec: number): number {
 const BEST_KM: [keyof Bests, number][] = [['run10k', 10], ['runHalf', 21.0975], ['run5k', 5], ['runMarathon', 42.195]];
 
 /* Geschätzte Schwellen. Jeder Wert sagt, woher er kommt. */
-export function estimateThresholds(p: Partial<Profile>, today: string): { values: Required<Omit<Thresholds, 'estimated' | 'ftp' | 'cssSec' | 'aetHr' | 'vo2max' | 'source' | 'breast100Sec' | 'crawl25Sec' | 'trendAt'>> & { ftp: number | null; cssSec: number | null }; basis: Partial<Record<ThresholdKey, string>> } {
+export function estimateThresholds(p: Partial<Profile>, today: string): { values: Required<Omit<Thresholds, 'estimated' | 'ftp' | 'cssSec' | 'aetHr' | 'vo2max' | 'source' | 'breast100Sec' | 'crawl25Sec' | 'trendAt' | 'bikeSpeeds'>> & { ftp: number | null; cssSec: number | null }; basis: Partial<Record<ThresholdKey, string>> } {
   const age = (p.birthYear ? +today.slice(0, 4) - p.birthYear : null);
   const basis: Partial<Record<ThresholdKey, string>> = {};
   const maxHr = Math.round(208 - 0.7 * (age ?? 35));

@@ -66,7 +66,7 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   if (ill.length) L.push('## Krankheiten: ' + ill.map((x: any) => `${d2(x.start)}-${x.end ? d2(x.end) : 'läuft'}${x.note ? ' ' + x.note : ''}`).join('; '));
   const adj = Object.values(ctx.state.adjustments || {}).filter((a: any) => a && a.date >= C.addDays(today, -14)).sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
   if (adj.length) { L.push('## Anpassungen der App (14 Tage)'); adj.forEach((a: any) => L.push(`- ${d2(a.date)} ${a.what || ''}${a.reason ? ' (' + a.reason + ')' : ''}${a.undone ? ' [rückgängig]' : ''}`)); }
-  if (opts.scores && opts.scores.length) L.push('## Leistungs-Scores (0-100, 100 = Ziel-Niveau): ' + opts.scores.map((s: any) => `${SPORT[s.sport]} ${s.score}`).join(', '));
+  if (opts.scores && opts.scores.length) L.push('## Leistungs-Scores (feste Skala: 20 Einsteiger, 50 solider Hobbysportler, 70 stark, 85 Spitzenamateur, 100 Elite): ' + opts.scores.map((s: any) => `${SPORT[s.sport]} ${s.score}${s.gains && s.gains[0] ? ` (am meisten bringt: ${s.gains[0].text})` : ''}`).join(', '));
   const notes = Object.values(ctx.state.coachNotes || {}).filter((n: any) => n && !n.deleted);
   if (notes.length) { L.push('## Coach-Notizen'); notes.forEach((n: any) => L.push('- ' + n.text)); }
   const mg = mainGoal(ctx.goals, today);

@@ -6,7 +6,9 @@ import { t, num, hours } from '../../../shared/i18n';
 import { D } from '../data';
 import { on, sec, ic, sparkline, bar, openSheet, armed, empty, more, sportLabel, field } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
-import { fmtDuration } from '../../../shared/prognosis';
+import { fmtDuration, type Prognosis } from '../../../shared/prognosis';
+import { pacingPlan } from '../../../shared/race';
+import type { Goal } from '../../../shared/goals';
 import { weekMinutes } from '../../../shared/rules';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -19,18 +21,12 @@ export function renderFortschritt(): string {
   h += sec(t('prog.scores'), `<div class="score-grid">${d.scores.map(s => {
     const first = s.trend[0].score, last = s.score; const delta = last - first;
     return `<button class="score" data-act="score-open" data-sport="${s.sport}" style="--c:${SPORT_COLOR[s.sport]}"><div class="top-l"><span style="color:var(--c);width:20px;height:20px;display:inline-block">${sportIcon(s.sport)}</span><span class="nm">${esc(sportLabel(s.sport))}</span></div>
-      <div class="spread"><span class="val">${s.score}</span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
-      ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.confidence < 0.3 ? t('prog.lowData') : t('prog.basis', { b: s.basis }))}</div></button>`;
-  }).join('')}</div>`, t('prog.tapWhy'));
+      <div class="spread"><span class="val">${s.score}<small class="xs muted lvl"> ${esc(s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
+      ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.confidence < 0.3 ? t('prog.lowData') : (s.gains[0] && s.gains[0].delta ? s.gains[0].text : t('prog.scale')))}</div></button>`;
+  }).join('')}</div><div class="hint">${esc(t('prog.scaleHint'))}</div>`, t('prog.tapWhy'));
   // Prognose
   const p = d.prognosis;
-  if (d.goal && p) {
-    h += sec(t('prog.prognosis'), `<div class="card">${p.ok && p.total ? `<div class="lbl">${esc(d.goal.name)}</div><div class="big" data-range><span class="nowrap-part">${fmtDuration(p.total.low)} –</span> <span class="nowrap-part">${fmtDuration(p.total.high)}</span></div><div class="xs muted">${esc(t('prog.confidence', { c: p.confidence }))}</div>
-      ${(p.parts || []).map(x => `<div class="kv"><span class="muted">${esc(x.label)}</span><b class="num">${fmtDuration(x.low)} – ${fmtDuration(x.high)}</b></div>`).join('')}
-      ${p.improve ? `<div class="banner info">${esc(p.improve)}</div>` : ''}
-      ${p.runDistances && d.goal.type.startsWith('run') ? more(t('prog.otherDistances'), p.runDistances.map(x => `<div class="kv"><span class="muted">${esc(x.label)}</span><b class="num">${fmtDuration(x.best)}</b></div>`).join('')) : ''}`
-      : `<div class="hint">${esc(t('prog.missing'))}</div><ul class="small">${(p.missing || []).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`}</div>`);
-  }
+  if (d.goal && p) h += sec(t('prog.prognosis'), progCard(d.goal, p, false));
   // Umfang pro Woche: höchstens 12 Wochen rund um die aktuelle (bei langen Plänen ragten sonst 60+ Balken aus dem Bildschirm, Auftrag 7)
   const cw = currentWeekIdx();
   const from = Math.max(0, Math.min(cw - 7, PLAN.weeks.length - 12)), to = Math.min(PLAN.weeks.length, from + 12);
@@ -50,13 +46,42 @@ export function renderFortschritt(): string {
   return h;
 }
 
+/* Balken mit eigener Position je Marke: Füllung = aktueller Wert, Striche = Für dein Ziel nötig / Etappenziel / Wunschzeit */
+function markBar(sub: number | null, marks: any[], color: string): string {
+  const max = Math.max(100, (sub || 0) + 5, ...marks.map(m => m.pos + 5));
+  const pc = (v: number) => Math.max(0, Math.min(100, v / max * 100)).toFixed(1);
+  return `<div class="mbar" style="--c:${color}" role="img" aria-label="${esc(marks.map(m => m.text).join(', '))}"><i class="fill" style="width:${pc(sub || 0)}%"></i>${marks.map(m => `<b class="mk ${m.kind}${m.done ? ' done' : ''}" style="left:${pc(m.pos)}%"></b>`).join('')}</div>`;
+}
 function scoreSheet(sport: string): string {
-  const s = D().scores.find(x => x.sport === sport); if (!s) return '';
-  return `<div class="stack"><div class="spread"><span class="hero-num" style="color:${SPORT_COLOR[sport]}">${s.score}</span><span class="small muted" style="text-align:right">${esc(t('prog.basis', { b: s.basis }))}<br>${esc(t('prog.measured', { m: s.measured ?? '–', c: Math.round(s.confidence * 100) }))}</span></div>
-    ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[sport])}
-    <div class="card flat tight"><div class="lbl">${esc(t('prog.why'))}</div><ul class="small" style="margin:6px 0 0;padding-left:18px">${s.why.map((w: string) => `<li>${esc(w)}</li>`).join('')}</ul></div>
-    <div class="card flat tight">${s.parts.map((p: any) => `<div class="part"><span class="small"><b>${esc(p.label)}</b><br><span class="muted">${esc(p.value)} · ${esc(t('prog.target'))} ${esc(p.target)}</span></span><span class="small num" style="align-self:center">${p.sub == null ? '–' : Math.round(p.sub)}</span><div style="grid-column:1/-1">${bar(p.sub ?? 0, SPORT_COLOR[sport])}</div></div>`).join('')}</div>
+  const s: any = D().scores.find(x => x.sport === sport); if (!s) return '';
+  const col = SPORT_COLOR[sport];
+  return `<div class="stack" data-score-sheet><div class="spread"><span class="hero-num" style="color:${col}">${s.score}</span><span class="small muted" style="text-align:right">${esc(s.level)}<br>${esc(t('prog.basis', { b: s.basis }))}</span></div>
+    ${sparkline(s.trend.map((x: any) => x.score), col)}
+    <div class="card flat tight"><div class="lbl">${esc(t('prog.why'))}</div><ul class="small" style="margin:6px 0 0;padding-left:18px">${s.why.map((w: string) => `<li>${esc(w)}</li>`).join('')}</ul>
+      <div class="small" style="margin-top:6px" data-conf>${esc(s.confText)}</div></div>
+    ${s.gains.length ? `<div class="card flat tight" data-gains><div class="lbl">${esc(t('prog.gains'))}</div><ul class="small" style="margin:6px 0 0;padding-left:18px">${s.gains.map((g: any) => `<li>${esc(g.text)}</li>`).join('')}</ul></div>` : ''}
+    <div class="card flat tight">${s.parts.map((p: any) => `<div class="part" data-part="${esc(p.key)}"><span class="small"><b>${esc(p.label)}</b><br><span class="muted">${esc(p.value)}</span></span><span class="small num" style="align-self:center">${p.sub == null ? '–' : Math.round(p.sub)}</span>
+      <div style="grid-column:1/-1">${markBar(p.sub, p.marks || [], col)}</div>${(p.marks || []).length ? `<div class="xs marks" style="grid-column:1/-1">${p.marks.map((m: any) => `<span class="mk-t ${m.kind}">${esc(m.text)}</span>`).join(' · ')}</div>` : p.target ? `<div class="xs muted" style="grid-column:1/-1">${esc(t('prog.good'))} ${esc(p.target)}</div>` : ''}</div>`).join('')}</div>
+    ${s.counted.length ? more(t('prog.counted'), `<div class="list">${s.counted.map((c: any) => `<div class="li"><span class="grow small"><b>${esc(fmtDate(c.date))}</b> ${esc(c.title)}<br><span class="muted">${esc(c.value)}${c.manual ? ' · ' + esc(t('prog.byHand')) : ''}</span></span></div>`).join('')}</div>`) : ''}
     <div class="hint">${esc(t('prog.scoreHint'))}</div></div>`;
+}
+/* Prognose: heute und am Renntag, je Disziplin Bereich und wahrscheinlichster Wert, was am meisten bringt, Tests, Annahmen, Pacing */
+export function progCard(goal: Goal, p: Prognosis, compact: boolean): string {
+  if (!p.ok || !p.total) return `<div class="card"><div class="hint">${esc(t('prog.noProg'))}</div></div>`;
+  const rng = (x: any) => `${fmtDuration(x.low)} – ${fmtDuration(x.high)}`;
+  const thr = D().profile.thresholds;
+  const pace = pacingPlan(goal, p, { lthrRun: thr.lthrRun, lthrBike: thr.lthrBike, ftp: thr.ftp });
+  const parts = (p.parts || []).map((x, i) => { const r = p.race && p.race.parts[i]; return `<div class="prow"><span class="muted">${esc(x.label)}${x.note ? `<br><span class="xs">${esc(x.note)}</span>` : ''}</span><b class="num">${fmtDuration(x.best)}<br><span class="xs muted">${rng(x)}</span></b>${p.race ? `<b class="num">${r ? fmtDuration(r.best) : ''}<br><span class="xs muted">${r ? rng(r) : ''}</span></b>` : ''}</div>`; }).join('');
+  return `<div class="card stack" data-prognosis><div class="lbl">${esc(goal.name)}</div>
+    <div class="prog2"><div><div class="xs muted">${esc(t('prog.ifToday'))}</div><div class="big num" data-range>${fmtDuration(p.total.best)}</div><div class="xs muted">${rng(p.total)}</div></div>
+    ${p.race ? `<div><div class="xs muted">${esc(t('prog.expectedAt', { d: fmtDate(p.race.date) }))}</div><div class="big num" data-race>${fmtDuration(p.race.total.best)}</div><div class="xs muted">${rng(p.race.total)}</div></div>` : ''}</div>
+    <div class="ptable ${p.race ? 'three' : ''}">${p.race ? `<div class="prow head xs muted"><span></span><span>${esc(t('prog.today'))}</span><span>${esc(fmtDate(p.race.date))}</span></div>` : ''}${parts}</div>
+    <div class="xs muted">${esc(t('prog.confidence', { c: p.confidence }))}${(p.confReasons || []).length ? ': ' + esc((p.confReasons || []).join('; ')) : ''}</div>
+    ${p.improve ? `<div class="banner info">${esc(p.improve)}</div>` : ''}
+    ${(p.missing || []).length ? `<div class="small" data-missing>${(p.missing || []).map(m => esc(m)).join('<br>')}</div>` : ''}
+    ${compact ? '' : more(t('race.pacing'), `<div class="list">${pace.map(x => `<div class="li"><span class="grow small"><b>${esc(x.leg)} · ${esc(x.part)}</b><br><span class="muted">${esc(x.hint)}</span></span><span class="v small">${esc(x.target)}</span></div>`).join('')}</div>`)}
+    ${compact || !(p.assumptions || []).length ? '' : more(t('prog.assumptions'), `<ul class="small" style="margin:0;padding-left:18px">${(p.assumptions || []).map(a => `<li>${esc(a)}</li>`).join('')}</ul><div class="hint">${esc(t('prog.courseHint'))}</div>`)}
+    ${p.runDistances && goal.type.startsWith('run') && !compact ? more(t('prog.otherDistances'), p.runDistances.map(x => `<div class="kv"><span class="muted">${esc(x.label)}</span><b class="num">${fmtDuration(x.best)}</b></div>`).join('')) : ''}</div>`;
 }
 on('score-open', el => { const sp = el.dataset.sport!; openSheet(sportLabel(sp), () => scoreSheet(sp)); });
 on('ms-add', () => {

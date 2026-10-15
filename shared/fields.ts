@@ -4,6 +4,7 @@
    Dazu: alte Notizen in Felder übertragen, Pulszone („Zone 3 statt 2“) und CTL/ATL/TSB des Tages berechnen.
    Scores, Coach und Analyse lesen die Felder über fieldsOf(). */
 import * as C from './core';
+import { kindOf, mainKind, BIKE_KIND_LABEL } from './bikespeed';
 
 export type FieldKind = 'num' | 'pace' | 'text' | 'select' | 'splits' | 'exercises';
 export interface FieldDef { key: string; label: string; unit?: string; kind: FieldKind; options?: [string, string][]; ph?: string; more?: boolean; /** nur bei Tests */ test?: boolean }
@@ -28,7 +29,8 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'indoor', label: 'Wo', kind: 'select', options: [['', '–'], ['in', 'drinnen (Smart Trainer)'], ['out', 'draußen']] },
     { key: 'bikeType', label: 'Rad', kind: 'select', options: [['', '–'], ['gravel', 'Gravelbike'], ['road', 'Rennrad'], ['mtb', 'Mountainbike'], ['other', 'anderes']] },
     { key: 'speed', label: 'Ø Tempo', unit: 'km/h', kind: 'num', more: true },
-    { key: 'testHr', label: 'Test: Ø Puls der 20 min', unit: 'bpm', kind: 'num', test: true }, { key: 'testPower', label: 'Test: Ø Watt der 20 min (falls gemessen)', unit: 'W', kind: 'num', test: true }
+    { key: 'testHr', label: 'Test: Ø Puls der 20 min', unit: 'bpm', kind: 'num', test: true }, { key: 'testPower', label: 'Test: Ø Watt der 20 min (falls gemessen)', unit: 'W', kind: 'num', test: true },
+    { key: 'testSpeed', label: 'Test: Ø Tempo der 20 min (flach)', unit: 'km/h', kind: 'num', test: true }
   ],
   swim: [
     { key: 'min', label: 'Dauer', unit: 'min', kind: 'num' }, { key: 'meters', label: 'Distanz', unit: 'm', kind: 'num' },
@@ -244,16 +246,22 @@ export function runTestUpdate(state: any, weeks: any[], profile: any, today: str
           text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit. Ändern kannst du die Werte unter Mehr → Einstellungen.` };
       }
       if (s.sport === 'bike') {
-        let hr: number | null = null, watt: number | null = null;
+        let hr: number | null = null, watt: number | null = null, kmh: number | null = null;
         const lap = laps.filter((l: any) => l.sec >= 1080 && l.sec <= 1380 && l.avgHr).sort((a: any, b: any) => (b.avgHr || 0) - (a.avgHr || 0))[0];
-        if (lap) { hr = Math.round(lap.avgHr); watt = lap.power || null; }
+        if (lap) { hr = Math.round(lap.avgHr); watt = lap.power || null; kmh = lap.speed ? lap.speed * 3.6 : null; }
         if (num(m.testHr)) hr = num(m.testHr);
         if (num(m.testPower)) watt = num(m.testPower);
+        if (num(m.testSpeed)) kmh = num(m.testSpeed);
         if (!hr) continue;
         if (th.lthrBike && (hr < th.lthrBike * 0.85 || hr > th.lthrBike * 1.1)) continue;
         const ftp = watt && watt > 50 && watt < 600 ? Math.round(watt * 0.95) : null;
-        const parts = [`Schwellenpuls Rad ${th.lthrBike || '–'} → ${hr}`, ftp ? `FTP ${th.ftp || '–'} → ${ftp} W` : 'ohne Wattmessung: Rad-Zonen über den Puls'];
-        return { sport: 'bike', sessionId: s.id, date: d.date, title: 'Rad-Zonen aktualisiert', thresholds: { lthrBike: hr, ...(ftp ? { ftp } : {}) }, settings: { lthrBike: hr },
+        // Auftrag 12: Schwellen-Geschwindigkeit des benutzten Rads (20 min → 1 Stunde etwa 3 % langsamer); nur flach (unter 8 Höhenmeter pro km)
+        const hilly = act && act.km && act.ascentM && act.ascentM / act.km > 8;
+        const kind = kindOf({ indoor: (act && act.indoor) || m.indoor === 'in', bikeType: m.bikeType || (act && act.bikeType), name: act && act.name, title: s.title }, profile);
+        const speed = kmh && kmh >= 15 && kmh <= 60 && !hilly ? Math.round(kmh * 0.97 * 10) / 10 : null;
+        const speeds = speed ? { ...(th.bikeSpeeds || {}), [kind]: speed } : null;
+        const parts = [`Schwellenpuls Rad ${th.lthrBike || '–'} → ${hr}`, ftp ? `FTP ${th.ftp || '–'} → ${ftp} W` : 'ohne Wattmessung: Rad-Zonen über den Puls', speed ? `Schwellen-Tempo ${BIKE_KIND_LABEL[kind]} ${String(speed).replace('.', ',')} km/h (flach)` : ''].filter(Boolean);
+        return { sport: 'bike', sessionId: s.id, date: d.date, title: 'Rad-Zonen aktualisiert', thresholds: { lthrBike: hr, ...(ftp ? { ftp } : {}), ...(speeds ? { bikeSpeeds: speeds } : {}), ...(speed && kind === mainKind(profile) ? { thresholdSpeedBikeKmh: speed } : {}) }, settings: { lthrBike: hr },
           text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Die Rad-Einheiten rechnen ab jetzt damit${ftp ? ', die Sweet-Spot-Intervalle auch mit Watt' : ''}.` };
       }
       // Schwimmen

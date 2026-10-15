@@ -6,7 +6,7 @@ import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr } from '../util'
 import { t, hhmm } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, openSheet, closeSheet, refreshSheet, field, select, toggle, armed, more, sportLabel, timeField, readTime } from '../kit';
 import { realism } from '../../../shared/goalcheck';
-import { GOALS, mainGoal, type Goal, type GoalType } from '../../../shared/goals';
+import { GOALS, mainGoal, type Goal, type GoalType , legsOf } from '../../../shared/goals';
 import { ageOf, isMinor, type Profile, type SportKey } from '../../../shared/profile';
 import { goalAllowed } from '../../../shared/rules';
 import { daysUntil } from '../../../shared/race';
@@ -89,11 +89,31 @@ function goalSheet(): string {
     ${G.date && G.type !== 'fitness' ? (() => { const r = realism(G!, profile(), todayStr()); return r ? `<div class="banner ${r.ok === false ? 'warn' : 'info'}" data-goal-realism>${esc(r.text)}</div>` : ''; })() : ''}
     ${!allowed.ok ? `<div class="banner warn">${esc(allowed.msg || '')}</div>` : ''}
     <div class="fld wide"><label for="g-why">${esc(t('goal.why'))}</label><input class="inp" id="g-why" data-ch="g" data-k="why" value="${esc(G.why || '')}"></div>
+    ${courseFields(G)}
     ${past || G.result ? `<div class="card flat tight"><div class="lbl">${esc(t('goal.result'))}</div><div class="fgrid">${timeField('g-res', t('goal.resultTime'), G.result && G.result.timeSec, 'hms', 'data-ch="g" data-k="resultTime"')}${field('g-place', t('goal.resultPlace'), (G.result && G.result.place) || '', { data: 'data-ch="g" data-k="resultPlace"' })}</div></div>` : ''}
     <button class="btn block" data-act="goal-save">${esc(t('common.save'))}</button>
     ${G_NEW ? '' : `<button class="btn danger" data-act="goal-del">${esc(t('goal.delete'))}</button>`}
     <div class="hint">${esc(t('goal.planHint'))}</div></div>`;
 }
+/* Strecke (Auftrag 12, optional): macht die Prognose genauer */
+function courseFields(g: Goal): string {
+  const sp = new Set(legsOf(g).map(l => l.sport)); if (!sp.size || g.type === 'fitness') return '';
+  const c: any = g.course || {};
+  const yn = (v: any) => v === true ? 'yes' : v === false ? 'no' : '';
+  return more(t('goal.course'), `<div class="fgrid" data-course>
+    ${sp.has('bike') ? field('gc-ba', t('goal.bikeAscent'), c.bikeAscentM ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="bikeAscentM"' }) : ''}
+    ${sp.has('run') ? field('gc-ra', t('goal.runAscent'), c.runAscentM ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="runAscentM"' }) : ''}
+    ${sp.has('swim') ? select('gc-sv', t('goal.swimVenue'), c.swimVenue || '', [['', t('goal.unknown')], ['open', t('goal.open')], ['pool', t('goal.pool')]], 'data-ch="gc" data-k="swimVenue"') + select('gc-ws', t('goal.wetsuit'), yn(c.wetsuit), [['', t('goal.unknown')], ['yes', t('common.yes')], ['no', t('common.no')]], 'data-ch="gc" data-k="wetsuit"') : ''}
+    ${field('gc-t', t('goal.temp'), c.tempC ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="tempC"' })}</div><div class="hint">${esc(t('goal.courseHint'))}</div>`);
+}
+onChange('gc', el => {
+  if (!G) return; const k = el.dataset.k!; const v = (el as HTMLInputElement).value.trim();
+  const c: any = { ...(G.course || {}) };
+  if (k === 'swimVenue') c.swimVenue = v || null;
+  else if (k === 'wetsuit') c.wetsuit = v === 'yes' ? true : v === 'no' ? false : null;
+  else { const n = v === '' ? null : parseFloat(v.replace(',', '.')); if (n != null && (!isFinite(n) || n < (k === 'tempC' ? -10 : 0) || n > (k === 'tempC' ? 45 : 10000))) { toast(t('common.invalidNumber')); return; } c[k] = n == null ? null : Math.round(n); }
+  G.course = c;
+});
 const parseHm = (s: string): number | null => { const m = /^(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?$/.exec(String(s).trim()); if (!m) return null; return m[3] != null ? +m[1] * 3600 + +m[2] * 60 + +m[3] : +m[1] * 3600 + +m[2] * 60; };
 on('goal-new', () => { G = { id: 'goal-' + Date.now(), type: 'run_10k', name: goalLabel('run_10k'), date: null, priority: draftGoals(SCREEN).length ? 'B' : 'A', outcome: 'finish' }; G_NEW = true; openSheet(t('prof.addGoal'), goalSheet); });
 on('goal-open', el => { const g = draftGoal(SCREEN, el.dataset.id!); if (!g) return; G = JSON.parse(JSON.stringify(g)); G_NEW = false; openSheet(g.name, goalSheet); });

@@ -21,12 +21,14 @@ describe('Prognose', () => {
     const p = prognosis({ id: 'g', type: 'tri_olympic', name: 'Olympisch', date: '2027-06-01', priority: 'A' }, { runThrSpeed: 1000 / 300, runEff: 1, bikeThrKmh: 32, ftp: null, swimCss: 115, nRun: 5, nBike: 5, nSwim: 4 });
     expect(p.parts!.map(x => x.label)).toEqual(['Schwimmen', 'Rad', 'Laufen', 'Wechsel']);
     expect(p.total!.best / 3600).toBeGreaterThan(2); expect(p.total!.best / 3600).toBeLessThan(3);
-    expect(p.improve).toMatch(/Rad/);
+    // Auftrag 12: Rad über Leistung (Tempo wächst mit der dritten Wurzel), deshalb bringt hier die Lauf-Schwelle mehr
+    expect(p.improve).toMatch(/Lauf-Schwelle/);
     expect(p.confidence).toBe('mittel');
   });
-  test('ohne Schwimmdaten: Hinweis auf den fehlenden Test statt Prognose', () => {
-    const p = prognosis({ id: 'g', type: 'tri_sprint', name: 'Sprint', date: '2027-06-01', priority: 'A' }, { runThrSpeed: 3, runEff: 1, bikeThrKmh: 30, ftp: null, swimCss: null, nRun: 5, nBike: 5, nSwim: 0 });
-    expect(p.ok).toBe(false); expect(p.missing![0]).toMatch(/Schwimmtest/);
+  test('ohne Schwimmdaten: trotzdem eine Prognose (Auftrag 12), mit breiterem Bereich und Hinweis auf den Test', () => {
+    const p = prognosis({ id: 'g', type: 'tri_sprint', name: 'Sprint', date: '2027-06-01', priority: 'A' }, { runThrSpeed: 3, runEff: 1, bikeThrKmh: 30, ftp: null, swimCss: null, nRun: 5, nBike: 5, nSwim: 0 }, { profile: { skills: { swimCrawl: 'yes', swimCrawlM: 800 }, thresholds: { estimated: ['cssSec'] } as any } });
+    expect(p.ok).toBe(true); expect(p.missing!.join(' ')).toMatch(/Schwimmtest/);
+    const sw = p.parts!.find(x => x.label === 'Schwimmen')!; expect((sw.high - sw.low) / sw.best).toBeGreaterThan(0.15);
   });
 });
 

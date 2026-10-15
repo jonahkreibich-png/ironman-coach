@@ -42,6 +42,16 @@ export const EFFORT = { chat: 'medium', routine: 'low' } as const;
 export type CreateFn = (params: any) => Promise<any>;
 let createOverride: CreateFn | null = null;
 export function setCreateOverride(fn: CreateFn | null) { createOverride = fn; }
+/* Streaming (Auftrag 12): Text kommt Stück für Stück; im Test (Mock) eine Runde ohne Streaming */
+export type StreamFn = (params: any, onText: (t: string) => void) => Promise<any>;
+let streamOverride: StreamFn | null = null;
+export function setStreamOverride(fn: StreamFn | null) { streamOverride = fn; }
+function streamer(env: Env): StreamFn | null {
+  if (streamOverride) return streamOverride;
+  if (createOverride) return null;
+  const client = new Anthropic({ apiKey: String(env.ANTHROPIC_API_KEY).trim() });
+  return (params: any, onText: (t: string) => void) => { const st = client.beta.messages.stream(params); st.on('text', (d: string) => onText(d)); return st.finalMessage(); };
+}
 function creator(env: Env): CreateFn {
   if (createOverride) return createOverride;
   const client = new Anthropic({ apiKey: String(env.ANTHROPIC_API_KEY).trim() });
@@ -108,7 +118,8 @@ function history(msgs: CoachMsg[]): any[] {
 
 export interface ChatResult { messages: CoachMsg[]; changes: ToolChange[]; status: AiStatus; blocked?: string }
 /* Eine Nachricht an den KI-Coach. Werkzeuge werden in einer Schleife ausgeführt (höchstens 6 Runden). */
-export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: string): Promise<ChatResult> {
+export interface ChatStream { delta: (t: string) => void; reset: () => void }
+export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: string, live?: ChatStream): Promise<ChatResult> {
   const ctx = aiSafeCtx(ctx0);
   const now = Date.now();
   const userMsg: CoachMsg = { id: `msg-user-${now}`, at: now, date: ctx.today, kind: 'user', from: 'user', text: String(text).slice(0, 2000) };
@@ -122,6 +133,7 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
     throw new HttpError(403, why + ' Die Schnellfragen und „Mit Claude besprechen“ funktionieren weiter.');
   }
   const create = creator(env);
+  const stream = live ? streamer(env) : null;
   const prior = Object.values(ctx.state.coachMsgs || {}) as CoachMsg[];
   const context = buildContext(ctx, { days: 28, appName: BRAND.name });
   const messages: any[] = [...history(prior), { role: 'user', content: [{ type: 'text', text: `<daten>\n${context}\n</daten>` }, { type: 'text', text: userMsg.text }] }];
@@ -129,7 +141,7 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   const tools = TOOL_DEFS.map(t => ({ ...t }));
   let finalText = '';
   for (let round = 0; round < 6; round++) {
-    const res = await create({
+    const params = {
       model: MODELS.strong, max_tokens: 16000,
       output_config: { effort: EFFORT.chat },
       // Verlauf und Werkzeug-Ergebnisse bleiben über die Runden im Cache (Cache lesen kostet ein Zwanzigstel)
@@ -137,7 +149,10 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
       betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
       system: [{ type: 'text', text: systemPrompt(ctx), cache_control: { type: 'ephemeral' } }],
       tools, tool_choice: { type: 'auto' }, messages
-    });
+    };
+    if (live && round > 0) live.reset();
+    const res = stream ? await stream(params, live!.delta) : await create(params);
+    if (live && !stream) { const tx = (res.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim(); if (tx) live.delta(tx); }
     await addUsage(env, uid, MODELS.strong, res.usage || {}, round === 0);
     if (res.stop_reason === 'refusal') { finalText = 'Dazu kann ich dir keine Antwort geben. Frag mich gern etwas zu deinem Training.'; break; }
     messages.push({ role: 'assistant', content: res.content });

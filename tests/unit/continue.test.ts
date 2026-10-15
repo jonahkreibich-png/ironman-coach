@@ -61,7 +61,8 @@ describe('Plan geht weiter (kein Neustart)', () => {
   test('Scores sind nach der Übernahme gleich wie vorher (nicht zurückgesetzt)', () => {
     const inp = (p: any) => ({ today, activities: legacyActivities(st, p.weeks, profile), trend: st.trend, illness: st.illnessPeriods, profile, goal: goals[0] as any, calibration: p.meta.scoreCalibration, manualAdjust: {} });
     expect(sportScores(inp(plan)).map(s => s.score)).toEqual(sportScores(inp(oldPlan())).map(s => s.score));
-    expect(sportScores(inp(plan)).find(s => s.sport === 'run')!.score).toBeGreaterThan(40);
+    // Auftrag 12: feste Leistungsskala (50 = solider Hobbysportler), nicht mehr Anteil am Ziel
+    expect(sportScores(inp(plan)).find(s => s.sport === 'run')!.score).toBeGreaterThan(25);
   });
   test('Umfang aus der letzten Aufbauwoche (Auftrag 8): erledigt statt geplant, wenn abgehakt und deutlich weniger; nach Krankheit in Stufen', () => {
     const own = (w: any) => w.days.reduce((a: number, d: any) => a + d.sessions.filter((s: any) => ['swim', 'bike', 'run'].includes(s.sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);

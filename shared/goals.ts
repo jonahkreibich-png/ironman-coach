@@ -36,6 +36,7 @@ export const GOALS: Record<GoalType, GoalDef> = {
   fitness: { type: 'fitness', group: 'other', legs: [], hours: [0, 0], prepWeeks: [4, 12] }
 };
 
+export interface Course { bikeAscentM?: number | null; runAscentM?: number | null; swimVenue?: 'open' | 'pool' | null; wetsuit?: boolean | null; tempC?: number | null }
 export interface Goal {
   id: string;
   type: GoalType;
@@ -50,7 +51,10 @@ export interface Goal {
   /** eigene Strecken (z. B. Rad-Event mit 150 km) */
   legs?: Leg[];
   why?: string;
-  result?: { timeSec?: number | null; place?: string; note?: string; splits?: Record<string, number> } | null;
+  /** Strecke (Auftrag 12, optional): Höhenmeter Rad/Lauf, Freiwasser oder Becken, Neopren, erwartete Temperatur (°C) */
+  course?: Course | null;
+  /** Ergebnis; predicted = Prognose am Renntag (für den persönlichen Korrekturfaktor) */
+  result?: { timeSec?: number | null; place?: string; note?: string; splits?: Record<string, number>; predicted?: Record<string, number> | null } | null;
   createdAt?: number;
 }
 

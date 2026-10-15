@@ -10,6 +10,7 @@ import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/act
 import { nav } from '../nav';
 import { toast } from '../toast';
 import { checkTestResult, checkSwimSkill } from '../testupdate';
+import { reviewSoon } from '../review';
 import * as C from '../../../shared/core';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
@@ -83,6 +84,8 @@ export function fieldsBlock(tg: Target): string {
 }
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
+/* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
+const rev = (tg: Target) => { const st = rec(tg); if (st && (tg.kind === 'custom' || st.completed)) reviewSoon(tg.id, tg.date); };
 onChange('fd', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const k = el.dataset.k!;
   let v: any = (el as HTMLInputElement).value.trim();
@@ -91,10 +94,11 @@ onChange('fd', el => {
   saveSoon(); if (el.tagName === 'SELECT' || k === 'hr') refreshSheet(); nav.rerender();
   if ((k === 'hr' || k === 'pace' || /^test|^css|^crawl25|^breast200/.test(k)) && checkTestResult()) { saveState(); refreshSheet(); nav.rerender(); }
   if ((k === 'longestCrawl' || k === 'longestPull') && checkSwimSkill()) { saveState(); refreshSheet(); nav.rerender(); }
+  rev(tg);
 });
 onChange('fd-top', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st[el.dataset.k!] = (el as HTMLInputElement).value; saveSoon(); });
-on('fd-rpe', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st.rpe = String(st.rpe) === el.dataset.v ? '' : el.dataset.v; redraw(); });
-on('fd-feel', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st.feel = String(st.feel) === el.dataset.v ? '' : el.dataset.v; redraw(); });
+on('fd-rpe', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st.rpe = String(st.rpe) === el.dataset.v ? '' : el.dataset.v; redraw(); rev(tg); });
+on('fd-feel', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st.feel = String(st.feel) === el.dataset.v ? '' : el.dataset.v; redraw(); rev(tg); });
 on('fd-reset', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; put(tg, resetSessionMetrics(st)); saveState(); refreshSheet(); nav.rerender(); toast(t('common.resetDone')); });
 /* Splits je km */
 const listOf = (st: any, k: string) => (Array.isArray((st.metrics || {})[k]) ? st.metrics[k].map((x: any) => ({ ...x })) : []);

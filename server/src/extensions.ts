@@ -96,6 +96,25 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     await putRecords(env, a.uid, changes);
     return { messages: r.messages, applied: r.changes.length, status: r.status, blocked: r.blocked || null };
   }
+  // Auftrag 12: dieselbe Antwort als Strom (NDJSON): {t:'delta'|'reset'|'done'|'error'}; gespeichert wird wie oben
+  if (p === '/api/coach/chat/stream' && M === 'POST') {
+    const body = await readJson(req);
+    if (!String(body.text || '').trim()) throw new HttpError(400, 'Leere Nachricht.');
+    const L = await loadState(env, a.uid);
+    const ts = new TransformStream(); const w = ts.writable.getWriter(); const enc = new TextEncoder();
+    const send = (o: any) => w.write(enc.encode(JSON.stringify(o) + '\n')).catch(() => {});
+    (async () => {
+      try {
+        const r = await aiChat(env, a.uid, engineCtx(L), String(body.text), { delta: t => { send({ t: 'delta', text: t }); }, reset: () => { send({ t: 'reset' }); } });
+        const t = Date.now();
+        const changes: Change[] = [...r.changes.map((c, i) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })), ...r.messages.map((mm, i) => ({ kind: 'coachMsg', key: mm.id, data: mm, updatedAt: t + 100 + i }))];
+        await putRecords(env, a.uid, changes);
+        await send({ t: 'done', messages: r.messages, applied: r.changes.length, status: r.status, blocked: r.blocked || null });
+      } catch (e: any) { await send({ t: 'error', status: e && e.status || 500, error: String(e && e.message || e) }); }
+      finally { try { await w.close(); } catch (e) { /* schon zu */ } }
+    })();
+    return new Response(ts.readable, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache' } });
+  }
   const pr = /^\/api\/coach\/proposal\/([\w.-]+)$/.exec(p);
   if (pr && M === 'POST') return decideProposal(env, a.uid, pr[1], !!(await readJson(req)).accept);
   if (p === '/api/coach/food' && M === 'POST') {

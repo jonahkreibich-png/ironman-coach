@@ -5,6 +5,7 @@ import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr, addDays } from 
 import { t, num } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel, timeField, readTime } from '../kit';
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
+import { bikeSpeedsOf, kindsOf, speedRange, mainKind, BIKE_KIND_LABEL, SPEED_HINT, type BikeKind } from '../../../shared/bikespeed';
 import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
 import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
 import { invalidate, D } from '../data';
@@ -13,6 +14,7 @@ import { STORAGE, APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
 import { keepDays } from './coach';
+import { reviewMode } from '../review';
 
 const NOTIFY_DEFAULTS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
@@ -42,7 +44,8 @@ export function renderEinstellungen(): string {
     <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`);
   h += sec(t('set.zones'), zonesCard(), t('set.zonesAside'));
   h += sec(t('set.notify'), notifyCard());
-  h += sec(t('set.chat'), `<div class="card stack"><span class="lab">${esc(t('set.chatKeep'))}</span><div class="seg" role="group" aria-label="${esc(t('set.chatKeep'))}">${[3, 7, 14].map(n => `<button class="${keepDays() === n ? 'on' : ''}" aria-pressed="${keepDays() === n}" data-act="set-chat-keep" data-v="${n}">${esc(t('set.chatDays', { n }))}</button>`).join('')}</div><div class="hint">${esc(t('set.chatKeepHint'))}</div></div>`);
+  h += sec(t('set.chat'), `<div class="card stack"><span class="lab">${esc(t('set.chatKeep'))}</span><div class="seg" role="group" aria-label="${esc(t('set.chatKeep'))}">${[3, 7, 14].map(n => `<button class="${keepDays() === n ? 'on' : ''}" aria-pressed="${keepDays() === n}" data-act="set-chat-keep" data-v="${n}">${esc(t('set.chatDays', { n }))}</button>`).join('')}</div><div class="hint">${esc(t('set.chatKeepHint'))}</div>
+    <span class="lab">${esc(t('set.review'))}</span><div class="seg" role="group" aria-label="${esc(t('set.review'))}" data-review-mode>${[['full', t('set.reviewFull')], ['short', t('set.reviewShort')], ['off', t('set.reviewOff')]].map(([v, l]) => `<button class="${reviewMode() === v ? 'on' : ''}" aria-pressed="${reviewMode() === v}" data-act="set-review" data-v="${v}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t('set.reviewHint'))}</div></div>`);
   h += sec(t('set.ai'), aiCard());
   h += sec(t('set.illness'), illnessCard());
   h += sec(t('set.ready'), readyCard(), t('set.readyAside'));
@@ -64,14 +67,33 @@ function zonesCard(): string {
   const est = (k: ThresholdKey) => isEstimated(p, k) ? ' ' + t('set.estShort') : '';
   return `<div class="card stack">${estimatedNote(p)}<div class="fgrid">
     ${hasRun ? field('z-lr', t('set.lthrRun') + est('lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + timeField('z-tp', t('set.paceRun') + est('thresholdPaceRunSec'), th.thresholdPaceRunSec, 'ms', 'data-ch="thr" data-k="thresholdPaceRunSec"') : ''}
-    ${hasBike ? field('z-lb', t('set.lthrBike') + est('lthrBike'), th.lthrBike, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrBike"' }) + field('z-ftp', t('set.ftp'), th.ftp ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="ftp"' }) + field('z-ts', t('set.speedBike') + est('thresholdSpeedBikeKmh'), th.thresholdSpeedBikeKmh, { inputmode: 'decimal', data: 'data-ch="thr" data-k="thresholdSpeedBikeKmh"' }) : ''}
+    ${hasBike ? field('z-lb', t('set.lthrBike') + est('lthrBike'), th.lthrBike, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrBike"' }) + field('z-ftp', t('set.ftp'), th.ftp ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="ftp"' }) + bikeSpeedFields(p) : ''}
     ${hasSwim ? timeField('z-css', t('set.css') + est('cssSec'), th.cssSec, 'ms', 'data-ch="thr" data-k="cssSec"') : ''}
     ${field('z-max', t('set.maxHr') + est('maxHr'), th.maxHr ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="maxHr"' })}</div>
     ${hasRun ? `<div class="lbl">${esc(sportLabel('run'))}</div>` + tbl(run.map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${paceRange(i)}/km</td></tr>`)) : ''}
-    ${hasBike ? `<div class="lbl">${esc(sportLabel('bike'))}</div>` + tbl(bike.map((z, i) => { const pw = th.ftp ? powerZonesFor(th.ftp)[i] : null; return `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${pw ? `${pw.lo}${pw.hi ? '–' + pw.hi : '+'} W` : ''}</td></tr>`; })) : ''}
+    ${hasBike ? `<div class="lbl">${esc(sportLabel('bike'))}</div>` + tbl(bike.map((z, i) => { const pw = th.ftp ? powerZonesFor(th.ftp)[i] : null; return `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${pw ? `${pw.lo}${pw.hi ? '–' + pw.hi : '+'} W` : ''}</td></tr>`; })) + bikeSpeedTable(p) : ''}
     ${hasSwim && th.cssSec ? `<div class="lbl">${esc(sportLabel('swim'))}</div>` + tbl(swimZonesFor(th.cssSec).map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${secToPace(z.fast)}–${secToPace(z.slow)} /100 m</td></tr>`)) : ''}
     <div class="hint">${esc(t('set.zonesHint'))}</div></div>`;
 }
+/* Rad-Tempo je Rad (Auftrag 12): Schwellen-Geschwindigkeit flach als Feld, Zonen in km/h als Tabelle, Hinweis auf Wind und Steigung */
+function bikeSpeedFields(p: any): string {
+  const bs = bikeSpeedsOf(p);
+  return kindsOf(p).map(k => field('z-bs-' + k, t('set.bikeSpeed', { bike: BIKE_KIND_LABEL[k] }) + (bs.measured[k] ? '' : ' ' + t('set.derivedShort')), num(bs[k], 1), { inputmode: 'decimal', data: `data-ch="bspeed" data-k="${k}"` })).join('');
+}
+function bikeSpeedTable(p: any): string {
+  const bs = bikeSpeedsOf(p); const kinds = kindsOf(p);
+  const zc = ['var(--rest)', 'var(--info)', 'var(--good)', 'var(--warn)', 'var(--bad)'];
+  return `<div class="lbl" data-speed-zones>${esc(t('set.speedZones'))}</div><div class="scroll-x"><table class="tbl"><thead><tr><th></th>${kinds.map(k => `<th class="num">${esc(BIKE_KIND_LABEL[k])}</th>`).join('')}</tr></thead><tbody>${[1, 2, 3, 4, 5].map(z => `<tr><td><b style="color:${zc[z - 1]}">Z${z}</b></td>${kinds.map(k => `<td class="num">${esc(speedRange(bs[k], z))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="hint">${esc(SPEED_HINT)}${kinds.includes('indoor') ? ' ' + esc(t('set.speedIndoor')) : ''}</div>`;
+}
+onChange('bspeed', el => {
+  const p = profile(); const k = el.dataset.k as BikeKind; const v = parseNum((el as HTMLInputElement).value.trim());
+  if (v == null || isNaN(v) || v < 10 || v > 60) { toast(t('set.outOfRange')); return; }
+  const th: any = { ...p.thresholds, bikeSpeeds: { ...(p.thresholds.bikeSpeeds || {}), [k]: Math.round(v * 10) / 10 } };
+  let np: any = { ...p, thresholds: th };
+  if (k === mainKind(p)) np = setThreshold(np, 'thresholdSpeedBikeKmh', Math.round(v * 10) / 10);
+  saveProfile(np); invalidate(); toast(t('common.saved'));
+});
 /* Geschätzte Werte: Hinweis mit Herkunft und Test-Vorschlag */
 function estimatedNote(p: any): string {
   const est = (p.thresholds.estimated || []) as ThresholdKey[];
@@ -217,4 +239,5 @@ on('set-theme', el => { applyTheme(el.dataset.v || ''); nav.rerender(); });
 on('set-variant', el => { UI.heuteVariant = el.dataset.v; saveUi(); nav.rerender(); });
 void fmtDate; void refreshSheet; void saveProfile;
 
+on('set-review', el => { STATE.settings.coachReview = el.dataset.v; saveState(); nav.rerender(); });
 on('set-chat-keep', el => { STATE.settings.coachKeepDays = +el.dataset.v!; saveState(); nav.rerender(); });

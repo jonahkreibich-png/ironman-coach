@@ -12,6 +12,7 @@ import { paceCtx } from '../plangen';
 import { sleepNeed, type Profile } from '../profile';
 import type { Op } from './ops';
 import { joinDe } from './texts';
+import { SPEED_HINT } from '../bikespeed';
 
 export interface Part { part: 'warm' | 'main' | 'cool'; label: string; lines: string[] }
 export interface Structure { title: string; minutes: number | null; km: number | null; parts: Part[]; how: string | null; why: string | null; tip: string | null; derived: boolean }
@@ -88,7 +89,7 @@ export function structureOf(s: any, prof: Profile, today: string): Structure | n
   }
   const t = W.totals(spec);
   const zmax = Math.max(...spec.steps.filter(x => x.part === 'main').map(x => x.zone || 2), 1);
-  return { title: s.title || W.title(spec), minutes: t.min || s.plannedMinutes || null, km: t.km, parts, how: spec.sport === 'strength' || spec.sport === 'football' ? null : W.FEEL[zmax], why: spec.why || null, tip: spec.tip || null, derived: !(s.spec && s.spec.steps) };
+  return { title: s.title || W.title(spec), minutes: t.min || s.plannedMinutes || null, km: t.km, parts, how: spec.sport === 'strength' || spec.sport === 'football' ? null : W.FEEL[zmax], why: spec.why || null, tip: [spec.tip, spec.sport === 'bike' && spec.ctx.bikeKmh && !spec.ctx.indoor && spec.kind !== 'race' ? SPEED_HINT : ''].filter(Boolean).join(' ') || null, derived: !(s.spec && s.spec.steps) };
 }
 export function structureText(x: Structure): string {
   const n = x.parts.map((p, i) => `${i + 1}. ${p.label}: ${p.lines.join('; dann ')}`);

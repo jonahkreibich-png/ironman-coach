@@ -33,3 +33,29 @@ export function realCtx(today: string): any {
   state.profile = profile;
   return { today, now: Date.parse(today + 'T07:00:00Z'), state, baseWeeks: plan.weeks, planMeta: plan.meta, profile, goals: Object.values(dict('goal')) };
 }
+
+/* Auftrag 12: neuester Stand der echten Daten (Sicherung vor dem Release 11, 15.10.), ohne Wiederherstellung von Auftrag 7 */
+export const REAL_DB_LATEST = process.env.REAL_DB_LATEST || 'data-export/prod-vor-release11.sqlite';
+export const hasLatestData = () => fs.existsSync(REAL_DB_LATEST);
+const latestCache: Record<number, any[]> = {};
+function latestRecords(uid: number): any[] {
+  if (latestCache[uid]) return latestCache[uid];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(REAL_DB_LATEST, { readOnly: true });
+  const recs = (db.prepare('SELECT kind, key, data FROM records WHERE user_id = ? AND deleted = 0').all(uid) as any[]).map(r => ({ kind: r.kind, key: r.key, data: JSON.parse(r.data) }));
+  db.close();
+  return (latestCache[uid] = recs);
+}
+export function latestCtx(today: string, uid = 1): any {
+  const recs = JSON.parse(JSON.stringify(latestRecords(uid)));
+  const dict = (k: string) => Object.fromEntries(recs.filter((r: any) => r.kind === k).map((r: any) => [r.key, r.data]));
+  const customWorkouts: any = {}; recs.filter((r: any) => r.kind === 'custom').forEach((r: any) => { (customWorkouts[r.data.date] = customWorkouts[r.data.date] || []).push(r.data); });
+  const plan = recs.find((r: any) => r.kind === 'plan').data; const set = (recs.find((r: any) => r.kind === 'settings') || { data: {} }).data;
+  const state: any = { sessions: dict('session'), customWorkouts, adjustments: dict('adjust'), activities: dict('activity'), coachMsgs: {}, weekNotes: {}, nutrition: {},
+    trend: recs.filter((r: any) => r.kind === 'trend').map((r: any) => r.data).sort((a: any, b: any) => a.date.localeCompare(b.date)), illnessPeriods: recs.filter((r: any) => r.kind === 'illness').map((r: any) => r.data), settings: set.settings || {} };
+  migrateNotes(state, plan.weeks);
+  const profile = mergeProfile((recs.find((r: any) => r.kind === 'profile') || { data: {} }).data, profileFromLegacy({ ...state, planWeeks: plan.weeks }, today), today);
+  state.profile = profile;
+  return { today, now: Date.parse(today + 'T16:00:00Z'), state, baseWeeks: plan.weeks, planMeta: plan.meta, profile, goals: Object.values(dict('goal')) };
+}

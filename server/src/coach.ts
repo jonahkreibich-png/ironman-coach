@@ -57,7 +57,8 @@ export async function runEngineFor(env: Env, uid: number, ev: EngineEvent, opts:
   const t = Date.now();
   const changes: Change[] = out.adjustments.map((a, i) => ({ kind: 'adjust', key: a.id, data: a, updatedAt: t + i }));
   const msgs: CoachMsg[] = [];
-  for (const m of out.messages) msgs.push(opts.rephrase && (m.kind === 'briefing' || m.kind === 'session' || m.kind === 'week') ? await opts.rephrase(m) : m);
+  // Bewertungen (Auftrag 12) behalten ihre 3 Teile, die KI formuliert sie nicht um
+  for (const m of out.messages) msgs.push(opts.rephrase && (m.kind === 'briefing' || m.kind === 'session' || m.kind === 'week') && !m.id.startsWith('msg-review-') ? await opts.rephrase(m) : m);
   msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));
   if (changes.length) await putRecords(env, uid, changes);
   // Im Speicher nachziehen, falls weitere Schritte denselben Stand nutzen

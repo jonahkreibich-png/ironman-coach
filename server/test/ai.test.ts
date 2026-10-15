@@ -254,3 +254,25 @@ describe('Auftrag 7: KI-Coach bereit für den echten Schlüssel', () => {
     expect(row.cost_micro).toBeGreaterThanOrEqual(100000); expect(row.cost_micro).toBeLessThan(101000); // dazu nur Cent-Bruchteile fürs Umformulieren
   });
 });
+
+/* Auftrag 12: Antwort als Strom (NDJSON) */
+import { setStreamOverride } from '../src/ai';
+import worker from '../src/index';
+describe('Streaming', () => {
+  afterEach(() => setStreamOverride(null));
+  test('Text kommt in Stücken, danach „done“ mit gespeicherten Nachrichten; ohne Einwilligung „error“', async () => {
+    mock([text('unused')]);
+    setStreamOverride(async (_req: any, onText: (t: string) => void) => { for (const w of ['Gut ', 'gemacht, ', 'weiter so.']) onText(w); return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Gut gemacht, weiter so.' }], usage: { input_tokens: 100, output_tokens: 20 } }; });
+    const { env, T } = await user();
+    const res = await worker.fetch(new Request('http://x/api/coach/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T }, body: JSON.stringify({ text: 'Wie war mein Lauf?' }) }), env, { waitUntil() {} } as any);
+    expect(res.headers.get('Content-Type')).toMatch(/ndjson/);
+    const lines = (await res.text()).trim().split('\n').map(l => JSON.parse(l));
+    expect(lines.filter(l => l.t === 'delta').map(l => l.text).join('')).toBe('Gut gemacht, weiter so.');
+    const done = lines.find(l => l.t === 'done'); expect(done.messages.find((m: any) => m.from === 'ai').text).toBe('Gut gemacht, weiter so.');
+    expect((await recs(env, T)).some((r: any) => r.kind === 'coachMsg' && r.data.text === 'Gut gemacht, weiter so.')).toBe(true);
+    const u2 = await user({ consent: false });
+    const r2 = await worker.fetch(new Request('http://x/api/coach/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + u2.T }, body: JSON.stringify({ text: 'Hallo' }) }), u2.env, { waitUntil() {} } as any);
+    const l2 = (await r2.text()).trim().split('\n').map(l => JSON.parse(l));
+    expect(l2[l2.length - 1]).toMatchObject({ t: 'error', status: 403 });
+  });
+});

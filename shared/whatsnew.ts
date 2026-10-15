@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '2.8.0', items: [
+    'Neue Score-Skala: 20 Einsteiger, 50 solider Hobbysportler, 70 stark, 85 Spitzenamateur, 100 Elite (nach Alter und Geschlecht bereinigt). Statt „Ziel“ siehst du „Für dein Ziel nötig“, dein nächstes Etappenziel und die Wunschzeit. Antippen zeigt, was zählt und was am meisten bringt.',
+    'Prognose für heute und für den Wettkampftag, mit Ausdauer, Rad-Physik, Strecke und Pacing-Plan. Nach einem Rennen Ergebnis eintragen, dann lernt sie dazu. Rad-Zonen gibt es jetzt auch in km/h.',
+    'Frag den Coach „Wie war mein Lauf?“ oder „Wie war meine Woche?“: Er sagt, was gut war, was besser geht und was das für die nächsten Tage heißt, auch automatisch nach jeder Einheit.'
+  ] },
   { version: '2.7.0', items: [
     'Änderungen gelten sofort: Fragebogen, Profil, Berücksichtigungen und Coach passen den Plan ab heute an (ab 18 Uhr ab morgen). Erledigtes und Vergangenes bleibt.',
     'Ein Wochenraster für die Zeit: pro Tag die Zeit und welche Sportart geht. Stunden, längster Tag und Häufigkeit rechnet die App daraus.',

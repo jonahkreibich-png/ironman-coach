@@ -111,8 +111,8 @@ describe('Dropbox (HealthFit)', () => {
     expect(act.swim.longestContinuousM).toBe(400);
     // Verlauf ist abrufbar, aber nicht im Sync
     expect((await call(env, 'GET', `/api/activity/${act.id}/streams`, null, token)).status).toBe(404); // Schwimmen hat keine Messpunkte
-    // Coach-Kommentar zur Einheit
-    expect(recs.some((r: any) => r.kind === 'coachMsg' && r.key === 'msg-sess-' + act.id)).toBe(true);
+    // Coach-Bewertung zur Einheit (Auftrag 12: msg-review-<Einheit>)
+    expect(recs.some((r: any) => r.kind === 'coachMsg' && r.key === 'msg-review-' + (act.sessionId || act.id))).toBe(true);
     // Webhook: Signatur nötig, dann Abruf mit Cursor
     const idx = (await import('../src/index')).default;
     const body = JSON.stringify({ list_folder: { accounts: ['dbid:AAA'] } });

@@ -18,8 +18,9 @@ import { isMinor } from '../profile';
 import type { Op } from './ops';
 import { explainDay, explainWanted, limitIn } from './explain';
 import { parseSwimSkill, swimSkillUpdate } from '../swimskill';
+import { reviewAnswer } from './review';
 
-export interface Opt { label: string; say: string }
+export interface Opt { label: string; say: string; go?: string }
 export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
 export interface DialogState { pending?: Pending | null; focus?: { sid: string; date: string } | null }
 export interface Reply { intent: string; text: string; options?: Opt[]; apply?: Op[]; pending?: Pending | null; suggestions?: string[] }
@@ -209,7 +210,10 @@ function step(ctx: EngineCtx, d: DialogState, raw: string, extra: Extra): Reply 
   // 1) offene Rückfrage auflösen
   const p = d.pending;
   if (p && Date.now() - p.at < 60 * 60 * 1000) { const r = resolve(ctx, d, p, toks, raw); if (r) return r; }
-  // 2) Einheit tagesgenau erklären (Auftrag 7): „Was genau soll ich heute beim Schwimmen machen?“, „Ich hab nur 20 min“
+  // 2) Trainings-Bewertung (Auftrag 12): „Wie war mein Lauf?“, „Wie war meine Woche?“, „Vergleich mit letzter Woche“
+  const rv = reviewAnswer(ctx, raw);
+  if (rv) return { intent: 'review', text: rv.text, options: rv.options.length ? rv.options : undefined };
+  // 2b) Einheit tagesgenau erklären (Auftrag 7): „Was genau soll ich heute beim Schwimmen machen?“, „Ich hab nur 20 min“
   const j0 = toks.join(' ');
   if (explainWanted(toks, raw) || (limitIn(j0) && /\b(hab|habe)\b/.test(j0) && !/\b(verschieb|streich|tausch)/.test(j0))) {
     const date = dayIn(toks, ctx.today) || daysOf(ctx, toks).any[0] || ctx.today;

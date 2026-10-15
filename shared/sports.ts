@@ -53,16 +53,26 @@ export interface Requirement {
   /** Bezug in Worten für „Warum?“ */
   basis: string;
 }
-/* Ankommen-Niveau je Distanz (deutlich unter Zielschluss), falls keine Zielzeit angegeben ist */
+/* Ankommen-Niveau je Distanz: sicher ankommen, deutlich unter dem Zielschluss (Auftrag 12: vorher zu streng, z. B. 27 km/h im Ironman).
+   Renntempo in s/km (Laufen), km/h (Rad, Rennrad flach) und s/100 m (Schwimmen) */
 const FINISH: Record<GoalType, { run?: number; bike?: number; swim?: number }> = {
   run_5k: { run: 400 }, run_10k: { run: 410 }, run_half: { run: 420 }, run_marathon: { run: 440 },
-  tri_supersprint: { run: 400, bike: 24, swim: 140 }, tri_sprint: { run: 400, bike: 25, swim: 140 }, tri_olympic: { run: 405, bike: 26, swim: 135 },
-  tri_middle: { run: 420, bike: 27, swim: 135 }, tri_long: { run: 435, bike: 27, swim: 135 },
-  duathlon: { run: 400, bike: 26 }, aquathlon: { run: 400, swim: 135 }, bike_event: { bike: 26 }, swim_goal: { swim: 140 }, fitness: { run: 420, bike: 25, swim: 150 }
+  tri_supersprint: { run: 400, bike: 23, swim: 150 }, tri_sprint: { run: 400, bike: 24, swim: 150 }, tri_olympic: { run: 405, bike: 24, swim: 145 },
+  tri_middle: { run: 420, bike: 24, swim: 145 }, tri_long: { run: 435, bike: 23, swim: 145 },
+  duathlon: { run: 400, bike: 25 }, aquathlon: { run: 400, swim: 145 }, bike_event: { bike: 24 }, swim_goal: { swim: 150 }, fitness: { run: 420, bike: 25, swim: 150 }
 };
+/* Schwellen-Geschwindigkeit Rennrad (km/h) → FTP in W/kg (passend zur Score-Skala) */
+export function wkgFromKmh(kmh: number): number {
+  const pts: [number, number][] = [[18, 0.5], [22, 1.0], [28, 2.0], [32, 3.0], [35.5, 3.8], [37.5, 4.5], [40.5, 5.8]];
+  if (kmh <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) if (kmh <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (kmh - x0) / (x1 - x0) * (y1 - y0); }
+  return pts[pts.length - 1][1];
+}
 /* Wie weit die Wettkampf-Pace von der Schwelle weg ist (Wettkampf-Pace = Schwelle × Faktor) */
 const RACE_FACTOR_RUN: Partial<Record<GoalType, number>> = { run_5k: 0.96, run_10k: 1.0, run_half: 1.05, run_marathon: 1.12, tri_supersprint: 1.0, tri_sprint: 1.02, tri_olympic: 1.06, tri_middle: 1.13, tri_long: 1.22, duathlon: 1.02, aquathlon: 1.0, fitness: 1.15 };
-const RACE_FACTOR_BIKE: Partial<Record<GoalType, number>> = { tri_supersprint: 0.98, tri_sprint: 0.96, tri_olympic: 0.93, tri_middle: 0.85, tri_long: 0.78, duathlon: 0.95, bike_event: 0.82, fitness: 0.8 };
+/* Rad: Renntempo = Schwellen-Tempo × Faktor. Leistung im Rennen (Anteil FTP) → Tempo mit der dritten Wurzel
+   (Sprint 92 %, Olympisch 88 %, Mittel 80 %, Lang 72 %) */
+const RACE_FACTOR_BIKE: Partial<Record<GoalType, number>> = { tri_supersprint: 0.98, tri_sprint: 0.97, tri_olympic: 0.958, tri_middle: 0.928, tri_long: 0.896, duathlon: 0.965, bike_event: 0.908, fitness: 0.89 };
 const LONG: Record<GoalType, { run?: number; ride?: number; swim?: number; ctl: number }> = {
   run_5k: { run: 50, ctl: 30 }, run_10k: { run: 70, ctl: 38 }, run_half: { run: 110, ctl: 48 }, run_marathon: { run: 160, ctl: 60 },
   tri_supersprint: { run: 30, ride: 50, swim: 500, ctl: 30 }, tri_sprint: { run: 45, ride: 75, swim: 900, ctl: 38 }, tri_olympic: { run: 75, ride: 120, swim: 1800, ctl: 55 },
@@ -91,8 +101,17 @@ export function requirementFor(goal: Goal | null, profile: Profile): Requirement
       if (l.sport === 'swim') swim100 = sec / (l.km * 10);
     }
   }
+  // Wunschzeit je Disziplin (Triathlon) geht vor der Aufteilung der Gesamtzeit
+  if (goal && goal.splits) {
+    const km = (s: SportKey) => legs.filter(l => l.sport === s).reduce((a, l) => a + l.km, 0);
+    const sp = goal.splits;
+    if (sp.run && km('run')) runPace = sp.run / km('run');
+    if (sp.bike && km('bike')) bikeKmh = km('bike') / (sp.bike / 3600);
+    if (sp.swim && km('swim')) swim100 = sp.swim / (km('swim') * 10);
+    if (Object.values(sp).some(Boolean)) req.basis = 'deine Wunschzeit';
+  }
   if (has('run') && runPace) { req.runThresholdSecKm = Math.round(runPace / (RACE_FACTOR_RUN[type] || 1.1)); req.longRunMin = L.run; }
-  if (has('bike') && bikeKmh) { req.bikeThresholdKmh = Math.round(bikeKmh / (RACE_FACTOR_BIKE[type] || 0.85) * 10) / 10; req.longRideMin = L.ride; req.bikeFtpWkg = Math.round(req.bikeThresholdKmh / 10.5 * 10) / 10; }
+  if (has('bike') && bikeKmh) { req.bikeThresholdKmh = Math.round(bikeKmh / (RACE_FACTOR_BIKE[type] || 0.85) * 10) / 10; req.longRideMin = L.ride; req.bikeFtpWkg = Math.round(wkgFromKmh(req.bikeThresholdKmh) * 10) / 10; }
   if (has('swim') && swim100) { req.swimCss100 = Math.round(swim100 - 5); req.longSwimM = L.swim; }
   const n = ['swim', 'bike', 'run'].filter(s => has(s as SportKey)).length || 1;
   (['swim', 'bike', 'run'] as SportKey[]).forEach(s => { if (has(s)) req.ctlBySport[s] = Math.round(L.ctl * (s === 'bike' ? 0.45 : s === 'run' ? 0.35 : 0.2) * (n === 1 ? 1 / (s === 'bike' ? 0.45 : s === 'run' ? 0.35 : 0.2) : 1)); });

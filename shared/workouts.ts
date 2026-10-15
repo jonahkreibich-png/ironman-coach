@@ -4,6 +4,7 @@
    Die Bauanleitung (spec) bleibt an der Einheit, damit Anpassungen (z. B. Umfang −10 %) Text und Zahlen gemeinsam ändern.
    Keine Abhängigkeit von core.ts (core importiert dieses Modul). */
 import { HR_ZONES, POWER_ZONES } from './sports';
+import { speedRange, SPEED_HINT } from './bikespeed';
 
 export type WSport = 'run' | 'bike' | 'swim' | 'strength' | 'football';
 export type StrokeMode = 'crawl' | 'breast' | 'drill' | 'kick' | 'mixed' | 'easy' | 'pull';
@@ -32,6 +33,8 @@ export interface PaceCtx {
   runThrSec?: number | null; lthrRun?: number | null; lthrBike?: number | null;
   bikeKmh?: number | null; ftp?: number | null; css?: number | null; breast100?: number | null;
   indoor?: boolean; bikeName?: string | null;
+  /** Tempo-Zonen Rad anzeigen (Auftrag 12, Standard ja) */
+  speedZones?: boolean;
   /** Beckenlänge (Auftrag 11): 25 m (auch „beides“) oder 50 m. Stücke gehen immer auf, man endet am Startrand */
   pool?: 25 | 50 | null;
 }
@@ -75,6 +78,8 @@ const ZNAME: Record<number, string> = { 1: 'ganz locker', 2: 'locker', 3: 'zügi
 
 const mid = (r: [number, number]) => (r[0] + r[1]) / 2;
 export function runPace(ctx: PaceCtx, zone: number): number { return Math.round((ctx.runThrSec || 390) * mid(RUN_F[zone] || RUN_F[2])); }
+/* Pace-Bereich (s/km, schnell … langsam) einer Zone, für Bewertungen (Auftrag 12) */
+export function runPaceRange(ctx: PaceCtx, zone: number): [number, number] { const thr = ctx.runThrSec || 390; const f = RUN_F[zone] || RUN_F[2]; return [Math.round(thr * f[0]), Math.round(thr * f[1])]; }
 export function bikeKmh(ctx: PaceCtx, zone: number): number { return (ctx.bikeKmh || 24) * (BIKE_F[zone] || BIKE_F[2]); }
 export function swimPace(ctx: PaceCtx, zone: number, mode: StrokeMode = 'crawl'): number {
   const breast = ctx.breast100 || 175;
@@ -138,6 +143,8 @@ export function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
   } else if (spec.sport === 'bike') {
     if (c.ftp) { const z = POWER_ZONES[zone - 1]; parts.push(`${Math.round(c.ftp * z.low / 100)}–${z.high >= 999 ? Math.round(c.ftp * 1.2) : Math.round(c.ftp * z.high / 100)} W`); }
     if (c.lthrBike) parts.push(hrRange(c.lthrBike, zone));
+    // Auftrag 12: Tempo als Anhalt (flach, ohne Wind), drinnen die virtuelle Geschwindigkeit; Puls und Watt bleiben die Vorgabe
+    if (c.bikeKmh && c.speedZones !== false) parts.push(`ca. ${speedRange(c.bikeKmh, zone)}${c.indoor ? ' (virtuell)' : ' flach'}`);
   } else if (spec.sport === 'swim') {
     parts.push(`etwa ${mmss(swimPace(c, zone, mode))}/100 m`);
   }
@@ -179,6 +186,7 @@ export function describe(spec: Spec): string {
     L.push(`Gesamt: ${t.min} min${t.km ? spec.sport === 'swim' ? `, ${thousands(t.km * 1000)} m` : `, ca. ${de1(t.km)} km` : ''}`);
     const zmax = Math.max(...spec.steps.filter(s => s.part === 'main').map(s => s.zone || 2), 1);
     L.push(`Wie hart: ${FEEL[zmax]}.`);
+    if (spec.sport === 'bike' && spec.ctx.bikeKmh && spec.ctx.speedZones !== false && !spec.ctx.indoor) L.push(SPEED_HINT);
   }
   if (spec.why) L.push(`Warum: ${spec.why}`);
   if (spec.tip) L.push(`Achte auf: ${spec.tip}`);
