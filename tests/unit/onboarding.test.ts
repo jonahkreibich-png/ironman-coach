@@ -3,8 +3,8 @@ import { BLOCKS, missingRequired, progress, prefillFromData, applyOnboarding, pr
 
 test('Pflichtfragen: nur das Nötigste, mit Stern', () => {
   const req = BLOCKS.flatMap(b => b.questions.filter(q => q.required).map(q => q.id));
-  expect(req).toEqual(['goals', 'birthYear', 'injuries', 'sports', 'weeklyHoursNow', 'dayLoad', 'weeklyHours']);
-  expect(missingRequired({}).length).toBe(req.length);
+  expect(req).toEqual(['goals', 'birthYear', 'injuries', 'sports', 'weeklyHoursNow', 'swimCrawl', 'dayLoad']);
+  expect(missingRequired({}).length).toBe(req.length - 1); // Kraulen nur, wenn Schwimmen gewählt ist
   // „kein Training“ an allen Tagen zählt nicht als Antwort
   expect(missingRequired({ dayLoad: { 1: 0, 2: 0 } }).some(m => m.q.id === 'dayLoad')).toBe(true);
 });
@@ -15,7 +15,9 @@ test('Fragen erscheinen nur, wenn sie passen (Schwimmen, Teamsport)', () => {
   expect(q('swimCrawlM').show!({ sports: ['swim'], swimCrawl: 'no' })).toBe(false);
   expect(q('swimBreast').show!({ sports: ['swim'], swimCrawl: 'no' })).toBe(true);
   expect(q('teamGameDays').show!({ teamYes: false })).toBe(false);
-  expect(q('teamGameDays').show!({ teamYes: true })).toBe(true);
+  expect(q('teamGameDays').show!({ teamYes: true })).toBe(false);
+  expect(q('teamGameDays').show!({ teamYes: true, teamGames: false })).toBe(false);
+  expect(q('teamGameDays').show!({ teamYes: true, teamGames: true })).toBe(true);
   // B1: keine Uhrzeiten mehr
   expect(BLOCKS.flatMap(b => b.questions).some(x => x.type === 'windows' || x.type === 'fixed')).toBe(false);
 });

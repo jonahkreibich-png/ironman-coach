@@ -11,16 +11,22 @@ import { BIKE_OPTIONS } from '../../../shared/onboarding';
 import { invalidate } from '../data';
 import { replanFuture } from '../replan';
 import { nav } from '../nav';
-import { gridHtml, listHtml, addHtml, registerTarget } from './rules';
+import { toast } from '../toast';
+import { gridHtml, listHtml, addHtml, registerTarget, weekHtml } from './rules';
+import { weekSummary } from '../../../shared/weekgrid';
+import { todayStr } from '../util';
 
 const SCREEN = 'beruecksichtigungen';
 const MONTH_OPTS = (): [string, string][] => Array.from({ length: 12 }, (_, i) => [String(i + 1), t('month.' + (i + 1))]);
-const dataOf = (p: any) => ({ notes: [...(p.notes || [])], rules: [...(p.rules || [])], dayLoad: p.dayLoad || {}, sports: p.sports, team: p.teamSport });
+const dataOf = (p: any) => ({ notes: [...(p.notes || [])], rules: [...(p.rules || [])], dayLoad: p.dayLoad || {}, sports: p.sports, team: p.teamSport,
+  weeklyHours: p.weeklyHours, weeklyHoursSet: p.weeklyHoursSet !== false, maxDayHours: p.maxDayHours, freq: p.freq });
 registerTarget('cons', {
   get: () => dataOf(draftProfile(SCREEN)),
   base: () => dataOf(profile()),
   set: next => stage(SCREEN, p => { p.notes = next.notes; p.rules = next.rules; }),
-  setFreq: (sport, n) => stage(SCREEN, p => { p.freq = { ...(p.freq || {}), [sport]: [n, n] }; })
+  setFreq: (sport, n) => stage(SCREEN, p => { p.freq = { ...(p.freq || {}), [sport]: [n, n] }; }),
+  // Wochenraster (Auftrag 11): Zeit pro Tag, Limit, längster Tag, Häufigkeit – Stunden nie über der Zeit im Raster
+  setWeek: patch => stage(SCREEN, (p: any) => { Object.assign(p, patch); const ws = weekSummary(dataOf(p), todayStr()); if (patch.dayLoad) { p.weeklyHours = ws.weeklyHours; p.maxDayHours = ws.maxDayHours; } })
 });
 /* Lösung aus einer Coach-Nachricht („Laufen auch am Mo erlauben?“): ein bewusster Tipp, gilt sofort */
 registerTarget('now', {
@@ -33,7 +39,8 @@ export function renderBeruecksichtigungen(): string {
   const LAST = lastApplied(SCREEN);
   let h = `<div class="hint" style="margin:0 2px var(--s3)">${esc(t('cons.intro'))}</div>`;
   if (LAST) h += `<div class="banner good" data-replanned style="margin-bottom:var(--s3)">${esc(LAST)}</div>`;
-  h += sec(t('rules.gridTitle'), `<div class="card stack"><div class="hint">${esc(t('rules.gridHint'))}</div>${gridHtml('cons')}</div>`);
+  h += sec(t('rules.gridTitle'), `<div class="card stack"><div class="hint">${esc(t('week.hint'))}</div>${weekHtml('cons')}</div>`);
+  h += sec(t('cons.team'), teamCard(p));
   h += sec(t('rules.notesTitle'), `<div class="hint" style="margin:0 2px var(--s2)">${esc(t('rules.notesHint'))}</div>${listHtml('cons')}<div style="margin-top:var(--s2)">${addHtml('cons')}</div>`);
   h += sec(t('cons.skills'), `<div class="card stack"><div class="fgrid">
     ${p.sports.includes('swim') ? select('cs-crawl', t('cons.crawl'), sk.swimCrawl || '', [['', '–'], ['yes', t('common.yes')], ['some', t('cons.some')], ['no', t('common.no')]], 'data-ch="cs" data-k="swimCrawl"') + field('cs-crawlm', t('cons.crawlM'), sk.swimCrawlM ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="swimCrawlM" data-num="1"' }) : ''}
@@ -54,3 +61,25 @@ onChange('cs', el => {
   stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), [k]: v || (v === 0 ? 0 : null) }; });
 });
 on('cs-bike', el => { const v = el.dataset.v!; stage(SCREEN, p => { p.bikes = (p.bikes || []).includes(v) ? p.bikes.filter(x => x !== v) : [...(p.bikes || []), v]; }); });
+
+/* Teamsport mit derselben Logik wie im Fragebogen (Auftrag 11): erst „Gibt es Spiele?“, nur dann Spieltage und Dauer */
+const DOWS = [1, 2, 3, 4, 5, 6, 0];
+function teamCard(p: any): string {
+  const ts = p.teamSport;
+  const yn = (act: string, on: boolean | null) => `<div class="seg">${[['1', t('common.yes')], ['0', t('common.no')]].map(([k, l]) => `<button class="${(on === true && k === '1') || (on === false && k === '0') ? 'on' : ''}" data-act="${act}" data-v="${k}">${esc(l)}</button>`).join('')}</div>`;
+  const days = (key: string, sel: number[]) => `<div class="daychips">${DOWS.map(d => `<button class="chip ${sel.includes(d) ? 'on' : ''}" aria-pressed="${sel.includes(d)}" data-act="ct-day" data-k="${key}" data-d="${d}">${esc(t('dow.' + d))}</button>`).join('')}</div>`;
+  if (!ts) return `<div class="card stack" data-team-card><div class="lab">${esc(t('cons.teamYes'))}</div>${yn('ct-yes', false)}</div>`;
+  const games = (ts.gameDays || []).length > 0 || ts.gameMinutes > 0;
+  return `<div class="card stack" data-team-card><div class="lab">${esc(t('cons.teamYes'))}</div>${yn('ct-yes', true)}
+    <div class="fgrid">${field('ct-name', t('prof.teamSport'), ts.name || '', { data: 'data-ch="ct" data-k="name"' })}${field('ct-tmin', t('cons.teamMin'), ts.trainingMinutes || 90, { inputmode: 'numeric', data: 'data-ch="ct" data-k="trainingMinutes" data-num="1"' })}</div>
+    <div class="lab">${esc(t('cons.teamDays'))}</div>${days('trainingDays', ts.trainingDays || [])}
+    <div class="lab">${esc(t('cons.teamGames'))}</div>${yn('ct-games', games)}
+    ${games ? `<div class="lab">${esc(t('cons.gameDays'))}</div>${days('gameDays', ts.gameDays || [])}<div class="fgrid">${field('ct-gmin', t('cons.gameMin'), ts.gameMinutes || 90, { inputmode: 'numeric', data: 'data-ch="ct" data-k="gameMinutes" data-num="1"' })}</div>` : `<div class="hint">${esc(t('cons.noGames'))}</div>`}</div>`;
+}
+on('ct-yes', el => stage(SCREEN, (p: any) => {
+  if (el.dataset.v === '1') { if (!p.teamSport) p.teamSport = { name: p.teamSportName || 'Teamsport', trainingDays: [], trainingMinutes: 90, gameDays: [], gameMinutes: 0, seasonFrom: null, seasonTo: null }; if (!p.sports.includes('football')) p.sports = [...p.sports, 'football']; }
+  else { p.teamSport = null; p.sports = p.sports.filter((x: string) => x !== 'football'); }
+}));
+on('ct-games', el => stage(SCREEN, (p: any) => { if (!p.teamSport) return; if (el.dataset.v === '1') p.teamSport = { ...p.teamSport, gameMinutes: p.teamSport.gameMinutes || 90 }; else p.teamSport = { ...p.teamSport, gameDays: [], gameMinutes: 0 }; }));
+on('ct-day', el => stage(SCREEN, (p: any) => { if (!p.teamSport) return; const k = el.dataset.k!; const d = +el.dataset.d!; const cur: number[] = p.teamSport[k] || []; p.teamSport = { ...p.teamSport, [k]: cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort() }; }));
+onChange('ct', el => { const k = el.dataset.k!; let v: any = (el as HTMLInputElement).value; if (el.dataset.num) { v = parseInt(v, 10); if (!(v >= 15 && v <= 240)) { toast(t('ob.range', { min: 15, max: 240 })); return; } } stage(SCREEN, (p: any) => { if (!p.teamSport) return; p.teamSport = { ...p.teamSport, [k]: v }; if (k === 'name') p.teamSportName = v; }); });

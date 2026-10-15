@@ -20,7 +20,7 @@ describe.each(PERSONAS.map(p => [p.id, p] as const))('Test-Person %s', (_id, p) 
     for (const b of BLOCKS) expect(visibleQuestions(b, p.answers).length).toBeGreaterThan(0);
     expect(missingRequired(p.answers)).toEqual([]);
     const u = understood(p.answers, today);
-    expect(u.map(x => x.label)).toEqual(['Ziele', 'Sportarten und Häufigkeit', 'Tage', 'Teamsport', 'Können', 'Einschränkungen', 'Kraft']);
+    expect(u.map(x => x.label)).toEqual(['Ziele', 'Training bisher', 'Sportarten und Häufigkeit', 'Tage', 'Teamsport', 'Können', 'Einschränkungen', 'Kraft']);
     u.forEach(x => expect(x.text.length).toBeGreaterThan(1));
   });
   test('erste 4 Planwochen: alle Planungsregeln eingehalten', () => {

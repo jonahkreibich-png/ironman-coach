@@ -21,7 +21,10 @@ describe('Keine harte Regel verletzt: alle Test-Personen, 16 Wochen', () => {
 
 test('Vater-Profil: 3 Läufe gewünscht, nur Sa/So erlaubt → klarer Hinweis mit zwei Lösungen, Plan hat 2 Läufe', () => {
   const p = PERSONAS.find(x => x.id === 'vater-regeln')!;
-  const r = applyOnboarding(p.answers, today);
+  const r: any = applyOnboarding(p.answers, today);
+  // Im Wochenraster ist 3× Laufen bei nur Sa/So gar nicht wählbar (Auftrag 11); der Hinweis gilt für Regeln, die später dazukommen
+  r.profile = { ...r.profile, freq: { ...r.profile.freq, run: [3, 3] } };
+  r.gen = generatePlan({ profile: r.profile, goals: r.goals, today });
   const c = r.gen!.conflicts.find(x => x.sport === 'run')!;
   expect(c).toBeTruthy();
   expect(c.text).toBe('Du möchtest 3× Laufen pro Woche, deine Regeln erlauben Laufen nur Sa und So. Der Plan plant deshalb 2× ein.');
@@ -38,7 +41,10 @@ test('Vater-Profil: 3 Läufe gewünscht, nur Sa/So erlaubt → klarer Hinweis mi
 
 test('Lösung „Laufen auch am Montag erlauben“ wirkt: Regel wird erweitert, Konflikt verschwindet', () => {
   const p = PERSONAS.find(x => x.id === 'vater-regeln')!;
-  const r = applyOnboarding(p.answers, today);
+  const r: any = applyOnboarding(p.answers, today);
+  // Im Wochenraster ist 3× Laufen bei nur Sa/So gar nicht wählbar (Auftrag 11); der Hinweis gilt für Regeln, die später dazukommen
+  r.profile = { ...r.profile, freq: { ...r.profile.freq, run: [3, 3] } };
+  r.gen = generatePlan({ profile: r.profile, goals: r.goals, today });
   let rules: Rule[] = rulesOf(r.profile, parseFor(today)).map(x => ({ ...x, source: 'text' as const }));
   const day = r.gen!.conflicts[0].options[1].day!;
   rules = setCell(rules, 'run', day, 'yes');

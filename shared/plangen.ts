@@ -746,7 +746,8 @@ export function generatePlan(inp: GenInput): GenResult {
   enforceLongRun(weeks, cont && cont.lastLongRun ? cont.lastLongRun : null);
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
-    weeks[0].days.forEach((d: any) => { d.sessions = d.sessions.map((s: any) => orig[s.id] || s); }); }
+    const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };
+    weeks[0].days.forEach((d: any) => { const f = (inp.frozen || []).find(x => x.date === d.date); d.sessions = d.date < from! && f && f.sessions.length ? f.sessions.map(strip) : d.sessions.map((s: any) => orig[s.id] || s); }); }
   const violations = validateWeeks(weeks, { minor, maxIncPct: prog.incPct }, prevRef);
   const age2 = goalAllowed(A.type, ageAtRace);
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });
@@ -767,6 +768,8 @@ export function generatePlan(inp: GenInput): GenResult {
       : startWhy ? `Umfang zum Start: ${hh(ownVols[0])} h eigenes Training pro Woche, ${startWhy}.` : '',
     `Aufbau: ${prog.buildWeeks} Wochen steigern (bis +${prog.incPct} % pro Woche), dann 1 Woche Erholung. Nach einer Erholungswoche geht es mindestens auf Höhe der letzten Aufbauwoche weiter.`,
     pat ? patternText(pat, profile) : '',
+    inp.hoursUnknown ? 'Deine bisherigen Stunden kanntest du nicht: der Plan startet vorsichtig und passt sich nach 2 Wochen an dein echtes Training an.' : '',
+    midWeek && !cont ? `Dein Plan beginnt ${from === today ? 'heute' : 'morgen'}; diese Woche ist deshalb kürzer.` : '',
     afterIllness && !patTargets.length ? 'Nach deiner Krankheit: die erste Woche ohne harte Einheiten' + (inp.needTests && inp.needTests.run ? ', der Test kommt erst am Ende der Woche.' : '.') : ''
   ].filter(Boolean));
   // Weg zum Hauptziel mit Terminen; Platzhalter klar gekennzeichnet

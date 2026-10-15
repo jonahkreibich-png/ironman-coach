@@ -8,7 +8,7 @@ import { t } from '../../../shared/i18n';
 import { on, onChange, ic, field, select, armed, more, sportLabel, timeField, readTime } from '../kit';
 import { BLOCKS, visibleQuestions, missingRequired, progress, prefillFromData, applyOnboarding, profileFromAnswers, understood, availableDays, goalTarget, DAYLOAD_OPTIONS, type Answers, type Question } from '../../../shared/onboarding';
 import { GOALS, type GoalType } from '../../../shared/goals';
-import { currentStages, replanFuture } from '../replan';
+import { currentStages, replanFuture, replanFrom } from '../replan';
 import { goalAllowed } from '../../../shared/rules';
 import { realism } from '../../../shared/goalcheck';
 import { parseBackupText, isBackup, isPlan, applyBackup } from '../backup';
@@ -21,14 +21,16 @@ import { D, invalidate } from '../data';
 import { APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
-import { gridHtml, listHtml, addHtml, registerTarget, conflictsHtml } from './rules';
+import { gridHtml, listHtml, addHtml, registerTarget, conflictsHtml, weekHtml } from './rules';
 import { recoveryBanner } from './intro';
 
 const DOW = [1, 2, 3, 4, 5, 6, 0];
 /* Regeln im Fragebogen: Wochenraster und Sätze landen in den Antworten (answers.rules, answers.notes) */
 registerTarget('ob', {
   get: () => { const a = draft().answers; const notes = Array.isArray(a.notes) ? a.notes : String(a.notes || '').split(/\n+/).map((x: string) => x.trim()).filter(Boolean);
-    return { notes, rules: Array.isArray(a.rules) ? a.rules : [], dayLoad: a.dayLoad || {}, sports: a.sports || [], team: a.teamYes ? { name: String(a.teamName || 'Teamsport'), trainingDays: (a.teamTrainingDays || []).map(Number), gameDays: (a.teamGameDays || []).map(Number) } : null }; },
+    return { notes, rules: Array.isArray(a.rules) ? a.rules : [], dayLoad: a.dayLoad || {}, sports: a.sports || [], team: a.teamYes ? { name: String(a.teamName || 'Teamsport'), trainingDays: (a.teamTrainingDays || []).map(Number), gameDays: a.teamGames === false ? [] : (a.teamGameDays || []).map(Number) } : null,
+      weeklyHours: a.weeklyHours, weeklyHoursSet: a.weeklyHoursSet, maxDayHours: a.maxDayHours, freq: a.freq }; },
+  setWeek: patch => { Object.assign(draft().answers, patch); saveState(); nav.rerender(); },
   set: next => { const a = draft().answers; a.notes = next.notes; a.rules = next.rules; saveState(); nav.rerender(); },
   setFreq: (sport, n) => { const a = draft().answers; a.freq = { ...(a.freq || {}), [sport]: [n, n] }; saveState(); nav.rerender(); }
 });
@@ -108,6 +110,8 @@ function question(q: Question, a: Answers): string {
     case 'date': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><input class="inp" type="date" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}" data-t="text" value="${esc(v ?? '')}"></div>${hint}`;
     case 'notes': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${listHtml('ob')}<div style="margin-top:var(--s2)">${addHtml('ob')}</div></div>`;
     case 'grid': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${gridHtml('ob')}</div>`;
+    case 'hoursnow': return hoursNowQ(q, a, lab, pre) + hint;
+    case 'week': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${weekHtml('ob')}</div>`;
     case 'select': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><select class="inp" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}">${(q.options || []).some(o => o[0] === '') ? '' : `<option value="" ${v == null || v === '' ? 'selected' : ''} disabled>${esc(t('ob.pick'))}</option>`}${(q.options || []).map(([k, l]) => `<option value="${esc(k)}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>${hint}`;
     case 'yesno': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span><div class="seg">${[['1', t('common.yes')], ['0', t('common.no')]].map(([k, l]) => `<button class="${(v === true && k === '1') || (v === false && k === '0') ? 'on' : ''}" data-act="ob-yn" data-q="${q.id}" data-v="${k}">${esc(l)}</button>`).join('')}</div></div>${hint}`;
     case 'multi': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}${pre}</span><div class="chips" style="flex-wrap:wrap">${(q.options || []).map(([k, l]) => { const on = Array.isArray(v) && v.includes(k); return `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="ob-multi" data-q="${q.id}" data-v="${esc(k)}">${esc(l)}</button>`; }).join('')}</div></div>${hint}`;
@@ -119,6 +123,18 @@ function question(q: Question, a: Answers): string {
     case 'connect': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${connectList('onboarding')}</div>${hint}`;
     default: return `<div class="hint">${lab}</div>`;
   }
+}
+/* Stunden bisher (Auftrag 11): Zahl, Rechner „Anzahl × Dauer“, „Weiß ich nicht“; aus Uhr/intervals.icu vorbefüllt */
+function hoursNowQ(q: Question, a: Answers, lab: string, pre: string): string {
+  const unknown = a.weeklyHoursNow === 'unknown';
+  const c = a._calc || { n: 3, min: 45 };
+  const h = Math.round(c.n * c.min / 60 * 10) / 10;
+  return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}${pre}</label>
+    <div class="row" style="gap:8px;align-items:center"><input class="inp" id="q-${q.id}" inputmode="decimal" style="max-width:110px" data-ch="ob-q" data-q="${q.id}" data-t="number" value="${esc(unknown ? '' : a.weeklyHoursNow ?? '')}" placeholder="${esc(unknown ? t('ob.hnUnknownPh') : 'z. B. 3')}">
+    <button class="chip ${unknown ? 'on' : ''}" aria-pressed="${unknown}" data-act="ob-hn-unknown">${esc(t('ob.hnUnknown'))}</button></div>
+    <div class="card flat tight stack" data-hn-calc><div class="small">${esc(t('ob.hnCalc'))}</div>
+      <div class="row" style="gap:6px;align-items:center;flex-wrap:wrap"><input class="inp" style="max-width:64px" inputmode="numeric" aria-label="${esc(t('ob.hnTimes'))}" data-ch="ob-hn" data-k="n" value="${c.n}"><span>× ${esc(t('ob.hnPerWeek'))}</span><input class="inp" style="max-width:72px" inputmode="numeric" aria-label="${esc(t('ob.hnMinutes'))}" data-ch="ob-hn" data-k="min" value="${c.min}"><span>min ≈ <b data-hn-result>${String(h).replace('.', ',')} h</b></span>
+      <button class="btn ghost sm" data-act="ob-hn-take">${esc(t('ob.hnTake'))}</button></div></div></div>`;
 }
 /* B1: pro Tag kurz/mittel/lang statt Uhrzeiten */
 function dayLoadQ(q: Question, a: Answers): string {
@@ -185,8 +201,9 @@ let RESULT: ReturnType<typeof applyOnboarding> | null = null;
 function preview(): string {
   const a = draft().answers;
   // vorhandener Plan: fortsetzen statt neu beginnen (Auftrag 7)
-  RESULT = applyOnboarding(a, todayStr(), STATE.profile ? profile() : undefined, HAS_PLAN ? { old: readPlan(), state: STATE, adjustments: STATE.adjustments || {}, stages: currentStages() } : {});
-  const from = nextMondayStr();
+  // gilt ab heute (ab 18 Uhr ab morgen), Auftrag 11
+  const from = replanFrom();
+  RESULT = applyOnboarding(a, todayStr(), STATE.profile ? profile() : undefined, HAS_PLAN ? { old: readPlan(), state: STATE, adjustments: STATE.adjustments || {}, stages: currentStages(), from } : { from });
   const g = RESULT.gen;
   return `<div class="stack"><h2 style="margin:var(--s2) 0 0">${esc(t('ob.planTitle'))}</h2>
     ${RESULT.warnings.map(w => `<div class="banner warn">${esc(w)}</div>`).join('')}
@@ -194,7 +211,7 @@ function preview(): string {
     ${g ? `<div class="card stack"><div class="lbl">${esc(t('ob.summary'))}</div>${g.summary.map(s => `<p class="small" style="margin:0">${esc(s)}</p>`).join('')}</div>
       <div class="card stack plan-explain"><div class="lbl">${esc(t('plan.explain'))}</div>${(g.plan.meta.explain || []).map((s: string) => `<p class="small">${esc(s)}</p>`).join('')}</div>
       ${RESULT.continued ? `<div class="banner good" data-continued>${esc(t('ob.continued'))}</div>` : ''}
-      ${more(t(RESULT.continued ? 'ob.nextWeeks' : 'ob.firstWeeks'), g.plan.weeks.filter((w: any) => !RESULT!.continued || w.startDate >= from).slice(0, 2).map((w: any) => `<div class="lbl" style="margin-top:var(--s2)">${esc(w.headline || t('plan.weekShort', { n: w.weekNumber }))} · ${esc(w.focus || '')}</div>${w.days.map((d: any) => `<div class="kv small"><span>${esc(t('dow.' + new Date(d.date + 'T12:00:00').getDay()))}</span><span style="text-align:right">${esc(d.sessions.filter((s: any) => s.sport !== 'rest').map((s: any) => s.title + (s.plannedMinutes && !/\d+ min/.test(s.title) ? ` (${s.plannedMinutes} min)` : '')).join(', ') || t('heute.restDay'))}</span></div>`).join('')}`).join(''))}
+      ${more(t(RESULT.continued ? 'ob.nextWeeks' : 'ob.firstWeeks'), g.plan.weeks.filter((w: any) => (w.endDate || w.startDate) >= from).slice(0, 2).map((w: any) => `<div class="lbl" style="margin-top:var(--s2)">${esc(w.headline || t('plan.weekShort', { n: w.weekNumber }))} · ${esc(w.focus || '')}</div>${w.days.filter((d: any) => d.date >= from).map((d: any) => `<div class="kv small"><span>${esc(t('dow.' + new Date(d.date + 'T12:00:00').getDay()))}</span><span style="text-align:right">${esc(d.sessions.filter((s: any) => s.sport !== 'rest').map((s: any) => s.title + (s.plannedMinutes && !/\d+ min/.test(s.title) ? ` (${s.plannedMinutes} min)` : '')).join(', ') || t('heute.restDay'))}</span></div>`).join('')}`).join(''))}
       ${g.dropped.length ? `<div class="hint">${esc(t('ob.dropped', { list: [...new Set(g.dropped.slice(0, 4))].join('; ') }))}</div>` : ''}
       ${g.violations.filter(v => v.rule !== 'age').length ? `<div class="hint">${esc(t('ob.checked', { n: g.violations.length }))}</div>` : `<div class="hint">${esc(t('ob.rulesOk'))}</div>`}`
       : `<div class="card"><div class="hint">${esc(t('ob.noGoal'))}</div></div>`}
@@ -222,6 +239,9 @@ onChange('ob-q', el => {
   } else a[k] = v;
   saveState(); if (el.tagName === 'SELECT') nav.rerender();
 });
+on('ob-hn-unknown', () => { const a = A(); a.weeklyHoursNow = a.weeklyHoursNow === 'unknown' ? null : 'unknown'; redraw(); });
+onChange('ob-hn', el => { const a = A(); const v = parseInt((el as HTMLInputElement).value, 10); const c = { ...(a._calc || { n: 3, min: 45 }) }; if (el.dataset.k === 'n') c.n = Math.max(0, Math.min(21, v || 0)); else c.min = Math.max(0, Math.min(600, v || 0)); a._calc = c; saveState(); const r = document.querySelector('[data-hn-result]'); if (r) r.textContent = String(Math.round(c.n * c.min / 60 * 10) / 10).replace('.', ',') + ' h'; });
+on('ob-hn-take', () => { const a = A(); const c = a._calc || { n: 3, min: 45 }; a.weeklyHoursNow = Math.round(c.n * c.min / 60 * 10) / 10; redraw(); });
 on('ob-yn', el => { A()[el.dataset.q!] = el.dataset.v === '1'; redraw(); });
 on('ob-multi', el => { const a = A(); const k = el.dataset.q!; const cur: string[] = Array.isArray(a[k]) ? a[k] : []; a[k] = cur.includes(el.dataset.v!) ? cur.filter(x => x !== el.dataset.v) : [...cur, el.dataset.v!]; redraw(); });
 on('ob-day', el => { const a = A(); const k = el.dataset.q!; const d = +el.dataset.d!; const cur: number[] = Array.isArray(a[k]) ? a[k].map(Number) : []; a[k] = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort(); redraw(); });
@@ -266,7 +286,6 @@ on('ob-apply', el => {
   toast(t('ob.applied'));
   setTimeout(() => { location.href = location.pathname + '?go=plan'; }, 700);
 });
-function nextMondayStr(): string { const d = todayStr(); const dow = new Date(d + 'T12:00:00Z').getUTCDay(); const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + (dow === 1 ? 7 : (8 - dow) % 7 || 7)); return x.toISOString().slice(0, 10); }
 void saveProfile;
 
 on('sync-recheck', async () => { await syncNow(); toast(t('welcome.stillNoData')); });

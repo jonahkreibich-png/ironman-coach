@@ -10,8 +10,9 @@ import { replanPlan } from './replan';
 import { addDays } from './core';
 import { rulesOf, describe as ruleText } from './constraints';
 import { parseFor } from './ruleparse';
+import { weekSummary } from './weekgrid';
 
-export type QType = 'grid' | 'goals' | 'select' | 'multi' | 'number' | 'text' | 'notes' | 'yesno' | 'dayload' | 'freq' | 'days' | 'date' | 'bests' | 'windows' | 'fixed' | 'connect' | 'info';
+export type QType = 'week' | 'hoursnow' | 'grid' | 'goals' | 'select' | 'multi' | 'number' | 'text' | 'notes' | 'yesno' | 'dayload' | 'freq' | 'days' | 'date' | 'bests' | 'windows' | 'fixed' | 'connect' | 'info';
 export interface Question { id: string; label: string; type: QType; required?: boolean; options?: [string, string][]; unit?: string; hint?: string; min?: number; max?: number; show?: (a: Answers) => boolean }
 export interface Block { id: string; title: string; intro: string; questions: Question[] }
 export type Answers = Record<string, any>;
@@ -39,7 +40,7 @@ export const BLOCKS: Block[] = [
   { id: 'background', title: 'Sportarten und Erfahrung', intro: 'Wo stehst du gerade?', questions: [
     { id: 'sports', label: 'Welche Sportarten willst du trainieren?', type: 'multi', options: SPORT_OPTIONS, required: true, hint: 'Teamsport kommt gleich extra.' },
     { id: 'experienceYears', label: 'Wie lange machst du schon Ausdauersport?', type: 'number', unit: 'Jahre', min: 0, max: 60 },
-    { id: 'weeklyHoursNow', label: 'Stunden pro Woche in den letzten 4-8 Wochen (alle Sportarten)', type: 'number', unit: 'h', required: true, min: 0, max: 40 },
+    { id: 'weeklyHoursNow', label: 'Wie viele Stunden pro Woche hast du in den letzten 4-8 Wochen trainiert (alle Sportarten)?', type: 'hoursnow', unit: 'h', required: true, min: 0, max: 40, hint: 'Grob reicht. Rechner: wie oft pro Woche × wie lange. „Weiß ich nicht“ geht auch: dann startet der Plan vorsichtig und passt sich nach 2 Wochen an deine echten Daten an.' },
     { id: 'bests', label: 'Bestzeiten (optional, macht die Zonen genauer)', type: 'bests', show: a => has(a, 'run') || has(a, 'swim') }
   ] },
   { id: 'skills', title: 'Können und Ausrüstung', intro: 'Damit der Plan nichts verlangt, was du (noch) nicht kannst.', questions: [
@@ -68,13 +69,9 @@ export const BLOCKS: Block[] = [
     { id: 'teamSeasonFrom', label: 'Saison von (optional)', type: 'date', show: teamOn },
     { id: 'teamSeasonTo', label: 'Saison bis (optional)', type: 'date', show: teamOn, hint: 'Leer lassen, wenn das ganze Jahr gespielt wird.' }
   ] },
-  { id: 'time', title: 'Zeit und Alltag', intro: 'Der Plan passt sich deinem Leben an, nicht umgekehrt.', questions: [
-    { id: 'dayLoad', label: 'Wie viel Zeit hast du an welchem Tag?', type: 'dayload', required: true, hint: 'Ein Tipp pro Tag genügt. Teamsport-Training musst du hier nicht einrechnen.' },
-    { id: 'timeOfDay', label: 'Ich trainiere eher …', type: 'select', options: [['', 'egal'], ['morning', 'morgens'], ['evening', 'abends']], hint: 'Nur für die Uhrzeit der Mitteilungen.' },
-    { id: 'weeklyHours', label: 'Höchstens so viele Stunden pro Woche', type: 'number', unit: 'h', required: true, min: 1, max: 30 },
-    { id: 'maxDayHours', label: 'Höchstens so lange an einem langen Tag', type: 'number', unit: 'h', min: 1, max: 10 },
-    { id: 'freq', label: 'Wie oft pro Woche willst oder kannst du …?', type: 'freq', hint: 'Der Plan hält sich daran.' },
-    { id: 'grid', label: 'Welche Sportart geht an welchem Tag?', type: 'grid', hint: 'Tippe ein Feld an: geht → lieber nicht → geht nicht. „Geht nicht“ hält der Plan immer ein.' }
+  // Auftrag 11: Zeit nur einmal abfragen – ein Wochenraster, daraus Stunden, längster Tag und Häufigkeit (änderbare Zusammenfassung)
+  { id: 'time', title: 'Wochenraster', intro: 'Wann hast du wie viel Zeit, und welche Sportart geht an welchem Tag? Der Plan passt sich deinem Leben an, nicht umgekehrt.', questions: [
+    { id: 'dayLoad', label: 'Dein Wochenraster', type: 'week', required: true, hint: 'Zeile „Zeit“: antippen, bis die Zeit für den Tag passt (– kein Training, 45 min, 90 min, lang). Darunter je Sportart: ✓ geht, – lieber nicht, ✕ geht nicht. Teamsport musst du nicht einrechnen.' }
   ] },
   { id: 'notes', title: 'Berücksichtigungen', intro: 'Was soll der Plan noch wissen?', questions: [
     { id: 'notes', label: 'Was soll der Plan noch berücksichtigen?', type: 'notes', hint: 'Ein Satz pro Sache, z. B. „kann mittwochs nicht laufen, nur Samstag oder Sonntag“, „Knie zwickt beim Bergablaufen“, „Urlaub vom 20.12. bis 6.1.“. Die App zeigt dir, was sie verstanden hat.' },
@@ -83,6 +80,7 @@ export const BLOCKS: Block[] = [
     { id: 'planStyle', label: 'Plan genau vorgeben oder flexibel?', type: 'select', options: [['flexible', 'flexibel mit Vorschlägen'], ['strict', 'genau vorgeben']] }
   ] },
   { id: 'devices', title: 'Geräte und Verbindungen', intro: 'Verbinde deine Uhr oder deinen Ring, dann musst du weniger eintragen.', questions: [
+    { id: 'timeOfDay', label: 'Mitteilungen eher …', type: 'select', options: [['', 'egal'], ['morning', 'morgens'], ['evening', 'abends']], hint: 'Nur für die Uhrzeit der Erinnerungen.' },
     { id: 'devices', label: 'Was nutzt du?', type: 'multi', options: [['applewatch', 'Apple Watch'], ['garmin', 'Garmin'], ['coros', 'COROS'], ['suunto', 'Suunto'], ['wahoo', 'Wahoo'], ['polar', 'Polar'], ['oura', 'Oura'], ['whoop', 'WHOOP'], ['withings', 'Withings'], ['other', 'andere']] },
     { id: 'connect', label: 'Jetzt verbinden', type: 'connect' }
   ] },
@@ -94,7 +92,7 @@ export const BLOCKS: Block[] = [
 export function visibleQuestions(b: Block, a: Answers): Question[] { return b.questions.filter(q => !q.show || q.show(a)); }
 function isEmpty(q: Question, v: any): boolean {
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return true;
-  if (q.type === 'dayload') return !Object.values(v || {}).some((x: any) => +x > 0);
+  if (q.type === 'dayload' || q.type === 'week') return !Object.values(v || {}).some((x: any) => +x > 0);
   if (q.type === 'windows') return !Object.keys(v || {}).length;
   return false;
 }
@@ -103,7 +101,7 @@ export function missingRequired(a: Answers): { block: string; q: Question }[] {
   for (const b of BLOCKS) for (const q of visibleQuestions(b, a)) {
     if (!q.required) continue;
     // alte Antworten mit Zeitfenstern gelten auch
-    if (q.type === 'dayload' && a.windows && Object.keys(a.windows).length) continue;
+    if ((q.type === 'dayload' || q.type === 'week') && a.windows && Object.keys(a.windows).length) continue;
     if (isEmpty(q, a[q.id])) out.push({ block: b.id, q });
   }
   return out;
@@ -194,10 +192,14 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   if (a.weeklyHours) p.weeklyHours = +a.weeklyHours;
   if (a.maxDayHours) p.maxDayHours = +a.maxDayHours;
   if (a.dayLoad && typeof a.dayLoad === 'object') { const dl: Record<number, DayLoad> = {}; Object.entries(a.dayLoad).forEach(([k, v]) => { dl[+k] = Math.max(0, Math.min(3, +(v as any) || 0)) as DayLoad; }); p.dayLoad = dl; }
+  // Stunden und längster Tag aus dem Wochenraster (Auftrag 11): nie mehr als die Zeit im Raster
+  if (a.dayLoad && Object.values(a.dayLoad).some((x: any) => +x > 0)) { const ws = weekSummary({ ...a, sports: a.sports || p.sports }, today); p.weeklyHours = ws.weeklyHours; p.maxDayHours = ws.maxDayHours; }
   if (a.windows && typeof a.windows === 'object') p.availability = a.windows as Record<number, DayWindow[]>;
   if (Array.isArray(a.fixed)) p.fixed = a.fixed;
   p.timeOfDay = a.timeOfDay === 'morning' || a.timeOfDay === 'evening' ? a.timeOfDay : '';
   if (a.freq && typeof a.freq === 'object') { const f: any = {}; Object.entries(a.freq).forEach(([k, v]: any) => { if (Array.isArray(v) && v.length === 2) f[k] = [Math.max(0, +v[0] || 0), Math.max(+v[0] || 0, +v[1] || 0)]; }); p.freq = f; if (f.strength && f.strength[1] > 0 && !p.sports.includes('strength')) p.sports = [...p.sports, 'strength']; }
+  // Häufigkeit nie öfter als Tage, an denen die Sportart laut Wochenraster geht
+  if (a.dayLoad && Object.values(a.dayLoad).some((x: any) => +x > 0)) weekSummary({ ...a, sports: p.sports }, today).sports.forEach(x => { const f = (p.freq || {})[x.sport as SportKey]; if (f) p.freq = { ...p.freq, [x.sport]: [Math.min(f[0], x.days), Math.min(f[1], x.days)] }; });
   p.skills = {
     swimCrawl: a.swimCrawl || null, swimCrawlM: num(a.swimCrawlM), swimBreast: a.swimBreast === true ? true : a.swimBreast === false ? false : undefined,
     runContinuousMin: num(a.runContinuousMin), bikeLongestMin: num(a.bikeLongestMin),
@@ -274,6 +276,7 @@ export function understood(a: Answers, today: string): Understood[] {
   out.push({ block: 'goal', label: 'Ziele', text: goals.length ? goals.map(g => `${g.name}${g.date ? ' am ' + g.date.split('-').reverse().join('.') : ''} (${g.priority}: ${PR[g.priority]})${g.targetTimeSec ? `, Wunschzeit ${fmtT(g.targetTimeSec)}` : ', ohne Wunschzeit'}`).join('; ') : 'noch kein Ziel' });
   const SD: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft' };
   const fr = (s: string) => { const f = (p.freq || {})[s as SportKey]; return f ? (f[0] === f[1] ? `${f[0]}×` : `${f[0]}-${f[1]}×`) : 'nach Plan'; };
+  out.push({ block: 'background', label: 'Training bisher', text: a.weeklyHoursNow === 'unknown' ? 'weiß ich nicht: vorsichtiger Start, nach 2 Wochen passt sich der Plan an deine Daten an' : a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? `${String(a.weeklyHoursNow).replace('.', ',')} h pro Woche` : 'keine Angabe' });
   out.push({ block: 'time', label: 'Sportarten und Häufigkeit', text: p.sports.filter(s => s !== 'football').map(s => `${SD[s]} ${fr(s)}`).join(', ') + ' pro Woche' });
   const dl = p.dayLoad || {};
   const LBL = ['–', 'kurz', 'mittel', 'lang'];

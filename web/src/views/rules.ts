@@ -11,9 +11,12 @@ import { nav } from '../nav';
 import { aiState, apiCall } from '../sync';
 import { rulesOf, cellOf, setCell, describe, ruleId, GRID_SPORTS, GRID_DAYS, type Rule, type RuleSport, type Cell, type RuleKind } from '../../../shared/constraints';
 import { parseRules, parseFor, type Ask } from '../../../shared/ruleparse';
+import { weekSummary } from '../../../shared/weekgrid';
 
-export interface RuleData { notes: string[]; rules: Rule[]; dayLoad: Record<number, number>; sports: string[]; team?: { name: string; trainingDays: number[]; gameDays: number[] } | null }
-export interface RuleTarget { get(): RuleData; base?(): RuleData; set(next: { notes: string[]; rules: Rule[] }, what: string): void; setFreq?(sport: string, n: number, what: string): void }
+export interface RuleData { notes: string[]; rules: Rule[]; dayLoad: Record<number, number>; sports: string[]; team?: { name: string; trainingDays: number[]; gameDays: number[] } | null;
+  /** Wochenraster (Auftrag 11): Limit, längster Tag, Häufigkeit */ weeklyHours?: number | null; weeklyHoursSet?: boolean; maxDayHours?: number | null; freq?: Record<string, [number, number]> }
+export interface WeekPatch { dayLoad?: Record<number, number>; weeklyHours?: number; weeklyHoursSet?: boolean; maxDayHours?: number; freq?: Record<string, [number, number]> }
+export interface RuleTarget { get(): RuleData; base?(): RuleData; set(next: { notes: string[]; rules: Rule[] }, what: string): void; setFreq?(sport: string, n: number, what: string): void; setWeek?(patch: WeekPatch, what: string): void }
 const TARGETS: Record<string, RuleTarget> = {};
 export function registerTarget(id: string, tg: RuleTarget) { TARGETS[id] = tg; }
 
@@ -34,14 +37,14 @@ const visible = (r: Rule) => !(r as any).hidden;
 
 /* ---------- Wochenraster ---------- */
 const SYM: Record<Cell, string> = { yes: '✓', soft: '–', no: '✕' };
-export function gridHtml(tid: string): string {
+export function gridHtml(tid: string, timeRow?: string): string {
   const d = TARGETS[tid].get();
   const rules = rulesOf({ notes: d.notes, rules: d.rules } as any, parseFor(todayStr()));
   // vorgemerkt, noch nicht übernommen (Auftrag 6): geänderte Felder markieren
   const bd = TARGETS[tid].base ? TARGETS[tid].base!() : null;
   const brules = bd ? rulesOf({ notes: bd.notes, rules: bd.rules } as any, parseFor(todayStr())) : null;
   const sports = GRID_SPORTS.filter(s => d.sports.includes(s));
-  if (!sports.length) return `<div class="hint">${esc(t('rules.gridNoSports'))}</div>`;
+  if (!sports.length && !timeRow) return `<div class="hint">${esc(t('rules.gridNoSports'))}</div>`;
   const team = d.team;
   const head = `<span></span>${GRID_DAYS.map(x => `<b class="rg-h">${esc(t('dow.' + x))}${team && (team.trainingDays.includes(x) || team.gameDays.includes(x)) ? `<i class="rg-team" title="${esc(team.name)}">${team.gameDays.includes(x) ? '●' : '○'}</i>` : ''}</b>`).join('')}`;
   const rows = sports.map(s => `<span class="rg-l">${esc(sportLabel(s))}</span>${GRID_DAYS.map(x => {
@@ -50,7 +53,7 @@ export function gridHtml(tid: string): string {
     const label = `${sportLabel(s)} ${t('dow.' + x)}: ${t('rules.cell.' + (c.noTime ? 'noTime' : c.state))}${chg ? ' (' + t('stage.changedCell') + ')' : ''}`;
     return `<button class="rg-c ${c.state}${c.noTime ? ' notime' : ''}${chg ? ' chg' : ''}"${chg ? ' data-chg="1"' : ''} data-act="rule-cell" data-t="${tid}" data-s="${s}" data-d="${x}" aria-label="${esc(label)}" title="${esc(label)}">${SYM[c.state]}</button>`;
   }).join('')}`).join('');
-  return `<div class="rgrid" role="group" aria-label="${esc(t('rules.grid'))}">${head}${rows}</div>
+  return `<div class="rgrid" role="group" aria-label="${esc(t('rules.grid'))}">${head}${timeRow || ''}${rows}</div>
     <div class="xs muted rg-legend">${esc(t('rules.legend'))}${team ? ' ' + esc(t('rules.teamLegend', { n: team.name })) : ''}</div>`;
 }
 on('rule-cell', el => {
@@ -62,6 +65,53 @@ on('rule-cell', el => {
   const next: Cell = c.state === 'yes' ? 'soft' : c.state === 'soft' ? 'no' : 'yes';
   const rules = tombstones(d.notes, setCell(all, s, dow, next));
   tg.set({ notes: d.notes, rules }, `${sportLabel(s)} ${t('dow.' + dow)}: ${t('rules.cell.' + next)}`);
+});
+
+/* ---------- Wochenraster mit Zeit pro Tag und Zusammenfassung (Auftrag 11, Punkt 4) ---------- */
+const hTxt = (h: number) => String(Math.round(h * 10) / 10).replace('.', ',');
+const timeLbl = (v: number, maxH: number) => v === 0 ? '–' : v === 1 ? '45′' : v === 2 ? '90′' : hTxt(maxH) + 'h';
+export function weekHtml(tid: string): string {
+  const tg = TARGETS[tid]; const d = tg.get();
+  const ws = weekSummary(d, todayStr());
+  const bd = tg.base ? tg.base() : null;
+  const time = `<span class="rg-l">${esc(t('week.time'))}</span>${GRID_DAYS.map(x => { const v = +((d.dayLoad as any)[x] || 0); const chg = !!bd && +((bd.dayLoad as any)[x] || 0) !== v;
+    return `<button class="rg-c rg-t t${v}${chg ? ' chg' : ''}" data-act="week-time" data-t="${tid}" data-d="${x}" aria-label="${esc(t('dow.' + x) + ': ' + t('week.t' + v, { h: hTxt(ws.maxDayHours) }))}">${esc(timeLbl(v, ws.maxDayHours))}</button>`; }).join('')}`;
+  const out = gridHtml(tid, time);
+  const step = (act: string, extra: string, label: string, val: string) => `<span class="stepper"><button class="btn ghost sm" data-act="${act}" data-t="${tid}" ${extra} data-dir="-1" aria-label="${esc(t('ob.less') + ': ' + label)}">−</button><b>${esc(val)}</b><button class="btn ghost sm" data-act="${act}" data-t="${tid}" ${extra} data-dir="1" aria-label="${esc(t('ob.more') + ': ' + label)}">+</button></span>`;
+  const fq = (f: [number, number]) => f[0] === f[1] ? `${f[0]}×` : `${f[0]}-${f[1]}×`;
+  const sum = ws.capH ? `<div class="card flat tight stack week-sum" data-week-sum>
+    <div class="lbl">${esc(t('week.sumTitle'))}</div>
+    <div class="freq-row"><span>${esc(t('week.hours'))}<br><span class="xs muted">${esc(t(ws.auto ? 'week.hoursAuto' : 'week.hoursOwn', { h: hTxt(ws.capH) }))}</span></span>${step('week-hours', '', t('week.hours'), t('week.hoursVal', { h: hTxt(ws.weeklyHours) }))}</div>
+    ${ws.hasLong ? `<div class="freq-row"><span>${esc(t('week.longDay'))}</span>${step('week-long', '', t('week.longDay'), t('week.hoursVal', { h: hTxt(ws.maxDayHours) }))}</div>` : ''}
+    ${ws.sports.map(x => `<div class="freq-row"><span>${esc(sportLabel(x.sport))}<br><span class="xs muted">${esc(t(x.days === 1 ? 'week.days1' : 'week.daysN', { n: x.days }))}</span></span>${step('week-freq', `data-s="${x.sport}"`, sportLabel(x.sport), fq(x.freq))}</div>`).join('')}
+    <div class="xs muted">${esc(t('week.sumHint'))}</div></div>` : `<div class="hint">${esc(t('week.noTime'))}</div>`;
+  return out + sum;
+}
+const FSTEPS: [number, number][] = [[0, 0], [1, 1], [1, 2], [2, 2], [2, 3], [3, 3], [3, 4], [4, 4], [4, 5], [5, 5], [5, 6], [6, 6], [7, 7]];
+on('week-time', el => {
+  const tg = TARGETS[el.dataset.t!]; if (!tg || !tg.setWeek) return; const d = tg.get(); const dow = +el.dataset.d!;
+  const v = (+((d.dayLoad as any)[dow] || 0) + 1) % 4;
+  tg.setWeek({ dayLoad: { ...(d.dayLoad || {}), [dow]: v } }, `${t('week.time')} ${t('dow.' + dow)}: ${t('week.t' + v, { h: hTxt(d.maxDayHours || 2.5) })}`);
+});
+on('week-hours', el => {
+  const tg = TARGETS[el.dataset.t!]; if (!tg || !tg.setWeek) return; const d = tg.get(); const ws = weekSummary(d, todayStr());
+  const h = Math.max(1, Math.min(ws.capH, ws.weeklyHours + 0.5 * +el.dataset.dir!));
+  if (h === ws.weeklyHours) { toast(t(+el.dataset.dir! > 0 ? 'week.hoursMax' : 'week.hoursMin', { h: hTxt(ws.capH) })); return; }
+  tg.setWeek({ weeklyHours: h, weeklyHoursSet: h < ws.capH }, `${t('week.hours')}: ${t('week.hoursVal', { h: hTxt(h) })}`);
+});
+on('week-long', el => {
+  const tg = TARGETS[el.dataset.t!]; if (!tg || !tg.setWeek) return; const d = tg.get(); const ws = weekSummary(d, todayStr());
+  const h = Math.max(2, Math.min(8, ws.maxDayHours + 0.5 * +el.dataset.dir!)); if (h === ws.maxDayHours) return;
+  tg.setWeek({ maxDayHours: h }, `${t('week.longDay')}: ${t('week.hoursVal', { h: hTxt(h) })}`);
+});
+on('week-freq', el => {
+  const tg = TARGETS[el.dataset.t!]; if (!tg || !tg.setWeek) return; const d = tg.get(); const ws = weekSummary(d, todayStr());
+  const x = ws.sports.find(y => y.sport === el.dataset.s); if (!x) return;
+  let i = FSTEPS.findIndex(f => f[0] === x.freq[0] && f[1] === x.freq[1]); if (i < 0) i = 2;
+  const nx = FSTEPS[Math.max(0, Math.min(FSTEPS.length - 1, i + +el.dataset.dir!))];
+  // nie öfter als Tage, an denen die Sportart geht (keine widersprüchlichen Eingaben)
+  if (nx[0] > x.days || nx[1] > x.days) { toast(t('week.freqMax', { s: sportLabel(x.sport), n: x.days })); return; }
+  tg.setWeek({ freq: { ...(d.freq || {}), [x.sport]: nx } }, `${sportLabel(x.sport)}: ${nx[0] === nx[1] ? nx[0] : nx[0] + '-' + nx[1]}×`);
 });
 
 /* ---------- Liste: Sätze und was daraus wurde ---------- */

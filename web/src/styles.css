@@ -441,3 +441,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .wk-r { flex: 0 0 auto; text-align: right; white-space: nowrap; }
 .big[data-range] { white-space: normal; }
 .nowrap-part { white-space: nowrap; }
+/* Wochenraster: Zeit pro Tag (Auftrag 11) */
+.rg-c.rg-t { font-size: var(--t-xs); font-weight: 700; background: var(--surface); color: var(--ink-2); }
+.rg-c.rg-t.t0 { color: var(--ink-3, var(--ink-2)); opacity: .7; }
+.rg-c.rg-t.t1, .rg-c.rg-t.t2, .rg-c.rg-t.t3 { background: var(--accent-soft, var(--good-soft)); color: var(--accent, var(--good)); }
+.week-sum { margin-top: var(--s3); }

@@ -33,6 +33,7 @@ import './views/planedit';
 import { checkForUpdate, startPwa } from './pwa';
 import { initErrorLog } from './errlog';
 import { nav } from './nav';
+import { calibrateIfDue } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
 import { isSyncOn, loadAiState, loadMe, entitled } from './sync';
@@ -177,6 +178,8 @@ function updateBadge() {
 
 /* ---------- Start ---------- */
 try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } catch (e) {}
+// „Stunden bisher: weiß ich nicht“: nach 2 Wochen an die echten Daten anpassen (Auftrag 11)
+try { if (HAS_PLAN) calibrateIfDue(); } catch (e) { /* nie den Start verhindern */ }
 render();
 openFromUrl(location.href);
 startPwa();

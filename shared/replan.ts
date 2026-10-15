@@ -28,7 +28,7 @@ export function frozenDays(old: any, adjustments: any, state: any, from: string)
   for (const d of C.planDays(C.applyAdjustments(old.weeks || [], adjustments || {}))) {
     if (d.date < mon || d.date > C.addDays(mon, 6)) continue;
     for (const s of d.sessions || []) {
-      if (!s || s.sport === 'rest') continue;
+      if (!s || (s.sport === 'rest' && d.date >= from)) continue;
       const done = !!(st[s.id] && st[s.id].completed);
       if (d.date >= from && !done) continue;
       const orig = JSON.parse(JSON.stringify(base[s.id] || s));

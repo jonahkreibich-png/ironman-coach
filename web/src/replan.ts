@@ -3,7 +3,7 @@
    Die Änderung erscheint mit Begründung im Coach-Chat. */
 import { STATE, PLAN, BASE_WEEKS, PLAN_KEY, readPlan, saveState, profile, goals, replacePlanInPlace, rebuildPlanIndex } from './store';
 import { todayStr, addDays } from './util';
-import { replanPlan } from '../../shared/replan';
+import { replanPlan, replanStart, calibrationDue } from '../../shared/replan';
 import * as C from '../../shared/core';
 import { D } from './data';
 import { repairWeek } from '../../shared/repair';
@@ -42,13 +42,16 @@ export function repairNow(rules?: Rule[]): string[] {
   if (adj.length) rebuildPlanIndex();
   return adj.map(a => a.what);
 }
+/* Ab wann gilt eine Änderung? Heute, ab 18 Uhr morgen (Auftrag 11) */
+export const replanFrom = () => replanStart(todayStr(), new Date().getHours());
+export const fromText = () => replanFrom() === todayStr() ? 'heute' : 'morgen';
 /* Vorschau ohne Speichern (Auftrag 6, Punkt 1): was ändert sich in dieser und der nächsten Woche, wenn Profil/Ziele so übernommen werden?
    Rechnet genau wie replanFuture: neuer Plan ab nächster Woche, laufende Woche nach den Regeln repariert. */
 export function previewReplan(p: Profile, goalList: Goal[]): { ok: boolean; msg: string; changes: string[]; thisWeek: string[]; nextWeek: string[]; conflicts: number } {
   const old = readPlan(); const gl = (goalList || []).filter(g => g && !g.result);
   if (!old || !gl.length) return { ok: false, msg: t('stage.noReplan'), changes: [], thisWeek: [], nextWeek: [], conflicts: 0 };
   const today = todayStr();
-  const r = replanPlan(old, p, gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {}, state: STATE });
+  const r = replanPlan(old, p, gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {}, state: STATE, from: replanFrom() });
   if (!r) return { ok: false, msg: t('stage.noReplan'), changes: [], thisWeek: [], nextWeek: [], conflicts: 0 };
   const before = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}));
   const adj = { ...(STATE.adjustments || {}) };
@@ -63,12 +66,14 @@ export function previewReplan(p: Profile, goalList: Goal[]): { ok: boolean; msg:
   const thisWeek = diff.filter(c => !wk(c.from || c.to || today)).map(c => c.text), nextWeek = diff.filter(c => wk(c.from || c.to || today)).map(c => c.text);
   return { ok: true, msg: '', changes: [...thisWeek, ...nextWeek], thisWeek, nextWeek, conflicts: (r.gen.conflicts || []).length };
 }
-export function replanFuture(reason: string, why: string, o: { needTests?: any } = {}): { ok: boolean; msg: string; conflicts?: Conflict[]; changed?: string[] } {
+export function replanFuture(reason: string, why: string, o: { needTests?: any; measuredStartMin?: number | null; fresh?: boolean } = {}): { ok: boolean; msg: string; conflicts?: Conflict[]; changed?: string[] } {
   const old = readPlan();
   const gl = goals().filter(g => !g.result);
   if (!old || !gl.length) return { ok: false, msg: 'Ohne Plan und Ziel gibt es nichts neu zu planen.' };
   const today = todayStr();
-  const r = replanPlan(old, profile(), gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {}, state: STATE, needTests: o.needTests });
+  const from = replanFrom();
+  const r = replanPlan(old, profile(), gl, today, { stages: currentStages(), recentHours: recentHours(), adjustments: STATE.adjustments || {}, state: STATE, needTests: o.needTests, from, measuredStartMin: o.measuredStartMin });
+  if (r && o.measuredStartMin) r.plan.meta = { ...r.plan.meta, calibrated: true };
   if (!r) return { ok: false, msg: 'Ohne Plan und Ziel gibt es nichts neu zu planen.' };
   const { plan: next, gen } = r;
   try { localStorage.setItem(PLAN_KEY + '_prev', JSON.stringify(old)); } catch (e) { return { ok: false, msg: 'Speichern nicht möglich.' }; }
@@ -76,10 +81,11 @@ export function replanFuture(reason: string, why: string, o: { needTests?: any }
   // diese Woche: was jetzt gegen eine harte Regel verstößt, sofort verschieben oder streichen
   const changed = repairNow();
   const now = Date.now();
-  const id = 'msg-replan-' + now;
+  // gleicher Anlass am selben Tag: eine Nachricht, die aktualisiert wird (Auftrag 11: Papa bekam 3 gleiche Nachrichten)
+  const id = `msg-replan-${today}-${reason.replace(/[^a-z0-9äöü]+/gi, '-').toLowerCase()}`;
   const dropped = [...new Set(gen.dropped.filter(x => !/wird locker/.test(x)).map(x => x.replace(/^Woche \d+: /, '')))].slice(0, 3);
   STATE.coachMsgs[id] = { id, at: now, date: today, kind: 'adjust', from: 'coach', title: 'Plan angepasst: ' + reason, unread: true,
-    text: `${why} Ab nächster Woche gilt der angepasste Plan, erledigte Einheiten bleiben, wie sie sind.${changed.length ? ' Diese Woche: ' + changed.join('; ') + '.' : ''}${dropped.length ? ' Nicht alles passte: ' + dropped.join('; ') + '.' : ''}` };
+    text: `${why} Der angepasste Plan gilt ab ${from === today ? 'heute' : 'morgen'}. Vergangene und erledigte Einheiten bleiben, wie sie sind; der Rest dieser Woche ist neu verteilt.${changed.length ? ' Diese Woche: ' + changed.join('; ') + '.' : ''}${dropped.length ? ' Nicht alles passte: ' + dropped.join('; ') + '.' : ''}` };
   // passt ein Wunsch nicht zu den harten Regeln: klar sagen und Lösungen anbieten
   gen.conflicts.forEach((c, i) => {
     const cid = `msg-conflict-${c.id}-${now}`;
@@ -89,4 +95,13 @@ export function replanFuture(reason: string, why: string, o: { needTests?: any }
   saveState();
   void PLAN;
   return { ok: true, msg: 'Kommende Wochen angepasst.', conflicts: gen.conflicts, changed };
+}
+
+/* „Stunden bisher: weiß ich nicht“ (Auftrag 11): nach 2 Wochen an die echten Daten anpassen (beim Öffnen der App) */
+export function calibrateIfDue(): boolean {
+  const plan = readPlan(); if (!plan) return false;
+  const due = calibrationDue(plan, STATE, todayStr()); if (!due) return false;
+  const h = (Math.round(due.minutes / 6) / 10).toString().replace('.', ',');
+  const r = replanFuture('deine ersten 2 Wochen', `Du hattest beim Start nicht gewusst, wie viel du bisher trainierst. In den ersten 2 Wochen waren es etwa ${h} h pro Woche: daran richtet sich der Plan jetzt aus.`, { measuredStartMin: due.minutes });
+  return r.ok;
 }
