@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '2.7.0', items: [
+    'Änderungen gelten sofort: Fragebogen, Profil, Berücksichtigungen und Coach passen den Plan ab heute an (ab 18 Uhr ab morgen). Erledigtes und Vergangenes bleibt.',
+    'Ein Wochenraster für die Zeit: pro Tag die Zeit und welche Sportart geht. Stunden, längster Tag und Häufigkeit rechnet die App daraus.',
+    'Schwimmen passt besser: wer kraulen kann, trainiert normal (Stücke nach der Strecke am Stück), dazu Beckenlänge und Freiwasser. Teamsport ohne Spiele hat keine Spieltage mehr.'
+  ] },
   { version: '2.6.0', items: [
     'Mehr Abwechslung: Die Schlüsseleinheiten steigern sich (Sweet Spot, Kraftausdauer, Schwelle, Over-Unders, VO2max), die lange Ausfahrt und das Schwimmen haben jede Woche einen anderen Schwerpunkt.',
     'Laufen mit Qualität: in der Grundlage Hügelsprints und Fahrtspiel, im Aufbau Schwelle, vor dem Wettkampf Wettkampftempo.',
