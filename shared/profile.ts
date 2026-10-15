@@ -71,6 +71,10 @@ export interface Skills {
   runContinuousMin?: number | null;
   /** längste Radfahrt in letzter Zeit (min) */
   bikeLongestMin?: number | null;
+  /** Beckenlänge (Auftrag 11): 25 m, 50 m oder beides */
+  poolM?: 25 | 50 | 'both' | null;
+  /** schwimmt auch im Freiwasser, Saison von … bis (Monat 1-12) */
+  openWater?: boolean | null; openWaterFrom?: number | null; openWaterTo?: number | null;
 }
 /** Bestzeiten in Sekunden */
 export interface Bests { run5k?: number | null; run10k?: number | null; runHalf?: number | null; runMarathon?: number | null; swim400?: number | null }

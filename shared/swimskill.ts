@@ -22,9 +22,9 @@ export function swimBests(state: any, weeks: any[], today: string): { crawl: num
   return { crawl, pull };
 }
 
-/* Stufe aus den Strecken (Kraul-Weg; null = kann 800 m am Stück, normales Schwimmen) */
-export function stageFor(crawlM: number, breast: boolean): { ladder: 'swim' | 'swimBreast'; n: number } | null {
-  if (crawlM >= 800) return null;
+/* Stufe aus den Strecken (Kraul-Weg; null = normales Schwimmen: ab 200 m am Stück, bei „kann kraulen“ ab 50 m) */
+export function stageFor(crawlM: number, breast: boolean, canCrawl = false): { ladder: 'swim' | 'swimBreast'; n: number } | null {
+  if (crawlM >= W.SWIM_NORMAL_M || (canCrawl && crawlM >= 50)) return null;
   if (crawlM <= 0) return breast ? { ladder: 'swimBreast', n: 0 } : { ladder: 'swim', n: 0 };
   return W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: crawlM }) as any;
 }
@@ -35,28 +35,39 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
   const sk = profile.skills || {};
   const crawl = Math.max(sk.swimCrawlM || 0, best.crawl || 0), pull = Math.max(sk.swimPullM || 0, best.pull || 0);
   if (crawl <= (sk.swimCrawlM || 0) && pull <= (sk.swimPullM || 0)) return null;
-  const stage = stageFor(crawl, !!sk.swimBreast);
+  const canCrawl = sk.swimCrawl === 'yes' || crawl >= W.SWIM_NORMAL_M;
+  const stage = stageFor(crawl, !!sk.swimBreast, canCrawl);
+  const repOld = W.swimRepMax(sk), repNew = W.swimRepMax({ swimCrawlM: crawl });
   const eff = C.applyAdjustments(weeks, adjustments || {});
   const adj: any[] = [];
   const g = 'swimstage-' + now;
   for (const d of C.planDays(eff)) {
     if (d.date <= today) continue;
     for (const s of d.sessions) {
-      if (s.sport !== 'swim' || s.cancelled || !s.stage || s.stage.ladder === 'runwalk') continue;
+      if (s.sport !== 'swim' || s.cancelled || (s.stage && s.stage.ladder === 'runwalk')) continue;
       const cur = s.stage;
-      const sameOrHigher = stage && (stage.ladder === cur.ladder ? stage.n <= cur.n : stage.ladder === 'swimBreast');
-      if (sameOrHigher && (cur.pull || 0) >= pull) continue;
       const ctx = (s.spec && s.spec.ctx) || {};
       const fill = (s.spec && s.spec.fillMin) || s.plannedMinutes || 45;
-      const spec = stage ? W.swimLearn(ctx, { ladder: stage.ladder, n: sameOrHigher ? cur.n : stage.n, breast: !!sk.swimBreast, pull }, s.spec && s.spec.why, fill)
-        : W.swimSession(ctx, 'endurance', [{ part: 'main', reps: Math.max(2, Math.round(fill / 12)), m: 200, zone: 2, mode: 'crawl', restSec: 30 }]);
+      let spec: W.Spec;
+      if (!cur) {
+        // normales Training: längere Stücke erst, wenn die Strecke am Stück eine Stufe weiter ist (Tests und Freiwasser bleiben)
+        const k = s.spec && s.spec.kind;
+        if (stage || repNew <= repOld || !['technique', 'endurance', 'css'].includes(k)) continue;
+        spec = W.swimNormal(ctx, k, s.plannedMinutes || 45, 'base', repNew);
+        if (s.spec && s.spec.why) spec.why = s.spec.why;
+      } else {
+        const sameOrHigher = stage && (stage.ladder === cur.ladder ? stage.n <= cur.n : stage.ladder === 'swimBreast');
+        if (sameOrHigher && (cur.pull || 0) >= pull) continue;
+        spec = stage ? W.swimLearn(ctx, { ladder: stage.ladder, n: sameOrHigher ? cur.n : stage.n, breast: !!sk.swimBreast, pull }, s.spec && s.spec.why, fill)
+          : W.swimNormal(ctx, 'technique', fill, 'base', repNew);
+      }
       const b = W.build(spec);
       adj.push({ id: `${g}-${s.id}`, group: g, type: 'modify', sessionId: s.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, stage: b.stage || null, zone: b.zone },
         what: `${s.title} → ${b.title}`, reason: `Neue Bestwerte (${source}): ${crawl} m Kraul am Stück${pull ? `, ${pull} m mit Pull Buoy` : ''}` });
     }
   }
-  const label = stage ? (stage.ladder === 'swimBreast' ? 'Brust und Kraul-Technik' : W.SWIM_LADDER[stage.n].label) : 'Ausdauer-Kraul';
-  return { skills: { swimCrawlM: crawl, ...(pull ? { swimPullM: pull } : {}), swimCrawl: crawl >= 400 ? 'yes' : 'some' }, adjustments: adj, stage,
+  const label = stage ? (stage.ladder === 'swimBreast' ? 'Brust und Kraul-Technik' : W.SWIM_LADDER[stage.n].label) : `normales Training mit Stücken bis ${repNew} m`;
+  return { skills: { swimCrawlM: crawl, ...(pull ? { swimPullM: pull } : {}), swimCrawl: canCrawl ? 'yes' : 'some' }, adjustments: adj, stage,
     text: `Eingetragen: ${crawl} m Kraul am Stück${pull ? `, ${pull} m mit Pull Buoy` : ''}. Deine Schwimm-Stufe: ${label}.${adj.length ? ` ${adj.length} kommende Schwimmeinheiten sind angepasst.` : ''}${crawl >= 400 ? ' Ab jetzt gibt es CSS-Tests und Zonen nach Pace pro 100 m.' : ''}` };
 }
 

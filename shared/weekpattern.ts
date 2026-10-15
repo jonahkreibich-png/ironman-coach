@@ -34,6 +34,7 @@ export interface PatternWeekIn {
   goalType?: GoalType; hardDows?: number[]; easyDates?: string[]; minor?: boolean;
   /** 400 m Kraul am Stück geschafft: CSS-Test statt Kraul-Check */
   crawl400: boolean;
+  /** längstes Kraul-Stück im normalen Training (Strecke am Stück, Auftrag 11) */ repMax?: number;
   strength: { knee?: boolean; back?: boolean; shoulder?: boolean };
   goalName: string;
 }
@@ -95,7 +96,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
         continue;
       }
       const base = (min: number) => inp.swimStage ? W.swimLearn(inp.swim, { ...inp.swimStage, breast: inp.swimStage.breast }, inp.swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : 'Kraul-Technik in kurzen Stücken, Brust für die Ausdauer im Wasser.', min)
-        : swimEndurance(inp.swim, min, first, ph);
+        : swimEndurance(inp.swim, min, first, ph, inp.repMax ?? 400);
       const make = (min: number) => K.fitSwim(K.swimVariant(base(min), (st.weekN || 0) + (first ? 0 : 1), st.blockWeek || 0, ph), min);
       out.push({ dow: sl.dow, slot: sl, s: null, make, min: swimMin, adj: t && t.swim ? undefined : rec || ph === 'taper' || ph === 'race' ? [30, 40] : [40, inp.caps ? inp.caps.swim : 60] });
     } else if (sl.role === 'lower' || sl.role === 'upper') {
@@ -197,15 +198,7 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
 
 const phaseOf = (items: PatternItem[]) => (items as any).phase || 'base';
 /* Schwimmen für alle, die schon kraulen können: Technik bzw. Ausdauer bis zur Zielzeit; ab Aufbau CSS-Intervalle in der zweiten Einheit */
-function swimEndurance(ctx: W.PaceCtx, min: number, technique: boolean, phase = 'base'): W.Spec {
-  if (!technique && (phase === 'build' || phase === 'specific') && ctx.css) {
-    const mk = (k: number) => W.swimSession(ctx, 'css', [{ part: 'main', reps: k, m: 100, zone: 4, mode: 'crawl', restSec: 15 }, { part: 'main', reps: 2, m: 200, zone: 2, mode: 'crawl', restSec: 20 }], 400, 200);
-    let k = 4; while (k < 20 && W.totals(mk(k + 1)).min <= min) k++;
-    return mk(k);
-  }
-  const mk = (k: number) => technique
-    ? W.swimSession(ctx, 'technique', [{ part: 'main', reps: 6, m: 50, zone: 1, mode: 'drill', restSec: 20, note: 'Abschlag, Fingerspitzen, Seitlage' }, { part: 'main', reps: k, m: 100, zone: 2, mode: 'crawl', restSec: 20 }])
-    : W.swimSession(ctx, 'endurance', [{ part: 'main', reps: k, m: 200, zone: 2, mode: 'crawl', restSec: 30 }]);
-  let k = 2; while (k < 30 && W.totals(mk(k + 1)).min <= min) k++;
-  return mk(k);
+function swimEndurance(ctx: W.PaceCtx, min: number, technique: boolean, phase = 'base', repMax = 400): W.Spec {
+  const css = !technique && (phase === 'build' || phase === 'specific') && !!ctx.css && repMax >= 400;
+  return W.swimNormal(ctx, css ? 'css' : technique ? 'technique' : 'endurance', min, phase, repMax);
 }

@@ -162,7 +162,9 @@ export function freqOf(p: Profile, sport: SportKey): [number, number] {
 
 export function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, today: string): W.PaceCtx {
   const th = p.thresholds; const age = ageOf(p, today) ?? 35;
-  return { runThrSec: th.thresholdPaceRunSec || null, lthrRun: th.lthrRun || null, lthrBike: th.lthrBike || null, bikeKmh: th.thresholdSpeedBikeKmh || null, ftp: p.powerMeter ? th.ftp || null : null, css: th.cssSec || null, breast100: th.breast100Sec || 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0), indoor, bikeName };
+  const pos = (v: any) => (typeof v === 'number' && v > 0 ? v : null);
+  return { runThrSec: pos(th.thresholdPaceRunSec), lthrRun: pos(th.lthrRun), lthrBike: pos(th.lthrBike), bikeKmh: pos(th.thresholdSpeedBikeKmh), ftp: p.powerMeter ? pos(th.ftp) : null, css: pos(th.cssSec), breast100: pos(th.breast100Sec) || 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0), indoor, bikeName,
+    pool: (p.skills || {}).poolM === 50 ? 50 : 25 };
 }
 const BIKE_LABEL: Record<string, string> = { road: 'Rennrad', gravel: 'Gravelbike', mtb: 'Mountainbike', tt: 'Zeitfahrrad', trekking: 'Trekkingrad', ebike: 'E-Bike', trainer: 'Rolle', spin: 'Indoor-Bike' };
 function bikeChoice(p: Profile, hard: boolean, month: number, eff: Effects): { indoor: boolean; name: string | null } {
@@ -251,11 +253,16 @@ export function generatePlan(inp: GenInput): GenResult {
   const fromSkill = W.swimLadderStart(profile.skills || {});
   const fromPlan = inp.stages && inp.stages.swim !== undefined ? inp.stages.swim : fromSkill;
   // Stufe: die weiter fortgeschrittene aus Plan und Können (z. B. nach „ich schaffe jetzt 100 m Kraul am Stück“)
-  const swimStage0 = fromPlan === null || fromSkill === null ? (fromSkill === null && (profile.skills || {}).swimCrawlM ? null : fromPlan ?? fromSkill)
+  // „kann kraulen“ (auch ohne Meterangabe) oder 200 m am Stück: normales Training, auch wenn der alte Plan noch eine Lernstufe hatte
+  const skS = profile.skills || {};
+  const swimStage0 = fromPlan === null || fromSkill === null ? (fromSkill === null && (skS.swimCrawlM || skS.swimCrawl === 'yes') ? null : fromPlan ?? fromSkill)
     : fromPlan.ladder === fromSkill.ladder ? (fromPlan.n >= fromSkill.n ? fromPlan : fromSkill) : fromSkill.ladder === 'swim' ? fromSkill : fromPlan;
   // Kraul lernen und Brust können: Brust zum Einschwimmen und für die Ausdauer dazu
   const swimStage = swimStage0 && swimStage0.ladder === 'swim' ? { ...swimStage0, ...((profile.skills || {}).swimBreast ? { breast: true } : {}), ...((profile.skills || {}).swimPullM ? { pull: (profile.skills || {}).swimPullM } : {}) } : swimStage0;
   const runStage = inp.stages && inp.stages.runwalk !== undefined ? inp.stages.runwalk : W.runLadderStart((profile.skills || {}).runContinuousMin);
+  // normales Schwimmtraining: Stücke höchstens so lang wie die Strecke am Stück; CSS-Test erst ab 400 m
+  const repMax = W.swimRepMax(skS);
+  const crawl400 = !swimStage && (skS.swimCrawlM || 0) >= 400;
 
   // Umfang (Auftrag 8, für alle): Start auf Höhe der letzten Aufbauwoche (geplant, bzw. erledigt, wenn die Woche abgehakt wurde und deutlich
   // weniger war). Die CTL ist nur dann eine Obergrenze, wenn sie zum tatsächlichen Training passt (sonst fehlen Einheiten in den Daten).
@@ -396,7 +403,7 @@ export function generatePlan(inp: GenInput): GenResult {
         caps: { run: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), runEasySecKm: profile.thresholds.thresholdPaceRunSec ? profile.thresholds.thresholdPaceRunSec * 1.2 : null, swimLearning: !!swimStage }).run,
           bikeOut: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor: cOut0.indoor }).bike, swim: capsFor(sgP.goalType, mon, { swimLearning: !!swimStage, phase: ph.phase as any }).swim },
         run: pc(false, null), bikeOut: pc(cOut.indoor, cOut.name), bikeIn: pc(cIn.indoor, cIn.name), swim: pc(false, null), swimStage: swimStage as any, inc: 1 + prog.incPct / 100,
-        crawl400: !swimStage || ((profile.skills || {}).swimCrawlM || 0) >= 400, strength: { knee: eff.strengthKnee, back: eff.strengthBack, shoulder: eff.strengthShoulder }, goalName: A.name }, pst);
+        crawl400, repMax, strength: { knee: eff.strengthKnee, back: eff.strengthBack, shoulder: eff.strengthShoulder }, goalName: A.name }, pst);
       for (const it of items) {
         const sl = slots.find(x => x.dow === it.dow)!;
         const probe = { ...it.s, long: !!it.long, hard: !!it.hard };
@@ -510,8 +517,8 @@ export function generatePlan(inp: GenInput): GenResult {
         const per = Math.max(25, Math.min(capsW(false).swim, mins / n));
         for (let k = 0; k < n; k++) {
           const hard = hardOk && hardLeft > 0 && k === 1 && ph.phase !== 'base';
-          const kind: W.Kind = k === 0 ? 'technique' : hard ? 'css' : 'endurance';
-          const sw = swimByMinutes(ctx, kind, per, ph.phase);
+          const kind = k === 0 ? 'technique' : hard ? 'css' : 'endurance';
+          const sw = W.swimNormal(ctx, kind, per, ph.phase, repMax);
           add(kind === 'css' ? sw : K.fitSwim(K.swimVariant(sw, wi + k, blockWeekOf(wi), ph.phase), per), { hard });
           if (hard) hardLeft--;
         }
@@ -520,10 +527,11 @@ export function generatePlan(inp: GenInput): GenResult {
     // Einstiegstests in den ersten 2 Wochen (nur, wenn das Können passt)
     if (wi <= 1 && inp.needTests) {
       const ctx = pc(false, null);
-      const swap = (sport: string, spec: W.Spec) => { const i = cands.findIndex(c => c.s.sport === sport && c.hard) ; const j = i >= 0 ? i : cands.findIndex(c => c.s.sport === sport && !c.long); const c: Cand = { s: W.build(spec), hard: true, prio: 0.8, test: true }; if (j >= 0) cands[j] = c; else cands.push(c); };
+      const swap = (sport: string, spec: W.Spec) => { const i = cands.findIndex(c => c.s.sport === sport && c.hard) ; const j = i >= 0 ? i : cands.findIndex(c => c.s.sport === sport && !c.long); const soft = /Kraul-Check/.test(spec.title || ''); const b = W.build(spec); if (soft) delete b.hard; const c: Cand = { s: b, hard: !soft, prio: 0.8, test: true }; if (j >= 0) cands[j] = c; else cands.push(c); };
       if (wi === 0 && inp.needTests.run && runStage == null && sports.includes('run')) swap('run', W.runTest(ctx));
       if (wi === 1 && inp.needTests.bike && sports.includes('bike')) { const c = bikeChoice(profile, true, month, eff); swap('bike', W.bikeTest(pc(c.indoor, c.name))); }
-      if (wi === 0 && inp.needTests.swim && !swimStage && sports.includes('swim') && !swimBlocked) swap('swim', W.swimTest(ctx));
+      // Schwimmtest 400/200 m nur, wer 400 m am Stück krault; sonst der Kraul-Check (Auftrag 11: vorher auch für Anfänger)
+      if (wi === 0 && inp.needTests.swim && sports.includes('swim') && !swimBlocked) swap('swim', crawl400 ? W.swimTest(ctx) : W.swimCheck(ctx, swimStage as any, 40));
     }
     // Kraft nach Körperbereich an festen Tagen (z. B. Unterkörper Di, Oberkörper Fr), nie Beine am Spieltag oder am Tag davor
     const sp = profile.strengthPlan;
@@ -650,6 +658,12 @@ export function generatePlan(inp: GenInput): GenResult {
     }));
 
     }
+    // Freiwasser (Auftrag 11): in der eigenen Saison jede zweite Woche, vor einem Triathlon jede Woche eine Schwimmeinheit im Freiwasser
+    if (!swimStage && repMax >= 200 && openWaterWeek(profile, mon, wi, goals, ph)) {
+      const it = slots.flatMap(sl => sl.items.map(x => ({ sl, x }))).filter(({ x }) => x.s.sport === 'swim' && !x.test && !x.hard && !x.fixed && (x.s.plannedMinutes || 0) >= 25)
+        .sort((a, b) => (+(b.sl.dow === 0 || b.sl.dow === 6)) - (+(a.sl.dow === 0 || a.sl.dow === 6)))[0];
+      if (it) it.x.s = W.build(W.swimOpenWater(pc(false, null), it.x.s.plannedMinutes || 45));
+    }
     // 4) Tage zusammenbauen
     let id = 0;
     const days = slots.map(sl => {
@@ -744,17 +758,14 @@ function patternText(p: NonNullable<Profile['weekPattern']>, profile: Profile): 
   return `Fester Wochenaufbau: ${days.join(', ')}. Langer Lauf höchstens +${p.longRunStep || 10} min pro Woche${p.longRunMax ? `, vorerst nicht über ${p.longRunMax} min` : ''}.${p.testEveryWeeks ? ` Tests alle ${p.testEveryWeeks} Wochen in der Erholungswoche.` : ''}`;
 }
 
-/* Schwimmeinheit mit Ziel-Minuten: Serien so wählen, dass die Zeit passt */
-function swimByMinutes(ctx: W.PaceCtx, kind: W.Kind, minutes: number, phase: Phase): W.Spec {
-  const mk = (k: number): W.Spec => {
-    if (kind === 'technique') return W.swimSession(ctx, kind, [{ part: 'main', reps: 6, m: 50, zone: 1, mode: 'drill', restSec: 20, note: 'Abschlag, Fingerspitzen, Seitlage' }, { part: 'main', reps: k, m: 100, zone: 2, mode: 'crawl', restSec: 20 }]);
-    if (kind === 'css') return W.swimSession(ctx, kind, [{ part: 'main', reps: k, m: 100, zone: 4, mode: 'crawl', restSec: 15 }], 300, 200);
-    const len = phase === 'specific' ? 400 : 200;
-    return W.swimSession(ctx, kind, [{ part: 'main', reps: k, m: len, zone: 2, mode: 'crawl', restSec: 30 }]);
-  };
-  let k = 2;
-  while (k < 20 && W.totals(mk(k + 1)).min <= minutes) k++;
-  return mk(k);
+/* Freiwasser-Woche? Saison (Monate) aus dem Profil, sonst Juni bis September; jede zweite Woche, in den 6 Wochen vor einem Triathlon jede Woche */
+export function openWaterWeek(p: Profile, mon: string, wi: number, goals: Goal[], ph: { phase: Phase; recovery: boolean }): boolean {
+  const sk = p.skills || {};
+  if (!sk.openWater || ph.phase === 'race') return false;
+  const m = +addDays(mon, 3).slice(5, 7), from = sk.openWaterFrom || 6, to = sk.openWaterTo || 9;
+  if (!(from <= to ? m >= from && m <= to : m >= from || m <= to)) return false;
+  const triSoon = goals.some(g => g.date && g.date >= mon && g.date <= addDays(mon, 42) && GOALS[g.type] && GOALS[g.type].group === 'tri' && g.type !== 'duathlon');
+  return triSoon || wi % 2 === 0;
 }
 
 /* Schlüsseleinheit Laufen passend zum Ziel */

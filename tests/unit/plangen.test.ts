@@ -51,7 +51,7 @@ describe('Plan erzeugen', () => {
     expect(r.plan.weeks.some((w: any) => w.days.some((d: any) => d.sessions.some((s: any) => /Lauf-Intervalle/.test(s.title))))).toBe(false);
   });
   test('Fehlende Schwellen: Einstiegstests in den ersten zwei Wochen', () => {
-    const r = generatePlan({ profile: adult, goal, today, needTests: { run: true, bike: true, swim: true } });
+    const r = generatePlan({ profile: { ...adult, skills: { swimCrawl: 'yes', swimCrawlM: 1000 } }, goal, today, needTests: { run: true, bike: true, swim: true } });
     const titles = r.plan.weeks.slice(0, 2).flatMap((w: any) => w.days.flatMap((d: any) => d.sessions.map((s: any) => s.title)));
     expect(titles).toEqual(expect.arrayContaining(['Lauftest 30 min', 'Radtest 20 min', 'Schwimmtest 400/200 m']));
     expect(r.plan.keyDates.length).toBeGreaterThan(1);

@@ -86,14 +86,24 @@ export function bikeLongVariant(spec: W.Spec, k: number, phase: Ph): W.Spec {
 export const SWIM_VARIANTS = ['Technik', 'Pull Buoy', 'zügige Bahnen'];
 export function swimVariant(spec: W.Spec, k: number, weekInBlock: number, phase: Ph): W.Spec {
   const out: W.Spec = JSON.parse(JSON.stringify(spec));
-  const v = SWIM_VARIANTS[k % SWIM_VARIANTS.length];
+  let v = SWIM_VARIANTS[k % SWIM_VARIANTS.length];
   const rest = Math.max(15, 30 - 5 * weekInBlock);
   out.steps.forEach(s => { if (s.part === 'main' && (s.reps || 1) > 1 && s.restSec && s.restSec >= 20 && s.mode !== 'drill') s.restSec = rest; });
+  // „Pull Buoy“ nur, wenn die Einheit auch Pull-Buoy-Stücke hat (Auftrag 11: vorher stand es manchmal nur im Titel).
+  // Wer schon krault, schwimmt die Hälfte der lockeren Kraul-Stücke mit Pull Buoy; Lernende ohne Pull-Buoy-Strecke bekommen Technik.
+  if (v === 'Pull Buoy' && !out.steps.some(s => s.mode === 'pull')) {
+    const c = out.stage ? null : out.steps.find(s => s.part === 'main' && s.mode === 'crawl' && (s.zone || 2) <= 2 && (s.reps || 1) >= 2);
+    if (c) { const half = Math.floor((c.reps || 1) / 2); c.reps = (c.reps || 1) - half; out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: half, m: c.m, zone: 2, mode: 'pull', restSec: c.restSec, note: 'Beine ruhig, lange Züge' })); }
+    else v = 'Technik';
+  }
   if (v === 'Technik') { const d = out.steps.find(s => s.mode === 'drill'); if (d) d.reps = (d.reps || 1) + 2; }
   if (v === 'Pull Buoy') { const p = out.steps.find(s => s.mode === 'pull'); if (p) p.reps = (p.reps || 1) + 2; }
   if (v === 'zügige Bahnen') { const c = out.steps.find(s => s.mode === 'crawl' && s.part === 'main'); if (c) out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: 4, m: Math.min(c.m || 25, 50), zone: 3, mode: 'crawl', restSec: 30, note: 'zügig, Technik sauber halten' })); }
-  if (phase === 'specific') out.steps.splice(out.steps.length - 1, 0, S('main', { reps: 4, m: 50, zone: 2, mode: out.stage && out.stage.ladder === 'swimBreast' ? 'breast' : 'crawl', restSec: 30, note: 'Freiwasser-Technik: alle 6 Züge nach vorn orientieren; letzte Bahn als Start mit schnellem Antritt' }));
-  out.variant = phase === 'specific' ? v + ', Freiwasser' : v;
+  // Freiwasser-Technik im Becken in der spezifischen Phase (Lernende nur in Stücken, die sie schon schaffen)
+  const owM = out.stage && out.stage.ladder === 'swim' ? Math.min(50, W.SWIM_STAGE_M[out.stage.n] || 25) : 50;
+  const ow = phase === 'specific' && !(out.stage && out.stage.ladder === 'swim' && out.stage.n < 2);
+  if (ow) out.steps.splice(out.steps.length - 1, 0, S('main', { reps: 4, m: owM, zone: 2, mode: out.stage && out.stage.ladder === 'swimBreast' ? 'breast' : 'crawl', restSec: 30, note: 'Freiwasser-Technik: alle 6 Züge nach vorn orientieren; letzte Bahn als Start mit schnellem Antritt' }));
+  out.variant = ow ? v + ', Freiwasser-Technik' : v;
   return out;
 }
 

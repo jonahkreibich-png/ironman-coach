@@ -471,10 +471,11 @@ function stageSession(s, n) {
     else { spec = W.runWalk(ctx, n, why); }
   } else {
     const L = s.stage.ladder === 'swimBreast' ? W.SWIM_BREAST_LADDER : W.SWIM_LADDER;
-    if (n >= L.length) {
+    // Kraul-Weg endet nach den 200-m-Stücken (Auftrag 11): ab da normales Training mit Technik-Anteil
+    if (n >= L.length || (s.stage.ladder === 'swim' && n >= 6)) {
       // Brust-Weg fertig → Kraul-Weg ab Stufe 2, Kraul-Weg fertig → normales Schwimmen
       if (s.stage.ladder === 'swimBreast') spec = W.swimLearn(ctx, { ladder: 'swim', n: 2, breast: true }, why);
-      else spec = W.swimSession(ctx, 'endurance', [{ part: 'main', reps: 3, m: 400, zone: 2, mode: 'crawl', restSec: 30 }]);
+      else spec = W.swimNormal(ctx, 'technique', s.plannedMinutes || 45, 'base', 200);
     } else spec = W.swimLearn(ctx, { ...s.stage, n }, why, s.spec && s.spec.fillMin);
   }
   if (tip && !spec.tip) spec.tip = tip;
@@ -620,8 +621,8 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     const v = stageVerdict(last.s, state.sessions[last.s.id], (state.activities || {})[(state.sessions[last.s.id] || {}).activityId]);
     let target = v.ok ? last.s.stage.n + 1 : last.s.stage.n;
     // Kraul-Check in den letzten 3 Wochen: die Stufe passt zur längsten Strecke am Stück (nie länger als das, was schon geht)
-    if (ladder === 'swim') { const skm = toNum(((state.profile || {}).skills || {}).swimCrawlM); const sn = skm ? (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: skm }) || { n: 99 }).n : 0; if (sn > target && sn < 99) target = sn; }
-    if (ladder === 'swim') { const ck = lastCrawlCheck(state, weeks, date); if (ck) { const n = (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: ck.m }) || { n: target }).n; if (n > target) { target = n; v.why = `Kraul-Check: ${ck.m} m am Stück`; } } }
+    if (ladder === 'swim') { const skm = toNum(((state.profile || {}).skills || {}).swimCrawlM); const sn = skm ? (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: skm }) || { n: 6 }).n : 0; if (sn > target && sn < 99) target = sn; }
+    if (ladder === 'swim') { const ck = lastCrawlCheck(state, weeks, date); if (ck) { const n = (W.swimLadderStart({ swimCrawl: 'some', swimCrawlM: ck.m }) || { n: 6 }).n; if (n > target) { target = n; v.why = `Kraul-Check: ${ck.m} m am Stück`; } } }
     nextSessions.filter(s => s.stage && s.stage.ladder === ladder && !s.cancelled && s.stage.n !== target).forEach(s => {
       const built = stageSession(s, target); if (!built) return;
       push({ id: `${group}-stage-${s.id}`, type: 'modify', sessionId: s.id, set: built, what: `${s.title} → ${built.title}`, reason: (v.ok ? 'Letzte Stufe hat geklappt (' : 'Stufe wiederholen (') + v.why + ')' });

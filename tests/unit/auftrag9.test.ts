@@ -18,9 +18,10 @@ const weeks = [{ weekNumber: 8, startDate: '2026-11-02', endDate: '2026-11-08', 
 const profile: any = withEstimates({ ...defaultProfile(), birthYear: 2009, skills: { swimCrawl: 'some', swimCrawlM: 25, swimPullM: 50, swimBreast: true }, thresholds: { lthrRun: 170, lthrBike: 169, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28, estimated: [] } } as any, today);
 
 describe('Schwimm-Stufen', () => {
-  test('Stufen nach Strecke am Stück: 25 → 50 → 100 → 200 → 400 → Ausdauer-Kraul; Brust-Weg für Anfänger', () => {
-    expect([25, 50, 100, 200, 400].map(m => stageFor(m, true)!.n)).toEqual([2, 3, 4, 5, 6]);
-    expect(stageFor(800, true)).toBe(null);
+  test('Stufen nach Strecke am Stück: 25 → 50 → 100, ab 200 m normales Training (Auftrag 11); Brust-Weg für Anfänger', () => {
+    expect([25, 50, 100, 150].map(m => stageFor(m, true)!.n)).toEqual([2, 3, 4, 4]);
+    expect(stageFor(200, true)).toBe(null); expect(stageFor(800, true)).toBe(null);
+    expect(stageFor(50, true, true)).toBe(null);
     expect(stageFor(0, true)).toEqual({ ladder: 'swimBreast', n: 0 });
   });
   test('mit jeder Stufe ändern sich Wiederholungslängen, Pull Buoy und Brust-Anteil', () => {
@@ -45,10 +46,11 @@ describe('Schwimm-Stufen', () => {
     // nichts Neues → keine Änderung; nie zurückstufen
     expect(swimSkillUpdate({ ...profile, skills: { ...profile.skills, swimCrawlM: 100, swimPullM: 100 } }, weeks, {}, today, { crawl: 50 })).toBe(null);
   });
-  test('ab 400 m: CSS-Hinweis; ab 800 m normales Ausdauer-Kraul', () => {
+  test('ab 400 m: CSS-Hinweis; ab 200 m normales Training', () => {
     expect(swimSkillUpdate(profile, weeks, {}, today, { crawl: 400 })!.text).toMatch(/CSS-Tests und Zonen nach Pace/);
-    const u = swimSkillUpdate(profile, weeks, {}, today, { crawl: 800 })!;
-    expect(u.adjustments[0].set.title).toMatch(/Schwimmen Ausdauer/);
+    const u = swimSkillUpdate(profile, weeks, {}, today, { crawl: 200 })!;
+    expect(u.adjustments[0].set.title).toMatch(/Schwimmen: Technik \+ Ausdauer/);
+    expect(u.skills.swimCrawl).toBe('yes');
   });
 });
 
