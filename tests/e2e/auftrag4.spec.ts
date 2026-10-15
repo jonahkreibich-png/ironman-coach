@@ -41,11 +41,19 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
   await next(page);
   // 6 Zeit pro Tag (keine Uhrzeiten), Häufigkeit
   await expect(page.locator('input[type="time"]')).toHaveCount(0);
-  for (const [d, v] of [['2', '2'], ['3', '1'], ['4', '2'], ['6', '3'], ['0', '3']]) await page.locator(`[data-act="ob-dl"][data-d="${d}"][data-v="${v}"]`).click();
-  await fill(page, '#q-weeklyHours', '7'); await fill(page, '#q-maxDayHours', '3.5');
-  await expect(page.locator('[data-qid="freq"]')).toContainText('Verfügbar sind 5 Trainingstage');
-  await page.locator('[data-act="ob-freq"][data-s="strength"][data-d="1"]').click(); // 1-2× → 2×
-  await expect(page.locator('[data-freq="strength"]')).toHaveText('2×');
+  // Auftrag 11: ein Wochenraster – Zeit pro Tag antippen (– → 45′ → 90′ → lang), Stunden, längster Tag und Häufigkeit daraus
+  for (const [d, n] of [['2', 2], ['3', 1], ['4', 2], ['6', 3], ['0', 3]] as [string, number][]) for (let k = 0; k < n; k++) await page.locator(`[data-act="week-time"][data-t="ob"][data-d="${d}"]`).click();
+  const sum = page.locator('[data-week-sum]');
+  await page.locator('[data-act="week-long"][data-dir="1"]').click(); await page.locator('[data-act="week-long"][data-dir="1"]').click(); // 2,5 → 3,5 h
+  await expect(sum).toContainText('Längster Tag');
+  await expect(sum).toContainText('bis 3,5 h');
+  await expect(sum).toContainText('bis 11 h'); // so viel Zeit hat das Raster (10,75 h)
+  for (let k = 0; k < 8; k++) await page.locator('[data-act="week-hours"][data-dir="-1"]').click();
+  await expect(sum).toContainText('bis 7 h');
+  await expect(sum).toContainText('geht an 5 Tagen');
+  await page.locator('[data-act="week-freq"][data-s="strength"][data-dir="1"]').click(); // 1-2× → 2×
+  await expect(sum.locator('.freq-row', { hasText: 'Kraft' })).toContainText('2×');
+  await expect(page.locator('#q-weeklyHours')).toHaveCount(0);
   await next(page);
   // 7 Berücksichtigungen
   await page.fill('#rule-new-ob', 'Knie links zwickt beim Bergablaufen'); await page.locator('[data-act="rule-check"]').click();

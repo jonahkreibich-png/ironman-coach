@@ -75,19 +75,22 @@ test('Bildschirm mit offenen Änderungen verlassen → App fragt nach (Verwerfen
   expect(await snapshot(page)).toEqual(before);
 });
 
-test('Profil: Wochenstunden und neues Ziel werden vorgemerkt; Name wird sofort gespeichert', async ({ page }) => {
+test('Profil: Erfahrung wird vorgemerkt; Name wird sofort gespeichert; Zeit nur im Wochenraster', async ({ page }) => {
   await seed(page);
   await open(page, '/?go=profil');
   const before = await snapshot(page);
-  await page.fill('#pf-wh', '4'); await page.locator('#pf-wh').blur();
+  // Auftrag 11: Zeit nur einmal (Wochenraster unter Berücksichtigungen), im Profil nur die Zusammenfassung
+  await expect(page.locator('#pf-wh')).toHaveCount(0);
+  await expect(page.locator('[data-week-link]')).toContainText('Wochenraster');
+  await page.fill('#pf-exp', '7'); await page.locator('#pf-exp').blur();
   await expect(page.locator('[data-stage-bar]')).toContainText('1 Änderung');
   await page.fill('#pf-name', 'Testname'); await page.locator('#pf-name').blur();
   await expect.poll(async () => (await stored(page)).profile.name).toBe('Testname');
   expect((await snapshot(page)).plan).toEqual(before.plan);
   await page.locator('[data-act="stage-apply"]').click();
-  await expect(page.locator('[data-stage-sheet]')).toContainText('Stunden');
+  await expect(page.locator('[data-stage-sheet]')).toContainText('Jahre Ausdauersport');
   await page.locator('[data-act="stage-confirm"]').click();
   await expect(page.locator('[data-replanned]')).toBeVisible({ timeout: 5000 });
   const p = (await stored(page)).profile;
-  expect(p.weeklyHours).toBe(4); expect(p.name).toBe('Testname');
+  expect(p.experienceYears).toBe(7); expect(p.name).toBe('Testname');
 });
