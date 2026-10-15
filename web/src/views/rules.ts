@@ -38,7 +38,9 @@ const visible = (r: Rule) => !(r as any).hidden;
 /* ---------- Wochenraster ---------- */
 const SYM: Record<Cell, string> = { yes: '✓', soft: '–', no: '✕' };
 export function gridHtml(tid: string, timeRow?: string): string {
-  const d = TARGETS[tid].get();
+  const d0 = TARGETS[tid].get();
+  // im Wochenraster: ohne eingetragene Zeit ist jeder Tag gesperrt (nicht grün „geht“)
+  const d = timeRow && !Object.values(d0.dayLoad || {}).some(v => +v > 0) ? { ...d0, dayLoad: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 0: 0 } } : d0;
   const rules = rulesOf({ notes: d.notes, rules: d.rules } as any, parseFor(todayStr()));
   // vorgemerkt, noch nicht übernommen (Auftrag 6): geänderte Felder markieren
   const bd = TARGETS[tid].base ? TARGETS[tid].base!() : null;
@@ -54,7 +56,7 @@ export function gridHtml(tid: string, timeRow?: string): string {
     return `<button class="rg-c ${c.state}${c.noTime ? ' notime' : ''}${chg ? ' chg' : ''}"${chg ? ' data-chg="1"' : ''} data-act="rule-cell" data-t="${tid}" data-s="${s}" data-d="${x}" aria-label="${esc(label)}" title="${esc(label)}">${SYM[c.state]}</button>`;
   }).join('')}`).join('');
   return `<div class="rgrid" role="group" aria-label="${esc(t('rules.grid'))}">${head}${timeRow || ''}${rows}</div>
-    <div class="xs muted rg-legend">${esc(t('rules.legend'))}${team ? ' ' + esc(t('rules.teamLegend', { n: team.name })) : ''}</div>`;
+    <div class="xs muted rg-legend">${esc(t('rules.legend'))}${team ? ' ' + esc(t((team.gameDays || []).length ? 'rules.teamLegend' : 'rules.teamLegendNoGames', { n: team.name })) : ''}</div>`;
 }
 on('rule-cell', el => {
   const tid = el.dataset.t!; const tg = TARGETS[tid]; if (!tg) return;

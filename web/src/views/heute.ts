@@ -56,6 +56,7 @@ function answerCard(): string {
   const d = D(); const s = todayStatus();
   const day = findDay(d.today);
   const list = day ? day.sessions.filter((x: any) => x.sport !== 'rest').map((x: any) => ({ ...x, date: d.today })) : [];
+  const beforeStart = !!day && day.sessions.some((x: any) => x.sport === 'rest' && x.title === 'Vor dem Planstart');
   const own = (STATE.trend || []).find((p: any) => p.date === d.today);
   const noValues = !C.hasRecovery(own);
   const sessions = list.length ? list.map((x: any) => {
@@ -64,7 +65,7 @@ function answerCard(): string {
       <button class="row grow" data-act="sess-open" data-sid="${esc(x.id)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px"><span class="ic">${sportIcon(x.sport)}</span>
       <span class="grow"><span class="t">${esc(x.title)}</span>${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
       ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}</div>`;
-  }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t('heute.restDay'))}</span><br><span class="m">${esc(t('heute.restLine'))}</span></span></div>`;
+  }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t(beforeStart ? 'plan.beforeStart' : 'heute.restDay'))}</span><br><span class="m">${esc(t(beforeStart ? 'heute.startsSoon' : 'heute.restLine'))}</span></span></div>`;
   return `<div class="answer l${s.level}">
     <div class="answer-top">${ring(d.ill ? null : d.readiness.score, s.level, t('heute.readiness'))}
       <div class="grow"><div class="status-word">${esc(s.word)}</div><div class="coach-line">${esc(s.line)}</div></div></div>

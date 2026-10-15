@@ -26,7 +26,7 @@ const teamOn = (a: Answers) => a.teamYes === true;
 
 export const BLOCKS: Block[] = [
   { id: 'goal', title: 'Ziele und Wunschzeiten', intro: 'Worauf trainierst du hin? Mehrere Ziele sind möglich.', questions: [
-    { id: 'goals', label: 'Deine Ziele', type: 'goals', required: true, hint: 'Pro Ziel: Art, Datum, Priorität (A = Hauptziel, B = wichtig, C = Training) und, wenn du willst, eine Wunschzeit für genau dieses Ziel.' },
+    { id: 'goals', label: 'Deine Ziele', type: 'goals', required: true, hint: 'Pro Ziel: Art, Datum, Priorität (A = Hauptziel, B = wichtig, C = Trainingsrennen) und, wenn du willst, eine Wunschzeit für genau dieses Ziel.' },
     { id: 'why', label: 'Warum diese Ziele? Was wäre ein Erfolg?', type: 'text', hint: 'Hilft dem Coach, dich zu motivieren.' }
   ] },
   { id: 'person', title: 'Person und Gesundheit', intro: 'Damit der Plan sicher ist.', questions: [
@@ -44,7 +44,7 @@ export const BLOCKS: Block[] = [
     { id: 'bests', label: 'Bestzeiten (optional, macht die Zonen genauer)', type: 'bests', show: a => has(a, 'run') || has(a, 'swim') }
   ] },
   { id: 'skills', title: 'Können und Ausrüstung', intro: 'Damit der Plan nichts verlangt, was du (noch) nicht kannst.', questions: [
-    { id: 'swimCrawl', label: 'Schwimmen: Kannst du kraulen?', type: 'select', required: true, options: [['yes', 'ja'], ['some', 'ein bisschen'], ['no', 'nein']], show: a => has(a, 'swim') },
+    { id: 'swimCrawl', label: 'Schwimmen: Kannst du kraulen?', type: 'select', required: true, hint: '„ja“ heißt: du schwimmst Kraul ohne Hilfe, auch wenn nur kurz. „ein bisschen“: ein paar Züge, die Atmung klappt noch nicht.', options: [['yes', 'ja'], ['some', 'ein bisschen'], ['no', 'nein']], show: a => has(a, 'swim') },
     { id: 'swimCrawlM', label: 'Wie weit kraulst du am Stück?', type: 'number', unit: 'm', min: 0, max: 5000, show: a => has(a, 'swim') && (a.swimCrawl === 'yes' || a.swimCrawl === 'some') },
     { id: 'swimBreast', label: 'Kannst du Brust schwimmen?', type: 'yesno', show: a => has(a, 'swim') && a.swimCrawl !== 'yes' },
     // Auftrag 11: Beckenlänge (Stücke gehen auf) und Freiwasser
@@ -55,7 +55,7 @@ export const BLOCKS: Block[] = [
     { id: 'runContinuousMin', label: 'Laufen: Wie lange kannst du am Stück locker laufen?', type: 'number', unit: 'min', min: 0, max: 400, show: a => has(a, 'run') },
     { id: 'bikeLongestMin', label: 'Rad: Längste Fahrt in letzter Zeit?', type: 'number', unit: 'min', min: 0, max: 900, show: a => has(a, 'bike') },
     { id: 'bikes', label: 'Welche Räder hast du?', type: 'multi', options: BIKE_OPTIONS, show: a => has(a, 'bike') },
-    { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', show: a => has(a, 'bike') }
+    { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', hint: 'Powermeter am Rad oder ein Smarttrainer, der Watt anzeigt. Im Zweifel: Nein.', show: a => has(a, 'bike') }
   ] },
   { id: 'team', title: 'Teamsport', intro: 'Fußball, Handball, Basketball oder feste Gruppentermine (z. B. Lauftreff): zählen im Plan als feste Termine und Belastung.', questions: [
     { id: 'teamYes', label: 'Machst du Teamsport oder hast du feste Gruppentermine?', type: 'yesno' },
@@ -256,9 +256,8 @@ export function applyOnboarding(a: Answers, today: string, base?: Profile, o: { 
       if (r) { gen = { ...r.gen, plan: r.plan }; continued = true; }
     }
     if (!gen) {
-      const dated = goals.map(g => ({ ...g, date: g.date || (g.priority === 'A' ? addDays(today, 84) : null) }));
       // neuer Plan ab heute (ab 18 Uhr ab morgen), nicht erst ab nächstem Montag (Auftrag 11)
-      gen = generatePlan({ profile: p, goals: dated as Goal[], today, from: o.from === undefined ? today : o.from, currentWeeklyHours: hoursNow(a, p), hoursUnknown: a.weeklyHoursNow === 'unknown', needTests: need, stages: o.stages });
+      gen = generatePlan({ profile: p, goals, today, from: o.from === undefined ? today : o.from, currentWeeklyHours: hoursNow(a, p), hoursUnknown: a.weeklyHoursNow === 'unknown', needTests: need, stages: o.stages });
     }
     gen.violations.filter(v => v.rule === 'age').forEach(v => warnings.push(v.msg));
   }
@@ -273,7 +272,7 @@ export function understood(a: Answers, today: string): Understood[] {
   const { profile: p, goals } = profileFromAnswers(a, today);
   const out: Understood[] = [];
   const PR: Record<string, string> = { A: 'Hauptziel', B: 'wichtig', C: 'Training' };
-  out.push({ block: 'goal', label: 'Ziele', text: goals.length ? goals.map(g => `${g.name}${g.date ? ' am ' + g.date.split('-').reverse().join('.') : ''} (${g.priority}: ${PR[g.priority]})${g.targetTimeSec ? `, Wunschzeit ${fmtT(g.targetTimeSec)}` : ', ohne Wunschzeit'}`).join('; ') : 'noch kein Ziel' });
+  out.push({ block: 'goal', label: 'Ziele', text: goals.length ? goals.map(g => `${g.name}${g.date ? ' am ' + g.date.split('-').reverse().join('.') : ', noch ohne Datum (die App plant einen Platzhalter in der passenden Saison)'} (${g.priority}: ${PR[g.priority]})${g.targetTimeSec ? `, Wunschzeit ${fmtT(g.targetTimeSec)}` : ', ohne Wunschzeit'}`).join('; ') : 'noch kein Ziel' });
   const SD: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft' };
   const ws = weekSummary({ ...a, sports: p.sports, freq: p.freq as any, weeklyHours: p.weeklyHours, maxDayHours: p.maxDayHours }, today);
   const fr = (s: string) => { const f = (p.freq || {})[s as SportKey] || (ws.sports.find(x => x.sport === s) || { freq: null as any }).freq; return f ? (f[0] === f[1] ? `${f[0]}×` : `${f[0]}-${f[1]}×`) : 'nach Plan'; };

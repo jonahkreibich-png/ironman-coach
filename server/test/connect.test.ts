@@ -66,7 +66,8 @@ describe('Oura', () => {
     expect(st.status).toBe('connected'); expect(st.lastOkAt).toBeGreaterThan(0);
     // Tokens liegen nur verschlüsselt in der Datenbank
     const row = env.DB.db.prepare("SELECT token_enc FROM connections WHERE provider = 'oura'").get();
-    expect(row.token_enc).not.toContain('AT');
+    // (vorher: not.toContain('AT') – schlug zufällig fehl, wenn der verschlüsselte Text „AT“ enthielt)
+    expect(row.token_enc).not.toContain('"AT"'); expect(row.token_enc).not.toContain('access_token');
   });
   test('Abgelaufenes Token wird erneuert, abgelehntes führt zu „neu verbinden“', async () => {
     const { env, token } = await setupUser();

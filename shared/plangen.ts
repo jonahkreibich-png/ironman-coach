@@ -219,7 +219,10 @@ export function generatePlan(inp: GenInput): GenResult {
   // Ein Hauptziel ohne Datum bekommt 12 Wochen.
   const dated = goals0.filter(g => g.date);
   const fallbackA = dated.some(g => g.priority === 'A') ? null : (goals0.find(g => !g.date && g.priority === 'A') || (!dated.length ? goals0[0] : null));
-  const goalsD = [...dated, ...(fallbackA && !fallbackA.date ? [fallbackA] : [])].map(g => ({ ...g, date: g.date || addDays(start, 7 * 12) }));
+  // Hauptziel ohne Datum: Platzhalter in der passenden Saison (Auftrag 11: vorher stillschweigend in 12 Wochen, z. B. ein Triathlon im Januar)
+  const fitH0 = inp.continueFrom && inp.continueFrom.lastNormalMin ? inp.continueFrom.lastNormalMin / 60 : inp.currentWeeklyHours ?? null;
+  const placeA = fallbackA && !fallbackA.date ? placeholders([fallbackA], null, today, fitH0)[0] || null : null;
+  const goalsD = [...dated, ...(fallbackA && !fallbackA.date ? [placeA || fallbackA] : [])].map(g => ({ ...g, date: g.date || addDays(start, 7 * 12) }));
   const A = (inp.goal && goalsD.find(g => g.id === inp.goal!.id)) || mainGoal(goalsD, today) || { id: 'goal-fitness', type: 'fitness' as GoalType, name: 'Fitness', date: addDays(start, 7 * 12 - 1), priority: 'A' as const };
   const goalDate = A.date!;
   const cont0 = inp.continueFrom || null;

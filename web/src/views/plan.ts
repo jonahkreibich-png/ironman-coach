@@ -49,7 +49,7 @@ export function renderPlan(): string {
     const list = d.sessions.map((s: any) => ({ ...s, date: d.date }));
     const customs = (STATE.customWorkouts || {})[d.date] || [];
     h += `<div class="day-h ${isToday ? 'today' : ''}" id="day-${d.date}"><b>${esc(dowLong(d.date))}</b><span>${fmtDate(d.date)}${isToday ? ' · ' + esc(t('common.today')) : ''}</span></div>
-      <div class="list">${list.filter((s: any) => s.sport !== 'rest' && !s.removed).map((s: any) => editing() && d.date >= today && !s.race ? editRow(s) : sessionRow(s)).join('') || `<div class="li"><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="t muted">${esc(t('heute.restDay'))}</span></div>`}
+      <div class="list">${list.filter((s: any) => s.sport !== 'rest' && !s.removed).map((s: any) => editing() && d.date >= today && !s.race ? editRow(s) : sessionRow(s)).join('') || `<div class="li"><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="t muted">${esc(list.some((s: any) => s.sport === 'rest' && s.title === 'Vor dem Planstart') ? t('plan.beforeStart') : t('heute.restDay'))}</span></div>`}
       ${(d.moved || []).map((m: any) => `<div class="li"><span class="s">${esc(t('plan.movedTo', { t: m.title, d: `${dowShort(m.to)} ${fmtDate(m.to)}` }))}</span></div>`).join('')}
       ${customs.map((c: any) => `<button class="li" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}"><span class="grow"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')}<br><span class="s">${esc([c.metrics && c.metrics.min ? c.metrics.min + ' min' : c.plannedMinutes ? c.plannedMinutes + ' min' : '', c.metrics && c.metrics.km ? c.metrics.km + ' km' : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`;
   }
