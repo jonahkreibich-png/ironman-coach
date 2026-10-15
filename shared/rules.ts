@@ -46,9 +46,9 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
   // Umfang: gegen die letzte normale Woche (nach einer Erholungswoche zählt die Woche davor)
   for (let i = Math.max(1, firstNew); i < all.length; i++) {
     const w = all[i];
-    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
-    // Wiedereinstieg nach Krankheit: niedriger als die Woche davor, keine Steigerung zu prüfen
-    if (w.entry) continue;
+    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
+    // Wiedereinstieg nach Krankheit: niedriger als die Woche davor, keine Steigerung zu prüfen; angebrochene Woche (Plan ab heute) ebenso
+    if (w.entry || w.partial || all[j].partial) continue;
     const ref = all[j];
     // eigenes Training (Teamsport ist ein fester Termin und steigt nicht)
     const refMin = ownWeekMinutes(ref), cur = ownWeekMinutes(w);

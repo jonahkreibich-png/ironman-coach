@@ -66,8 +66,9 @@ function fromProfile(): Answers {
   if (p.sex) a.sex = p.sex; a.sports = p.sports.filter(s => s !== 'football'); a.weeklyHours = p.weeklyHours; a.maxDayHours = p.maxDayHours;
   if (Object.keys(p.dayLoad || {}).length) a.dayLoad = p.dayLoad;
   if (Object.keys(p.freq || {}).length) a.freq = p.freq;
-  if (p.teamSport) { a.teamYes = true; a.teamName = p.teamSport.name; a.teamTrainingDays = p.teamSport.trainingDays; a.teamTrainingMinutes = p.teamSport.trainingMinutes; a.teamGameDays = p.teamSport.gameDays; a.teamGameMinutes = p.teamSport.gameMinutes; a.teamSeasonFrom = p.teamSport.seasonFrom; a.teamSeasonTo = p.teamSport.seasonTo; }
+  if (p.teamSport) { a.teamYes = true; a.teamName = p.teamSport.name; a.teamTrainingDays = p.teamSport.trainingDays; a.teamTrainingMinutes = p.teamSport.trainingMinutes; a.teamGames = (p.teamSport.gameDays || []).length > 0; a.teamGameDays = p.teamSport.gameDays; a.teamGameMinutes = p.teamSport.gameMinutes; a.teamSeasonFrom = p.teamSport.seasonFrom; a.teamSeasonTo = p.teamSport.seasonTo; }
   const sk = p.skills || {}; Object.assign(a, { swimCrawl: sk.swimCrawl ?? a.swimCrawl, swimCrawlM: sk.swimCrawlM ?? a.swimCrawlM, swimBreast: sk.swimBreast ?? a.swimBreast, runContinuousMin: sk.runContinuousMin ?? a.runContinuousMin, bikeLongestMin: sk.bikeLongestMin ?? a.bikeLongestMin });
+  if (sk.poolM) a.poolM = String(sk.poolM); if (sk.openWater != null) { a.openWater = sk.openWater; a.openWaterFrom = sk.openWaterFrom != null ? String(sk.openWaterFrom) : a.openWaterFrom; a.openWaterTo = sk.openWaterTo != null ? String(sk.openWaterTo) : a.openWaterTo; }
   if ((p.bikes || []).length) a.bikes = p.bikes; a.powerMeter = p.powerMeter;
   if (Object.keys(p.bests || {}).length) a.bests = p.bests;
   if ((p.notes || []).length) a.notes = p.notes.join('\n');
@@ -107,7 +108,7 @@ function question(q: Question, a: Answers): string {
     case 'date': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><input class="inp" type="date" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}" data-t="text" value="${esc(v ?? '')}"></div>${hint}`;
     case 'notes': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${listHtml('ob')}<div style="margin-top:var(--s2)">${addHtml('ob')}</div></div>`;
     case 'grid': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${gridHtml('ob')}</div>`;
-    case 'select': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><select class="inp" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}">${(q.options || []).map(([k, l]) => `<option value="${esc(k)}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>${hint}`;
+    case 'select': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><select class="inp" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}">${(q.options || []).some(o => o[0] === '') ? '' : `<option value="" ${v == null || v === '' ? 'selected' : ''} disabled>${esc(t('ob.pick'))}</option>`}${(q.options || []).map(([k, l]) => `<option value="${esc(k)}" ${String(v ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>${hint}`;
     case 'yesno': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span><div class="seg">${[['1', t('common.yes')], ['0', t('common.no')]].map(([k, l]) => `<button class="${(v === true && k === '1') || (v === false && k === '0') ? 'on' : ''}" data-act="ob-yn" data-q="${q.id}" data-v="${k}">${esc(l)}</button>`).join('')}</div></div>${hint}`;
     case 'multi': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}${pre}</span><div class="chips" style="flex-wrap:wrap">${(q.options || []).map(([k, l]) => { const on = Array.isArray(v) && v.includes(k); return `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="ob-multi" data-q="${q.id}" data-v="${esc(k)}">${esc(l)}</button>`; }).join('')}</div></div>${hint}`;
     case 'days': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${DAYS(Array.isArray(v) ? v.map(Number) : [], q.id)}</div>${hint}`;
@@ -211,7 +212,16 @@ on('ob-back', () => { const d = draft(); d.block = Math.max(0, d.block - 1); red
 on('ob-jump', el => { const d = draft(); d.block = Math.max(0, +el.dataset.i!); d.done = false; d.confirmed = false; redraw(); top(); });
 on('ob-edit', () => { const d = draft(); d.done = false; d.confirmed = false; d.block = 0; redraw(); });
 on('ob-confirm', () => { const d = draft(); d.confirmed = true; redraw(); top(); });
-onChange('ob-q', el => { const v = (el as HTMLInputElement).value; const a = A(); a[el.dataset.q!] = el.dataset.t === 'number' ? parseNum(v) : v; saveState(); if (el.tagName === 'SELECT') nav.rerender(); });
+onChange('ob-q', el => {
+  const v = (el as HTMLInputElement).value; const a = A(); const k = el.dataset.q!;
+  // Zahlen nur im erlaubten Bereich (Auftrag 11: Geburtsjahr „197“ wurde angenommen)
+  if (el.dataset.t === 'number') {
+    const n = parseNum(v); const q = BLOCKS.flatMap(b => b.questions).find(x => x.id === k);
+    if (v.trim() && (n == null || (q && q.min != null && n < q.min) || (q && q.max != null && n > q.max))) { el.setAttribute('aria-invalid', 'true'); toast(q && q.min != null && q.max != null ? t('ob.range', { min: q.min, max: q.max }) : t('common.invalidNumber')); return; }
+    el.removeAttribute('aria-invalid'); a[k] = n;
+  } else a[k] = v;
+  saveState(); if (el.tagName === 'SELECT') nav.rerender();
+});
 on('ob-yn', el => { A()[el.dataset.q!] = el.dataset.v === '1'; redraw(); });
 on('ob-multi', el => { const a = A(); const k = el.dataset.q!; const cur: string[] = Array.isArray(a[k]) ? a[k] : []; a[k] = cur.includes(el.dataset.v!) ? cur.filter(x => x !== el.dataset.v) : [...cur, el.dataset.v!]; redraw(); });
 on('ob-day', el => { const a = A(); const k = el.dataset.q!; const d = +el.dataset.d!; const cur: number[] = Array.isArray(a[k]) ? a[k].map(Number) : []; a[k] = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort(); redraw(); });

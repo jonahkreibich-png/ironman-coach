@@ -9,7 +9,7 @@ import { evaluate } from '../../shared/constraints';
 import * as C from '../../shared/core';
 
 import { today, oldPlan, targets, profile, goals, state } from '../../fixtures/pattern-person';
-const r = replanPlan(oldPlan(), profile, goals, today, { state: state(), adjustments: {}, stages: { swim: { ladder: 'swim', n: 2 } } })!;
+const r = replanPlan(oldPlan(), profile, goals, today, { state: state(), adjustments: {}, stages: { swim: { ladder: 'swim', n: 2 } }, from: '2026-10-19' })!;
 const plan = r.plan;
 const W = (mon: string) => plan.weeks.find((w: any) => w.startDate === mon);
 const day = (w: any, dow: number) => w.days.find((d: any) => new Date(d.date + 'T12:00:00Z').getUTCDay() === dow);

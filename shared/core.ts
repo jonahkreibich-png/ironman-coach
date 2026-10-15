@@ -165,7 +165,8 @@ function thrOf(state) { return (state && state.profile && state.profile.threshol
 const toNum = v => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 const clone = o => JSON.parse(JSON.stringify(o));
 const HARD_RE = /sweet|schwelle|intervall|vo2|zone\s*[45]|\bz[45]\b|tempo|\d\s*[×x]\s*\d/i;
-function isGame(s) { return !!s && s.sport === 'football' && /spiel|match/i.test(s.title || ''); }
+// Spiel: aus der Bauanleitung (Teamname wie „Spielvereinigung“ zählt nicht), sonst aus dem Titel (alte Pläne)
+function isGame(s) { if (!s || s.sport !== 'football') return false; if (s.spec && s.spec.kind) return s.spec.kind === 'game'; return /(^|[\s:])(spiel|match)\b/i.test(s.title || ''); }
 const EASED_RE = /^(Zone 2|Locker) statt/;
 function isIntervals(s) { return !!s && ['run', 'bike', 'swim'].includes(s.sport) && !EASED_RE.test(s.title || '') && HARD_RE.test((s.title || '') + ' ' + (s.zone || '')); }
 function isLong(s) {

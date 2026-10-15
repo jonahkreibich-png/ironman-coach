@@ -28,7 +28,7 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   if (p.strengthPlan) L.push(`Kraft: ${(p.strengthPlan.lower || []).map(d => 'Unterkörper ' + DOW[d]).concat((p.strengthPlan.upper || []).map(d => 'Oberkörper ' + DOW[d])).join(', ')}; nie Beine am Spieltag`);
   if (p.morning) L.push(`Morgens ${p.morning.label || 'vor der Schule'} (${p.morning.days.map(d => DOW[d]).join(', ')}): höchstens ${p.morning.maxMin} min${p.morning.noPool ? ', kein Schwimmbad' : ''}`);
   if (p.runGoal) L.push(`Langfristiges Lauf-Ziel: ${mmss(p.runGoal.paceSec)}/km bei Puls ${p.runGoal.hr}`);
-  if (p.teamSport) L.push(`Teamsport: ${p.teamSport.name}, Training ${p.teamSport.trainingDays.map(d => DOW[d]).join(', ')}, Spiel ${p.teamSport.gameDays.map(d => DOW[d]).join(', ')}${p.teamSport.seasonTo ? ` bis ${d2(p.teamSport.seasonTo)}${p.teamSport.seasonTo.slice(0, 4)}` : ''}`);
+  if (p.teamSport) L.push(`Teamsport: ${p.teamSport.name}, Training ${p.teamSport.trainingDays.map(d => DOW[d]).join(', ')}, ${p.teamSport.gameDays.length ? 'Spiel ' + p.teamSport.gameDays.map(d => DOW[d]).join(', ') : 'keine Spiele'}${p.teamSport.seasonTo ? ` bis ${d2(p.teamSport.seasonTo)}${p.teamSport.seasonTo.slice(0, 4)}` : ''}`);
   (p.focus || []).forEach(f => L.push('- ' + f));
   if (p.injuries) L.push(`Beschwerden/Verletzungen: ${p.injuries}`);
   if (p.medicalCaution) L.push('Gesundheit: ärztliche Freigabe empfohlen, vorsichtig planen.');

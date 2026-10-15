@@ -14,6 +14,7 @@ import { nav } from '../nav';
 import { gridHtml, listHtml, addHtml, registerTarget } from './rules';
 
 const SCREEN = 'beruecksichtigungen';
+const MONTH_OPTS = (): [string, string][] => Array.from({ length: 12 }, (_, i) => [String(i + 1), t('month.' + (i + 1))]);
 const dataOf = (p: any) => ({ notes: [...(p.notes || [])], rules: [...(p.rules || [])], dayLoad: p.dayLoad || {}, sports: p.sports, team: p.teamSport });
 registerTarget('cons', {
   get: () => dataOf(draftProfile(SCREEN)),
@@ -38,6 +39,7 @@ export function renderBeruecksichtigungen(): string {
     ${p.sports.includes('swim') ? select('cs-crawl', t('cons.crawl'), sk.swimCrawl || '', [['', '–'], ['yes', t('common.yes')], ['some', t('cons.some')], ['no', t('common.no')]], 'data-ch="cs" data-k="swimCrawl"') + field('cs-crawlm', t('cons.crawlM'), sk.swimCrawlM ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="swimCrawlM" data-num="1"' }) : ''}
     ${p.sports.includes('run') ? field('cs-run', t('cons.runMin'), sk.runContinuousMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="runContinuousMin" data-num="1"' }) : ''}
     ${p.sports.includes('bike') ? field('cs-bike', t('cons.bikeMin'), sk.bikeLongestMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="bikeLongestMin" data-num="1"' }) : ''}</div>
+    ${p.sports.includes('swim') ? `<div class="fgrid">${select('cs-pool', t('cons.pool'), String(sk.poolM || ''), [['', '–'], ['25', '25 m'], ['50', '50 m'], ['both', t('cons.poolBoth')]], 'data-ch="cs" data-k="poolM"')}</div>${toggle('cs-ow', t('cons.openWater'), !!sk.openWater, 'data-ch="cs" data-k="openWater" data-bool="1"')}${sk.openWater ? `<div class="fgrid">${select('cs-owf', t('cons.owFrom'), String(sk.openWaterFrom || 6), MONTH_OPTS(), 'data-ch="cs" data-k="openWaterFrom" data-num="1"')}${select('cs-owt', t('cons.owTo'), String(sk.openWaterTo || 9), MONTH_OPTS(), 'data-ch="cs" data-k="openWaterTo" data-num="1"')}</div>` : ''}` : ''}
     ${p.sports.includes('swim') && sk.swimCrawl !== 'yes' ? toggle('cs-breast', t('cons.breast'), !!sk.swimBreast, 'data-ch="cs" data-k="swimBreast" data-bool="1"') : ''}
     ${p.sports.includes('bike') ? `<div class="lbl">${esc(t('cons.bikes'))}</div><div class="chips" style="flex-wrap:wrap">${BIKE_OPTIONS.map(([k, l]) => `<button class="chip ${(p.bikes || []).includes(k) ? 'on' : ''}" aria-pressed="${(p.bikes || []).includes(k)}" data-act="cs-bike" data-v="${k}">${esc(l)}</button>`).join('')}</div>` : ''}</div>`);
   if (!LAST && HAS_PLAN) h += `<div class="hint">${esc(t('cons.replanHint'))}</div>`;
@@ -47,6 +49,8 @@ onChange('cs', el => {
   const k = el.dataset.k!; const inp = el as HTMLInputElement;
   let v: any = el.dataset.bool ? inp.checked : inp.value;
   if (el.dataset.num) v = v === '' ? null : +v;
+  if (k === 'poolM') v = v === '50' ? 50 : v === '25' ? 25 : v === 'both' ? 'both' : null;
+  if (k === 'openWater' && v) { stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), openWater: true, openWaterFrom: (p.skills || {}).openWaterFrom || 6, openWaterTo: (p.skills || {}).openWaterTo || 9 }; }); return; }
   stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), [k]: v || (v === 0 ? 0 : null) }; });
 });
 on('cs-bike', el => { const v = el.dataset.v!; stage(SCREEN, p => { p.bikes = (p.bikes || []).includes(v) ? p.bikes.filter(x => x !== v) : [...(p.bikes || []), v]; }); });

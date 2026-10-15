@@ -7,6 +7,7 @@ import { type Profile, profileFromLegacy, mergeProfile } from '../../shared/prof
 import { type Goal, goalFromPlanMeta } from '../../shared/goals';
 import { setLang, setUnits } from '../../shared/i18n';
 import { migrateNotes } from '../../shared/fields';
+import { sanitizeProfile, ghostGames } from '../../shared/sanity';
 
 export const PLAN_KEY = STORAGE.plan;
 export const LS_KEY = STORAGE.state;
@@ -217,5 +218,28 @@ export function scrubLegacyDefaults(): boolean {
   void changed; return true; // beim ersten Lauf immer speichern (Merker legacyScrubbed)
 }
 { const a = scrubLegacyDefaults(); const b = ensureProfileAndGoals(); if (a || b) saveState(); }
+/* Auftrag 11: unplausible Profildaten reparieren (z. B. Geburtsjahr „197“ → negative Pulswerte) und Spiele ohne Spieltage entfernen */
+export function repairOnStart(): boolean {
+  if (!STATE.profile) return false;
+  const today = todayStr(); let changed = false;
+  const fx = sanitizeProfile(profile(), today);
+  if (fx.changed) {
+    saveProfile(fx.profile); changed = true;
+    if (STATE.nutritionProfile && (STATE.nutritionProfile.age > 110 || STATE.nutritionProfile.age < 5)) delete STATE.nutritionProfile.age;
+    if (fx.badBirthYear != null) {
+      const id = 'msg-birthyear-' + today;
+      STATE.coachMsgs[id] = { id, at: Date.now(), date: today, kind: 'info', from: 'coach', title: 'Bitte Geburtsjahr prüfen', unread: true, important: true,
+        text: `Als Geburtsjahr stand „${fx.badBirthYear}“ im Profil. Damit konnte ich Alter und Pulsbereiche nicht richtig berechnen. Trag es bitte unter Mehr → Profil und Ziele ein (vier Ziffern, z. B. 1975). Bis dahin rechne ich mit vorsichtigen Standardwerten.` };
+    }
+  }
+  const ghosts = ghostGames(BASE_WEEKS, profile(), today);
+  if (ghosts.length) {
+    const now = Date.now();
+    ghosts.forEach((g, i) => { const id = `nogame-${g.id}`; if (!STATE.adjustments[id]) { STATE.adjustments[id] = { id, group: 'nogame-' + today, type: 'cancel', removed: true, sessionId: g.id, date: today, createdAt: now + i, what: `${g.title} entfällt`, reason: 'Keine Spiele eingetragen' }; changed = true; } });
+    if (changed) rebuildPlanIndex();
+  }
+  return changed;
+}
+{ try { if (repairOnStart()) saveState(); } catch (e) { /* nie den Start verhindern */ } }
 /* Einmalig je Einheit: Werte aus alten Notizen in die Felder übertragen (Auftrag 7). Die Notiz bleibt. */
 { try { if (migrateNotes(STATE, BASE_WEEKS)) saveState(); } catch (e) { /* nie den Start verhindern */ } }

@@ -20,6 +20,7 @@ export const SPORT_OPTIONS: [string, string][] = [['swim', 'Schwimmen'], ['bike'
 export const BIKE_OPTIONS: [string, string][] = [['road', 'Rennrad'], ['gravel', 'Gravelbike'], ['mtb', 'Mountainbike'], ['tt', 'Triathlon-/Zeitfahrrad'], ['trekking', 'Trekking-/Stadtrad'], ['ebike', 'E-Bike'], ['trainer', 'Rollentrainer/Smarttrainer'], ['spin', 'Indoor-Bike/Spinning']];
 export const DAYLOAD_OPTIONS: [DayLoad, string][] = [[0, 'kein Training'], [1, 'kurz (bis 45 min)'], [2, 'mittel (bis 90 min)'], [3, 'lang (mehr als 90 min)']];
 const has = (a: Answers, s: string) => (a.sports || []).includes(s);
+const MONTHS: [string, string][] = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'].map((m, i) => [String(i + 1), m]);
 const teamOn = (a: Answers) => a.teamYes === true;
 
 export const BLOCKS: Block[] = [
@@ -42,21 +43,28 @@ export const BLOCKS: Block[] = [
     { id: 'bests', label: 'Bestzeiten (optional, macht die Zonen genauer)', type: 'bests', show: a => has(a, 'run') || has(a, 'swim') }
   ] },
   { id: 'skills', title: 'Können und Ausrüstung', intro: 'Damit der Plan nichts verlangt, was du (noch) nicht kannst.', questions: [
-    { id: 'swimCrawl', label: 'Schwimmen: Kannst du kraulen?', type: 'select', options: [['yes', 'ja'], ['some', 'ein bisschen'], ['no', 'nein']], show: a => has(a, 'swim') },
+    { id: 'swimCrawl', label: 'Schwimmen: Kannst du kraulen?', type: 'select', required: true, options: [['yes', 'ja'], ['some', 'ein bisschen'], ['no', 'nein']], show: a => has(a, 'swim') },
     { id: 'swimCrawlM', label: 'Wie weit kraulst du am Stück?', type: 'number', unit: 'm', min: 0, max: 5000, show: a => has(a, 'swim') && (a.swimCrawl === 'yes' || a.swimCrawl === 'some') },
     { id: 'swimBreast', label: 'Kannst du Brust schwimmen?', type: 'yesno', show: a => has(a, 'swim') && a.swimCrawl !== 'yes' },
+    // Auftrag 11: Beckenlänge (Stücke gehen auf) und Freiwasser
+    { id: 'poolM', label: 'Wie lang ist dein Becken?', type: 'select', options: [['25', '25 m'], ['50', '50 m'], ['both', 'beides']], show: a => has(a, 'swim'), hint: 'Danach richten sich die Stücke, z. B. keine 75 m im 25-m-Becken.' },
+    { id: 'openWater', label: 'Schwimmst du auch im Freiwasser (See, Meer)?', type: 'yesno', show: a => has(a, 'swim') },
+    { id: 'openWaterFrom', label: 'Freiwasser-Saison von', type: 'select', options: MONTHS, show: a => has(a, 'swim') && a.openWater === true },
+    { id: 'openWaterTo', label: 'Freiwasser-Saison bis', type: 'select', options: MONTHS, show: a => has(a, 'swim') && a.openWater === true, hint: 'In der Saison und vor Triathlons plant die App ab und zu Freiwasser-Einheiten (Sichten, Orientierung, Start, Neopren).' },
     { id: 'runContinuousMin', label: 'Laufen: Wie lange kannst du am Stück locker laufen?', type: 'number', unit: 'min', min: 0, max: 400, show: a => has(a, 'run') },
     { id: 'bikeLongestMin', label: 'Rad: Längste Fahrt in letzter Zeit?', type: 'number', unit: 'min', min: 0, max: 900, show: a => has(a, 'bike') },
     { id: 'bikes', label: 'Welche Räder hast du?', type: 'multi', options: BIKE_OPTIONS, show: a => has(a, 'bike') },
     { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', show: a => has(a, 'bike') }
   ] },
-  { id: 'team', title: 'Teamsport', intro: 'Fußball, Handball, Basketball …: zählt im Plan als Belastung.', questions: [
-    { id: 'teamYes', label: 'Machst du Teamsport?', type: 'yesno' },
+  { id: 'team', title: 'Teamsport', intro: 'Fußball, Handball, Basketball oder feste Gruppentermine (z. B. Lauftreff): zählen im Plan als feste Termine und Belastung.', questions: [
+    { id: 'teamYes', label: 'Machst du Teamsport oder hast du feste Gruppentermine?', type: 'yesno' },
     { id: 'teamName', label: 'Welche Sportart?', type: 'text', show: teamOn },
     { id: 'teamTrainingDays', label: 'An welchen Tagen ist Training?', type: 'days', show: teamOn },
     { id: 'teamTrainingMinutes', label: 'Wie lange dauert ein Training?', type: 'number', unit: 'min', min: 15, max: 240, show: teamOn },
-    { id: 'teamGameDays', label: 'An welchen Tagen sind meist Spiele?', type: 'days', show: teamOn },
-    { id: 'teamGameMinutes', label: 'Wie lange dauert ein Spiel?', type: 'number', unit: 'min', min: 15, max: 240, show: teamOn },
+    // Auftrag 11: erst fragen, ob es überhaupt Spiele gibt; ohne Spiele keine Spiel-Einheiten und keine Spieltag-Regeln
+    { id: 'teamGames', label: 'Gibt es Spiele oder Wettkämpfe?', type: 'yesno', show: teamOn },
+    { id: 'teamGameDays', label: 'An welchen Tagen sind meist Spiele?', type: 'days', show: a => teamOn(a) && a.teamGames === true },
+    { id: 'teamGameMinutes', label: 'Wie lange dauert ein Spiel?', type: 'number', unit: 'min', min: 15, max: 240, show: a => teamOn(a) && a.teamGames === true },
     { id: 'teamSeasonFrom', label: 'Saison von (optional)', type: 'date', show: teamOn },
     { id: 'teamSeasonTo', label: 'Saison bis (optional)', type: 'date', show: teamOn, hint: 'Leer lassen, wenn das ganze Jahr gespielt wird.' }
   ] },
@@ -176,7 +184,9 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   else if (a.strength && !p.sports.includes('strength')) p.sports = [...p.sports, 'strength'];
   // Teamsport
   if (a.teamYes) {
-    p.teamSport = { name: String(a.teamName || a.teamSportName || 'Teamsport').trim() || 'Teamsport', trainingDays: (a.teamTrainingDays || []).map(Number), trainingMinutes: num(a.teamTrainingMinutes) || 90, gameDays: (a.teamGameDays || []).map(Number), gameMinutes: num(a.teamGameMinutes) || 90, seasonFrom: a.teamSeasonFrom || null, seasonTo: a.teamSeasonTo || null };
+    // ohne Spiele (oder ohne Spieltage) keine Spiele im Plan (Auftrag 11); alte Antworten ohne die Frage: Spieltage zählen, wenn eingetragen
+    const games = a.teamGames === false ? [] : (a.teamGameDays || []).map(Number);
+    p.teamSport = { name: String(a.teamName || a.teamSportName || 'Teamsport').trim() || 'Teamsport', trainingDays: (a.teamTrainingDays || []).map(Number), trainingMinutes: num(a.teamTrainingMinutes) || 90, gameDays: games, gameMinutes: games.length ? num(a.teamGameMinutes) || 90 : 0, seasonFrom: a.teamSeasonFrom || null, seasonTo: a.teamSeasonTo || null };
     p.teamSportName = p.teamSport.name;
     if (!p.sports.includes('football')) p.sports = [...p.sports, 'football'];
   } else if (a.teamYes === false) { p.teamSport = null; p.sports = p.sports.filter(s => s !== 'football'); p.teamSportName = ''; }
@@ -190,7 +200,12 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   if (a.freq && typeof a.freq === 'object') { const f: any = {}; Object.entries(a.freq).forEach(([k, v]: any) => { if (Array.isArray(v) && v.length === 2) f[k] = [Math.max(0, +v[0] || 0), Math.max(+v[0] || 0, +v[1] || 0)]; }); p.freq = f; if (f.strength && f.strength[1] > 0 && !p.sports.includes('strength')) p.sports = [...p.sports, 'strength']; }
   p.skills = {
     swimCrawl: a.swimCrawl || null, swimCrawlM: num(a.swimCrawlM), swimBreast: a.swimBreast === true ? true : a.swimBreast === false ? false : undefined,
-    runContinuousMin: num(a.runContinuousMin), bikeLongestMin: num(a.bikeLongestMin)
+    runContinuousMin: num(a.runContinuousMin), bikeLongestMin: num(a.bikeLongestMin),
+    poolM: a.poolM === '50' || a.poolM === 50 ? 50 : a.poolM === 'both' ? 'both' : a.poolM === '25' || a.poolM === 25 ? 25 : null,
+    openWater: a.openWater === true ? true : a.openWater === false ? false : null,
+    openWaterFrom: a.openWater === true ? num(a.openWaterFrom) || 6 : null, openWaterTo: a.openWater === true ? num(a.openWaterTo) || 9 : null,
+    // „ja“ ohne Meterangabe: wie 100 m (Auftrag 11), nie Technik-Stufe 0
+    ...(a.swimPullM != null ? { swimPullM: num(a.swimPullM) } : {})
   };
   if (Array.isArray(a.bikes)) p.bikes = a.bikes;
   if (Array.isArray(a.bikeSetup)) { p.bikes = [...new Set([...(p.bikes || []), ...a.bikeSetup.filter((x: string) => x !== 'power' && x !== 'clip' && x !== 'group')])]; if (a.bikeSetup.includes('power')) p.powerMeter = true; }
@@ -221,20 +236,27 @@ export const GOAL_NAMES: Record<GoalType, string> = {
   tri_olympic: 'Olympischer Triathlon', tri_middle: 'Mitteldistanz', tri_long: 'Langdistanz', duathlon: 'Duathlon', aquathlon: 'Aquathlon', bike_event: 'Radmarathon', swim_goal: 'Schwimm-Ziel', fitness: 'Fitness'
 };
 
+/* Stunden der letzten Wochen: Antwort, Schätzung aus dem Rechner, oder bei „weiß ich nicht“ ein vorsichtiger Start
+   (höchstens 3 h und 40 % des Wochenlimits); der Plan passt sich nach 2 Wochen an die echten Daten an (Auftrag 11) */
+export function hoursNow(a: Answers, p: Profile): number | null {
+  if (a.weeklyHoursNow === 'unknown') return Math.round(Math.min(3, Math.max(1, (p.weeklyHours || 5) * 0.4)) * 10) / 10;
+  return a.weeklyHoursNow != null && a.weeklyHoursNow !== '' && isFinite(+a.weeklyHoursNow) ? +a.weeklyHoursNow : null;
+}
 /* Gibt es schon einen Plan (o.old), wird er fortgesetzt statt neu begonnen (Auftrag 7): gen.plan ist dann der ganze Plan
    mit den vergangenen Wochen, continued = true. Score-Kalibrierung, Verlauf und erledigte Einheiten bleiben. */
-export function applyOnboarding(a: Answers, today: string, base?: Profile, o: { stages?: any; old?: any; state?: any; adjustments?: any } = {}): { profile: Profile; goals: Goal[]; gen: GenResult | null; warnings: string[]; continued: boolean; needTests?: any } {
+export function applyOnboarding(a: Answers, today: string, base?: Profile, o: { stages?: any; old?: any; state?: any; adjustments?: any; from?: string | null } = {}): { profile: Profile; goals: Goal[]; gen: GenResult | null; warnings: string[]; continued: boolean; needTests?: any } {
   const { profile: p, goals, warnings } = profileFromAnswers(a, today, base);
   let gen: GenResult | null = null; let continued = false;
   const need = a.wantTests ? { run: p.sports.includes('run'), bike: p.sports.includes('bike'), swim: p.sports.includes('swim') } : undefined;
   if (goals.length) {
     if (o.old && Array.isArray(o.old.weeks) && o.old.weeks.length) {
-      const r = replanPlan(o.old, p, goals, today, { stages: o.stages, adjustments: o.adjustments, state: o.state, needTests: need, recentHours: a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? +a.weeklyHoursNow : null });
+      const r = replanPlan(o.old, p, goals, today, { stages: o.stages, adjustments: o.adjustments, state: o.state, needTests: need, recentHours: hoursNow(a, p), from: o.from });
       if (r) { gen = { ...r.gen, plan: r.plan }; continued = true; }
     }
     if (!gen) {
       const dated = goals.map(g => ({ ...g, date: g.date || (g.priority === 'A' ? addDays(today, 84) : null) }));
-      gen = generatePlan({ profile: p, goals: dated as Goal[], today, currentWeeklyHours: a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? +a.weeklyHoursNow : null, needTests: need, stages: o.stages });
+      // neuer Plan ab heute (ab 18 Uhr ab morgen), nicht erst ab nächstem Montag (Auftrag 11)
+      gen = generatePlan({ profile: p, goals: dated as Goal[], today, from: o.from === undefined ? today : o.from, currentWeeklyHours: hoursNow(a, p), hoursUnknown: a.weeklyHoursNow === 'unknown', needTests: need, stages: o.stages });
     }
     gen.violations.filter(v => v.rule === 'age').forEach(v => warnings.push(v.msg));
   }
@@ -256,10 +278,12 @@ export function understood(a: Answers, today: string): Understood[] {
   const dl = p.dayLoad || {};
   const LBL = ['–', 'kurz', 'mittel', 'lang'];
   out.push({ block: 'time', label: 'Tage', text: [1, 2, 3, 4, 5, 6, 0].map(d => `${DOWS[d]} ${LBL[(dl as any)[d] || 0]}`).join(', ') + `, höchstens ${p.weeklyHours} h pro Woche` });
-  out.push({ block: 'team', label: 'Teamsport', text: p.teamSport ? `${p.teamSport.name}: Training ${p.teamSport.trainingDays.map(d => DOWS[d]).join(', ') || '–'} (${p.teamSport.trainingMinutes} min), Spiele ${p.teamSport.gameDays.map(d => DOWS[d]).join(', ') || '–'}` + (p.teamSport.seasonFrom || p.teamSport.seasonTo ? `, Saison ${p.teamSport.seasonFrom || '…'} bis ${p.teamSport.seasonTo || '…'}` : '') : 'kein Teamsport' });
+  out.push({ block: 'team', label: 'Teamsport', text: p.teamSport ? `${p.teamSport.name}: Training ${p.teamSport.trainingDays.map(d => DOWS[d]).join(', ') || '–'} (${p.teamSport.trainingMinutes} min), ${p.teamSport.gameDays.length ? 'Spiele ' + p.teamSport.gameDays.map(d => DOWS[d]).join(', ') : 'keine Spiele'}` + (p.teamSport.seasonFrom || p.teamSport.seasonTo ? `, Saison ${p.teamSport.seasonFrom || '…'} bis ${p.teamSport.seasonTo || '…'}` : '') : 'kein Teamsport' });
   const sk = p.skills || {};
   const can: string[] = [];
   if (p.sports.includes('swim')) can.push(sk.swimCrawl === 'yes' ? `Kraul${sk.swimCrawlM ? ` ${sk.swimCrawlM} m am Stück` : ''}` : sk.swimCrawl === 'some' ? `ein bisschen Kraul${sk.swimCrawlM ? ` (${sk.swimCrawlM} m)` : ''}` : sk.swimBreast ? 'nur Brust, kein Kraul' : 'kann noch nicht kraulen');
+  if (p.sports.includes('swim') && sk.poolM) can.push(sk.poolM === 'both' ? '25- und 50-m-Becken' : `${sk.poolM}-m-Becken`);
+  if (p.sports.includes('swim') && sk.openWater) can.push(`Freiwasser ${sk.openWaterFrom || 6}/${sk.openWaterTo || 9} (Monate)`);
   if (p.sports.includes('run') && sk.runContinuousMin != null) can.push(`${sk.runContinuousMin} min am Stück laufen`);
   if (p.sports.includes('bike') && sk.bikeLongestMin != null) can.push(`längste Radfahrt ${sk.bikeLongestMin} min`);
   if ((p.bikes || []).length) can.push('Räder: ' + p.bikes.map(b => (BIKE_OPTIONS.find(x => x[0] === b) || [b, b])[1]).join(', ') + (p.powerMeter ? ', mit Wattmessung' : ''));

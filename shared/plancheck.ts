@@ -32,9 +32,11 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
   const first = o.from || 0;
 
   weeks.forEach((w, wi) => {
-    const normal = !w.isRecoveryWeek && w.phase !== 'race' && w.phase !== 'taper' && !(w.races || []).length;
+    // angebrochene Woche (Plan ab heute, Auftrag 11): keine Mindest-Häufigkeit, Tage davor gehören nicht zum Plan
+    const normal = !w.isRecoveryWeek && !w.partial && w.phase !== 'race' && w.phase !== 'taper' && !(w.races || []).length;
     const count: Partial<Record<SportKey, number>> = {};
     for (const d of w.days || []) {
+      if (w.partial && w.from && d.date < w.from) continue;
       const dow = dowOf(d.date);
       const list = (d.sessions || []).filter((s: any) => s && s.sport !== 'rest' && !s.cancelled);
       // Tagesdauer (Teamsport und Wettkampf sind feste Termine)

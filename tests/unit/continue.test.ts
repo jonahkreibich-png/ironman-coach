@@ -36,7 +36,7 @@ function state() {
 
 describe('Plan geht weiter (kein Neustart)', () => {
   const st = state();
-  const r = replanPlan(oldPlan(), profile, goals, today, { state: st, adjustments: {}, needTests: { run: true } })!;
+  const r = replanPlan(oldPlan(), profile, goals, today, { state: st, adjustments: {}, needTests: { run: true }, from: '2026-10-19' })!;
   const plan = r.plan; const w6 = plan.weeks.find((w: any) => w.startDate === '2026-10-19');
 
   test('vergangene Wochen bleiben unverändert, Zählung läuft weiter: Woche 6 = Block 2, Woche 1', () => {
@@ -79,14 +79,14 @@ describe('Plan geht weiter (kein Neustart)', () => {
     // ohne Krankheit in der Woche: abgehakt (2 von 3) und deutlich weniger erledigt → das Erledigte zählt (mindestens 60 % des Plans)
     const healthy = { ...st, illnessPeriods: [{ id: 'ill-x', start: '2026-09-01', end: '2026-09-03' }] };
     expect(continuationOf(oldPlan(), today, healthy)).toMatchObject({ lastNormalTracked: true, lastNormalDoneMin: 80 });
-    const r3 = replanPlan(oldPlan(), profile, goals, today, { state: healthy, adjustments: {} })!;
+    const r3 = replanPlan(oldPlan(), profile, goals, today, { state: healthy, adjustments: {}, from: '2026-10-19' })!;
     expect(r3.plan.meta.explain.join(' ')).toMatch(/wie in deiner letzten Aufbauwoche erledigt \(2,3 h von 3,8 h\)/);
     void ctlToWeekMin;
   });
   test('CTL zählt nicht, wenn Einheiten in den Daten fehlen (CTL viel niedriger als das Training)', () => {
     const low = { ...state(), trend: state().trend.map((p: any) => ({ ...p, ctl: 8, atl: 8 })) };
     const full = { ...low, sessions: { ...low.sessions, 'w4-sat-bike': { completed: true, metrics: { min: '120' } }, 'w4-thu-run': { completed: true, metrics: { min: '60' } }, 'w4-tue-swim': { completed: true, metrics: { min: '50' } } } };
-    const r2 = replanPlan(oldPlan(), profile, goals, today, { state: full, adjustments: {} })!;
+    const r2 = replanPlan(oldPlan(), profile, goals, today, { state: full, adjustments: {}, from: '2026-10-19' })!;
     expect(r2.plan.meta.explain.join(' ')).toMatch(/auf Höhe deiner letzten Aufbauwoche \(3,8 h\).*nicht alle Einheiten in den Daten/);
   });
   test('erste Woche nach der Krankheit: nichts Hartes außer dem Schwellentest, der liegt am Ende der Woche', () => {
@@ -111,7 +111,7 @@ describe('Fragebogen bei vorhandenem Plan', () => {
   const answers = { goals: [{ id: 'goal-main', type: 'tri_long', name: 'Ironman', date: '2029-09-15', priority: 'A' }, { id: 'g-sprint', type: 'tri_sprint', name: 'Sprint-Triathlon', date: null, priority: 'C' }],
     birthYear: 2009, sports: ['swim', 'bike', 'run', 'strength'], weeklyHoursNow: 1.2, weeklyHours: 15, maxDayHours: 5, teamYes: true, teamName: 'Fußball', teamTrainingDays: [1], teamGameDays: [5],
     dayLoad: { 0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3 }, swimBreast: true, injuries: 'keine' };
-  const r = applyOnboarding(answers, today, profile, { old: oldPlan(), state: state(), adjustments: {} });
+  const r = applyOnboarding(answers, today, profile, { old: oldPlan(), state: state(), adjustments: {}, from: '2026-10-19' });
   test('setzt fort statt neu zu beginnen', () => {
     expect(r.continued).toBe(true);
     const w6 = r.gen!.plan.weeks.find((w: any) => w.startDate === '2026-10-19');
@@ -136,7 +136,7 @@ describe('Fragebogen bei vorhandenem Plan', () => {
       const first = applyOnboarding(p.answers, '2026-10-14');
       if (!first.gen) continue;
       const later = '2026-11-04';
-      const second = applyOnboarding(p.answers, later, first.profile, { old: first.gen.plan, state: { trend: [], illnessPeriods: [], sessions: {} }, adjustments: {} });
+      const second = applyOnboarding(p.answers, later, first.profile, { old: first.gen.plan, state: { trend: [], illnessPeriods: [], sessions: {} }, adjustments: {}, from: '2026-11-09' });
       const weeks = second.gen!.plan.weeks;
       expect(second.continued).toBe(true);
       // Wochen vor dem nächsten Montag sind dieselben, die Zählung lückenlos

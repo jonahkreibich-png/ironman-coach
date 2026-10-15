@@ -343,7 +343,7 @@ export const de: Record<string, string> = {
   'ob.missingTitle': 'Diese Pflichtfragen fehlen noch:', 'ob.planTitle': 'Dein Plan', 'ob.summary': 'In 5 Sätzen', 'ob.phases': 'Phasen', 'ob.weeks': 'Wochen',
   'ob.firstWeeks': 'Die ersten 2 Wochen', 'ob.checked': 'Der Plan wurde an {n} Stellen an die Sicherheitsregeln angepasst.',
   'ob.rulesOk': 'Alle Sicherheitsregeln eingehalten.', 'ob.noGoal': 'Ohne Ziel gibt es noch keinen Plan. Dein Profil wird trotzdem gespeichert.',
-  'ob.apply': 'Plan übernehmen', 'ob.applyReplace': 'Plan ab nächster Woche fortsetzen', 'ob.saveProfile': 'Profil speichern',
+  'month.1': 'Januar', 'month.2': 'Februar', 'month.3': 'März', 'month.4': 'April', 'month.5': 'Mai', 'month.6': 'Juni', 'month.7': 'Juli', 'month.8': 'August', 'month.9': 'September', 'month.10': 'Oktober', 'month.11': 'November', 'month.12': 'Dezember', 'cons.pool': 'Beckenlänge', 'cons.poolBoth': 'beides', 'cons.openWater': 'Ich schwimme auch im Freiwasser', 'cons.owFrom': 'Freiwasser von', 'cons.owTo': 'Freiwasser bis', 'ob.pick': '– bitte wählen –', 'ob.range': 'Bitte eine Zahl von {min} bis {max} eingeben.', 'ob.apply': 'Plan übernehmen', 'ob.applyReplace': 'Plan ab nächster Woche fortsetzen', 'ob.saveProfile': 'Profil speichern',
   'ob.applySure': 'Ab nächster Woche anpassen? Nochmal tippen', 'ob.continued': 'Dein Plan geht weiter: vergangene Wochen, erledigte Einheiten, Werte und Scores bleiben. Ab nächster Woche gilt der angepasste Abschnitt.', 'ob.nextWeeks': 'Die nächsten 2 Wochen', 'ob.replanReason': 'Fragebogen', 'ob.replanWhy': 'Du hast den Fragebogen ausgefüllt. Dein Plan geht weiter, er wird nicht neu begonnen.', 'ob.edit': 'Antworten ändern', 'ob.applied': 'Plan übernommen. Viel Erfolg!',
 
   /* ---------- Plan-Generator ---------- */

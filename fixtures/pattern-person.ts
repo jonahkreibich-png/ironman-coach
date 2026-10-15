@@ -68,5 +68,5 @@ export function state() {
 /* Plan ab dem 19.10. mit allen Zusätzen: Einstieg, Tests, Erholung, Platzhalter-Ziele, Zeitleiste */
 export function patternPlan(withPath = false): any {
   const gl: any[] = withPath ? [...goals, { id: 'g-sprint', type: 'tri_sprint', name: 'Sprint-Triathlon', date: null, priority: 'C' }, { id: 'g-oly', type: 'tri_olympic', name: 'Olympische Distanz', date: null, priority: 'B' }, { id: 'g-mid', type: 'tri_middle', name: 'Halb-Ironman', date: null, priority: 'B' }] : goals;
-  return replanPlan(oldPlan(), profile, gl, today, { state: state(), adjustments: {}, stages: { swim: { ladder: 'swim', n: 2 } } })!;
+  return replanPlan(oldPlan(), profile, gl, today, { state: state(), adjustments: {}, stages: { swim: { ladder: 'swim', n: 2 } }, from: '2026-10-19' })!;
 }

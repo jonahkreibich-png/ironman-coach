@@ -11,7 +11,8 @@ const all = (weeks: any[]) => weeks.flatMap((w: any) => w.days.flatMap((d: any) 
 const run = (id: string) => {
   const p = PERSONAS.find(x => x.id === id)!;
   const r = applyOnboarding(p.answers, today);
-  return { ...r, weeks: r.gen!.plan.weeks.slice(0, 4) };
+  // die ersten 4 vollen Wochen (dazu die angebrochene Woche ab heute, Auftrag 11)
+  const ws = r.gen!.plan.weeks; return { ...r, weeks: ws.slice(0, ws[0] && ws[0].partial ? 5 : 4) };
 };
 
 describe.each(PERSONAS.map(p => [p.id, p] as const))('Test-Person %s', (_id, p) => {
@@ -43,7 +44,8 @@ describe.each(PERSONAS.map(p => [p.id, p] as const))('Test-Person %s', (_id, p) 
 describe('Besonderheiten der Personen', () => {
   test('Jugendlicher mit Fußball: Training Mo/Fr im Plan, Spieltag Sa hart, am Freitag nichts Hartes zusätzlich, Kraul nur in kurzen Stücken', () => {
     const { weeks, profile } = run('jugend-langdistanz');
-    for (const w of weeks) {
+    // die angebrochene erste Woche (Plan ab heute, Auftrag 11) hat Mo/Di noch keinen Plan
+    for (const w of weeks.filter((x: any) => !x.partial)) {
       const byDow = (d: number) => w.days.find((x: any) => new Date(x.date + 'T12:00:00Z').getUTCDay() === d);
       expect(byDow(1).sessions.some((s: any) => s.title === 'Fußball-Training')).toBe(true);
       expect(byDow(5).sessions.some((s: any) => s.title === 'Fußball-Training')).toBe(true);
@@ -81,8 +83,8 @@ describe('Besonderheiten der Personen', () => {
     expect(s.find((x: any) => x.race && x.date === raceDay).title).toBe('10-km-Rennen');
     const near = s.filter((x: any) => !x.race && x.date >= '2026-11-10' && x.date <= '2026-11-17');
     expect(near.some(isIntense)).toBe(false);
-    weeks.filter((w: any) => !w.races.length && !w.isRecoveryWeek).forEach((w: any) => expect(w.days.flatMap((d: any) => d.sessions).filter((x: any) => x.sport === 'run').length).toBe(4));
-    expect(weeks[0].headline).toBe('Woche 1 von 9 · Aufbau → 10-km-Rennen'); // Phase und nächstes Ziel (Auftrag 9)
+    weeks.filter((w: any) => !w.races.length && !w.isRecoveryWeek && !w.partial).forEach((w: any) => expect(w.days.flatMap((d: any) => d.sessions).filter((x: any) => x.sport === 'run').length).toBe(4));
+    expect(weeks[0].headline).toBe('Woche 1 von 10 · Aufbau → 10-km-Rennen'); // Phase und nächstes Ziel (Auftrag 9)
   });
   test('Einsteigerin: Brust plus Kraul-Technik, Lauf-Geh-Wechsel, kein Schwimmen im Winter', () => {
     const r = applyOnboarding(PERSONAS.find(x => x.id === 'einsteiger-sprint')!.answers, today);
