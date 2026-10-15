@@ -72,7 +72,7 @@ export function specOf(s: any, prof: Profile, today: string): W.Spec | null {
 
 export function structureOf(s: any, prof: Profile, today: string): Structure | null {
   const spec = specOf(s, prof, today); if (!spec) return null;
-  const L = LABELS[spec.sport] || LABELS.run;
+  const L: [string, string, string] = spec.sport === 'football' ? ['Aufwärmen', spec.kind === 'game' ? 'Spiel' : 'Training', 'Ausklang'] : LABELS[spec.sport] || LABELS.run;
   const parts: Part[] = [];
   if (spec.sport === 'strength') {
     const w = spec.steps.find(x => x.part === 'warm');

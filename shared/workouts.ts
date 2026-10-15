@@ -152,10 +152,12 @@ export function stepText(spec: Spec, s: Step): string {
   }
   if (s.walkOnly) return `${s.min} min ${s.note || 'zügig gehen'}`;
   if (s.walkMin) return `${reps}× (${s.min} min locker laufen + ${s.walkMin} min zügig gehen), laufen ${intensity(spec, z)}${s.note ? ', ' + s.note : ''}`;
-  const len = `${reps > 1 ? `${reps}×${s.min} min` : `${s.min} min`}`;
-  const rest = reps > 1 && s.restMin ? `, dazwischen ${s.restMin} min ${spec.sport === 'run' ? 'locker traben' : 'locker rollen'}` : '';
+  const len = `${reps > 1 ? `${reps}×${minTxt(s.min)}` : minTxt(s.min)}`;
+  const rest = reps > 1 && s.restMin ? `, dazwischen ${minTxt(s.restMin)} ${spec.sport === 'run' ? (s.restMin < 1 ? 'locker zurück' : 'locker traben') : 'locker rollen'}` : '';
   return `${len} ${ZNAME[z]} (${intensity(spec, z)})${rest}${s.note ? ', ' + s.note : ''}`;
 }
+/* „0.25 min“ → „15 s“, „1.5 min“ → „1,5 min“ */
+export const minTxt = (m: number | undefined) => { const v = m || 0; return v > 0 && v < 1 ? `${Math.round(v * 60)} s` : `${String(Math.round(v * 10) / 10).replace('.', ',')} min`; };
 const PART: Record<Step['part'], string> = { warm: 'Aufwärmen', main: 'Hauptteil', cool: 'Ausklang' };
 
 export function describe(spec: Spec): string {
@@ -199,7 +201,8 @@ export function title(spec: Spec): string {
     case 'intervals': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min${where}`;
     case 'threshold': return `${spec.sport === 'run' ? 'Schwellenlauf' : 'Rad Schwelle'} ${m0.reps && m0.reps > 1 ? `${m0.reps}×${m0.min}` : m0.min} min${where}`;
     case 'tempo': return `${spec.sport === 'run' ? 'Tempolauf' : 'Rad Tempo'} ${m0.reps && m0.reps > 1 ? `${m0.reps}×${m0.min}` : m0.min} min${where}`;
-    case 'long': return (spec.sport === 'run' ? `Langer Lauf ${t.min} min` : `Lange Ausfahrt ${t.min} min${where}`) + (spec.variant ? `, ${spec.variant}` : '');
+    // kurze „lange“ Einheiten heißen nicht „lang“ (Auftrag 11: „Lange Ausfahrt 35 min“, „Langer Lauf 30 min“)
+    case 'long': return (spec.sport === 'run' ? `${t.min >= 50 ? 'Langer' : 'Lockerer'} Lauf ${t.min} min` : `${t.min >= 75 ? 'Lange' : 'Lockere'} Ausfahrt ${t.min} min${where}`) + (spec.variant ? `, ${spec.variant}` : '');
     case 'sweetspot': return `Sweet Spot ${m0.reps}×${m0.min} min${where}`;
     case 'overunder': return `Over-Unders ${m0.reps}×${m0.min} min${where}`;
     case 'vo2': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'} VO2max ${m0.reps}×${m0.min} min${where}`;
@@ -443,7 +446,8 @@ export function swimCheck(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; 
       S('main', { reps: 4, m: 25, zone: 3, mode: 'crawl', restSec: 30, note: '(b) locker-zügig, Zeit und Züge pro Bahn merken' }),
       S('main', { reps: 1, m: 200, zone: 3, mode: 'breast', note: '(c) auf Zeit, Zeit merken' }),
       ...tech.map(x => ({ ...x, note: x.note ? 'danach Technik: ' + x.note : 'danach Technik' })), S('cool', { m: 100, zone: 1, mode: 'breast' })] };
-  if (fillMin) for (let k = 0; k < 10 && totals(spec).min + 4 <= fillMin; k++) spec.steps.splice(spec.steps.length - 1, 0, S('main', { reps: 1, m: 100, zone: 2, mode: 'breast', note: 'ruhig' }));
+  // Auffüllen als eine Serie („4×100 m Brust“) statt viermal „100 m Brust“ hintereinander
+  if (fillMin) { const f = S('main', { reps: 0, m: 100, zone: 2, mode: 'breast', restSec: 20, note: 'ruhig' }); for (let k = 0; k < 10 && totals({ ...spec, steps: [...spec.steps, { ...f, reps: (f.reps || 0) + 1 }] }).min <= fillMin - 1; k++) f.reps = (f.reps || 0) + 1; if (f.reps) spec.steps.splice(spec.steps.length - 1, 0, f); }
   return spec;
 }
 export function runWalk(ctx: PaceCtx, n: number, why?: string): Spec {

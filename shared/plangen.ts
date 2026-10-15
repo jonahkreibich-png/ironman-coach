@@ -395,7 +395,7 @@ export function generatePlan(inp: GenInput): GenResult {
       if (n <= okDays.length) return n;
       const seasonal = !okDays.length && slots.filter(sl => sl.cap > 0).every(sl => evaluate(rules, { sport, place: sport === 'swim' ? 'pool' : undefined }, sl.date).hard.every(r => (r.months && r.months.length) || r.kind === 'period'));
       if (seasonal) return 0;
-      if (!ph.recovery && ph.phase !== 'race' && ph.phase !== 'taper') noteConflict(conflicts, rules, slots, sport, Math.max(want, n), okDays.map(x => x.dow));
+      if (!ph.recovery && ph.phase !== 'race' && ph.phase !== 'taper' && !part) noteConflict(conflicts, rules, slots, sport, Math.max(want, n), okDays.map(x => x.dow));
       return okDays.length;
     };
 
@@ -574,9 +574,9 @@ export function generatePlan(inp: GenInput): GenResult {
       const ctx = pc(false, null);
       const swap = (sport: string, spec: W.Spec) => { const i = cands.findIndex(c => c.s.sport === sport && c.hard) ; const j = i >= 0 ? i : cands.findIndex(c => c.s.sport === sport && !c.long); const soft = /Kraul-Check/.test(spec.title || ''); const b = W.build(spec); if (soft) delete b.hard; const c: Cand = { s: b, hard: !soft, prio: 0.8, test: true }; if (j >= 0) cands[j] = c; else cands.push(c); };
       if (wi === tw && inp.needTests.run && runStage == null && sports.includes('run')) swap('run', W.runTest(ctx));
-      if (wi === tw + 1 && inp.needTests.bike && sports.includes('bike')) { const c = bikeChoice(profile, true, month, eff); swap('bike', W.bikeTest(pc(c.indoor, c.name))); }
+      if (wi === tw + 1 && inp.needTests.bike && sports.includes('bike') && !(skS.bikeLongestMin != null && skS.bikeLongestMin < 75)) { const c = bikeChoice(profile, true, month, eff); swap('bike', W.bikeTest(pc(c.indoor, c.name))); }
       // Schwimmtest 400/200 m nur, wer 400 m am Stück krault; sonst der Kraul-Check (Auftrag 11: vorher auch für Anfänger)
-      if (wi === tw && inp.needTests.swim && sports.includes('swim') && !swimBlocked) swap('swim', crawl400 ? W.swimTest(ctx) : W.swimCheck(ctx, swimStage as any, 40));
+      if (wi === tw && inp.needTests.swim && sports.includes('swim') && !swimBlocked && !(swimStage && (swimStage.ladder === 'swimBreast' || swimStage.n < 2))) swap('swim', crawl400 ? W.swimTest(ctx) : W.swimCheck(ctx, swimStage as any, 40));
     }
     // Kraft nach Körperbereich an festen Tagen (z. B. Unterkörper Di, Oberkörper Fr), nie Beine am Spieltag oder am Tag davor
     const sp = profile.strengthPlan;
@@ -735,7 +735,7 @@ export function generatePlan(inp: GenInput): GenResult {
       weekNumber: wn, label: 'Woche ' + wn, headline, ...blk, target: { goalId: A.id, name: A.name, weeks: nTotal, n: wi + 1 }, races,
       startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || dates.some(d => goals.some(g => g.date && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type))) || undefined,
       entry: entryWeek[wi] || undefined, ...(part ? { partial: true, from } : {}), vorgabe: pat && WP.targetFor(pat, mon) ? true : undefined,
-      phase: ph.phase, focus: ph.recovery ? 'Erholung: weniger Umfang, Körper verarbeitet das Training' : entryWeek[wi] ? 'Wiedereinstieg: locker, Umfang steigt in Stufen' : focusText(ph.phase, GOALS[A.type].group),
+      phase: ph.phase, focus: ph.recovery ? 'Erholung: weniger Umfang, Körper verarbeitet das Training' : entryWeek[wi] ? 'Wiedereinstieg: locker, Umfang steigt in Stufen' : focusText(ph.phase, GOALS[A.type].group, sports.includes('strength')),
       important: patImportant || weekImportant(ph, otherRaces, wi, inp, runStage, swimStage, afterIllness), days
     });
   });
@@ -876,8 +876,8 @@ function enforceLongRun(weeks: any[], start: number | null) {
     if (lr && !w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') last = lr;
   }
 }
-function focusText(p: Phase, group: string): string {
-  return ({ base: 'Grundlage: viel locker, Technik, Kraft', build: 'Aufbau: Intervalle dazu, lange Einheiten wachsen', specific: group === 'tri' ? 'Wettkampfnah: Koppeltraining und Renntempo' : 'Wettkampfnah: Renntempo üben', taper: 'Tapering: weniger Umfang, kurz und knackig', race: 'Wettkampfwoche: frisch werden' } as Record<Phase, string>)[p];
+function focusText(p: Phase, group: string, strength = true): string {
+  return ({ base: strength ? 'Grundlage: viel locker, Technik, Kraft' : 'Grundlage: viel locker, Technik', build: 'Aufbau: Intervalle dazu, lange Einheiten wachsen', specific: group === 'tri' ? 'Wettkampfnah: Koppeltraining und Renntempo' : 'Wettkampfnah: Renntempo üben', taper: 'Tapering: weniger Umfang, kurz und knackig', race: 'Wettkampfwoche: frisch werden' } as Record<Phase, string>)[p];
 }
 function weekImportant(ph: { phase: Phase; recovery: boolean }, races: any[], wi: number, inp: GenInput, runStage: number | null, swimStage: any, after = false): string {
   if (races.length) return races.map(r => r.priority === 'C' ? `${r.name} ist ein Trainingswettkampf: zügig, aber nicht am Limit.` : `${r.name}: die Tage davor ruhiger, danach 2-3 Tage locker.`).join(' ');

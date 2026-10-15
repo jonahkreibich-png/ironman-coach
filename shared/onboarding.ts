@@ -275,12 +275,13 @@ export function understood(a: Answers, today: string): Understood[] {
   const PR: Record<string, string> = { A: 'Hauptziel', B: 'wichtig', C: 'Training' };
   out.push({ block: 'goal', label: 'Ziele', text: goals.length ? goals.map(g => `${g.name}${g.date ? ' am ' + g.date.split('-').reverse().join('.') : ''} (${g.priority}: ${PR[g.priority]})${g.targetTimeSec ? `, Wunschzeit ${fmtT(g.targetTimeSec)}` : ', ohne Wunschzeit'}`).join('; ') : 'noch kein Ziel' });
   const SD: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft' };
-  const fr = (s: string) => { const f = (p.freq || {})[s as SportKey]; return f ? (f[0] === f[1] ? `${f[0]}×` : `${f[0]}-${f[1]}×`) : 'nach Plan'; };
+  const ws = weekSummary({ ...a, sports: p.sports, freq: p.freq as any, weeklyHours: p.weeklyHours, maxDayHours: p.maxDayHours }, today);
+  const fr = (s: string) => { const f = (p.freq || {})[s as SportKey] || (ws.sports.find(x => x.sport === s) || { freq: null as any }).freq; return f ? (f[0] === f[1] ? `${f[0]}×` : `${f[0]}-${f[1]}×`) : 'nach Plan'; };
   out.push({ block: 'background', label: 'Training bisher', text: a.weeklyHoursNow === 'unknown' ? 'weiß ich nicht: vorsichtiger Start, nach 2 Wochen passt sich der Plan an deine Daten an' : a.weeklyHoursNow != null && a.weeklyHoursNow !== '' ? `${String(a.weeklyHoursNow).replace('.', ',')} h pro Woche` : 'keine Angabe' });
   out.push({ block: 'time', label: 'Sportarten und Häufigkeit', text: p.sports.filter(s => s !== 'football').map(s => `${SD[s]} ${fr(s)}`).join(', ') + ' pro Woche' });
   const dl = p.dayLoad || {};
   const LBL = ['–', 'kurz', 'mittel', 'lang'];
-  out.push({ block: 'time', label: 'Tage', text: [1, 2, 3, 4, 5, 6, 0].map(d => `${DOWS[d]} ${LBL[(dl as any)[d] || 0]}`).join(', ') + `, höchstens ${p.weeklyHours} h pro Woche` });
+  out.push({ block: 'time', label: 'Tage', text: [1, 2, 3, 4, 5, 6, 0].map(d => `${DOWS[d]} ${LBL[(dl as any)[d] || 0]}`).join(', ') + `, höchstens ${String(p.weeklyHours).replace('.', ',')} h pro Woche` });
   out.push({ block: 'team', label: 'Teamsport', text: p.teamSport ? `${p.teamSport.name}: Training ${p.teamSport.trainingDays.map(d => DOWS[d]).join(', ') || '–'} (${p.teamSport.trainingMinutes} min), ${p.teamSport.gameDays.length ? 'Spiele ' + p.teamSport.gameDays.map(d => DOWS[d]).join(', ') : 'keine Spiele'}` + (p.teamSport.seasonFrom || p.teamSport.seasonTo ? `, Saison ${p.teamSport.seasonFrom || '…'} bis ${p.teamSport.seasonTo || '…'}` : '') : 'kein Teamsport' });
   const sk = p.skills || {};
   const can: string[] = [];
