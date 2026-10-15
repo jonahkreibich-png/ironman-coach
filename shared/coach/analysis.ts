@@ -165,7 +165,7 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   // Schwellen geschätzt oder alt und kein Test geplant
   const est = prof.thresholds.estimated || [];
   const testPlanned = C.planDays(weeks).some((d: any) => d.date >= today && d.date <= C.addDays(today, 28) && d.sessions.some((s: any) => /test/i.test(s.title || '') && !s.cancelled));
-  if (!testPlanned && !ill && (est.includes('lthrRun') || est.includes('thresholdPaceRunSec'))) add({ id: 'test-needed', kind: 'trend', tone: 'info', score: 40, title: 'Deine Laufzonen sind geschätzt', why: 'Schwellenpuls und Schwellen-Pace kommen noch aus einer Schätzung, nicht aus einem Test.', tip: 'Ein 30-min-Lauftest macht alle Zonen genau. Schreib „Plan einen Lauftest ein“.' });
+  if (!testPlanned && !ill && (est.includes('lthrRun') || est.includes('thresholdPaceRunSec'))) add({ id: 'test-needed', kind: 'trend', tone: 'info', score: 40, title: 'Deine Laufzonen sind geschätzt', why: 'Schwellenpuls und Schwellen-Pace kommen noch aus einer Schätzung, nicht aus einem Test.', tip: ((prof.skills || {}).runContinuousMin ?? 99) < 30 || !(prof.sports || []).includes('run') ? 'Für den Anfang reicht das. Sobald du 30 min am Stück laufen kannst, macht ein Lauftest die Zonen genau.' : 'Ein 30-min-Lauftest macht alle Zonen genau. Schreib „Plan einen Lauftest ein“.' });
 
   /* ---------- Reihenfolge, Top 3 (verschiedene Arten bevorzugt) ---------- */
   ins.sort((a, b) => b.score - a.score);

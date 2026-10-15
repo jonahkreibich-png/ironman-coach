@@ -156,7 +156,7 @@ for (const [wname, w] of WIDTHS) {
           }
           // Auftrag 6: vorgemerkte Änderung – Leiste unten und Vorschau-Sheet
           if (url.endsWith('beruecksichtigungen') && state !== 'leer') {
-            const cell = page.locator('[data-act="rule-cell"]').first();
+            const cell = page.locator('[data-act="rule-cell"]:not(.notime)').first(); // Tage ohne Zeit sind gesperrt
             if (await cell.count()) {
               await cell.click(); await expect(page.locator('[data-stage-bar]')).toBeVisible();
               (await overflow(page)).forEach(p => problems.push(`${url} Leiste „übernehmen“: ${p}`));

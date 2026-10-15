@@ -14,11 +14,14 @@ import { nav } from '../nav';
 import { toast } from '../toast';
 import { gridHtml, listHtml, addHtml, registerTarget, weekHtml } from './rules';
 import { weekSummary } from '../../../shared/weekgrid';
+import { dayCap } from '../../../shared/plangen';
 import { todayStr } from '../util';
 
 const SCREEN = 'beruecksichtigungen';
 const MONTH_OPTS = (): [string, string][] => Array.from({ length: 12 }, (_, i) => [String(i + 1), t('month.' + (i + 1))]);
-const dataOf = (p: any) => ({ notes: [...(p.notes || [])], rules: [...(p.rules || [])], dayLoad: p.dayLoad || {}, sports: p.sports, team: p.teamSport,
+/* alte Profile ohne „Zeit pro Tag“: die Zeiten, mit denen der Plan rechnet (alte Zeitfenster oder Standard), als Raster zeigen */
+const dayLoadOf = (p: any) => Object.keys(p.dayLoad || {}).length ? p.dayLoad : Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map(d => { const m = dayCap(p, d); return [d, m <= 0 ? 0 : m <= 45 ? 1 : m <= 90 ? 2 : 3]; }));
+const dataOf = (p: any) => ({ notes: [...(p.notes || [])], rules: [...(p.rules || [])], dayLoad: dayLoadOf(p), sports: p.sports, team: p.teamSport,
   weeklyHours: p.weeklyHours, weeklyHoursSet: p.weeklyHoursSet !== false, maxDayHours: p.maxDayHours, freq: p.freq });
 registerTarget('cons', {
   get: () => dataOf(draftProfile(SCREEN)),
@@ -26,7 +29,7 @@ registerTarget('cons', {
   set: next => stage(SCREEN, p => { p.notes = next.notes; p.rules = next.rules; }),
   setFreq: (sport, n) => stage(SCREEN, p => { p.freq = { ...(p.freq || {}), [sport]: [n, n] }; }),
   // Wochenraster (Auftrag 11): Zeit pro Tag, Limit, längster Tag, Häufigkeit – Stunden nie über der Zeit im Raster
-  setWeek: patch => stage(SCREEN, (p: any) => { Object.assign(p, patch); const ws = weekSummary(dataOf(p), todayStr()); if (patch.dayLoad) { p.weeklyHours = ws.weeklyHours; p.maxDayHours = ws.maxDayHours; } })
+  setWeek: patch => stage(SCREEN, (p: any) => { if (patch.dayLoad && !Object.keys(p.dayLoad || {}).length) p.dayLoad = dayLoadOf(p); Object.assign(p, patch); const ws = weekSummary(dataOf(p), todayStr()); if (patch.dayLoad) { p.weeklyHours = ws.weeklyHours; p.maxDayHours = ws.maxDayHours; } })
 });
 /* Lösung aus einer Coach-Nachricht („Laufen auch am Mo erlauben?“): ein bewusster Tipp, gilt sofort */
 registerTarget('now', {

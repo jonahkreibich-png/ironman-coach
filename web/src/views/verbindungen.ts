@@ -63,7 +63,8 @@ export function renderVerbindungen(): string {
   h += `<div class="hint" style="margin:0 2px var(--s3)">${esc(t('conn.intro'))}</div>`;
   h += sec(t('conn.sources'), `<div class="list">${main.map(row).join('')}</div>`);
   h += importSection();
-  h += sec(t('conn.priority'), priorityList(), t('conn.priorityAside'));
+  // erst mit einer Verbindung wichtig (Auftrag 11: neue Nutzer sahen eine lange Liste mit Fachbegriffen)
+  if (CONN.some(c => c.status === 'connected' || c.status === 'via' || c.status === 'reauth')) h += sec(t('conn.priority'), priorityList(), t('conn.priorityAside'));
   if (later.length) h += sec(t('conn.later'), `<div class="list">${later.map(row).join('')}</div>`, t('conn.laterAside'));
   if (isAdmin()) h += sec(t('conn.serverKeys'), serverKeysCard(), t('conn.serverKeysAside'));
   return h;

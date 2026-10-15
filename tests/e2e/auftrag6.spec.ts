@@ -40,11 +40,12 @@ test('Übernehmen zeigt vorher, was sich im Plan ändert; erst „Übernehmen“
   await seed(page);
   await open(page, '/?go=beruecksichtigungen');
   const before = await snapshot(page);
-  for (const d of [1, 2, 3, 4, 5]) await page.locator(`[data-act="rule-cell"][data-s="run"][data-d="${d}"]`).click({ clickCount: 1 }).then(() => page.locator(`[data-act="rule-cell"][data-s="run"][data-d="${d}"]`).click());
+  // Testdaten ohne „Zeit pro Tag“: montags hat der Plan keine Zeit (Feld gesperrt), deshalb Di–Sa
+  for (const d of [2, 3, 4, 5, 6]) await page.locator(`[data-act="rule-cell"][data-s="run"][data-d="${d}"]`).click({ clickCount: 1 }).then(() => page.locator(`[data-act="rule-cell"][data-s="run"][data-d="${d}"]`).click());
   await expect(page.locator('[data-stage-bar]')).toContainText('5 Änderungen übernehmen');
   await page.locator('[data-act="stage-apply"]').click();
   const sheet = page.locator('[data-stage-sheet]');
-  await expect(sheet).toContainText('Laufen Mo: geht nicht');
+  await expect(sheet).toContainText('Laufen Di: geht nicht');
   await expect(sheet.locator('[data-stage-preview]')).toBeVisible();
   // Zurück: noch nichts gespeichert
   await page.locator('[data-act="stage-back"]').click();

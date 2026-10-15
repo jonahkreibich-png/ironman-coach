@@ -35,8 +35,8 @@ export const de: Record<string, string> = {
   'm.min': 'Minuten', 'm.km': 'Kilometer', 'm.hr': 'Puls Ø', 'm.pace': 'Pace', 'm.pace100': 'Pace /100 m', 'm.speed': 'Tempo',
   'm.spl': 'Züge pro Bahn', 'm.dps': 'Meter pro Zug', 'm.power': 'Leistung Ø (W)', 'm.meters': 'Meter', 'm.liftKg': 'Gewicht (kg)',
   'src.from': 'Quelle: {s}',
-  'group.workouts': 'Einheiten', 'group.sleep': 'Schlaf', 'group.hrv': 'HFV', 'group.restingHR': 'Ruhepuls', 'group.temp': 'Temperatur',
-  'group.spo2': 'Sauerstoff (SpO2)', 'group.breath': 'Atemfrequenz', 'group.load': 'Belastung (CTL/ATL)', 'group.weight': 'Gewicht',
+  'group.workouts': 'Einheiten', 'group.sleep': 'Schlaf', 'group.hrv': 'HFV (Herzfrequenz-Variabilität)', 'group.restingHR': 'Ruhepuls', 'group.temp': 'Temperatur',
+  'group.spo2': 'Sauerstoff (SpO2)', 'group.breath': 'Atemfrequenz', 'group.load': 'Belastung (Fitness und Müdigkeit, CTL/ATL)', 'group.weight': 'Gewicht',
 
   /* ---------- Heute ---------- */
   'heute.st.ready': 'Bereit', 'heute.st.easy': 'Locker', 'heute.st.rest': 'Ruhe', 'heute.st.novalues': 'Keine Werte',
@@ -226,7 +226,7 @@ export const de: Record<string, string> = {
   'conn.desc.oura': 'Schlaf, HFV, Ruhepuls, Temperatur und SpO2 vom Oura-Ring.',
   'conn.desc.whoop': 'Erholung, Schlaf und Trainings von WHOOP.', 'conn.desc.polar': 'Trainings, Schlaf und Nachtwerte von Polar.',
   'conn.desc.withings': 'Gewicht, Schlaf und Puls von Withings-Geräten.', 'conn.desc.fitbit': 'Schlaf und Aktivität von Fitbit über Google Health.',
-  'conn.desc.intervals': 'Belastung (CTL/ATL), Wellness-Werte und Trainings aus intervals.icu.',
+  'conn.desc.intervals': 'Trainings, Belastung (Fitness und Müdigkeit) und Morgenwerte aus intervals.icu.',
   'conn.desc.shortcut': 'Werte aus Apple Health per iPhone-Kurzbefehl, automatisch morgens und nach dem Training.',
   'conn.desc.suunto': 'Trainings von Suunto-Uhren.', 'conn.desc.coros': 'Trainings von COROS-Uhren.', 'conn.desc.wahoo': 'Fahrten vom Wahoo-Radcomputer.',
   'conn.desc.garmin': 'Trainings und Gesundheitswerte von Garmin.', 'conn.desc.trainingpeaks': 'Geplante und erledigte Einheiten aus TrainingPeaks.',

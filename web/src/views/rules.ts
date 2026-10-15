@@ -40,7 +40,8 @@ const SYM: Record<Cell, string> = { yes: '✓', soft: '–', no: '✕' };
 export function gridHtml(tid: string, timeRow?: string): string {
   const d0 = TARGETS[tid].get();
   // im Wochenraster: ohne eingetragene Zeit ist jeder Tag gesperrt (nicht grün „geht“)
-  const d = timeRow && !Object.values(d0.dayLoad || {}).some(v => +v > 0) ? { ...d0, dayLoad: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 0: 0 } } : d0;
+  // (nur im Fragebogen; bestehende Profile ohne Zeit pro Tag planen weiter mit ihren alten Zeiten)
+  const d = timeRow && tid === 'ob' && !Object.values(d0.dayLoad || {}).some(v => +v > 0) ? { ...d0, dayLoad: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 0: 0 } } : d0;
   const rules = rulesOf({ notes: d.notes, rules: d.rules } as any, parseFor(todayStr()));
   // vorgemerkt, noch nicht übernommen (Auftrag 6): geänderte Felder markieren
   const bd = TARGETS[tid].base ? TARGETS[tid].base!() : null;
