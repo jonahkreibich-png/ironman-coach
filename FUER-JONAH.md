@@ -2,6 +2,10 @@
 
 Nur das, was du selbst tun musst.
 
+## 0. Papa: Geburtsjahr neu eintragen (1 Minute, neu am 15.10.)
+
+Papa hatte als Geburtsjahr „197“ eingegeben. Die App hat das gelöscht und rechnet bis dahin mit Standardwerten. Sag ihm: App öffnen → Mehr → Profil und Ziele → Geburtsjahr mit vier Ziffern eintragen. Der Coach erinnert ihn auch.
+
 ## 1. KI-Coach einschalten (wenn du willst)
 
 Ohne Schlüssel funktioniert alles weiter mit dem Regel-Coach (kostenlos). Mit Schlüssel formuliert Claude frei, die Regeln und Zahlen bleiben dieselben.

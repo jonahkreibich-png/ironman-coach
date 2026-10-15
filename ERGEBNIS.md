@@ -1,5 +1,34 @@
 # Ergebnis
 
+## Auftrag 11: Fehler aus Papas Test, neue Nutzer (15.10.)
+
+Live in der echten App (Version 2.7.0), vorher in stamio-test geprüft. Sicherungen in `data-export/` (`prod-vor-release11.sql`, `test-vor-auftrag11.sql`).
+
+**Papa** (echte App, nicht zurückgesetzt): Profil repariert und Plan nach den neuen Regeln neu berechnet, gilt ab morgen (16.10.). Kraulen jetzt normales Training (Stücke bis 100 m), Lauftreff fest eingeplant ohne Spieltage, Pulswerte wieder richtig. Er bekommt im Coach eine Nachricht. **Er muss sein Geburtsjahr neu eintragen** (er hatte „197“ eingegeben, siehe FUER-JONAH.md).
+
+| Punkt | Was |
+|---|---|
+| **1** Kraulen | „ja“ = normales Training, Stücke so lang wie die Strecke am Stück (ohne Meter: 100 m). Lern-Stufen nur bei „ein bisschen“ oder unter 50 m, „nein“ = Technik von Anfang an, ab 200 m immer normal. Titel „Schwimmen: Grundlage / Technik + Ausdauer / Intervalle“, „Kraul lernen“ nur für Anfänger. 6 Fälle getestet. |
+| **2** Teamsport ohne Spiele | Erst „Gibt es Spiele?“, nur bei Ja Spieltage. Ohne Spiele keine Spiel-Einheiten, keine Spieltag-Regeln; alte Spiele ohne Spieltage entfallen. Gleich im Fragebogen und unter Berücksichtigungen. |
+| **3** Sofort gültig | Änderungen gelten ab heute (ab 18 Uhr ab morgen). Vergangenes und Erledigtes bleibt, der Rest der Woche wird neu verteilt (Erledigtes zählt mit, keine doppelte harte Einheit). Vorschau zeigt diese Woche. Neue Nutzer starten sofort. |
+| **4** Wochenraster | Ein Bildschirm: Zeit pro Tag + Sportart × Tag. Stunden, längster Tag, Häufigkeit werden berechnet und sind nur nach innen änderbar (nie mehr als möglich). Im Profil nur noch die Zusammenfassung. |
+| **5** Becken, Freiwasser | Neue Fragen. 25 m: keine 75-m-Stücke; 50 m: 50-m-Schritte. Freiwasser-Einheiten (Sichten, Orientierung, Start, Neopren) in der Saison und vor Triathlons, erst ab 200 m Kraul am Stück. |
+| **6** Stunden bisher | Rechner „wie oft × wie lange“, Vorschlag aus Uhr/intervals.icu, „Weiß ich nicht“ = vorsichtiger Start, nach 2 Wochen passt sich der Plan an. |
+
+**7: Die 10 wichtigsten Funde** (Papas echte Daten, 5 neue Test-Personen und ein Durchlauf im Browser von Einladung bis Verbindungen), alle behoben:
+1. Geburtsjahr „197“ wurde angenommen → Alter 1829, Schwellenpuls −954. Jetzt Bereichsprüfung, Reparatur beim Start, Coach bittet um das Jahr.
+2. „Kannst du kraulen?“ zeigte „ja“, speicherte aber nichts. Jetzt „bitte wählen“ und Pflicht.
+3. Neuer Plan begann erst nächsten Montag („Heute kein Training“). Jetzt ab heute.
+4. Fragebogen erneut → 3 gleiche Nachrichten „Dein Plan geht weiter …“. Jetzt eine je Anlass und Tag.
+5. Tests, die nicht zum Können passen: 400-m-Schwimmtest ohne Kraul, Kraul-Check für Nichtkrauler, 70-min-Radtest bei 45 min längster Fahrt, Coach empfahl Anfängern einen 30-min-Lauftest.
+6. Ziel ohne Datum landete stillschweigend 12 Wochen später (Sprint-Triathlon im Januar). Jetzt Saison-Platzhalter.
+7. „Pull Buoy“ im Titel ohne Pull Buoy, Schwimm-Zone 2 = Zone 3, Kraul-Check mit viermal „100 m Brust“.
+8. Unklare Texte: „Lange Ausfahrt 35 min“, „8×0.25 min“ (jetzt „8×15 s“), „Spiel/Training“ beim Volleyball ohne Spiele, „Kraft“ im Wochentext ohne Kraft, „nach Plan“ und „10.5 h“ in der Zusammenfassung.
+9. Wochenraster zeigte ohne Zeit alles grün, Legende nannte „Spiel“ ohne Spiele; Tage vor dem Planstart hießen „Ruhetag“.
+10. Verbindungen: lange Quellen-Liste mit HFV, CTL/ATL, SpO2 schon vor der ersten Verbindung. Jetzt erst danach, Begriffe erklärt. Dazu Hinweise bei Kraul, Wattmessung und Priorität.
+
+Getestet: 1143 Unit- und Server-Tests, 133 E2E-Tests (Chromium und WebKit), dazu 5 neue Personen als Dauertest. Ein zufällig scheiternder Oura-Test ist repariert. Code auf Branch `entwicklung` gepusht.
+
 ## Auftrag 7 (13./14.10.2026)
 
 **Dein Plan geht weiter.** Block 1 endet mit Woche 5 (Erholung bis 18.10.). Ab 19.10. Block 2: Woche 6 = Block 2, Woche 1, locker nach der Erkältung (ca. 4 h eigenes Training, Umfang aus deiner Fitness vor der Erkältung, CTL 32, minus 15 %), Lauftest am Sonntag 25.10., danach 3 Wochen +10 % und 1 Woche Erholung. Scores sind zurück (Schwimmen 33, Rad 50, Laufen 68, Kraft 44 statt 25/37/35/44), dazu Verlauf, Kalibrierung und deine echten Schwellen (LTHR 170). Erledigte Einheiten und Morgenwerte waren nie weg.
