@@ -10,6 +10,7 @@ import { parseFit } from '../../shared/activity/fit';
 import { parseActivityFile } from '../../shared/activity/xml';
 import { upgradeLegacyPoint, bestAuto } from '../../shared/activity/merge';
 import type { RawActivity } from '../../shared/activity/types';
+import { logError } from './errlog';
 
 export type ProviderId = 'dropbox' | 'oura' | 'whoop' | 'polar' | 'withings' | 'intervals' | 'shortcut' | 'fitbit' | 'suunto' | 'coros' | 'wahoo' | 'garmin' | 'trainingpeaks';
 interface OAuthDef {
@@ -366,6 +367,8 @@ export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: {
     const f = friendlyError(e);
     const old = c && c.stats ? JSON.parse(c.stats) : {};
     await saveConn(env, uid, p, { last_sync_at: Date.now(), last_error: f.text.slice(0, 300), status: f.reauth || (c && c.status === 'reauth') ? 'reauth' : 'error', stats: JSON.stringify({ ...old, errorCode: f.code }) }).catch(() => {});
+    // Protokoll für den Betreiber (ohne Werte): echte Meldung, Code und ob TOKEN_KEY an dieser Stelle vorhanden war
+    await logError(env, 'server', `${p}: ${String((e as Error).message || e).slice(0, 160)} [${f.code}, TOKEN_KEY ${env.TOKEN_KEY ? (String(env.TOKEN_KEY).trim().length >= 16 ? 'ok' : 'zu kurz') : 'fehlt'}]`, 'sync-' + p, { uid }).catch(() => {});
     throw f.reauth && !(e instanceof HttpError) ? new HttpError(401, f.text) : e;
   }
 }
