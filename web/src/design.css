@@ -1,0 +1,206 @@
+/* Auftrag 13, Punkt 4: drei Design-Varianten zur Auswahl (Mehr → Einstellungen → Design-Vorschau, nur Test-Umgebung).
+   Jede Variante setzt Farben (hell und dunkel), Schrift, Karten, Abstände, Tab-Leiste und Knöpfe über :root[data-design].
+   Ohne data-design gilt das bisherige Design. „Bewegung reduzieren“ schaltet alle Übergänge ab (Regel in styles.css). */
+
+/* =====================================================================
+   A „Glas“: iOS-26-Anmutung. Schwebende Glas-Kapsel, Linse unter dem aktiven Tab, Glas-Karten über weichem Verlauf.
+   ===================================================================== */
+:root[data-design="glas"] {
+  --bg: #e8edf4; --surface: rgba(255,255,255,.62); --surface-2: rgba(255,255,255,.5); --ink: #0b1b2b; --ink-2: #46586b; --ink-3: #6f8094; --line: rgba(255,255,255,.75);
+  --accent: #0a66f0; --accent-ink: #ffffff; --accent-soft: rgba(10,102,240,.12);
+  --good: #0f8a54; --warn: #b26a00; --bad: #d02f2f; --info: #2a63d4;
+  --good-soft: rgba(15,138,84,.13); --warn-soft: rgba(178,106,0,.13); --bad-soft: rgba(208,47,47,.12); --info-soft: rgba(42,99,212,.12);
+  --shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 8px 28px rgba(30,50,80,.10);
+  --r-sm: 14px; --r: 24px; --r-lg: 30px;
+  --f-display: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --t-hero: 56px; --nav-h: 66px;
+  --glass-blur: blur(22px) saturate(170%);
+  --blob-1: #9cc6ff; --blob-2: #ffc2ad; --blob-3: #a9e9d2;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-design="glas"]:not([data-theme="light"]) {
+    --bg: #060a12; --surface: rgba(30,40,58,.55); --surface-2: rgba(40,52,74,.5); --ink: #eef3fa; --ink-2: #a6b4c6; --ink-3: #7c8ba0; --line: rgba(255,255,255,.12);
+    --accent: #4b9bff; --accent-ink: #04122b; --accent-soft: rgba(75,155,255,.16);
+    --good: #43d08f; --warn: #ffb547; --bad: #ff7468; --info: #7aaeff;
+    --good-soft: rgba(67,208,143,.15); --warn-soft: rgba(255,181,71,.15); --bad-soft: rgba(255,116,104,.15); --info-soft: rgba(122,174,255,.15);
+    --shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 10px 30px rgba(0,0,0,.45);
+    --blob-1: #1d3f86; --blob-2: #6b2a1a; --blob-3: #0f4d40;
+  }
+}
+:root[data-design="glas"][data-theme="dark"] {
+  --bg: #060a12; --surface: rgba(30,40,58,.55); --surface-2: rgba(40,52,74,.5); --ink: #eef3fa; --ink-2: #a6b4c6; --ink-3: #7c8ba0; --line: rgba(255,255,255,.12);
+  --accent: #4b9bff; --accent-ink: #04122b; --accent-soft: rgba(75,155,255,.16);
+  --good: #43d08f; --warn: #ffb547; --bad: #ff7468; --info: #7aaeff;
+  --good-soft: rgba(67,208,143,.15); --warn-soft: rgba(255,181,71,.15); --bad-soft: rgba(255,116,104,.15); --info-soft: rgba(122,174,255,.15);
+  --shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 10px 30px rgba(0,0,0,.45);
+  --blob-1: #1d3f86; --blob-2: #6b2a1a; --blob-3: #0f4d40;
+}
+[data-design="glas"] body {
+  background:
+    radial-gradient(60% 40% at 0% 0%, color-mix(in srgb, var(--blob-1) 70%, transparent), transparent 70%),
+    radial-gradient(55% 35% at 100% 30%, color-mix(in srgb, var(--blob-2) 55%, transparent), transparent 70%),
+    radial-gradient(70% 40% at 30% 100%, color-mix(in srgb, var(--blob-3) 55%, transparent), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+[data-design="glas"] .card, [data-design="glas"] .list, [data-design="glas"] .answer, [data-design="glas"] .score, [data-design="glas"] .tcard,
+[data-design="glas"] .msg.coach, [data-design="glas"] .composer, [data-design="glas"] .wd {
+  background: var(--surface); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-color: var(--line);
+}
+[data-design="glas"] .tcard.locked { background: var(--surface-2); border-style: solid; }
+[data-design="glas"] .crit, [data-design="glas"] .session-hero { background: var(--surface-2); border: 1px solid var(--line); }
+[data-design="glas"] .top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-design="glas"] .top-title { text-transform: none; letter-spacing: -.01em; font: 700 30px/1.1 var(--f-body); }
+[data-design="glas"] .sec-h h2 { text-transform: none; letter-spacing: 0; font: 700 var(--t-lg)/1.2 var(--f-body); color: var(--ink); }
+[data-design="glas"] .lbl { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); }
+[data-design="glas"] .hero-num, [data-design="glas"] .big, [data-design="glas"] .ring .rv b, [data-design="glas"] .tc-n, [data-design="glas"] .score .val, [data-design="glas"] .crit .v { font-family: var(--f-display); letter-spacing: -.02em; }
+[data-design="glas"] .ring { width: 104px; height: 104px; }
+[data-design="glas"] .ring .rv b { font-size: 34px; letter-spacing: -.04em; }
+/* Blatt (Einheit, Details): mattes Glas, Kopf in derselben Farbe */
+[data-design="glas"] .sheet { background: color-mix(in srgb, var(--bg) 95%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-radius: 30px 30px 0 0; }
+[data-design="glas"] .sheet-h { background: color-mix(in srgb, var(--bg) 95%, transparent); margin: 0 calc(-1 * var(--s4)); padding-left: var(--s4); padding-right: var(--s4); }
+[data-design="glas"] .score .val { font-size: 34px; }
+[data-design="glas"] .score .delta, [data-design="fjord"] .score .delta { font-size: 12px; white-space: nowrap; }
+[data-design="glas"] .score .lvl { -webkit-hyphens: manual; hyphens: manual; }
+[data-design="glas"] .sheet-h h2, [data-design="fjord"] .sheet-h h2 { text-transform: none; letter-spacing: -.01em; font: 700 24px/1.15 var(--f-body); }
+[data-design="glas"] .status-word, [data-design="glas"] .day-h b, [data-design="glas"] .session-hero .t { text-transform: none; font-family: var(--f-body); letter-spacing: -.01em; }
+/* Tab-Leiste: schwebende Glas-Kapsel */
+[data-design="glas"] .tabbar { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--line); border-radius: 36px; background: color-mix(in srgb, var(--surface) 80%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow); max-width: 520px; margin: 0 auto; }
+[data-design="glas"] .tab { height: calc(var(--nav-h) - 12px); border-radius: 28px; color: var(--ink-2); transition: background .25s cubic-bezier(.34,1.56,.64,1), color .2s; }
+[data-design="glas"] .tab svg { width: 26px; height: 26px; }
+[data-design="glas"] .tab.on { color: var(--accent); background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.18)); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(0,0,0,.04), 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent); }
+:root[data-design="glas"][data-theme="dark"] .tab.on { background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04)); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 4px 14px rgba(0,0,0,.4); }
+@media (prefers-color-scheme: dark) { :root[data-design="glas"]:not([data-theme="light"]) .tab.on { background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04)); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 4px 14px rgba(0,0,0,.4); } }
+[data-design="glas"] main { padding-bottom: calc(var(--nav-h) + 56px + env(safe-area-inset-bottom, 0px)); }
+/* Knöpfe: „Liquid“ mit Glanzkante und federndem Druck */
+[data-design="glas"] .btn { border-radius: 999px; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent)); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent); transition: transform .28s cubic-bezier(.34,1.56,.64,1), filter .15s; }
+[data-design="glas"] .btn:active { transform: scale(.94); filter: brightness(1.08); }
+[data-design="glas"] .btn.ghost, [data-design="glas"] .btn.soft { background: var(--surface); color: var(--ink); border-color: var(--line); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 4px 14px rgba(30,50,80,.08); }
+[data-design="glas"] .btn.soft { color: var(--accent); }
+[data-design="glas"] .btn.danger { background: transparent; box-shadow: none; }
+[data-design="glas"] .seg { border-radius: 999px; background: var(--surface-2); border-color: var(--line); }
+[data-design="glas"] .seg button { border-radius: 999px; }
+[data-design="glas"] .check { background: var(--surface); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-design="glas"] { --surface: #ffffff; --surface-2: #f2f5f9; }
+}
+
+/* =====================================================================
+   B „Tempo“: Sport-Display. Hoher Kontrast, sehr große Zahlen, feste Leiste mit großen Icons und gefülltem Aktiv-Feld.
+   ===================================================================== */
+:root[data-design="tempo"] {
+  --bg: #f2f3f5; --surface: #ffffff; --surface-2: #eceef1; --ink: #0c0e11; --ink-2: #4a5260; --ink-3: #7d8593; --line: #e1e4e8;
+  --accent: #ff4d1a; --accent-ink: #ffffff; --accent-soft: #ffe6dd;
+  --good: #0f8f4f; --warn: #b8690a; --bad: #d42a1f; --info: #1f5fd6;
+  --shadow: 0 1px 0 #e1e4e8;
+  --r-sm: 8px; --r: 14px; --r-lg: 16px;
+  --t-hero: 68px; --t-2xl: 38px; --nav-h: 74px;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-design="tempo"]:not([data-theme="light"]) {
+    --bg: #131518; --surface: #1d2024; --surface-2: #262a2f; --ink: #f4f5f7; --ink-2: #aab1bc; --ink-3: #7b8390; --line: #2c3036;
+    --accent: #ff6a3d; --accent-ink: #1a0700; --accent-soft: #3a1c12;
+    --good: #3ccf86; --warn: #ffad42; --bad: #ff6b5f; --info: #6aa3ff;
+    --good-soft: #142a20; --warn-soft: #2f2412; --bad-soft: #331a18; --info-soft: #172438;
+    --shadow: none;
+  }
+}
+:root[data-design="tempo"][data-theme="dark"] {
+  --bg: #131518; --surface: #1d2024; --surface-2: #262a2f; --ink: #f4f5f7; --ink-2: #aab1bc; --ink-3: #7b8390; --line: #2c3036;
+  --accent: #ff6a3d; --accent-ink: #1a0700; --accent-soft: #3a1c12;
+  --good: #3ccf86; --warn: #ffad42; --bad: #ff6b5f; --info: #6aa3ff;
+  --good-soft: #142a20; --warn-soft: #2f2412; --bad-soft: #331a18; --info-soft: #172438;
+  --shadow: none;
+}
+[data-design="tempo"] .card, [data-design="tempo"] .list, [data-design="tempo"] .answer, [data-design="tempo"] .score, [data-design="tempo"] .tcard, [data-design="tempo"] .msg, [data-design="tempo"] .wd { border-color: transparent; }
+[data-design="tempo"] .answer::before { height: 6px; }
+[data-design="tempo"] .top-title { font-size: 30px; letter-spacing: .01em; }
+[data-design="tempo"] .sec-h h2 { font: 700 var(--t-lg)/1.1 var(--f-display); letter-spacing: .03em; color: var(--ink); }
+[data-design="tempo"] .ring { width: 112px; height: 112px; }
+[data-design="tempo"] .ring .rv b { font-size: 46px; }
+[data-design="tempo"] .crit .v { font-size: 26px; }
+[data-design="tempo"] .tc-n { font-size: 32px; }
+[data-design="tempo"] .score .val { font-size: 48px; }
+[data-design="tempo"] .status-word { font-size: 30px; }
+[data-design="tempo"] .li .ic { background: var(--c, var(--ink-2)); color: #fff; border-radius: 10px; }
+[data-design="tempo"] .session-hero .ic { background: var(--c); color: #fff; }
+[data-design="tempo"] .session-hero { border-left: 6px solid var(--c, var(--accent)); }
+[data-design="tempo"] .wd.today { background: var(--ink); color: var(--bg); border-color: var(--ink); box-shadow: none; }
+[data-design="tempo"] .wd.today .d { color: var(--accent); }
+/* Tab-Leiste: fest, große Icons, gefülltes Feld hinter dem aktiven Icon */
+[data-design="tempo"] .tabbar { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; border-top: 1px solid var(--line); }
+[data-design="tempo"] .tab { gap: 4px; color: var(--ink-3); font-size: 12px; }
+[data-design="tempo"] .tab svg { width: 28px; height: 28px; padding: 3px 14px; box-sizing: content-box; border-radius: 10px; transition: background .15s; }
+[data-design="tempo"] .tab.on { color: var(--ink); }
+[data-design="tempo"] .tab.on svg { background: var(--accent); color: var(--accent-ink); }
+[data-design="tempo"] .tab span { font-weight: 700; }
+[data-design="tempo"] .tab .dot { top: 6px; left: calc(50% + 14px); }
+/* Knöpfe: Kante, die beim Drücken einrastet */
+[data-design="tempo"] .btn { border-radius: 12px; font-weight: 700; letter-spacing: .01em; box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 62%, #000); transition: transform .08s, box-shadow .08s; }
+[data-design="tempo"] .btn:active { transform: translateY(3px); box-shadow: 0 0 0 transparent; }
+[data-design="tempo"] .btn.ghost { border: 2px solid var(--ink); background: var(--surface); box-shadow: 0 3px 0 var(--ink); }
+[data-design="tempo"] .btn.soft { box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+[data-design="tempo"] .btn.danger { box-shadow: none; }
+[data-design="tempo"] .seg { border-radius: 10px; }
+[data-design="tempo"] .seg button.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+[data-design="tempo"] .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* =====================================================================
+   C „Fjord“: ruhig und luftig. Grün-Blau, feine Linien statt Schatten, viel Weißraum, dunkles Dock mit aufklappendem Aktiv-Tab.
+   ===================================================================== */
+:root[data-design="fjord"] {
+  --bg: #f3f7f5; --surface: #ffffff; --surface-2: #eaf1ee; --ink: #12302a; --ink-2: #4e6b63; --ink-3: #7f978f; --line: #d8e3df;
+  --accent: #0c7a63; --accent-ink: #ffffff; --accent-soft: #dcf1ea;
+  --good: #0c7a50; --warn: #a8640c; --bad: #c43a2f; --info: #2a6aa8;
+  --good-soft: #e0f2e9; --warn-soft: #f8eedc; --bad-soft: #f9e4e1; --info-soft: #e2edf7;
+  --shadow: none; --dock: #12302a; --dock-ink: #a9c4bb; --dock-on: #7ee0c3;
+  --s4: 18px; --s5: 28px;
+  --r-sm: 12px; --r: 20px; --r-lg: 24px;
+  --t-hero: 58px; --nav-h: 64px;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-design="fjord"]:not([data-theme="light"]) {
+    --bg: #0b1513; --surface: #12201d; --surface-2: #192a26; --ink: #e2f0ea; --ink-2: #93b2a8; --ink-3: #6a877e; --line: #233733;
+    --accent: #44d1aa; --accent-ink: #052019; --accent-soft: #143229;
+    --good: #44d1aa; --warn: #f0b04f; --bad: #ff7b6e; --info: #79b4ee;
+    --good-soft: #143229; --warn-soft: #2d2513; --bad-soft: #321b18; --info-soft: #15283a;
+    --dock: #1c302b; --dock-ink: #8fb0a6; --dock-on: #7ee0c3;
+  }
+}
+:root[data-design="fjord"][data-theme="dark"] {
+  --bg: #0b1513; --surface: #12201d; --surface-2: #192a26; --ink: #e2f0ea; --ink-2: #93b2a8; --ink-3: #6a877e; --line: #233733;
+  --accent: #44d1aa; --accent-ink: #052019; --accent-soft: #143229;
+  --good: #44d1aa; --warn: #f0b04f; --bad: #ff7b6e; --info: #79b4ee;
+  --good-soft: #143229; --warn-soft: #2d2513; --bad-soft: #321b18; --info-soft: #15283a;
+  --dock: #1c302b; --dock-ink: #8fb0a6; --dock-on: #7ee0c3;
+}
+[data-design="fjord"] .top { background: color-mix(in srgb, var(--bg) 92%, transparent); }
+[data-design="fjord"] .top-title { text-transform: none; font: 600 28px/1.1 var(--f-body); letter-spacing: -.02em; }
+[data-design="fjord"] .sec-h h2 { text-transform: none; letter-spacing: -.005em; font: 600 var(--t-lg)/1.2 var(--f-body); color: var(--ink); }
+[data-design="fjord"] .lbl { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); }
+[data-design="fjord"] .hero-num, [data-design="fjord"] .big, [data-design="fjord"] .ring .rv b, [data-design="fjord"] .tc-n, [data-design="fjord"] .score .val, [data-design="fjord"] .crit .v { font-family: var(--f-body); font-weight: 600; letter-spacing: -.03em; }
+[data-design="fjord"] .status-word, [data-design="fjord"] .day-h b, [data-design="fjord"] .session-hero .t { text-transform: none; font-family: var(--f-body); font-weight: 600; letter-spacing: -.01em; }
+[data-design="fjord"] .ring { width: 100px; height: 100px; }
+[data-design="fjord"] .ring .rv b { font-size: 36px; }
+[data-design="fjord"] .answer::before { display: none; }
+[data-design="fjord"] .answer { border-color: color-mix(in srgb, var(--st) 45%, var(--line)); }
+[data-design="fjord"] .msg.user { background: var(--ink); color: var(--bg); }
+/* Tab-Leiste: dunkles Dock, aktiver Tab klappt mit Beschriftung auf */
+[data-design="fjord"] .tabbar { left: 50%; right: auto; transform: translateX(-50%); width: min(calc(100% - 28px), 380px); bottom: max(14px, env(safe-area-inset-bottom, 0px)); padding: 6px; border: 0; border-radius: 999px; background: var(--dock); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 10px 30px rgba(10,30,26,.28); }
+[data-design="fjord"] .tabbar-in { display: flex; gap: 2px; }
+[data-design="fjord"] .tab { flex: 1 1 0; flex-direction: row; gap: 6px; height: 52px; border-radius: 999px; color: var(--dock-ink); transition: flex-grow .3s cubic-bezier(.2,.8,.2,1), background .2s; }
+[data-design="fjord"] .tab svg { width: 24px; height: 24px; flex-shrink: 0; }
+[data-design="fjord"] .tab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+[data-design="fjord"] .tab.on { flex-grow: 2.6; background: color-mix(in srgb, var(--dock-on) 18%, transparent); color: var(--dock-on); }
+[data-design="fjord"] .tab.on span { position: static; width: auto; height: auto; clip: auto; font-size: 13px; font-weight: 600; }
+[data-design="fjord"] .tab .dot { top: 8px; left: calc(50% + 6px); border-color: var(--dock); }
+[data-design="fjord"] main { padding-bottom: calc(var(--nav-h) + 60px + env(safe-area-inset-bottom, 0px)); }
+/* Knöpfe: weiche Pillen */
+[data-design="fjord"] .btn { border-radius: 999px; font-weight: 600; transition: transform .18s cubic-bezier(.2,.8,.2,1), background .15s; }
+[data-design="fjord"] .btn:active { transform: scale(.96); background: color-mix(in srgb, var(--accent) 85%, #000); }
+[data-design="fjord"] .btn.ghost { background: transparent; border-color: var(--line); }
+[data-design="fjord"] .btn.ghost:active, [data-design="fjord"] .btn.soft:active, [data-design="fjord"] .btn.danger:active { background: var(--surface-2); }
+[data-design="fjord"] .seg { border-radius: 999px; }
+[data-design="fjord"] .seg button { border-radius: 999px; }
+[data-design="fjord"] .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

@@ -1,6 +1,7 @@
 /* Einstieg: Tabs (Heute, Plan, Coach, Fortschritt, Mehr), Unterseiten unter „Mehr“, Aktionen, Deep Links. */
 import { guardLeave } from './staged';
 import './styles.css';
+import './design.css';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';

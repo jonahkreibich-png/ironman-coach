@@ -251,6 +251,7 @@ export const de: Record<string, string> = {
 
   /* ---------- Einstellungen ---------- */
   'set.look': 'Darstellung', 'set.theme': 'Farbschema', 'set.system': 'System', 'set.light': 'Hell', 'set.dark': 'Dunkel',
+  'set.design': 'Design-Vorschau', 'set.designAside': 'nur Test-Umgebung', 'set.designNow': 'Aktuell', 'set.designHint': 'Zum Ausprobieren: A Glas, B Tempo, C Fjord. Gilt nur auf diesem Gerät.',
   'set.heuteVariant': 'Startseite „Heute“', 'set.variantA': 'Antwort-Karte', 'set.variantB': 'Tages-Feed',
   'set.zones': 'Zonen und Schwellen', 'set.zonesAside': 'nach einem Test anpassen', 'set.lthrRun': 'Schwellenpuls Laufen', 'set.paceRun': 'Schwellen-Pace (min/km)',
   'set.lthrBike': 'Schwellenpuls Rad', 'set.ftp': 'FTP (Watt)', 'set.speedBike': 'Schwelle Rad (km/h)', 'set.bikeSpeed': 'Schwellen-Tempo {bike} (km/h, flach)', 'set.derivedShort': '(abgeleitet)', 'set.speedZones': 'Rad-Tempo flach (km/h), nur als Anhalt', 'set.speedIndoor': 'Drinnen gilt die virtuelle Geschwindigkeit der App (z. B. Zwift).', 'set.css': 'CSS Schwimmen (min/100 m)', 'set.maxHr': 'Maximalpuls',
