@@ -4,6 +4,7 @@
 import { decryptJson } from './http';
 import { type Env, berlinDate, addDaysStr, getRecord, getRecords, putRecords, getMeta, setMeta } from './store';
 import { fieldsFromIcu } from '../../shared/fields';
+import { pickMatch } from '../../shared/activity/merge';
 
 const SPORT_MAP = {
   run: ['Run', 'TrailRun', 'VirtualRun', 'Treadmill'],
@@ -180,6 +181,10 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
       A.sources[src] = (A.sources[src] || 0) + 1;
       if (a && !a.type && !a.moving_time) A.stubs++;
     }
+    // Auftrag 13: dieselbe Zuordnung wie bei Uhr/HealthFit (gleicher Tag und Sport, Uhrzeit und Dauer möglichst nah).
+    // Eine Einheit, die schon mit einer Aufzeichnung verknüpft ist, nimmt nur dieselbe Einheit (Start ±30 min) auf – sonst Dubletten.
+    const actRecs = await getRecords(env, uid, 'activity');
+    const startOfLinked = (st: any) => { const ar = st && st.activityId ? actRecs[st.activityId] : null; return ar && isNum(ar.startMs) ? ar.startMs : null; };
     for (const a of sorted) {
       const id = String(a.id);
       if (linked[id]) { A.already++; continue; }
@@ -188,9 +193,18 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
       const date = a.start_date_local.slice(0, 10);
       const metrics = activityMetrics(a, sport);
       const extra: any = { icuId: id };
+      const startMs = Date.parse(a.start_date || '') || Date.parse(a.start_date_local + 'Z') || null;
+      if (startMs) extra.icuStart = startMs;
       if (isNum(a.icu_training_load)) extra.icuLoad = Math.round(a.icu_training_load);
-      // Passende geplante Einheit: gleicher Tag, gleicher Sport, nicht ausgefallen, noch nicht verknüpft
-      const cand = (byDate[date] || []).find(s => s.sport === sport && !usedThisRun.has(s.id) && !((sessRecs[s.id] || {}).skipped));
+      const sameOrFree = (st: any) => { const s0 = startOfLinked(st); return s0 == null ? !(st && st.activityId) : !!startMs && Math.abs(s0 - startMs) <= 30 * 60000; };
+      customsByKey = customsByKey || await getRecords(env, uid, 'custom');
+      const candList = [
+        ...(byDate[date] || []).filter(s => s.sport === sport && !usedThisRun.has(s.id) && !((sessRecs[s.id] || {}).skipped) && !s.cancelled && sameOrFree(sessRecs[s.id])).map(s => ({ kind: 'session' as const, item: s, st: sessRecs[s.id] || {} })),
+        ...Object.values(customsByKey).filter((c: any) => c && c.date === date && c.sport === sport && !c.icuId && !usedCustom.has(c.id) && sameOrFree(c)).map((c: any) => ({ kind: 'custom' as const, item: c, st: c }))
+      ];
+      const best = startMs ? pickMatch(candList, { startMs, min: metrics.min || null }) : candList[0] || null;
+      const cand = best && best.kind === 'session' ? best.item : null;
+      manual = best && best.kind === 'custom' ? best.item : null;
       if (cand) {
         const st = Object.assign({ completed: false, notes: '' }, sessRecs[cand.id] || {});
         st.metrics = Object.assign({}, st.metrics || {}); st.metricsSrc = Object.assign({}, st.metricsSrc || {});
@@ -202,8 +216,7 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
         changes.push({ kind: 'session', key: cand.id, data: st, updatedAt: t });
         linked[id] = { kind: 'session', key: cand.id, date };
         status.matched++;
-      } else if ((customsByKey = customsByKey || await getRecords(env, uid, 'custom')) &&
-                 (manual = Object.values(customsByKey).find(c => c && c.date === date && c.sport === sport && !c.icuId && !usedCustom.has(c.id)))) {
+      } else if (manual) {
         // Selbst eingetragene Extra-Einheit desselben Tages und Sports: nur ergänzen, nicht doppelt anlegen
         const c = Object.assign({}, manual);
         c.metrics = Object.assign({}, c.metrics || {}); c.metricsSrc = Object.assign({}, c.metricsSrc || {});

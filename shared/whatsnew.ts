@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '2.9.0', items: [
+    'Neue Trends unter Fortschritt: Erholung (HFV, Ruhepuls, Schlaf), Fitness und Belastung, Effizienz (Pace bzw. Watt bei gleichem Puls), locker/hart, Schwimmen, Bestwerte und lange Einheiten. Zeitraum 4 Wochen, 3 Monate oder 1 Jahr, jeder Trend mit einem Satz, was er bedeutet.',
+    'Selbst hinzugefügte Einheiten bekommen die Daten deiner Uhr (HealthFit, intervals.icu) automatisch, ohne doppelte Einheiten. Eine harte Extra-Einheit prüft den nächsten harten Tag, eine zu volle Woche bekommt einen Entlastungs-Vorschlag.',
+    'Verbindungen zeigen jetzt klar: verbunden oder Fehler mit Grund, letzte Datei, letzter Abruf und „Jetzt abrufen“.'
+  ] },
   { version: '2.8.0', items: [
     'Neue Score-Skala: 20 Einsteiger, 50 solider Hobbysportler, 70 stark, 85 Spitzenamateur, 100 Elite (nach Alter und Geschlecht bereinigt). Statt „Ziel“ siehst du „Für dein Ziel nötig“, dein nächstes Etappenziel und die Wunschzeit. Antippen zeigt, was zählt und was am meisten bringt.',
     'Prognose für heute und für den Wettkampftag, mit Ausdauer, Rad-Physik, Strecke und Pacing-Plan. Nach einem Rennen Ergebnis eintragen, dann lernt sie dazu. Rad-Zonen gibt es jetzt auch in km/h.',

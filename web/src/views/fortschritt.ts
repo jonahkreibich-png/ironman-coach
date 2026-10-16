@@ -12,6 +12,7 @@ import type { Goal } from '../../../shared/goals';
 import { weekMinutes } from '../../../shared/rules';
 import { nav } from '../nav';
 import { toast } from '../toast';
+import { renderTrends } from './trends';
 
 export function renderFortschritt(): string {
   const d = D();
@@ -24,6 +25,8 @@ export function renderFortschritt(): string {
       <div class="spread"><span class="val">${s.score}<small class="xs muted lvl"> ${esc(s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
       ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.confidence < 0.3 ? t('prog.lowData') : (s.gains[0] && s.gains[0].delta ? s.gains[0].text : t('prog.scale')))}</div></button>`;
   }).join('')}</div><div class="hint">${esc(t('prog.scaleHint'))}</div>`, t('prog.tapWhy'));
+  // Auftrag 13: Trends (Erholung, Fitness, Effizienz, Intensität, Schwimmen, Bestwerte, lange Einheiten, Zusammenhänge)
+  h += renderTrends();
   // Prognose
   const p = d.prognosis;
   if (d.goal && p) h += sec(t('prog.prognosis'), progCard(d.goal, p, false));

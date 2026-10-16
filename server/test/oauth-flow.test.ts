@@ -25,7 +25,7 @@ beforeEach(() => {
     dataCalls.push(url.host + url.pathname);
     // einfache, leere Antworten der Dienste
     if (/withings/.test(url.host)) return json({ status: 0, body: { measuregrps: [], series: [] } });
-    if (/dropboxapi/.test(url.host)) return json({ entries: [], cursor: 'c1', has_more: false });
+    if (/dropboxapi/.test(url.host)) return /get_metadata/.test(url.pathname) ? json({ '.tag': 'folder', path_display: '/Apps/HealthFit' }) : json({ entries: [], cursor: 'c1', has_more: false });
     if (/polaraccesslink/.test(url.host)) return /\/v3\/users$/.test(url.pathname) ? json({}) : json(/exercises/.test(url.pathname) ? [] : {});
     return json({ data: [], records: [] });
   });

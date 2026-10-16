@@ -195,28 +195,58 @@ export function ingestActivity(ctx: IngestCtx, incoming: Activity): IngestResult
   }
   if (linkedCustom) { res.customs.push(applyToCustom(linkedCustom, act, metrics)); if (res.matched === 'unchanged') res.matched = 'custom'; return res; }
 
-  // Neue Zuordnung: gleicher Tag, gleicher Sport, nicht ausgefallen, noch nicht verknüpft. Geplante Uhrzeit möglichst nah.
+  // Neue Zuordnung: gleicher Tag, gleicher Sport, nicht ausgefallen, noch nicht verknüpft – geplante Einheiten UND selbst
+  // hinzugefügte (Auftrag 13). Uhrzeit und Dauer möglichst nah. Einheiten, die intervals.icu schon mit einer anderen Aufzeichnung
+  // (mehr als 30 min Abstand) verknüpft hat, sind vergeben.
   const day = ctx.planDays.find(d => d.date === act.date);
   const taken = new Set(Object.values(ctx.activities).map(a => a && a.sessionId).filter(Boolean));
   const sportOk = (s: any) => s.sport === act.sport || (act.sport === 'walk' && s.sport === 'run' && /locker|spazier|walk|geh/i.test(s.title || ''));
-  const cands = day ? day.sessions.filter(s => s && sportOk(s) && !s.cancelled && !(ctx.sessions[s.id] || {}).skipped && !taken.has(s.id) && !(ctx.sessions[s.id] || {}).activityId) : [];
-  if (cands.length) {
-    const startH = +new Intl.DateTimeFormat('en-GB', { timeZone: ctx.tz || 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(new Date(act.startMs));
-    const tOf = (s: any) => { const m = /(\d{1,2})[:.](\d{2})/.exec(s.time || s.title || ''); return m ? +m[1] : 12; };
-    cands.sort((a, b) => Math.abs(tOf(a) - startH) - Math.abs(tOf(b) - startH));
-    const s = cands[0];
+  const otherWorkout = (st: any) => !!st && st.icuStart != null && Math.abs(st.icuStart - act.startMs) > SAME_WINDOW_MS;
+  const sessCands = day ? day.sessions.filter(s => s && sportOk(s) && !s.cancelled && !(ctx.sessions[s.id] || {}).skipped && !taken.has(s.id) && !(ctx.sessions[s.id] || {}).activityId && !otherWorkout(ctx.sessions[s.id])) : [];
+  const custCands = Object.values(ctx.customs).filter(c => c && c.date === act.date && sportOk(c) && !c.activityId && !otherWorkout(c));
+  const best = pickMatch([...sessCands.map(s => ({ kind: 'session' as const, item: s, st: ctx.sessions[s.id] || {} })), ...custCands.map(c => ({ kind: 'custom' as const, item: c, st: c }))], act, ctx.tz);
+  if (best && best.kind === 'session') {
+    const s = best.item;
     act.sessionId = s.id;
     res.activities[0] = act;
     res.sessions[s.id] = applyToSession(ctx.sessions[s.id] || {}, act, metrics);
     res.matched = res.matched === 'merged' ? 'merged' : 'session';
     return res;
   }
-  // Keine passende geplante Einheit: Extra-Einheit
+  if (best && best.kind === 'custom') {
+    res.customs.push(applyToCustom(best.item, act, metrics));
+    if (res.matched === 'unchanged') res.matched = 'custom';
+    return res;
+  }
+  // Keine passende Einheit: Extra-Einheit
   const id = 'act-' + act.id;
   const c = ctx.customs[id] || { id, date: act.date, sport: act.sport === 'walk' ? 'run' : act.sport, title: act.name || defaultTitle(act), description: '', auto: true };
   res.customs.push(applyToCustom(c, act, metrics));
   if (res.matched === 'unchanged') res.matched = 'custom';
   return res;
+}
+/* Beste Einheit für eine Aufzeichnung: Uhrzeit (geplant, „HH:MM“ im Titel oder Start aus intervals.icu) und Dauer möglichst nah.
+   Weicht beides stark ab (mehr als 4 h und mehr als 60 % Dauer), ist es wohl eine andere Einheit. */
+export interface MatchCand { kind: 'session' | 'custom'; item: any; st: any }
+export function pickMatch(cands: MatchCand[], act: { startMs: number; min?: number | null }, tz = 'Europe/Berlin'): MatchCand | null {
+  if (!cands.length) return null;
+  const hm = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(act.startMs)).split(':');
+  const startH = +hm[0] + +hm[1] / 60;
+  const hourOf = (c: MatchCand): number | null => {
+    if (c.st && c.st.icuStart != null) { const p = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(c.st.icuStart)).split(':'); return +p[0] + +p[1] / 60; }
+    const m = /(\d{1,2})[:.](\d{2})/.exec(c.item.time || (c.st && c.st.time) || c.item.title || '');
+    return m ? +m[1] + +m[2] / 60 : null;
+  };
+  const minOf = (c: MatchCand): number | null => { const v = +((c.st && c.st.metrics && c.st.metrics.min) || c.item.plannedMinutes || 0); return v > 0 ? v : null; };
+  const scored = cands.map(c => {
+    const h = hourOf(c), m = minOf(c);
+    const dt = h == null ? null : Math.abs(h - startH);
+    const dd = m == null || !act.min ? null : Math.abs(m - act.min) / Math.max(m, act.min);
+    const score = (dt == null ? 1.5 : dt) + (dd == null ? 0.5 : dd * 3) + (c.kind === 'custom' ? 0.01 : 0);
+    const far = dt != null && dt > 4 && dd != null && dd > 0.6;
+    return { c, score, far };
+  }).filter(x => !x.far).sort((a, b) => a.score - b.score);
+  return scored.length ? scored[0].c : null;
 }
 function defaultTitle(a: Activity): string {
   return ({ run: 'Lauf', bike: 'Radfahrt', swim: 'Schwimmen', strength: 'Kraft', football: 'Teamsport', walk: 'Gehen', multi: 'Multisport', other: 'Training' } as any)[a.sport] || 'Training';

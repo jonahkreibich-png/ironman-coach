@@ -99,6 +99,7 @@ describe('Dropbox (HealthFit)', () => {
   test('neue .fit-Datei wird geladen, ausgewertet, der Einheit zugeordnet und abgehakt', async () => {
     const { env, token } = await setupUser();
     const fit = swimFit(`${today}T15:00:00Z`, [{ lengths: 16, secPerLength: 30, strokes: 19, restSec: 30 }, { lengths: 16, secPerLength: 29, strokes: 18, restSec: 0 }]);
+    routes.push([/files\/get_metadata/, () => ({ '.tag': 'folder', path_display: '/Apps/HealthFit' })]);
     routes.push([/files\/list_folder$/, () => ({ entries: [{ '.tag': 'file', name: 'Schwimmen.fit', path_lower: '/apps/healthfit/schwimmen.fit', client_modified: new Date().toISOString() }, { '.tag': 'file', name: 'notiz.txt', path_lower: '/apps/healthfit/notiz.txt' }], cursor: 'C1', has_more: false })]);
     routes.push([/files\/list_folder\/continue/, () => ({ entries: [], cursor: 'C2', has_more: false })]);
     routes.push([/files\/download/, () => new Response(fit, { status: 200 })]);
@@ -144,6 +145,7 @@ describe('Neue Verbindung ändert nichts Vergangenes', () => {
     routes.push([/usercollection/, () => ({ data: [] })]);
     await connectViaOAuth(env, token, 'oura', { access_token: 'AT', expires_in: 86400 }, null);
     const yFit = intervalFit(`${yday}T16:00:00Z`, 'run', { warm: 300, reps: [{ sec: 120, speed: 4, hr: 170, restSec: 60, restHr: 130 }], cool: 300, easySpeed: 3, easyHr: 140 });
+    routes.push([/files\/get_metadata/, () => ({ '.tag': 'folder', path_display: '/Apps/HealthFit' })]);
     routes.push([/files\/list_folder$/, () => ({ entries: [{ '.tag': 'file', name: 'Lauf.fit', path_lower: '/apps/healthfit/lauf.fit', client_modified: `${yday}T17:00:00Z` }], cursor: 'C1', has_more: false })]);
     routes.push([/files\/download/, () => new Response(yFit)]);
     await connectViaOAuth(env, token, 'dropbox', { access_token: 'DT', expires_in: 14400, account_id: 'dbid:B' }, null);

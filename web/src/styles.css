@@ -475,3 +475,19 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .dots i:nth-child(3) { animation-delay: .15s; } .dots i:nth-child(4) { animation-delay: .3s; }
 @keyframes dotpulse { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .dots i { animation: none; opacity: .6; } }
+
+/* Trends (Auftrag 13): Liste statt enger Kacheln, links Bedeutung, rechts große Zahl */
+.tgroup { display: flex; flex-direction: column; gap: var(--s2); }
+.tlist { display: flex; flex-direction: column; gap: var(--s2); }
+.tcard { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s3); align-items: center; width: 100%; text-align: left; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3); box-shadow: var(--shadow); }
+.tcard.locked { grid-template-columns: minmax(0, 1fr); box-shadow: none; background: var(--surface-2); border-style: dashed; }
+.tcard.locked .tc-t { color: var(--ink-2); }
+.tc-main { min-width: 0; }
+.tc-t { font-weight: 700; font-size: var(--t-md); display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.tc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+.tc-s { font-size: var(--t-sm); color: var(--ink-2); margin-top: 2px; line-height: 1.35; overflow-wrap: anywhere; }
+.tc-val { text-align: right; min-width: 84px; max-width: 128px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.tc-n { font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums; color: var(--c); white-space: nowrap; }
+.tc-n small { font: 500 12px var(--f-body); color: var(--ink-2); }
+.tc-d { font-size: 11.5px; color: var(--ink-2); font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.tc-val svg { width: 84px; height: 22px; }

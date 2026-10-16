@@ -30,13 +30,18 @@ export function reauthHints(): string[] {
   return (CONN || []).filter(c => c.status === 'reauth').map(c => t('conn.reauthHint', { name: c.label }));
 }
 
-const stateText = (c: any) => c.status === 'connected' ? t('conn.connected') : c.status === 'via' ? t('conn.viaIcu') : c.status === 'reauth' ? t('conn.reauth') : t('conn.notConnected');
-const stateKind = (c: any) => c.status === 'connected' || c.status === 'via' ? 'good' : c.status === 'reauth' ? 'warn' : '';
+/* Auftrag 13: „Fehler“ ist ein eigener Zustand. Vorher stand bei einem fehlgeschlagenen Abruf „nicht verbunden“ mit Knopf „Verbinden“,
+   obwohl die Verbindung bestand – so sah es aus, als ließe sich Dropbox nicht verbinden. */
+const live = (c: any) => c.status === 'connected' || c.status === 'error' || c.status === 'reauth';
+const stateText = (c: any) => c.status === 'connected' ? t('conn.connected') : c.status === 'via' ? t('conn.viaIcu') : c.status === 'reauth' ? t('conn.reauth') : c.status === 'error' ? t('conn.errorState') : t('conn.notConnected');
+const stateKind = (c: any) => c.status === 'connected' || c.status === 'via' ? 'good' : c.status === 'reauth' || c.status === 'error' ? 'warn' : '';
 function lastLine(c: any) {
   const parts: string[] = [];
+  if (c.status === 'error' && c.error) return c.error;
   if (c.lastOkAt) parts.push(t('conn.lastOk', { ago: ago(c.lastOkAt) }));
   if (c.error) parts.push(c.error);
-  if (c.stats && c.stats.folder) parts.push(t('conn.folder', { f: c.stats.folder }));
+  if (c.stats && c.stats.lastFile) parts.push(c.stats.lastFile.name);
+  else if (c.stats && c.stats.folder) parts.push(t('conn.folder', { f: c.stats.folder }));
   return parts.join(' · ');
 }
 function subLine(c: any): string {
@@ -46,7 +51,7 @@ function subLine(c: any): string {
   return lastLine(c) || t('conn.desc.' + c.id);
 }
 function row(c: any): string {
-  return `<button class="li" data-act="conn-open" data-id="${esc(c.id)}"><span class="ic" style="--c:${c.status === 'reauth' ? 'var(--warn)' : c.status === 'connected' || c.status === 'via' ? 'var(--good)' : 'var(--ink-3)'}">${ic(c.status === 'connected' || c.status === 'via' ? 'check' : 'link')}</span>
+  return `<button class="li" data-act="conn-open" data-id="${esc(c.id)}" data-state="${esc(c.status)}"><span class="ic" style="--c:${c.status === 'reauth' || c.status === 'error' ? 'var(--warn)' : c.status === 'connected' || c.status === 'via' ? 'var(--good)' : 'var(--ink-3)'}">${ic(c.status === 'connected' || c.status === 'via' ? 'check' : 'link')}</span>
     <span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s">${esc(subLine(c))}</span></span>${pill(c.availability !== 'partner' && !c.configured && c.kind === 'oauth' ? t('conn.notReady') : stateText(c), stateKind(c))}<span class="chev">${ic('right')}</span></button>`;
 }
 const ORDER = ['shortcut', 'intervals', 'garmin', 'coros', 'suunto', 'wahoo', 'dropbox', 'oura', 'whoop', 'polar', 'withings', 'trainingpeaks', 'fitbit'];
@@ -82,7 +87,7 @@ function noSyncCard(): string {
 }
 /* Server-Schlüssel (nur Betreiber): welche Secrets gesetzt sind */
 function serverKeysCard(): string {
-  const oauth = (CONN || []).filter(c => c.kind === 'oauth' && c.availability === 'ready');
+  const oauth = (CONN || []).filter(c => (c.kind === 'oauth' && c.availability === 'ready') || c.kind === 'server');
   return `<div class="card stack"><div class="hint">${esc(t('conn.serverKeysHint'))}</div><div class="list">${oauth.map(c => `<div class="li" data-key-status="${esc(c.id)}"><span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s"><code>${(c.secrets || []).map((s: any) => esc(s.name)).join(', ')}</code></span></span>${pill(c.configured ? t('conn.keySet') : t('conn.keyMissing'), c.configured ? 'good' : 'warn')}</div>`).join('')}</div></div>`;
 }
 
@@ -149,13 +154,23 @@ function connSheet(): string {
       ${isAdmin() ? `<div class="hint">${esc(t('conn.adminKeys', { keys: (c.secrets || []).map((s: any) => s.name).join(', ') }))}</div>` : ''}
       <button class="btn ghost block" data-act="conn-open" data-id="shortcut">${esc(t('conn.appleInstead'))}</button></div>`;
   }
-  if (c.status === 'connected' || c.status === 'reauth') {
-    h += `<div class="kv"><span class="muted">${esc(t('conn.state'))}</span><b>${esc(stateText(c))}</b></div>`;
-    if (c.lastOkAt) h += `<div class="kv"><span class="muted">${esc(t('conn.lastSync'))}</span><b>${esc(ago(c.lastOkAt))}</b></div>`;
-    if (c.error) h += `<div class="banner warn">${esc(c.error)}</div>`;
-    if (c.id === 'dropbox') h += `<div class="row">${field('dbx-folder', t('conn.dbxFolder'), (c.stats && c.stats.folder) || '/Apps/HealthFit', { wide: true })}<button class="btn ghost" data-act="dbx-folder" style="align-self:flex-end">${esc(t('common.save'))}</button></div><div class="hint">${esc(t('conn.dbxHint'))}</div>`;
-    if (c.status === 'reauth') h += `<button class="btn block" data-act="conn-start">${esc(t('conn.reconnect'))}</button>`;
-    else if (c.id !== 'intervals') h += `<button class="btn ghost block" data-act="conn-sync">${ic('sync')} ${esc(t('conn.syncNow'))}</button>`;
+  if (live(c)) {
+    const st = c.stats || {};
+    h += `<div class="kv" data-conn-state><span class="muted">${esc(t('conn.state'))}</span><b>${esc(stateText(c))}</b></div>`;
+    const check = c.lastSyncAt ? t(c.status === 'error' || c.status === 'reauth' ? 'conn.checkFail' : 'conn.checkOk', { ago: ago(c.lastSyncAt) }) : c.lastOkAt ? ago(c.lastOkAt) : '–';
+    h += `<div class="kv" data-conn-check><span class="muted">${esc(t('conn.lastCheck'))}</span><b>${esc(check)}</b></div>`;
+    if (c.id === 'dropbox') h += `<div class="kv" data-conn-file><span class="muted">${esc(t('conn.lastFile'))}</span><b style="text-align:right;overflow-wrap:anywhere">${esc(st.lastFile ? st.lastFile.name + (st.lastFile.at ? ' · ' + fmtDate(ymd(new Date(st.lastFile.at))) : '') : t('conn.noFileYet'))}</b></div>`;
+    if (c.error) {
+      const code = st.errorCode || '';
+      h += `<div class="banner warn" data-conn-error="${esc(code)}">${esc(c.error)}</div>`;
+      if (code === 'folder') h += `<div class="hint">${esc(t('conn.help.folder'))}</div>`;
+      if (isAdmin() && ['folder', 'token_key', 'scope'].includes(code)) h += `<div class="hint"><b>${esc(t(code === 'folder' ? 'conn.help.folderAdmin' : 'conn.help.' + code))}</b></div>`;
+    }
+    if (c.id === 'dropbox' && st.errors && st.errors.length) h += `<div class="hint">${esc(t('conn.fileErrors', { list: st.errors.map((e: any) => typeof e === 'string' ? e : `${e.name} (${e.why})`).join(', ') }))}</div>`;
+    if (c.id === 'dropbox') h += `<div class="row">${field('dbx-folder', t('conn.dbxFolder'), st.folderSet ? st.folder || '' : '', { wide: true, placeholder: st.folder && !st.folderSet ? st.folder : t('conn.dbxFolderPh') })}<button class="btn ghost" data-act="dbx-folder" style="align-self:flex-end">${esc(t('common.save'))}</button></div><div class="hint">${esc(t('conn.dbxHint'))}</div>`;
+    if (c.status === 'reauth' || (c.status === 'error' && ['token_mismatch', 'scope'].includes(st.errorCode))) h += `<button class="btn block" data-act="conn-start">${esc(t('conn.reconnect'))}</button>`;
+    if (c.status !== 'reauth' && c.id !== 'intervals') h += `<button class="btn ${c.status === 'error' ? '' : 'ghost '}block" data-act="conn-sync">${ic('sync')} ${esc(t('conn.syncNow'))}</button>`;
+    if (c.id === 'dropbox') h += more(t('conn.hfIcuHow'), `<ol class="small stack" style="padding-left:18px;margin:0">${[1, 2, 3].map(i => `<li>${esc(t('conn.hfIcu' + i))}</li>`).join('')}</ol>`);
     h += more(t('conn.disconnect'), `<div class="hint">${esc(t('conn.disconnectHint'))}</div><label class="switch"><input type="checkbox" id="conn-del" ${c.id === 'oura' ? 'checked' : ''}><span>${esc(t('conn.deleteData'))}</span></label><button class="btn danger" data-act="conn-disconnect">${esc(t('conn.disconnect'))}</button>`);
   } else h += `<div class="hint">${esc(t('conn.willOpen', { name: c.label }))}</div><button class="btn block" data-act="conn-start">${esc(t('conn.connect'))}</button>`;
   return h + '</div>';
@@ -186,8 +201,10 @@ on('conn-start', el => busy(el, async () => {
   location.href = r.url;
 }));
 on('conn-sync', el => busy(el, async () => {
-  const r = await apiCall('POST', `/api/connect/${CUR}/sync`);
-  await syncNow(); await loadConnections(true); refreshSheet();
+  let r: any;
+  // Auch bei einem Fehler den neuen Status (Grund, Zeitpunkt) zeigen
+  try { r = await apiCall('POST', `/api/connect/${CUR}/sync`); } finally { await loadConnections(true); refreshSheet(); }
+  await syncNow();
   const s = r.stats || {}; toast(t('conn.synced', { d: s.days || 0, a: s.activities || 0 }));
 }));
 on('conn-disconnect', el => {

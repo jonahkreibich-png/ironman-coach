@@ -10,6 +10,7 @@ import { T, pick, de, mmss, joinDe, dowName } from './texts';
 import { checkData, type SafetyHit } from './safety';
 import { underEatingCheck } from '../nutrition';
 import { doneItems, autoReview, type Done } from './review';
+import { extraChecks } from './extra';
 
 export interface CoachMsg {
   id: string; at: number; date: string;
@@ -190,6 +191,8 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
       let text: string; try { text = autoReview(ctx, d, mode); } catch (e) { continue; }
       push(msg(ctx, { id: 'msg-review-' + d.key, date: d.date, kind: 'session', title: 'Bewertung: ' + d.title, text, refs: { sessionId: d.custom ? undefined : d.key } }));
     }
+    // Auftrag 13: Extra-Einheiten zählen für den Plan (harte Extra-Einheit → nächster harter Tag, volle Woche → Entlastung)
+    try { for (const m of extraChecks(ctx)) push(m); } catch (e) { /* Prüfung darf die Bewertung nicht verhindern */ }
   }
 
   if (ev.type === 'trend' || ev.type === 'daily' || ev.type === 'illness') {

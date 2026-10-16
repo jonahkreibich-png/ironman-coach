@@ -60,6 +60,8 @@ export async function startOAuth(env: Env, a: Auth, p: ProviderId, returnTo?: st
   if (def.status !== 'ready') throw new HttpError(409, `${def.label} braucht noch eine Freischaltung durch den Anbieter.`);
   const clientId = env[def.idEnv];
   if (!clientId || !env[def.secretEnv]) throw new HttpError(503, `${def.label} ist auf dem Server noch nicht eingerichtet: Der Betreiber muss einmal den App-Schlüssel des Anbieters hinterlegen. Bis dahin klappt es über Apple Health (Kurzbefehl) oder intervals.icu.`);
+  // Ohne TOKEN_KEY kann der Server die Anmeldung nicht speichern: gleich sagen statt nach dem Erlaubnis-Bildschirm scheitern
+  if (!env.TOKEN_KEY || String(env.TOKEN_KEY).trim().length < 16) throw new HttpError(503, friendlyError(new Error('TOKEN_KEY fehlt')).text);
   const state = randomToken(24);
   const verifier = randomToken(32);
   await env.DB.prepare('INSERT INTO oauth_states (state, user_id, provider, verifier, return_to, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(state, a.uid, p, verifier, (returnTo || '').slice(0, 200), Date.now()).run();
@@ -259,33 +261,89 @@ async function syncWithings(env: Env, uid: number, days: number): Promise<Ingest
   return ingest(env, uid, { source: 'withings', trend, weights }, { protect: await protectOf(env, uid, 'withings') });
 }
 
-/* Dropbox: neue .fit/.gpx/.tcx-Dateien im HealthFit-Ordner (über Cursor nur Neues) */
+/* Dropbox: neue .fit/.gpx/.tcx-Dateien im HealthFit-Ordner (über Cursor nur Neues).
+   Auftrag 13: HealthFit speichert in /Apps/HealthFit. Eine Dropbox-App mit „App folder“-Zugriff sieht diesen Ordner nicht
+   (sie sieht nur /Apps/<eigener Name>) – das war der Grund, warum nie eine Datei ankam. Deshalb: Ordner suchen, verständliche
+   Fehler mit Code (für die App), fehlgeschlagene Dateien beim nächsten Abruf wiederholen, letzte Datei und Abruf merken. */
+export const DROPBOX_FOLDERS = ['/Apps/HealthFit', '/HealthFit', '/Apps/Health Fit'];
+export class DbxError extends HttpError { constructor(status: number, msg: string, public code: string) { super(status, msg); } }
+async function dbxFetch(env: Env, uid: number, url: string, init: RequestInit): Promise<Response> {
+  const t = await accessToken(env, uid, 'dropbox');
+  const res = await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: 'Bearer ' + t } });
+  if (res.status === 401) {
+    const txt = await res.text().catch(() => '');
+    // Fehlende Berechtigung ist kein abgelaufenes Login: neu verbinden hilft erst, wenn die Berechtigung in der Dropbox-App angehakt ist
+    if (/missing_scope/.test(txt)) throw new DbxError(403, 'Dropbox erlaubt das Lesen der Dateien nicht. In der Dropbox-App unter „Permissions“ files.content.read und files.metadata.read anhaken, dann hier neu verbinden.', 'scope');
+    await saveConn(env, uid, 'dropbox', { status: 'reauth', last_error: 'Dropbox-Anmeldung abgelaufen. Bitte neu verbinden.' });
+    throw new DbxError(401, 'Dropbox-Anmeldung abgelaufen. Bitte neu verbinden.', 'reauth');
+  }
+  return res;
+}
+async function dbxJson(env: Env, uid: number, B: string, path: string, body: any): Promise<{ status: number; data: any }> {
+  const res = await dbxFetch(env, uid, `${B}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => null);
+  if (res.status === 429) throw new DbxError(503, 'Dropbox bremst gerade (zu viele Abrufe). Der nächste Abruf in 15 min klappt meist.', 'rate');
+  if (res.status >= 500) throw new DbxError(502, `Dropbox antwortet gerade nicht (Fehler ${res.status}). Der nächste Abruf versucht es wieder.`, 'down');
+  return { status: res.status, data };
+}
+/* Ordner finden: eingestellter Ordner, sonst die üblichen HealthFit-Orte, sonst ein Ordner „HealthFit“ in /Apps oder ganz oben */
+async function findDropboxFolder(env: Env, uid: number, B: string, wanted: string | null): Promise<string | null> {
+  const isFolder = async (p: string) => { const r = await dbxJson(env, uid, B, '/2/files/get_metadata', { path: p }); return r.status === 200 && r.data && r.data['.tag'] === 'folder' ? (r.data.path_display || p) : null; };
+  for (const p of [...(wanted ? [wanted] : []), ...DROPBOX_FOLDERS.filter(x => x !== wanted)]) { if (p === '/') return '/'; const f = await isFolder(p); if (f) return f; }
+  for (const parent of ['/Apps', '']) {
+    const r = await dbxJson(env, uid, B, '/2/files/list_folder', { path: parent, recursive: false, limit: 200 });
+    const hit = r.status === 200 && (r.data.entries || []).find((e: any) => e['.tag'] === 'folder' && /health\s*fit/i.test(e.name));
+    if (hit) return hit.path_display || hit.path_lower;
+  }
+  return null;
+}
 async function syncDropbox(env: Env, uid: number): Promise<IngestStats> {
   const B = base(env, 'dropbox', 'https://api.dropboxapi.com'), CB = base(env, 'dropboxcontent', 'https://content.dropboxapi.com');
   const conn = await getConn(env, uid, 'dropbox');
   const meta = conn && conn.stats ? JSON.parse(conn.stats) : {};
-  const folder = meta.folder || '/Apps/HealthFit';
-  const post = (path: string, body: any) => api(env, uid, 'dropbox', `${B}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(jsonOf);
-  let res: any = conn && conn.cursor ? await post('/2/files/list_folder/continue', { cursor: conn.cursor }).catch(() => null) : null;
-  if (!res) res = await post('/2/files/list_folder', { path: folder === '/' ? '' : folder, recursive: true, limit: 500 });
+  const list = async (path: string, body: any) => {
+    const r = await dbxJson(env, uid, B, path, body);
+    if (r.status === 200) return r.data;
+    if (r.status === 409 && /reset/.test(JSON.stringify(r.data))) return null; // Cursor veraltet: neu auflisten
+    throw new DbxError(502, `Dropbox: Ordner konnte nicht gelesen werden (${(r.data && r.data.error_summary) || 'Fehler ' + r.status}).`, 'list');
+  };
+  let folder: string | null = meta.folder || null;
+  let res: any = conn && conn.cursor && folder ? await list('/2/files/list_folder/continue', { cursor: conn.cursor }).catch(e => { if (e instanceof DbxError && (e.code === 'reauth' || e.code === 'scope')) throw e; return null; }) : null;
+  if (!res) {
+    const found = await findDropboxFolder(env, uid, B, meta.folderSet ? folder : null);
+    if (!found) {
+      await saveConn(env, uid, 'dropbox', { stats: JSON.stringify({ ...meta, folder: null }) });
+      throw new DbxError(404, 'Der HealthFit-Ordner ist in deiner Dropbox nicht zu finden. Entweder hat HealthFit noch nichts exportiert (in HealthFit: Automatischer Export → Dropbox einschalten), oder die Dropbox-App des Servers hat nur Zugriff auf ihren eigenen Ordner („App folder“) statt auf die ganze Dropbox.', 'folder');
+    }
+    folder = found;
+    res = await list('/2/files/list_folder', { path: folder === '/' ? '' : folder, recursive: true, limit: 500 });
+  }
   const files: any[] = [];
   for (let guard = 0; guard < 20; guard++) {
     files.push(...(res.entries || []).filter((e: any) => e['.tag'] === 'file' && /\.(fit|gpx|tcx)$/i.test(e.name)));
     if (!res.has_more) break;
-    res = await post('/2/files/list_folder/continue', { cursor: res.cursor });
+    res = await list('/2/files/list_folder/continue', { cursor: res.cursor });
   }
   // Beim ersten Mal nur die letzten 6 Wochen ansehen, und nie Dateien von vor dem Verbinden (die Tage davor bleiben, wie sie waren)
   const prot = await protectOf(env, uid, 'dropbox');
   const since = Math.max(Date.now() - 42 * 86400000, prot ? prot.at - 6 * 3600000 : 0);
-  const pick = files.filter(f => Date.parse(f.client_modified || f.server_modified || '') >= since).slice(-60);
+  const fileTime = (f: any) => Date.parse(f.client_modified || f.server_modified || '') || 0;
+  // Dateien, die beim letzten Mal nicht geladen werden konnten, kommen noch einmal dran (höchstens 3 Versuche)
+  const retry: any[] = (meta.retry || []).filter((r: any) => r && r.path && (r.n || 0) < 3);
+  const pick = [...retry.map(r => ({ name: r.name, path_lower: r.path, client_modified: r.at, _n: r.n || 0 })), ...files.filter(f => fileTime(f) >= since && !retry.some(r => r.path === f.path_lower))].slice(-60);
   const raw: RawActivity[] = [];
-  const errors: string[] = [];
+  const errors: { name: string; why: string }[] = [];
+  const nextRetry: any[] = [];
+  let lastFile = meta.lastFile || null;
   for (const f of pick) {
-    const r = await api(env, uid, 'dropbox', `${CB}/2/files/download`, { method: 'POST', headers: { 'Dropbox-API-Arg': JSON.stringify({ path: f.path_lower || f.id }), Accept: '*/*' } });
-    if (!r.ok) { errors.push(f.name); continue; }
-    try { raw.push(parseActivityFile(f.name, new Uint8Array(await r.arrayBuffer()), parseFit)); } catch (e) { errors.push(f.name); }
+    const r = await dbxFetch(env, uid, `${CB}/2/files/download`, { method: 'POST', headers: { 'Dropbox-API-Arg': JSON.stringify({ path: f.path_lower || f.id }), Accept: '*/*' } });
+    if (!r.ok) { errors.push({ name: f.name, why: `Download fehlgeschlagen (${r.status})` }); nextRetry.push({ path: f.path_lower, name: f.name, at: f.client_modified, n: (f._n || 0) + 1 }); continue; }
+    try {
+      raw.push(parseActivityFile(f.name, new Uint8Array(await r.arrayBuffer()), parseFit));
+      if (!lastFile || fileTime(f) >= Date.parse(lastFile.at || '') || !lastFile.at) lastFile = { name: f.name, at: f.client_modified || f.server_modified || null, importedAt: Date.now() };
+    } catch (e) { errors.push({ name: f.name, why: 'Datei nicht lesbar: ' + String((e as Error).message || e).slice(0, 80) }); }
   }
-  await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify({ ...meta, folder, lastFiles: pick.length, errors: errors.slice(0, 5) }) });
+  await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify({ ...meta, folder, lastFiles: pick.length, filesInFolder: files.length, lastFile, errors: errors.slice(0, 5), retry: nextRetry.slice(0, 20) }) });
   return ingest(env, uid, { source: 'healthfit', raw }, { protect: await protectOf(env, uid, 'dropbox') });
 }
 
@@ -305,9 +363,20 @@ export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: {
     return stats;
   } catch (e) {
     const c = await getConn(env, uid, p);
-    await saveConn(env, uid, p, { last_sync_at: Date.now(), last_error: (e as Error).message.slice(0, 200), status: c && c.status === 'reauth' ? 'reauth' : 'error' });
-    throw e;
+    const f = friendlyError(e);
+    const old = c && c.stats ? JSON.parse(c.stats) : {};
+    await saveConn(env, uid, p, { last_sync_at: Date.now(), last_error: f.text.slice(0, 300), status: f.reauth || (c && c.status === 'reauth') ? 'reauth' : 'error', stats: JSON.stringify({ ...old, errorCode: f.code }) }).catch(() => {});
+    throw f.reauth && !(e instanceof HttpError) ? new HttpError(401, f.text) : e;
   }
+}
+/* Fehler in einen Satz für die App übersetzen (Code für passende Hilfe in der App) */
+export function friendlyError(e: any): { text: string; code: string; reauth?: boolean } {
+  const m = String((e && e.message) || e || '');
+  if (e instanceof DbxError) return { text: m, code: e.code, reauth: e.code === 'reauth' };
+  if (/TOKEN_KEY fehlt/.test(m)) return { text: 'Der Server ist nicht vollständig eingerichtet (Schlüssel TOKEN_KEY fehlt). Das kann nur der Betreiber beheben, danach einmal neu verbinden.', code: 'token_key' };
+  if (/operation-specific|OperationError|decrypt/i.test(m)) return { text: 'Die gespeicherte Anmeldung passt nicht mehr zum Server (Schlüssel geändert). Bitte einmal neu verbinden.', code: 'token_mismatch', reauth: true };
+  if (/abgelaufen|abgelehnt|neu verbinden/i.test(m)) return { text: m, code: 'reauth', reauth: true };
+  return { text: m || 'Unbekannter Fehler beim Abruf.', code: 'other' };
 }
 
 /* Trennen. deleteData: alle automatisch übernommenen Werte dieser Quelle entfernen (Oura verlangt Löschung auf Wunsch binnen 72 h). */
@@ -346,6 +415,8 @@ export async function connectionsStatus(env: Env, uid: number): Promise<any[]> {
     const c = by[p];
     list.push({ id: p, label, kind, availability: status, configured, secrets, status: c ? c.status : 'none', lastSyncAt: c ? c.last_sync_at : null, lastOkAt: c ? c.last_ok_at : null, error: c ? c.last_error : null, stats: c && c.stats ? JSON.parse(c.stats) : null });
   };
+  // Grundlagen des Servers (nur ob gesetzt, nie Werte): TOKEN_KEY fehlte in der echten App (Auftrag 13)
+  list.push({ id: 'server', label: 'Server', kind: 'server', availability: 'internal', configured: !!(env.TOKEN_KEY && String(env.TOKEN_KEY).trim().length >= 16), status: 'none', secrets: ['TOKEN_KEY', 'SETUP_CODE', 'VAPID_PRIVATE_JWK'].map(name => ({ name, set: !!env[name] })) });
   for (const [p, d] of Object.entries(OAUTH) as [ProviderId, OAuthDef][]) pub(p, d.label, 'oauth', d.status, !!(env[d.idEnv] && env[d.secretEnv]), [{ name: d.idEnv, set: !!env[d.idEnv] }, { name: d.secretEnv, set: !!env[d.secretEnv] }]);
   pub('intervals', 'intervals.icu', 'apikey', 'ready', true);
   list.push({ id: 'shortcut', label: 'Apple Health (Kurzbefehl)', kind: 'key', availability: 'ready', configured: true, status: (keys.results || []).length ? 'connected' : 'none', keys: (keys.results || []).map((k: any) => ({ id: k.id, label: k.label, createdAt: k.created_at, lastUsed: k.last_used })) });

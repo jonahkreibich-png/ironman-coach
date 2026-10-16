@@ -44,10 +44,11 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     if (m[2] === 'disconnect') return { ok: true, ...(await X.disconnect(env, a.uid, prov, !!(await readJson(req)).deleteData)) };
     if (m[2] === 'folder' && prov === 'dropbox') {
       const folder = String((await readJson(req)).folder || '').trim();
-      if (!/^\/[^\u0000-\u001f]{0,200}$/.test(folder)) throw new HttpError(400, 'Ordner muss mit / beginnen, z. B. /Apps/HealthFit');
+      // leer = automatisch suchen (Auftrag 13)
+      if (folder && !/^\/[^\u0000-\u001f]{0,200}$/.test(folder)) throw new HttpError(400, 'Ordner muss mit / beginnen, z. B. /Apps/HealthFit');
       const c = await X.getConn(env, a.uid, 'dropbox');
       const stats = c && c.stats ? JSON.parse(c.stats) : {};
-      await env.DB.prepare("UPDATE connections SET stats = ?, cursor = NULL WHERE user_id = ? AND provider = 'dropbox'").bind(JSON.stringify({ ...stats, folder }), a.uid).run();
+      await env.DB.prepare("UPDATE connections SET stats = ?, cursor = NULL WHERE user_id = ? AND provider = 'dropbox'").bind(JSON.stringify({ ...stats, folder: folder || null, folderSet: !!folder }), a.uid).run();
       return { ok: true };
     }
   }
