@@ -166,14 +166,33 @@ describe('Verständliche Fehler', () => {
     const { env, token } = await setup();
     healthFitFolder([{ name: 'kaputt.fit', data: new Uint8Array([1, 2, 3, 4]) }, { name: 'weg.fit', data: null }, { name: 'gut.fit', data: FIT }]);
     await connectDropbox(env, token);
+    for (let i = 0; i < 8 && ((await conn(env, token)).stats.queue || []).length; i++) await call(env, 'POST', '/api/connect/dropbox/sync', {}, token);
     const st = await conn(env, token);
     expect(st.status).toBe('connected');
-    expect(st.stats.errors.map((e: any) => e.name)).toEqual(['kaputt.fit', 'weg.fit']);
+    expect(st.stats.queue).toEqual([]);
+    expect([...new Set(st.stats.errors.map((e: any) => e.name))]).toEqual(['kaputt.fit', 'weg.fit']);
     expect(st.stats.errors[0].why).toMatch(/nicht lesbar/);
-    expect(st.stats.retry.map((r: any) => r.name)).toEqual(['weg.fit']);
-    calls.length = 0;
-    await call(env, 'POST', '/api/connect/dropbox/sync', {}, token);
-    expect(calls.filter(c => c.endsWith('/files/download')).length).toBe(1); // nur weg.fit noch einmal
+    expect(calls.filter(c => c.endsWith('/files/download')).length).toBe(5); // kaputt 1×, gut 1×, weg 3 Versuche
+    expect((await records(env, token)).filter(r => r.kind === 'activity').length).toBe(1);
+  });
+
+  test('CPU-Grenze: eine Datei pro Aufruf, die übrigen warten; der Zeitplan holt alle 5 min die nächste', async () => {
+    const { env, token } = await setup();
+    healthFitFolder([{ name: 'a.fit', data: FIT }, { name: 'b.fit', data: FIT }, { name: 'c.fit', data: FIT }]);
+    await connectDropbox(env, token);
+    let st = await conn(env, token);
+    expect(st.stats.queue.map((q: any) => q.name)).toEqual(['b.fit', 'c.fit']);
+    expect(st.stats.lastFile.name).toBe('a.fit');
+    const r = await call(env, 'POST', '/api/connect/dropbox/sync', {}, token);
+    expect(r.data.stats.queued).toBe(1);
+    // Zeitplan: nach 5 min ist die nächste Datei dran (ohne Warteschlange erst nach 15 min)
+    env.DB.db.prepare("UPDATE connections SET last_sync_at = ? WHERE provider = 'dropbox'").run(Date.now() - 5 * 60000);
+    const { scheduledSync } = await import('../src/connect');
+    await scheduledSync(env, [1]);
+    st = await conn(env, token);
+    expect(st.stats.queue).toEqual([]);
+    // dieselbe Datei dreimal: nur eine Einheit (Dubletten erkannt)
+    expect((await records(env, token)).filter(r => r.kind === 'custom').length).toBe(1);
   });
 
   test('TOKEN_KEY fehlt auf dem Server: Verbinden sagt es sofort, bestehende Verbindung zeigt den Grund, Betreiber sieht das Secret', async () => {

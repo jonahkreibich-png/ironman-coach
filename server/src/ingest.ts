@@ -15,7 +15,7 @@ export interface IngestInput {
   activities?: Activity[];
   weights?: Record<string, number>;
 }
-export interface IngestStats { days: number; activities: number; matched: number; extras: number; merged: number; duplicates: number; kept?: number }
+export interface IngestStats { days: number; activities: number; matched: number; extras: number; merged: number; duplicates: number; kept?: number; /** Dropbox: Dateien, die noch warten */ queued?: number }
 /* Neue Verbindung ändert nichts Vergangenes: Tage vor dem Verbinden bleiben, wie sie waren; am Tag des Verbindens werden nur leere Werte
    gefüllt; Einheiten zählen erst ab dem Zeitpunkt des Verbindens. */
 export interface Protect { at: number; day: string }

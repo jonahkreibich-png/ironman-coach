@@ -203,7 +203,7 @@ export const de: Record<string, string> = {
   'conn.later': 'Später möglich', 'conn.laterAside': 'Freischaltung nötig',
   'conn.connected': 'verbunden', 'conn.reauth': 'neu verbinden', 'conn.notConnected': 'nicht verbunden', 'conn.errorState': 'Fehler',
   'conn.lastFile': 'Letzte Datei', 'conn.noFileYet': 'noch keine', 'conn.lastCheck': 'Letzter Abruf', 'conn.checkOk': '{ago}, ok', 'conn.checkFail': '{ago}, fehlgeschlagen',
-  'conn.folderAuto': 'wird automatisch gesucht', 'conn.dbxFolderPh': 'leer = automatisch (/Apps/HealthFit)', 'conn.fileErrors': 'Nicht gelesen: {list}',
+  'conn.folderAuto': 'wird automatisch gesucht', 'conn.dbxFolderPh': 'leer = automatisch (/Apps/HealthFit)', 'conn.fileErrors': 'Nicht gelesen: {list}', 'conn.queue': 'Noch {n} Datei(en) in der Warteschlange. Sie kommen nach und nach an (alle 5 min eine) oder mit „Jetzt abrufen“.', 'conn.queueing': 'Hole weitere Dateien … noch {n}',
   'conn.help.folder': 'So behebst du es: 1. In HealthFit unten „Einstellungen“ (Zahnrad) → „Automatischer Export“ → Dropbox einschalten, Format FIT. 2. Ein Training in HealthFit antippen → Teilen → Dropbox, damit der Ordner entsteht. 3. Hier „Jetzt abrufen“. Kommt der Fehler wieder, liegt es an der Dropbox-App des Servers (Betreiber).',
   'conn.help.folderAdmin': 'Betreiber: Die Dropbox-App muss mit „Full Dropbox“ angelegt sein, nicht mit „App folder“ (lässt sich nachträglich nicht ändern, also neue App anlegen). Anleitung: FUER-JONAH.md.',
   'conn.help.token_key': 'Betreiber: Secret TOKEN_KEY in der echten App setzen (node scripts/set-secret.mjs TOKEN_KEY echt neu), danach alle Dienste einmal neu verbinden.',

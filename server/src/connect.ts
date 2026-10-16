@@ -298,7 +298,7 @@ async function findDropboxFolder(env: Env, uid: number, B: string, wanted: strin
   }
   return null;
 }
-async function syncDropbox(env: Env, uid: number): Promise<IngestStats> {
+async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestStats> {
   const B = base(env, 'dropbox', 'https://api.dropboxapi.com'), CB = base(env, 'dropboxcontent', 'https://content.dropboxapi.com');
   const conn = await getConn(env, uid, 'dropbox');
   const meta = conn && conn.stats ? JSON.parse(conn.stats) : {};
@@ -329,26 +329,46 @@ async function syncDropbox(env: Env, uid: number): Promise<IngestStats> {
   const prot = await protectOf(env, uid, 'dropbox');
   const since = Math.max(Date.now() - 42 * 86400000, prot ? prot.at - 6 * 3600000 : 0);
   const fileTime = (f: any) => Date.parse(f.client_modified || f.server_modified || '') || 0;
-  // Dateien, die beim letzten Mal nicht geladen werden konnten, kommen noch einmal dran (höchstens 3 Versuche)
-  const retry: any[] = (meta.retry || []).filter((r: any) => r && r.path && (r.n || 0) < 3);
-  const pick = [...retry.map(r => ({ name: r.name, path_lower: r.path, client_modified: r.at, _n: r.n || 0 })), ...files.filter(f => fileTime(f) >= since && !retry.some(r => r.path === f.path_lower))].slice(-60);
-  const raw: RawActivity[] = [];
-  const errors: { name: string; why: string }[] = [];
-  const nextRetry: any[] = [];
-  let lastFile = meta.lastFile || null;
-  for (const f of pick) {
-    const r = await dbxFetch(env, uid, `${CB}/2/files/download`, { method: 'POST', headers: { 'Dropbox-API-Arg': JSON.stringify({ path: f.path_lower || f.id }), Accept: '*/*' } });
-    if (!r.ok) { errors.push({ name: f.name, why: `Download fehlgeschlagen (${r.status})` }); nextRetry.push({ path: f.path_lower, name: f.name, at: f.client_modified, n: (f._n || 0) + 1 }); continue; }
-    try {
-      raw.push(parseActivityFile(f.name, new Uint8Array(await r.arrayBuffer()), parseFit));
-      if (!lastFile || fileTime(f) >= Date.parse(lastFile.at || '') || !lastFile.at) lastFile = { name: f.name, at: f.client_modified || f.server_modified || null, importedAt: Date.now() };
-    } catch (e) { errors.push({ name: f.name, why: 'Datei nicht lesbar: ' + String((e as Error).message || e).slice(0, 80) }); }
+  // Warteschlange: neue Dateien erst merken (mit Cursor sofort speichern), dann höchstens maxFiles pro Aufruf auswerten.
+  // Grund (Auftrag 13): Der kostenlose Cloudflare-Tarif erlaubt 10 ms CPU pro Aufruf, eine FIT-Datei braucht 5-40 ms.
+  // Viele Dateien auf einmal brachen den Aufruf ab, bevor etwas gespeichert war – bei jedem Versuch wieder.
+  const queue: any[] = [...(meta.queue || []), ...(meta.retry || []).map((r: any) => ({ ...r }))].filter((q: any) => q && q.path && (q.n || 0) < 3);
+  for (const f of files.filter(f => fileTime(f) >= since).sort((x, y) => fileTime(x) - fileTime(y))) {
+    if (!queue.some(q => q.path === f.path_lower)) queue.push({ path: f.path_lower, name: f.name, at: f.client_modified || f.server_modified || null, n: 0 });
   }
-  await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify({ ...meta, folder, lastFiles: pick.length, filesInFolder: files.length, lastFile, errors: errors.slice(0, 5), retry: nextRetry.slice(0, 20) }) });
-  return ingest(env, uid, { source: 'healthfit', raw }, { protect: await protectOf(env, uid, 'dropbox') });
+  const errors: { name: string; why: string }[] = (meta.errors || []).filter((e: any) => e && typeof e === 'object').slice(-4);
+  let lastFile = meta.lastFile || null;
+  let st: any = { ...meta, folder, filesInFolder: files.length || meta.filesInFolder || 0, queue: queue.slice(-60), errors, lastFile };
+  delete st.retry;
+  await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify(st) });
+  const total: IngestStats = { days: 0, activities: 0, matched: 0, extras: 0, merged: 0, duplicates: 0 };
+  for (let k = 0; k < maxFiles && st.queue.length; k++) {
+    const f = st.queue[0];
+    const r = await dbxFetch(env, uid, `${CB}/2/files/download`, { method: 'POST', headers: { 'Dropbox-API-Arg': JSON.stringify({ path: f.path }), Accept: '*/*' } });
+    let raw: RawActivity | null = null;
+    if (!r.ok) {
+      st.errors = [...st.errors, { name: f.name, why: `Download fehlgeschlagen (${r.status})` }].slice(-5);
+      st.queue = [...st.queue.slice(1), ...((f.n || 0) + 1 < 3 ? [{ ...f, n: (f.n || 0) + 1 }] : [])];
+    } else {
+      try { raw = parseActivityFile(f.name, new Uint8Array(await r.arrayBuffer()), parseFit); }
+      catch (e) { st.errors = [...st.errors, { name: f.name, why: 'Datei nicht lesbar: ' + String((e as Error).message || e).slice(0, 80) }].slice(-5); }
+      st.queue = st.queue.slice(1);
+    }
+    if (raw) {
+      if (!lastFile || !lastFile.at || Date.parse(f.at || '') >= Date.parse(lastFile.at)) lastFile = { name: f.name, at: f.at || null, importedAt: Date.now() };
+      st.lastFile = lastFile;
+    }
+    // Fortschritt vor der Auswertung speichern: bricht der Aufruf ab, ist die Datei trotzdem aus der Warteschlange
+    await saveConn(env, uid, 'dropbox', { stats: JSON.stringify(st) });
+    if (raw) {
+      const one = await ingest(env, uid, { source: 'healthfit', raw: [raw] }, { protect: await protectOf(env, uid, 'dropbox') });
+      for (const key of Object.keys(total) as (keyof IngestStats)[]) (total as any)[key] = ((total as any)[key] || 0) + ((one as any)[key] || 0);
+    }
+  }
+  return { ...total, queued: st.queue.length };
 }
 
-export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: { initial?: boolean } = {}): Promise<IngestStats> {
+export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: { initial?: boolean; maxFiles?: number } = {}): Promise<IngestStats> {
   const days = opts.initial ? 28 : 3;
   let stats: IngestStats;
   try {
@@ -356,7 +376,7 @@ export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: {
     else if (p === 'whoop') stats = await syncWhoop(env, uid, opts.initial ? 28 : 4);
     else if (p === 'polar') stats = await syncPolar(env, uid);
     else if (p === 'withings') stats = await syncWithings(env, uid, days);
-    else if (p === 'dropbox') stats = await syncDropbox(env, uid);
+    else if (p === 'dropbox') stats = await syncDropbox(env, uid, opts.maxFiles || 1);
     else throw new HttpError(400, 'Dieser Dienst wird anders abgerufen.');
     const c = await getConn(env, uid, p);
     const old = c && c.stats ? JSON.parse(c.stats) : {};
@@ -576,9 +596,10 @@ export async function whoopWebhook(env: Env, req: Request, ctx: any): Promise<Re
 export async function scheduledSync(env: Env, users: number[]): Promise<void> {
   const now = Date.now();
   for (const uid of users) {
-    const rows = await env.DB.prepare("SELECT provider, last_sync_at FROM connections WHERE user_id = ? AND status IN ('connected', 'error')").bind(uid).all();
+    const rows = await env.DB.prepare("SELECT provider, last_sync_at, stats FROM connections WHERE user_id = ? AND status IN ('connected', 'error')").bind(uid).all();
     for (const r of rows.results || []) {
-      const every = r.provider === 'dropbox' ? 15 : 30;
+      const waiting = r.provider === 'dropbox' && r.stats && (JSON.parse(r.stats).queue || []).length > 0;
+      const every = r.provider === 'dropbox' ? (waiting ? 5 : 15) : 30;
       if (r.provider === 'intervals' || (r.last_sync_at && now - r.last_sync_at < every * 60000 - 30000)) continue;
       try { await syncProvider(env, uid, r.provider as ProviderId); } catch (e) { /* Status steht in der Verbindung */ }
     }

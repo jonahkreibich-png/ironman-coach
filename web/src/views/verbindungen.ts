@@ -166,6 +166,7 @@ function connSheet(): string {
       if (code === 'folder') h += `<div class="hint">${esc(t('conn.help.folder'))}</div>`;
       if (isAdmin() && ['folder', 'token_key', 'scope'].includes(code)) h += `<div class="hint"><b>${esc(t(code === 'folder' ? 'conn.help.folderAdmin' : 'conn.help.' + code))}</b></div>`;
     }
+    if (c.id === 'dropbox' && st.queue && st.queue.length) h += `<div class="hint" data-conn-queue>${esc(t('conn.queue', { n: st.queue.length }))}</div>`;
     if (c.id === 'dropbox' && st.errors && st.errors.length) h += `<div class="hint">${esc(t('conn.fileErrors', { list: st.errors.map((e: any) => typeof e === 'string' ? e : `${e.name} (${e.why})`).join(', ') }))}</div>`;
     if (c.id === 'dropbox') h += `<div class="row">${field('dbx-folder', t('conn.dbxFolder'), st.folderSet ? st.folder || '' : '', { wide: true, placeholder: st.folder && !st.folderSet ? st.folder : t('conn.dbxFolderPh') })}<button class="btn ghost" data-act="dbx-folder" style="align-self:flex-end">${esc(t('common.save'))}</button></div><div class="hint">${esc(t('conn.dbxHint'))}</div>`;
     if (c.status === 'reauth' || (c.status === 'error' && ['token_mismatch', 'scope'].includes(st.errorCode))) h += `<button class="btn block" data-act="conn-start">${esc(t('conn.reconnect'))}</button>`;
@@ -203,9 +204,18 @@ on('conn-start', el => busy(el, async () => {
 on('conn-sync', el => busy(el, async () => {
   let r: any;
   // Auch bei einem Fehler den neuen Status (Grund, Zeitpunkt) zeigen
-  try { r = await apiCall('POST', `/api/connect/${CUR}/sync`); } finally { await loadConnections(true); refreshSheet(); }
+  const sum = { days: 0, activities: 0 };
+  try {
+    // Dropbox wertet eine Datei pro Aufruf aus (CPU-Grenze des Servers): weiter abrufen, solange Dateien warten (höchstens 12)
+    for (let i = 0; i < 12; i++) {
+      r = await apiCall('POST', `/api/connect/${CUR}/sync`);
+      const s0 = r.stats || {}; sum.days += s0.days || 0; sum.activities += s0.activities || 0;
+      if (!s0.queued) break;
+      toast(t('conn.queueing', { n: s0.queued }));
+    }
+  } finally { await loadConnections(true); refreshSheet(); }
   await syncNow();
-  const s = r.stats || {}; toast(t('conn.synced', { d: s.days || 0, a: s.activities || 0 }));
+  toast(t('conn.synced', { d: sum.days, a: sum.activities }));
 }));
 on('conn-disconnect', el => {
   if (!armed(el as HTMLElement, t('common.sure'))) return;
