@@ -2,6 +2,15 @@
 
 Stand der Recherche: Oktober 2026, aktualisiert mit Auftrag 4 (11.10.2026).
 
+## Auftrag 13: Warum HealthFit/Dropbox nicht ging (16.10.2026)
+
+1. **Zweiter Worker mit altem Code:** Beim Umzug am 13.10. entstand versehentlich ein Worker `coach-app-efc7` (gleicher Name wie die Pages-App) an der echten Datenbank, ohne Schlüssel. Er holte alle 5 min Dropbox ab, scheiterte an „TOKEN_KEY fehlt“ und setzte den Zeitstempel, deshalb kam der richtige Server nie dran. Zeitplan abgeschaltet (16.10.); löschen beim Aufräumen der alten App.
+2. **Anzeige:** Ein Fehler stand als „nicht verbunden“ mit Knopf „Verbinden“ da. Jetzt: „Fehler“ mit Grund, Hilfe, letzter Abruf, letzte Datei, „Jetzt abrufen“.
+3. **CPU-Grenze (kostenloser Tarif, 10 ms pro Aufruf):** Eine FIT-Datei braucht 5-40 ms. Jetzt Warteschlange, eine Datei pro Aufruf, alle 5 min die nächste.
+4. **Ordner:** HealthFit speichert in `/Apps/HealthFit`. Eine Dropbox-App mit „App folder“-Zugriff sieht diesen Ordner nicht; nötig ist „Full Dropbox“. Die App sucht auch `/HealthFit` und Ordner mit „HealthFit“ im Namen.
+
+**Alternative ohne Dropbox:** HealthFit → Einstellungen → Intervals.icu → anmelden, automatisch hochladen; in der App intervals.icu verbinden. Trainings kommen alle 30 min.
+
 ## Auftrag 4: Warum „Verbinden“ beim ersten Test nicht ging
 
 Geprüft am 11.10.2026 mit `node scripts/check-secrets.mjs` (zeigt nur Namen, keine Werte), der Test-Datenbank (nur Gerätenamen) und simulierten Anbietern in den Tests.
@@ -28,7 +37,8 @@ Die Weiterleitungs-Adresse stimmt: `https://stamio-test.pages.dev/api/connect/<d
 | Quelle | Status in der App | Was kommt rein | Kosten | Was fehlt noch |
 |---|---|---|---|---|
 | **Apple Health per Kurzbefehl** | fertig | HFV, Ruhepuls, Schlaf, Gewicht, SpO2, Atemfrequenz, Trainings (Dauer, Distanz, Puls) | kostenlos | Jonah baut den Kurzbefehl + 2 Automationen (FUER-JONAH.md) |
-| **HealthFit → Dropbox** | fertig | jede Einheit als FIT-Datei: Runden, Puls, Pace/Leistung, Schwimmzüge | kostenlos (Dropbox Basic) | Dropbox-App anlegen (5 min), in HealthFit Export aktivieren |
+| **HealthFit → Dropbox** | fertig | jede Einheit als FIT-Datei: Runden, Puls, Pace/Leistung, Schwimmzüge | kostenlos (Dropbox Basic) | Dropbox-App mit **Full Dropbox** (nicht „App folder“), in HealthFit Export aktivieren |
+| **HealthFit → intervals.icu** | fertig (über intervals.icu) | Trainings | kostenlos | in HealthFit Intervals.icu anmelden, in der App intervals.icu verbinden |
 | **HealthFit → iCloud/Datei** | fertig | wie oben, per Kurzbefehl „Datei hochladen“ oder Datei-Import | kostenlos | – |
 | **Datei-Import** (.fit, .gpx, .tcx) | fertig | Einheiten von jeder Uhr/jedem Radcomputer | kostenlos | – |
 | **intervals.icu** | fertig | CTL/ATL/TSB, Wellness, Trainings | kostenlos | API-Schlüssel in der App eintragen (oder wie bisher als Secret) |

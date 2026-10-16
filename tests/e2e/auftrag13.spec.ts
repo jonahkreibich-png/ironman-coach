@@ -33,8 +33,8 @@ test.describe('mit Server', () => {
     await expect(page.locator('#sheetPanel summary', { hasText: 'HealthFit → intervals.icu' })).toBeVisible();
     await page.locator('#sheetPanel [data-act="conn-sync"]').click();
     await expect.poll(() => syncCalls).toBe(1);
-    // kein „Verbinden“-Knopf, der so tut, als wäre nichts verbunden
-    await expect(page.locator('#sheetPanel [data-act="conn-start"]')).toHaveCount(0);
+    // „Neu verbinden“ (nach neuer Dropbox-App nötig), aber kein „Verbinden“, das so tut, als wäre nichts verbunden
+    await expect(page.locator('#sheetPanel [data-act="conn-start"]')).toHaveText('Neu verbinden');
   });
 });
 

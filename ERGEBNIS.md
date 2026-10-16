@@ -1,5 +1,23 @@
 # Ergebnis
 
+## Auftrag 13: Verbindung, Extra-Einheiten, Trends, Design (16.10.)
+
+Punkte 1-3 live in der echten App (Version 2.9.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag13.sql`, `prod-vor-auftrag13b.sql`. Daten wurden nicht verändert. **Punkt 4 wartet auf deine Wahl.**
+
+**1 HealthFit/Dropbox – drei Ursachen:**
+- Ein versehentlich beim Umzug (13.10.) entstandener zweiter Server `coach-app-efc7` ohne Schlüssel lief alle 5 min auf deiner echten Datenbank, scheiterte an „TOKEN_KEY fehlt“ und blockierte den richtigen Server. **Abgeschaltet.** Seitdem läuft der Abruf wieder über den richtigen Server (geprüft).
+- Deine Dropbox-App hat nur „App folder“-Zugriff (sie sieht 0 Einträge) und damit nie `/Apps/HealthFit`. **Das musst du ändern:** FUER-JONAH.md, Abschnitt B (10 min). Alternative ohne Dropbox: HealthFit → intervals.icu (ebenfalls dort).
+- Viele FIT-Dateien auf einmal überschritten die CPU-Grenze des kostenlosen Tarifs. Jetzt eine Datei pro Abruf, alle 5 min die nächste.
+- Unter Verbindungen: „Fehler“ mit Grund und Hilfe statt „nicht verbunden“, letzter Abruf, letzte Datei, Warteschlange, „Jetzt abrufen“, „Neu verbinden“. Getestet Datei → Dropbox → App → Einheit mit einer echten Garmin-FIT-Datei (deine Dropbox ist erst nach Schritt B lesbar).
+
+**2 Extra-Einheiten:** Aufzeichnungen füllen jetzt auch selbst hinzugefügte Einheiten (gleicher Tag und Sport, Uhrzeit und Dauer), mit Quelle und änderbar. Keine Dubletten mehr zwischen HealthFit und intervals.icu (das war eine Lücke). Extras zählten schon für Scores, CTL/ATL/TSB, Analyse und Bewertung; neu: harte Extra-Einheit → Vorschlag, die harte Einheit am selben/nächsten Tag locker zu machen; Woche über 115 % → Vorschlag, die restlichen lockeren Einheiten zu kürzen.
+
+**3 Trends** unter Fortschritt (4 Wochen / 3 Monate / 1 Jahr): Erholung (HFV, Ruhepuls gegen 60-Tage-Basis, Schlaf, Bereitschaft), Fitness (CTL/ATL/TSB, Umfang je Sportart, ACWR), Effizienz (Pace bzw. Watt bei gleichem Puls, Entkopplung, Efficiency Factor), locker/mittel/hart, Schwimmen (Pace, Meter pro Zug, Züge pro Bahn, Kraul am Stück), Bestwerte mit „neu“, längste Einheiten, Schlaf gegen Qualität, Gewicht. Je Trend ein Satz, antippen zeigt den Verlauf; zu wenig Daten → „ab X … verfügbar“. Bei dir gerade z. B.: Pace bei Puls 141 um 26 s/km schneller, Verteilung 66/29/5 (zu viel mittel).
+
+**4 Design:** 3 Varianten in `design-varianten.html` und in stamio-test unter Mehr → Einstellungen → Design-Vorschau. Nach deiner Wahl baue ich sie überall ein.
+
+Tests: 1318 Unit- und Server-Tests, 152 Browser-Tests (Chromium, WebKit, Layout 320-430 px). Entscheidungen 149-160.
+
 ## Auftrag 12: Zonen, Coach, Scores, Prognose (15.10.)
 
 Live in der echten App (Version 2.8.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-release12.sql`, `test-vor-auftrag12.sql`. Daten wurden nicht verändert.
