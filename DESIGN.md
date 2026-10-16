@@ -1,5 +1,7 @@
 # Design
 
+> Seit Version 3.0.0 (Auftrag 13) gilt das Design „Glas“: Tokens und Regeln in `web/src/design.css` (über `<html data-design="glas">`), Grundbausteine weiter in `web/src/styles.css`. Vergleich der Varianten: `design-varianten.html`.
+
 Stand: 11.10.2026. Bilder: `docs/design/vorher/` (alte App) und `docs/design/nachher/` (neue App). Alle Bilder sind 390 px breit (iPhone), hell und dunkel, mit erfundenen Demo-Daten (`fixtures/demo.mjs`).
 Die Bilder werden neu erzeugt mit `npm run build`, `node scripts/test-server.mjs 4180` und `node scripts/screens.mjs`.
 

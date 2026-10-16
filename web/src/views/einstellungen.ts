@@ -10,7 +10,7 @@ import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from
 import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
 import { invalidate, D } from '../data';
 import { needsParentConsent } from '../../../shared/features';
-import { STORAGE, APP, APP_ENV } from '../config';
+import { STORAGE, APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
 import { keepDays } from './coach';
@@ -39,20 +39,9 @@ export function applyTheme(v: string) {
   try { localStorage.setItem(STORAGE.theme, v); } catch (e) {}
 }
 
-/* Auftrag 13: Design-Vorschau (nur Test-Umgebung), je Gerät */
-const design = () => { try { return localStorage.getItem(STORAGE.design) || ''; } catch (e) { return ''; } };
-export function applyDesign(v: string) {
-  if (v) document.documentElement.setAttribute('data-design', v); else document.documentElement.removeAttribute('data-design');
-  try { if (v) localStorage.setItem(STORAGE.design, v); else localStorage.removeItem(STORAGE.design); } catch (e) {}
-}
-function designCard(): string {
-  return `<div class="card stack" data-design-preview><div class="seg" role="group" aria-label="${esc(t('set.design'))}">${[['', t('set.designNow')], ['glas', 'A Glas'], ['tempo', 'B Tempo'], ['fjord', 'C Fjord']].map(([v, l]) => `<button class="${design() === v ? 'on' : ''}" aria-pressed="${design() === v}" data-act="set-design" data-v="${v}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t('set.designHint'))}</div></div>`;
-}
-
 export function renderEinstellungen(): string {
   let h = sec(t('set.look'), `<div class="card stack"><div class="seg" role="group" aria-label="${esc(t('set.theme'))}">${[['', t('set.system')], ['light', t('set.light')], ['dark', t('set.dark')]].map(([v, l]) => `<button class="${theme() === v ? 'on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${theme() === v}">${esc(l)}</button>`).join('')}</div>
     <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`);
-  if (APP_ENV !== 'production') h += sec(t('set.design'), designCard(), t('set.designAside'));
   h += sec(t('set.zones'), zonesCard(), t('set.zonesAside'));
   h += sec(t('set.notify'), notifyCard());
   h += sec(t('set.chat'), `<div class="card stack"><span class="lab">${esc(t('set.chatKeep'))}</span><div class="seg" role="group" aria-label="${esc(t('set.chatKeep'))}">${[3, 7, 14].map(n => `<button class="${keepDays() === n ? 'on' : ''}" aria-pressed="${keepDays() === n}" data-act="set-chat-keep" data-v="${n}">${esc(t('set.chatDays', { n }))}</button>`).join('')}</div><div class="hint">${esc(t('set.chatKeepHint'))}</div>
@@ -247,7 +236,6 @@ on('score-adj', el => { const s = el.dataset.sport!; STATE.scoreAdjust = { ...(S
 on('score-reset', () => { STATE.scoreAdjust = {}; saveState(); invalidate(); nav.rerender(); toast(t('common.saved')); });
 
 on('set-theme', el => { applyTheme(el.dataset.v || ''); nav.rerender(); });
-on('set-design', el => { applyDesign(el.dataset.v || ''); nav.rerender(); });
 on('set-variant', el => { UI.heuteVariant = el.dataset.v; saveUi(); nav.rerender(); });
 void fmtDate; void refreshSheet; void saveProfile;
 

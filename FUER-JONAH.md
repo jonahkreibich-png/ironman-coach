@@ -2,11 +2,7 @@
 
 Nur das, was du selbst tun musst.
 
-## A. Design wählen (neu, 16.10.)
-
-`design-varianten.html` im Projektordner im Browser öffnen (3 Varianten, je 5 Bildschirme hell und dunkel). Auf dem iPhone: Test-App → Mehr → Einstellungen → Design-Vorschau. Dann Claude schreiben, z. B. „B“ oder „Farben von A, Leiste von C“.
-
-## B. HealthFit über Dropbox reparieren (10 min, neu am 16.10.)
+## A. HealthFit über Dropbox reparieren (10 min, neu am 16.10.)
 
 Deine Dropbox-App hat nur Zugriff auf ihren eigenen Ordner („App folder“). HealthFit speichert aber in `/Apps/HealthFit`. Den Zugriff kann man nicht ändern, deshalb eine neue App:
 

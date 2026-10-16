@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.0.0', items: [
+    'Neues Design „Glas“: Karten wie Glas über einem weichen Farbverlauf, die Tab-Leiste schwebt unten, große Zahlen, Knöpfe, die beim Drücken federn. Hell und dunkel, mit „Bewegung reduzieren“ und „Transparenz reduzieren“ aus den iPhone-Einstellungen.',
+    'Unter Fortschritt gibt es jetzt Trends (Erholung, Fitness, Effizienz, locker/hart, Schwimmen, Bestwerte), je mit einem Satz, was sie bedeuten.',
+    'Selbst hinzugefügte Einheiten bekommen die Daten deiner Uhr automatisch, und Verbindungen zeigen klar, was los ist.'
+  ] },
   { version: '2.9.0', items: [
     'Neue Trends unter Fortschritt: Erholung (HFV, Ruhepuls, Schlaf), Fitness und Belastung, Effizienz (Pace bzw. Watt bei gleichem Puls), locker/hart, Schwimmen, Bestwerte und lange Einheiten. Zeitraum 4 Wochen, 3 Monate oder 1 Jahr, jeder Trend mit einem Satz, was er bedeutet.',
     'Selbst hinzugefügte Einheiten bekommen die Daten deiner Uhr (HealthFit, intervals.icu) automatisch, ohne doppelte Einheiten. Eine harte Extra-Einheit prüft den nächsten harten Tag, eine zu volle Woche bekommt einen Entlastungs-Vorschlag.',

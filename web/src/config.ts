@@ -9,7 +9,6 @@ export const STORAGE = {
   state: 'ec_state_v2',
   ui: 'ec_ui',
   theme: 'theme_pref',
-  design: 'design_pref',
   syncAuth: 'ec_sync_auth',
   syncMeta: 'ec_sync',
   errors: 'ec_errors',
