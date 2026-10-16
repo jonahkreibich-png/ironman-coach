@@ -132,14 +132,25 @@ describe('Verständliche Fehler', () => {
     expect(loc).toContain('verbunden=dropbox'); // Anmeldung selbst klappt
     const st = await conn(env, token);
     expect(st.status).toBe('error');
-    expect(st.error).toMatch(/HealthFit-Ordner/);
-    expect(st.error).toMatch(/App folder/);
+    expect(st.error).toMatch(/nur ihren eigenen, leeren Ordner/);
+    expect(st.error).toMatch(/Full Dropbox/);
     expect(st.stats.errorCode).toBe('folder');
+    expect(st.stats.diag).toEqual({ root: 0, apps: false });
     expect(calls.filter(c => c.includes('get_metadata')).length).toBeGreaterThanOrEqual(3); // übliche Orte durchsucht
     // Jetzt abrufen: gleicher, klarer Grund
     const r = await call(env, 'POST', '/api/connect/dropbox/sync', {}, token);
     expect(r.status).toBe(404);
-    expect(r.data.error).toMatch(/HealthFit-Ordner/);
+    expect(r.data.error).toMatch(/App folder/);
+  });
+
+  test('volle Dropbox, aber HealthFit hat noch nichts exportiert → Hinweis auf den Export in HealthFit', async () => {
+    const { env, token } = await setup();
+    routes.push([/files\/get_metadata/, () => jres({ error_summary: 'path/not_found/..' }, 409)]);
+    routes.push([/files\/list_folder$/, (_u, init) => JSON.parse(init.body).path === '' ? { entries: [{ '.tag': 'folder', name: 'Apps' }, { '.tag': 'folder', name: 'Fotos' }], cursor: 'X', has_more: false } : { entries: [{ '.tag': 'folder', name: 'Strava' }], cursor: 'Y', has_more: false }]);
+    await connectDropbox(env, token);
+    const st = await conn(env, token);
+    expect(st.error).toMatch(/HealthFit-Ordner ist in deiner Dropbox nicht zu finden/);
+    expect(st.stats.diag).toEqual({ root: 2, apps: true });
   });
 
   test('Ordner liegt woanders (z. B. /HealthFit): wird gefunden', async () => {

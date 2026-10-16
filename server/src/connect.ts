@@ -287,12 +287,15 @@ async function dbxJson(env: Env, uid: number, B: string, path: string, body: any
   if (res.status >= 500) throw new DbxError(502, `Dropbox antwortet gerade nicht (Fehler ${res.status}). Der nächste Abruf versucht es wieder.`, 'down');
   return { status: res.status, data };
 }
-/* Ordner finden: eingestellter Ordner, sonst die üblichen HealthFit-Orte, sonst ein Ordner „HealthFit“ in /Apps oder ganz oben */
-async function findDropboxFolder(env: Env, uid: number, B: string, wanted: string | null): Promise<string | null> {
+/* Ordner finden: eingestellter Ordner, sonst die üblichen HealthFit-Orte, sonst ein Ordner „HealthFit“ in /Apps oder ganz oben.
+   diag (nur Anzahlen, keine Namen): wie viele Einträge die Dropbox-App ganz oben sieht und ob es /Apps gibt. 0 Einträge und kein /Apps
+   heißt fast sicher: die Dropbox-App hat nur „App folder“-Zugriff. */
+async function findDropboxFolder(env: Env, uid: number, B: string, wanted: string | null, diag: any = {}): Promise<string | null> {
   const isFolder = async (p: string) => { const r = await dbxJson(env, uid, B, '/2/files/get_metadata', { path: p }); return r.status === 200 && r.data && r.data['.tag'] === 'folder' ? (r.data.path_display || p) : null; };
   for (const p of [...(wanted ? [wanted] : []), ...DROPBOX_FOLDERS.filter(x => x !== wanted)]) { if (p === '/') return '/'; const f = await isFolder(p); if (f) return f; }
   for (const parent of ['/Apps', '']) {
     const r = await dbxJson(env, uid, B, '/2/files/list_folder', { path: parent, recursive: false, limit: 200 });
+    if (parent === '') { diag.root = r.status === 200 ? (r.data.entries || []).length : -1; diag.apps = r.status === 200 && (r.data.entries || []).some((e: any) => e['.tag'] === 'folder' && /^apps$/i.test(e.name)); }
     const hit = r.status === 200 && (r.data.entries || []).find((e: any) => e['.tag'] === 'folder' && /health\s*fit/i.test(e.name));
     if (hit) return hit.path_display || hit.path_lower;
   }
@@ -311,9 +314,11 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
   let folder: string | null = meta.folder || null;
   let res: any = conn && conn.cursor && folder ? await list('/2/files/list_folder/continue', { cursor: conn.cursor }).catch(e => { if (e instanceof DbxError && (e.code === 'reauth' || e.code === 'scope')) throw e; return null; }) : null;
   if (!res) {
-    const found = await findDropboxFolder(env, uid, B, meta.folderSet ? folder : null);
+    const diag: any = {};
+    const found = await findDropboxFolder(env, uid, B, meta.folderSet ? folder : null, diag);
     if (!found) {
-      await saveConn(env, uid, 'dropbox', { stats: JSON.stringify({ ...meta, folder: null }) });
+      await saveConn(env, uid, 'dropbox', { stats: JSON.stringify({ ...meta, folder: null, diag }) });
+      if (diag.root === 0 && !diag.apps) throw new DbxError(404, 'Die Dropbox-App des Servers sieht nur ihren eigenen, leeren Ordner („App folder“). HealthFit speichert aber in /Apps/HealthFit. Der Betreiber muss eine Dropbox-App mit Zugriff „Full Dropbox“ anlegen; danach hier neu verbinden.', 'folder');
       throw new DbxError(404, 'Der HealthFit-Ordner ist in deiner Dropbox nicht zu finden. Entweder hat HealthFit noch nichts exportiert (in HealthFit: Automatischer Export → Dropbox einschalten), oder die Dropbox-App des Servers hat nur Zugriff auf ihren eigenen Ordner („App folder“) statt auf die ganze Dropbox.', 'folder');
     }
     folder = found;
