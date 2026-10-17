@@ -128,7 +128,7 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o: Check
   }
   let bw = o.baseOffset || 0;
   for (const w of weeks) {
-    const ph = (w.phase || 'base') as IPhase;
+    const ph = String(w.phase || 'base').toLowerCase() as IPhase;
     const baseWeek = ph === 'base' ? bw : 0; bw = ph === 'base' ? bw + 1 : 0;
     if (o.from && w.endDate && w.endDate < o.from) continue;
     const hd = (w.days || []).filter((d: any) => (d.sessions || []).some(isHardSession));
@@ -268,7 +268,7 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o: Repa
   let bw = o.baseOffset || 0; let prevHard = new Set<string>();
   const goalSport = /^run_/.test(o.goalType) ? 'run' : o.goalType === 'bike_event' ? 'bike' : '';
   for (const w of weeks) {
-    const ph = (w.phase || 'base') as IPhase; const baseWeek = ph === 'base' ? bw : 0; bw = ph === 'base' ? bw + 1 : 0;
+    const ph = String(w.phase || 'base').toLowerCase() as IPhase; const baseWeek = ph === 'base' ? bw : 0; bw = ph === 'base' ? bw + 1 : 0;
     const max = maxHard(p, ph, w.startDate || today, baseWeek) + ((w.races || []).length ? 1 : 0);
     for (let guard = 0; guard < 4 && !w.partial && (w.days || []).filter(hardDay).length > max; guard++) {
       const cands = (w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && flexible(s, o.from, d.date)).map((s: any) => ({ d, s })));

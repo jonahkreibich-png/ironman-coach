@@ -11,6 +11,7 @@ import * as W from '../../../shared/workouts';
 import { paceCtx } from '../../../shared/plangen';
 import { validateWeeks } from '../../../shared/rules';
 import { checkPlan } from '../../../shared/plancheck';
+import { checkIntensity } from '../../../shared/intensity';
 import { rulesOf, hardViolations, describe as ruleText } from '../../../shared/constraints';
 import { parseFor } from '../../../shared/ruleparse';
 import { isMinor, progressionOf } from '../../../shared/profile';
@@ -34,7 +35,9 @@ function issuesOf(adjustments: any): string[] {
   const p = profile();
   const out = [
     ...validateWeeks(fut, { minor: isMinor(p, today), maxIncPct: progressionOf(p, today).incPct }).map(v => v.msg),
-    ...checkPlan(fut, p, goals(), today).filter(i => i.rule === 'dayTime' || i.rule === 'teamSport' || (i.rule === 'strength' && /harten Tag/.test(i.msg))).map(i => i.msg)
+    ...checkPlan(fut, p, goals(), today).filter(i => i.rule === 'dayTime' || i.rule === 'teamSport' || (i.rule === 'strength' && /harten Tag/.test(i.msg))).map(i => i.msg),
+    // Auftrag 14: eigene Änderungen werden geprüft (zwei harte Tage, zu viele harte Tage), aber nicht ungefragt geändert
+    ...checkIntensity(fut, p, today, { from: today }).filter(i => i.rule === 'adjacent' || i.rule === 'tooMany').map(i => i.msg)
   ];
   return [...new Set(out)];
 }

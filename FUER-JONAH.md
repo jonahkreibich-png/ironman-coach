@@ -2,22 +2,13 @@
 
 Nur das, was du selbst tun musst.
 
-## A. HealthFit über Dropbox reparieren (10 min, neu am 16.10.)
+## A. Schwimm-Hilfsmittel eintragen (1 Minute, du und Papa, neu am 17.10.)
 
-Deine Dropbox-App hat nur Zugriff auf ihren eigenen Ordner („App folder“). HealthFit speichert aber in `/Apps/HealthFit`. Den Zugriff kann man nicht ändern, deshalb eine neue App:
+Mehr → Berücksichtigungen → Können und Ausrüstung → **Schwimm-Hilfsmittel** antippen (Kickbrett, Pull Buoy, Flossen, Paddles, Frontschnorchel). Nur was ihr habt (oder im Bad leihen könnt), kommt in die Einheiten. Bis dahin plant die App ohne Hilfsmittel. Der Coach erinnert euch auch.
 
-1. https://www.dropbox.com/developers/apps → **Create app** → **Scoped access** → **Full Dropbox** → Name z. B. `stamio-healthfit-jonah` → Create.
-2. Tab **Permissions**: Haken bei `files.metadata.read`, `files.content.read`, `account_info.read` → **Submit**.
-3. Tab **Settings** → Redirect URIs: `https://coach-app-efc7.pages.dev/api/connect/dropbox/callback` → **Add**.
-4. Im Ordner `ironman-coach`: „App key“ kopieren → `node scripts/set-secret.mjs DROPBOX_APP_KEY echt`. „App secret“ (Show) kopieren → `node scripts/set-secret.mjs DROPBOX_APP_SECRET echt`.
-5. In HealthFit: Einstellungen → Automatischer Export → **Dropbox** an, Format **FIT**.
-6. In der App: Mehr → Verbindungen → Dropbox → **Neu verbinden**. Danach steht dort „verbunden“ und die letzte Datei.
+## B. Dropbox-Schlüssel (mit Claude im Chat, 5 min)
 
-**Statt Dropbox (ohne eigene App):** HealthFit → Einstellungen → **Intervals.icu** → anmelden, automatisch hochladen. In der App: Mehr → Verbindungen → intervals.icu → Athleten-ID und API-Schlüssel (intervals.icu → Settings → Developer Settings).
-
-## 0. Papa: Geburtsjahr neu eintragen (1 Minute, neu am 15.10.)
-
-Papa hatte als Geburtsjahr „197“ eingegeben. Die App hat das gelöscht und rechnet bis dahin mit Standardwerten. Sag ihm: App öffnen → Mehr → Profil und Ziele → Geburtsjahr mit vier Ziffern eintragen. Der Coach erinnert ihn auch.
+Die echte App liest Dropbox schon seit 16.10. (eine echte FIT-Datei wurde übernommen). Wenn du eine neue Dropbox-App mit „Full Dropbox“ anlegst, führt dich Claude durch das Setzen von App key und App secret (Wert kopieren, „kopiert“ schreiben, Claude setzt ihn, ohne ihn anzuzeigen). Redirect URIs der App: `https://coach-app-efc7.pages.dev/api/connect/dropbox/callback` und `https://stamio-test.pages.dev/api/connect/dropbox/callback`.
 
 ## 1. KI-Coach einschalten (wenn du willst)
 

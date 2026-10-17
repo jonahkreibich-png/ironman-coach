@@ -1,5 +1,58 @@
 # Ergebnis
 
+## Auftrag 14: Ampel, Fehler melden, Dropbox, Schwimmen, Intensität (17.10.)
+
+Live in der echten App (Version 3.1.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag14.sql`, `prod-vor-auftrag14b.sql`, `test-vor-auftrag14.sql`. Geändert wurden nur Papas und dein Plan (neu berechnet ab heute, Vergangenes und Erledigtes bleibt) plus je eine Coach-Nachricht „Plan korrigiert“.
+
+**1 Ampel:** Ursache bei Papa: Morgens kam erst nur der Ruhepuls, der Server schrieb „grün 100/100“. Später kam der Schlaf (5,3 h), die App rechnete gelb 70, zeigte aber den alten Satz. Jetzt gibt es einen Wert (0-100) aus HFV, Ruhepuls, Schlaf, Krankheit, Belastung (Form und ACWR, erst ab etwas Trainingsverlauf) und neu Gefühl/Muskelkater (Morgen-Eingabe oder intervals.icu), je gegen die persönliche Basis. Farbe kommt nur aus dem Wert (ab 70 grün, 45-69 gelb, unter 45 rot); Ring, Wort, Satz und Farbe sind gleich, die Morgen-Nachricht wird bei neuen Werten erneuert. Unter „Warum?“ hat jeder Einzelwert seine Farbe. Ohne Morgenwerte (oder nur einem Wert): „Ampel unsicher – keine Morgenwerte“. „Lockerer Lauf mit Hügelsprints“ ist jetzt Zone 2 (kurze Stücke ändern die Grundzone nicht); alle Einheiten aller Test-Personen ohne Widerspruch Titel/Zone.
+
+**2 Fehler melden:** Status neu → in Arbeit → erledigt oder verworfen, per Knopf oder Wischen (links erledigt, rechts in Arbeit). Erledigte stehen zugeklappt unter „Erledigt“, „neu“ zählt nur Offene. Melder sehen den Status, auch bei eigenen Meldungen. Gleiche Fehler sind eine Zeile („9× Dropbox: …“, kurzer Text, „Erledigt“). Die lange Dropbox-Meldung steht nicht mehr bei den Testern, sondern als „Hinweis für dich als Betreiber“; Tester sehen bei Verbindungen nur „noch nicht fertig eingerichtet, du musst nichts tun“.
+
+**3 HealthFit/Dropbox:** Die echte App liest Dropbox schon seit 16.10., 17:53 Uhr: Der Server kann `/Apps` durchsuchen (geht nur mit „Full Dropbox“), fand `/Apps/HealthFitExporter` und hat eine echte FIT-Datei übernommen (Rad indoor 16.10., 30 min). In der Test-Umgebung fehlen die Schlüssel noch. Das Schlüssel-Skript zeigt jetzt gar nichts mehr vom Wert und setzt auf Wunsch Test und echt zusammen (`… beide`).
+
+**4 Schwimmen:** Papa war wieder in „Kraul lernen“, weil er am 15.10. „25 m am Stück“ eingetragen hat und die Regel „kann kraulen, aber unter 50 m → Lernstufen“ griff. Jetzt gilt: „kann kraulen“ heißt immer normales Training, Stücke so lang wie am Stück (auch 25 m). Dauer = Meter × persönliche Pace (Kraul aus CSS oder Kraul-Check, sonst etwa Brust; Beinschlag und Übungen langsamer) + Pausen + 30 s je Serienwechsel. Geschätzte CSS zählt erst ab 400 m am Stück (Papas 2:05 war viel zu schnell). Papas alte 950 m in 32 min wären ehrlich gut 36 min; jetzt z. B. 700 m in 28 min (21 min schwimmen, 7 min Pausen). Neue Frage „Welche Hilfsmittel hast du?“ (Fragebogen, Berücksichtigungen); nur Vorhandenes wird eingeplant, ohne Brett Beinschlag in Seitlage. Jede Einheit als Liste Einschwimmen, Technik, Hauptteil, Ausschwimmen, je Zeile Wdh × Strecke, Lage, Hilfsmittel, Pause, Fokus, darunter Übungen erklärt (1 Satz) und Summe.
+
+**5 Intensität:** Schon da war (Auftrag 9/10): Phasen, Rad Sweet Spot → Schwelle/Over-Unders → VO2max/Wettkampftempo mit Leitern, Lauf Schwelle im Aufbau und Wettkampftempo je Distanz, Hügelsprints/Fahrtspiel in der Grundlage, keine harten Tage vor Spielen. Neu: harte Tage nach Niveau (Einsteiger 1, Fortgeschrittene 2, Erfahrene 3; unter 18 und ab 60 höchstens 2, kein VO2max), Spiele zählen in allen Phasen; Einsteiger in der Grundlage nichts Hartes; Tempo in der späten Grundlage (Erfahrene jede Woche, Fortgeschrittene jede zweite); 5/10 km mit VO2max (5×3 min); Rad-Event mit langen Anstiegen; Tapering mit kurzen Reizen; Sportarten im Triathlon reihum; Leitern bleiben oben nicht stehen (keine gleiche Einheit zwei Wochen hintereinander); CSS-Intervalle wechseln (100er, 200er, 50er). Neuer Plan-Check bei jedem neuen und geänderten Plan korrigiert vor dem Anzeigen: zwei harte Tage nebeneinander, zu viele harte Tage, unter 75 % locker, Wiederholung, fehlende Intensität je Phase und Sportart.
+
+Bei dir (Beispiel): bisher in den nächsten Wochen kein einziger Qualitätslauf; jetzt in den nächsten 8 Wochen 4 Tempo-/Schwellenläufe (sonntags im langen Lauf, weil Do zwischen Mi-Rad und Fr-Spiel liegt) und 4 harte Radeinheiten, im Aufbau 12 Schwellenläufe.
+
+Auswertung (harte/leichte Qualitätseinheiten je Phase: S Schwimmen, R Rad, L Laufen; leicht = Hügelsprints, Fahrtspiel, Steigerungen, Technik-Sets; locker = Zeit in Zone 1-2 im geplanten Training):
+
+| Person | Niveau | Grundlage | Aufbau | Spezifisch | Tapering | locker | Fehler |
+|---|---|---|---|---|---|---|---|
+| jugend-langdistanz | Fortgeschritten | S 0/38, R 10/0, L 1/19 | S 0/12, R 2/0, L 2/0 | – | – | 91 % | 0 |
+| vater-rad-lauf | Erfahren | R 2/0, L 0/0 | R 6/0, L 0/0 | R 5/0, L 0/0 | R 2/0, L 0/0 | 93 % | 0 |
+| laeuferin-hm | Erfahren | L 0/1 | L 3/0 | L 2/0 | L 2/0 | 93 % | 0 |
+| einsteiger-sprint | Einsteiger | S 0/3, R 0/0, L 0/0 | R 4/0, L 0/0 | S 0/1, R 3/0, L 0/0 | S 0/1, R 1/0, L 0/0 | 95 % | 0 |
+| erfahren-md-marathon | Erfahren | S 0/20, R 6/0, L 3/10 | S 9/18, R 9/0, L 9/0 | S 9/13, R 8/0, L 9/0 | S 2/4, R 2/0, L 2/0 | 89 % | 0 |
+| vater-regeln | Erfahren | S 0/18, R 12/0, L 0/18 | S 0/10, R 7/0, L 0/0 | S 0/6, R 4/0, L 0/0 | S 0/1, R 1/0, L 1/0 | 91 % | 0 |
+| marathon-anfaenger | Einsteiger | L 0/0 | L 0/0 | L 0/0 | L 0/0 | 100 % | 0 |
+| rad-event | Erfahren | R 14/0 | R 8/0 | R 5/0 | R 2/0 | 93 % | 0 |
+| olympisch-erfahren | Erfahren | S 0/38, R 14/0, L 11/19 | S 7/15, R 8/0, L 7/0 | S 5/10, R 5/0, L 5/0 | S 2/2, R 1/0, L 1/0 | 89 % | 0 |
+| langdistanz-profi | Erfahren | S 0/54, R 13/0, L 10/17 | S 9/27, R 9/0, L 8/0 | S 9/24, R 9/0, L 9/0 | S 2/7, R 2/0, L 2/0 | 91 % | 0 |
+| anfaenger-ohne-kraul | Einsteiger | S 0/24, R 0/0, L 0/0 | S 0/17, R 10/0, L 0/0 | S 0/6, R 4/0, L 0/0 | S 0/1, R 1/0, L 0/0 | 95 % | 0 |
+| laeufer-ohne-rad | Erfahren | L 6/11 | L 5/0 | L 5/0 | L 1/0 | 92 % | 0 |
+| teamsport-ohne-spiele | Fortgeschritten | R 0/0, L 5/18 | R 0/0, L 5/0 | R 0/0, L 3/0 | R 1/0, L 1/0 | 95 % | 0 |
+| fuenfzig-wenig-zeit | Fortgeschritten | S 0/21, R 10/0, L 0/9 | S 0/15, R 7/0, L 1/0 | S 0/5, R 4/0, L 1/0 | S 0/1, R 1/0, L 1/0 | 93 % | 0 |
+| triathlet-50m-freiwasser | Erfahren | S 0/52, R 14/0, L 11/18 | S 3/17, R 6/0, L 4/0 | S 3/11, R 5/0, L 5/0 | S 2/2, R 1/0, L 1/0 | 92 % | 0 |
+| zufall-1 | Einsteiger | – | L 0/0 | L 0/0 | L 0/0 | 100 % | 0 |
+| zufall-2 | Erfahren | L 0/1 | L 3/0 | L 3/0 | L 1/0 | 93 % | 0 |
+| zufall-3 | Fortgeschritten | L 5/22 | L 14/0 | L 5/0 | L 1/0 | 93 % | 0 |
+| zufall-4 | Erfahren | – | L 4/0 | L 3/0 | L 2/0 | 90 % | 0 |
+| zufall-5 | Einsteiger | – | S 0/4, R 2/0, L 0/0 | S 0/3, R 2/0, L 0/0 | S 0/1, R 1/0, L 0/0 | 93 % | 0 |
+| zufall-6 | Fortgeschritten | S 0/17, R 4/0, L 0/17 | S 0/11, R 7/0, L 1/0 | S 0/6, R 3/0, L 1/0 | S 0/1, R 1/0, L 0/0 | 91 % | 2 |
+| zufall-7 | Erfahren | – | S 1/4, R 2/0, L 1/0 | S 2/2, R 2/0, L 1/0 | S 0/2, R 2/0, L 2/0 | 87 % | 0 |
+| zufall-8 | Einsteiger | S 0/29, R 0/0, L 0/0 | S 10/24, R 5/0, L 0/0 | S 4/13, R 4/0, L 0/0 | S 0/2, R 2/0, L 0/0 | 95 % | 0 |
+| zufall-9 | Fortgeschritten | R 7/0 | R 4/0 | R 4/0 | R 2/0 | 90 % | 0 |
+| zufall-10 | Fortgeschritten | R 0/0, L 0/0 | R 0/0, L 3/0 | R 0/0, L 3/0 | R 1/0, L 1/0 | 92 % | 0 |
+| fester-wochenaufbau | Fortgeschritten | S 0/36, R 12/0, L 0/12 | S 0/26, R 4/0, L 4/9 | S 0/8, R 2/0, L 1/3 | – | 93 % | 0 |
+| jonah | Erfahren | S 0/36, R 12/0, L 11/12 | S 0/32, R 11/0, L 12/12 | S 0/10, R 3/0, L 3/3 | – | 88 % | 0 |
+| papa | Erfahren | S 0/36, R 11/0, L 0/19 | S 9/15, R 9/0, L 0/0 | S 5/7, R 5/0, L 0/0 | S 0/2, R 1/0, L 0/0 | 87 % | 0 |
+
+Einziger Rest: zufall-6 (Spiel samstags, Training dienstags, 5 h): nur montags ist Platz für Hartes, deshalb wechseln sich Rad und Lauf ab (Lauf 1 von 4 Wochen). Einsteiger mit Lauf-Geh-Wechsel (marathon-anfaenger, zufall-1) laufen bewusst alles locker.
+
+Tests: 1392 Unit- und Server-Tests, 158 Browser-Tests (Chromium, WebKit, Layout 320-430 px). Entscheidungen 162-171.
+
 ## Auftrag 13: Verbindung, Extra-Einheiten, Trends, Design (16.10.)
 
 Alles live in der echten App (Version 3.0.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag13.sql`, `prod-vor-auftrag13b.sql`, `prod-vor-design.sql`. Daten wurden nicht verändert.
