@@ -301,6 +301,25 @@ async function findDropboxFolder(env: Env, uid: number, B: string, wanted: strin
   }
   return null;
 }
+/* Auftrag 14: Wo liegen FIT-Dateien in der Dropbox? Nur Ordner, Anzahl und neuestes Datum (keine Inhalte). Ordner mit „HealthFit“
+   im Pfad zählen ab diesem Ordner (Unterordner je Jahr gehören dazu). */
+export async function fitFolders(env: Env, uid: number, B: string): Promise<{ folder: string; n: number; newest: string | null }[]> {
+  const r = await dbxJson(env, uid, B, '/2/files/search_v2', { query: 'fit', options: { file_extensions: ['fit'], max_results: 200, file_status: 'active', filename_only: true } });
+  if (r.status !== 200 || !r.data) return [];
+  const by: Record<string, { folder: string; n: number; newest: string | null }> = {};
+  for (const m of r.data.matches || []) {
+    const md = m && m.metadata && m.metadata.metadata;
+    if (!md || md['.tag'] !== 'file' || !/\.fit$/i.test(md.name || '')) continue;
+    const p = String(md.path_display || md.path_lower || '');
+    const parts = p.split('/'); parts.pop();
+    const hf = parts.findIndex(x => /health\s*fit/i.test(x));
+    const dir = (hf >= 0 ? parts.slice(0, hf + 1) : parts).join('/') || '/';
+    const t = md.client_modified || md.server_modified || null;
+    const g = by[dir.toLowerCase()] = by[dir.toLowerCase()] || { folder: dir, n: 0, newest: null };
+    g.n++; if (t && (!g.newest || t > g.newest)) g.newest = t;
+  }
+  return Object.values(by).sort((a, b) => String(b.newest || '').localeCompare(String(a.newest || ''))).slice(0, 6);
+}
 async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestStats> {
   const B = base(env, 'dropbox', 'https://api.dropboxapi.com'), CB = base(env, 'dropboxcontent', 'https://content.dropboxapi.com');
   const conn = await getConn(env, uid, 'dropbox');
@@ -312,10 +331,24 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
     throw new DbxError(502, `Dropbox: Ordner konnte nicht gelesen werden (${(r.data && r.data.error_summary) || 'Fehler ' + r.status}).`, 'list');
   };
   let folder: string | null = meta.folder || null;
-  let res: any = conn && conn.cursor && folder ? await list('/2/files/list_folder/continue', { cursor: conn.cursor }).catch(e => { if (e instanceof DbxError && (e.code === 'reauth' || e.code === 'scope')) throw e; return null; }) : null;
+  // Auftrag 14: kommt seit einem Tag nichts Neues, höchstens alle 3 h in der ganzen Dropbox nach FIT-Dateien suchen.
+  // Liegen neuere HealthFit-Dateien in einem anderen Ordner, wird auf ihn gewechselt (außer der Ordner ist von Hand eingestellt).
+  let switched = false;
+  const staleFile = !meta.lastFile || !meta.lastFile.at || Date.parse(meta.lastFile.at) < Date.now() - 86400000;
+  if (staleFile && (!meta.fitAt || meta.fitAt < Date.now() - 3 * 3600000)) {
+    const fit = await fitFolders(env, uid, B).catch(() => null);
+    if (fit) {
+      meta.fit = fit; meta.fitAt = Date.now();
+      const cur = folder ? fit.find(g => g.folder.toLowerCase() === folder!.toLowerCase()) : null;
+      const best = fit.find(g => /health\s*fit/i.test(g.folder)) || null;
+      if (!meta.folderSet && best && (!folder || best.folder.toLowerCase() !== folder.toLowerCase()) && String(best.newest || '') > String((cur && cur.newest) || (meta.lastFile && meta.lastFile.at) || '')) { folder = best.folder; switched = true; meta.switchedFrom = meta.folder || null; }
+      await saveConn(env, uid, 'dropbox', { stats: JSON.stringify({ ...meta, folder }) });
+    }
+  }
+  let res: any = conn && conn.cursor && folder && !switched ? await list('/2/files/list_folder/continue', { cursor: conn.cursor }).catch(e => { if (e instanceof DbxError && (e.code === 'reauth' || e.code === 'scope')) throw e; return null; }) : null;
   if (!res) {
     const diag: any = {};
-    const found = await findDropboxFolder(env, uid, B, meta.folderSet ? folder : null, diag);
+    const found = await findDropboxFolder(env, uid, B, meta.folderSet || switched ? folder : null, diag);
     if (!found) {
       await saveConn(env, uid, 'dropbox', { stats: JSON.stringify({ ...meta, folder: null, diag }) });
       if (diag.root === 0 && !diag.apps) throw new DbxError(404, 'Die Dropbox-App des Servers sieht nur ihren eigenen, leeren Ordner („App folder“). HealthFit speichert aber in /Apps/HealthFit. Der Betreiber muss eine Dropbox-App mit Zugriff „Full Dropbox“ anlegen; danach hier neu verbinden.', 'appfolder');
@@ -338,12 +371,17 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
   // Grund (Auftrag 13): Der kostenlose Cloudflare-Tarif erlaubt 10 ms CPU pro Aufruf, eine FIT-Datei braucht 5-40 ms.
   // Viele Dateien auf einmal brachen den Aufruf ab, bevor etwas gespeichert war – bei jedem Versuch wieder.
   const queue: any[] = [...(meta.queue || []), ...(meta.retry || []).map((r: any) => ({ ...r }))].filter((q: any) => q && q.path && (q.n || 0) < 3);
+  // Auftrag 14: schon übernommene Dateien (Pfad und Stand) nicht noch einmal auswerten, auch wenn der Ordner neu aufgelistet wird
+  const done: Record<string, string> = meta.done || {};
+  // Stand der Datei: rev bzw. content_hash von Dropbox (ändert sich nur, wenn die Datei sich ändert)
+  const stamp = (f: any) => String(f.rev || f.content_hash || '');
   for (const f of files.filter(f => fileTime(f) >= since).sort((x, y) => fileTime(x) - fileTime(y))) {
-    if (!queue.some(q => q.path === f.path_lower)) queue.push({ path: f.path_lower, name: f.name, at: f.client_modified || f.server_modified || null, n: 0 });
+    if (Object.prototype.hasOwnProperty.call(done, f.path_lower) && done[f.path_lower] === stamp(f)) continue;
+    if (!queue.some(q => q.path === f.path_lower)) queue.push({ path: f.path_lower, name: f.name, at: f.client_modified || f.server_modified || null, n: 0, stamp: stamp(f) });
   }
   const errors: { name: string; why: string }[] = (meta.errors || []).filter((e: any) => e && typeof e === 'object').slice(-4);
   let lastFile = meta.lastFile || null;
-  let st: any = { ...meta, folder, filesInFolder: files.length || meta.filesInFolder || 0, queue: queue.slice(-60), errors, lastFile };
+  let st: any = { ...meta, folder, filesInFolder: files.length || meta.filesInFolder || 0, queue: queue.slice(-60), errors, lastFile, done };
   delete st.retry;
   await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify(st) });
   const total: IngestStats = { days: 0, activities: 0, matched: 0, extras: 0, merged: 0, duplicates: 0 };
@@ -359,6 +397,7 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
       catch (e) { st.errors = [...st.errors, { name: f.name, why: 'Datei nicht lesbar: ' + String((e as Error).message || e).slice(0, 80) }].slice(-5); }
       st.queue = st.queue.slice(1);
     }
+    if (raw || r.ok) { const d = { ...(st.done || {}), [f.path]: f.stamp || '' }; const keys = Object.keys(d); st.done = keys.length > 400 ? Object.fromEntries(keys.slice(-400).map(k => [k, d[k]])) : d; }
     if (raw) {
       if (!lastFile || !lastFile.at || Date.parse(f.at || '') >= Date.parse(lastFile.at)) lastFile = { name: f.name, at: f.at || null, importedAt: Date.now() };
       st.lastFile = lastFile;
@@ -385,6 +424,8 @@ export async function syncProvider(env: Env, uid: number, p: ProviderId, opts: {
     else throw new HttpError(400, 'Dieser Dienst wird anders abgerufen.');
     const c = await getConn(env, uid, p);
     const old = c && c.stats ? JSON.parse(c.stats) : {};
+    // Auftrag 14: nach einem Erfolg keinen alten Fehlercode und keine alte Fehler-Diagnose mehr mitschleppen
+    delete old.errorCode; if (old.diag) delete old.diag;
     await saveConn(env, uid, p, { last_sync_at: Date.now(), last_ok_at: Date.now(), last_error: null, status: 'connected', stats: JSON.stringify({ ...old, last: stats }) });
     return stats;
   } catch (e) {

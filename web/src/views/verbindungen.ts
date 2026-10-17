@@ -160,6 +160,12 @@ function connSheet(): string {
     const check = c.lastSyncAt ? t(c.status === 'error' || c.status === 'reauth' ? 'conn.checkFail' : 'conn.checkOk', { ago: ago(c.lastSyncAt) }) : c.lastOkAt ? ago(c.lastOkAt) : '–';
     h += `<div class="kv" data-conn-check><span class="muted">${esc(t('conn.lastCheck'))}</span><b>${esc(check)}</b></div>`;
     if (c.id === 'dropbox') h += `<div class="kv" data-conn-file><span class="muted">${esc(t('conn.lastFile'))}</span><b style="text-align:right;overflow-wrap:anywhere">${esc(st.lastFile ? st.lastFile.name + (st.lastFile.at ? ' · ' + fmtDate(ymd(new Date(st.lastFile.at))) : '') : t('conn.noFileYet'))}</b></div>`;
+    // Auftrag 14: kommt lange nichts, sagen, wo FIT-Dateien liegen und was in HealthFit zu tun ist
+    if (c.id === 'dropbox' && !c.error) {
+      const lastAt = st.lastFile && st.lastFile.at ? Date.parse(st.lastFile.at) : 0;
+      if (!lastAt || Date.now() - lastAt > 2 * 86400000) h += `<div class="banner info" data-dbx-stale>${esc(t('conn.dbxStale', { d: lastAt ? fmtDate(ymd(new Date(lastAt))) : '–' }))}</div>`;
+      if (Array.isArray(st.fit) && st.fit.length) h += `<div class="hint" data-dbx-fit>${esc(t('conn.dbxFit'))} ${st.fit.slice(0, 3).map((g: any) => esc(`${g.folder} (${g.n}${g.newest ? ', ' + t('conn.newest') + ' ' + fmtDate(ymd(new Date(g.newest))) : ''})`)).join(' · ')}${st.switchedFrom ? ' · ' + esc(t('conn.dbxSwitched', { f: st.folder })) : ''}</div>`;
+    }
     if (c.error) {
       const code = st.errorCode || '';
       // Auftrag 14: falscher Ordnertyp der Dropbox-App ist ein Einstellungsfehler des Servers: Tester sehen einen ruhigen Hinweis, der Betreiber die Lösung

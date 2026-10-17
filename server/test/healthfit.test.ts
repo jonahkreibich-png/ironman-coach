@@ -223,3 +223,42 @@ describe('Verständliche Fehler', () => {
     expect(server.secrets.find((x: any) => x.name === 'TOKEN_KEY').set).toBe(false);
   });
 });
+
+describe('Auftrag 14: Dropbox-Abruf', () => {
+  test('neu aufgelisteter Ordner: schon übernommene Datei wird nicht noch einmal ausgewertet; alter Fehlercode verschwindet', async () => {
+    const { env, token } = await setup();
+    healthFitFolder([{ name: '2015-08-15-Laufen.fit', data: FIT }]);
+    await connectDropbox(env, token);
+    env.DB.db.prepare("UPDATE connections SET stats = json_set(stats, '$.errorCode', 'folder') WHERE provider = 'dropbox'").run();
+    const downloads = () => calls.filter(c => c.includes('files/download')).length;
+    const before = downloads();
+    // Cursor ungültig → Ordner wird komplett neu aufgelistet
+    env.DB.db.prepare("UPDATE connections SET cursor = NULL WHERE provider = 'dropbox'").run();
+    expect((await call(env, 'POST', '/api/connect/dropbox/sync', {}, token)).status).toBe(200);
+    expect(downloads()).toBe(before);
+    const st = await conn(env, token);
+    expect(st.stats.errorCode).toBeUndefined();
+    expect(Object.keys(st.stats.done)).toEqual(['/apps/healthfit/2015/2015-08-15-laufen.fit']);
+  });
+  test('kommt lange nichts: Suche nach FIT-Dateien findet neuere HealthFit-Dateien in einem anderen Ordner und wechselt dorthin', async () => {
+    const { env, token } = await setup();
+    healthFitFolder([]);
+    await connectDropbox(env, token);
+    routes.unshift([/files\/search_v2/, () => ({ matches: [
+      { metadata: { metadata: { '.tag': 'file', name: 'alt.fit', path_display: '/Apps/HealthFit/alt.fit', server_modified: '2015-08-01T10:00:00Z' } } },
+      { metadata: { metadata: { '.tag': 'file', name: '2015-08-15-Laufen.fit', path_display: '/Apps/HealthFit Exporter/2015/2015-08-15-Laufen.fit', client_modified: '2015-08-15T17:00:00Z' } } },
+      { metadata: { metadata: { '.tag': 'file', name: 'x.fit', path_display: '/Garmin/x.fit', client_modified: '2015-08-10T17:00:00Z' } } }
+    ] })]);
+    routes.unshift([/files\/list_folder$/, (_u, init) => JSON.parse(init.body).path === '/Apps/HealthFit Exporter'
+      ? { entries: [{ '.tag': 'file', name: '2015-08-15-Laufen.fit', path_lower: '/apps/healthfit exporter/2015/2015-08-15-laufen.fit', client_modified: new Date().toISOString() }], cursor: 'E1', has_more: false }
+      : { entries: [], cursor: 'C1', has_more: false }]);
+    routes.unshift([/files\/get_metadata/, (_u, init) => { const p = JSON.parse(init.body).path; return p === '/Apps/HealthFit' || p === '/Apps/HealthFit Exporter' ? { '.tag': 'folder', path_display: p } : jres({ error_summary: 'path/not_found/' }, 409); }]);
+    routes.unshift([/files\/download/, () => new Response(FIT)]);
+    expect((await call(env, 'POST', '/api/connect/dropbox/sync', {}, token)).status).toBe(200);
+    const st = await conn(env, token);
+    expect(st.stats.folder).toBe('/Apps/HealthFit Exporter');
+    expect(st.stats.fit.map((g: any) => g.folder)).toEqual(['/Apps/HealthFit Exporter', '/Garmin', '/Apps/HealthFit']);
+    expect(st.stats.lastFile.name).toBe('2015-08-15-Laufen.fit');
+    expect((await records(env, token)).some(r => r.kind === 'activity' && r.data.source === 'healthfit')).toBe(true);
+  });
+});

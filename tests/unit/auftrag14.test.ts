@@ -218,3 +218,26 @@ describe('Schwimmen genau und realistisch', () => {
     expect(S.meters).toBeLessThan(950);
   });
 });
+
+describe('Fehlersuche 17.10.', () => {
+  test('„Fussballspiel (abends)“ zählt als Spiel, „Spielvereinigung“ nicht', () => {
+    expect(C.isGame({ sport: 'football', title: 'Fussballspiel (abends)' })).toBe(true);
+    expect(C.isGame({ sport: 'football', title: 'Fußball: Spiel' })).toBe(true);
+    expect(C.isGame({ sport: 'football', title: 'Spielvereinigung Training' })).toBe(false);
+  });
+  test('Puls für Zone 1: „unter 150 bpm“ statt „0-150 bpm“', () => {
+    expect(C.zoneBpm({ sport: 'bike', zone: 'Zone 1' }, { lthrBike: 170 }, null)).toMatch(/^unter \d+ bpm$/);
+    expect(C.zoneBpm({ sport: 'run', zone: 'Zone 2' }, { lthrRun: 170 }, null)).toMatch(/^\d+-\d+ bpm$/);
+  });
+  test('Spiel mit RPE 7 wird nicht als „zu hart für eine lockere Einheit“ bewertet; harte Extra-Einheit nicht als „geplant war Zone 2“', () => {
+    const prof = withEstimates({ ...defaultProfile(), birthYear: 1977, sports: ['run', 'football'], thresholds: { ...defaultProfile().thresholds, lthrRun: 155 } } as any, T);
+    const weeks = [{ weekNumber: 1, startDate: C.addDays(T, -6), days: [{ date: day(1), sessions: [{ id: 'm', sport: 'football', title: 'Fussballspiel (abends)', plannedMinutes: 70 }] }] }];
+    const state: any = { sessions: { m: { completed: true, rpe: '7', metrics: { min: '70' } } }, customWorkouts: { [day(1)]: [{ id: 'c1', date: day(1), sport: 'run', title: 'Laufen', plannedMinutes: 63, rpe: '7', metrics: { min: '63', km: '11.35', hr: '164', pace: '5:38' } }] }, trend: [], adjustments: {}, coachMsgs: {}, settings: {}, illnessPeriods: [], activities: {} };
+    const out = runEngine({ today: T, now: Date.now(), state, baseWeeks: weeks, planMeta: {}, profile: prof, goals: [] }, { type: 'activity' });
+    const txt = out.messages.filter(m => m.id.startsWith('msg-review-')).map(m => m.text).join('\n');
+    expect(txt).toMatch(/Fussballspiel/);
+    expect(txt).not.toMatch(/für eine lockere Einheit ist hoch/);
+    expect(txt).not.toMatch(/geplant war Zone/);
+    expect(txt).toMatch(/harte Einheit, keine lockere/);
+  });
+});

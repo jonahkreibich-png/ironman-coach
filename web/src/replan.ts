@@ -83,7 +83,7 @@ export function replanFuture(reason: string, why: string, o: { needTests?: any; 
   const now = Date.now();
   // gleicher Anlass am selben Tag: eine Nachricht, die aktualisiert wird (Auftrag 11: Papa bekam 3 gleiche Nachrichten)
   const id = `msg-replan-${today}-${reason.replace(/[^a-z0-9äöü]+/gi, '-').toLowerCase()}`;
-  const dropped = [...new Set(gen.dropped.filter(x => !/wird locker/.test(x)).map(x => x.replace(/^Woche \d+: /, '')))].slice(0, 3);
+  const dropped = [...new Set(gen.dropped.filter(x => !/wird locker|entfällt \(Wettkampf\)/.test(x)).map(x => x.replace(/^Woche \d+: /, '')))].slice(0, 3);
   STATE.coachMsgs[id] = { id, at: now, date: today, kind: 'adjust', from: 'coach', title: 'Plan angepasst: ' + reason, unread: true,
     text: `${why} Der angepasste Plan gilt ab ${from === today ? 'heute' : 'morgen'}. Vergangene und erledigte Einheiten bleiben, wie sie sind; der Rest dieser Woche ist neu verteilt.${changed.length ? ' Diese Woche: ' + changed.join('; ') + '.' : ''}${dropped.length ? ' Nicht alles passte: ' + dropped.join('; ') + '.' : ''}` };
   // passt ein Wunsch nicht zu den harten Regeln: klar sagen und Lösungen anbieten

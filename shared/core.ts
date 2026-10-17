@@ -229,7 +229,7 @@ const toNum = v => { if (v == null || v === '') return null; const n = typeof v 
 const clone = o => JSON.parse(JSON.stringify(o));
 const HARD_RE = /sweet|schwelle|intervall|vo2|zone\s*[45]|\bz[45]\b|tempo|\d\s*[×x]\s*\d/i;
 // Spiel: aus der Bauanleitung (Teamname wie „Spielvereinigung“ zählt nicht), sonst aus dem Titel (alte Pläne)
-function isGame(s) { if (!s || s.sport !== 'football') return false; if (s.spec && s.spec.kind) return s.spec.kind === 'game'; return /(^|[\s:])(spiel|match)\b/i.test(s.title || ''); }
+function isGame(s) { if (!s || s.sport !== 'football') return false; if (s.spec && s.spec.kind) return s.spec.kind === 'game'; return /(spiel|match)\b/i.test(s.title || ''); } // auch „Fussballspiel“, nicht „Spielvereinigung“
 const EASED_RE = /^(Zone 2|Locker) statt/;
 function isIntervals(s) { return !!s && ['run', 'bike', 'swim'].includes(s.sport) && !EASED_RE.test(s.title || '') && HARD_RE.test((s.title || '') + ' ' + (s.zone || '')); }
 function isLong(s) {
@@ -741,7 +741,7 @@ function zoneBpm(s, settings, zonePercents) {
   if (!hit.length) return null;
   const lo = Math.min(...hit.map(z => Math.round(lthr * z.low / 100)));
   const hi = Math.max(...hit.map(z => z.high >= 999 ? Math.round(lthr * z.low / 100) + 30 : Math.round(lthr * z.high / 100)));
-  return `${lo}-${hi} bpm`;
+  return lo > 0 ? `${lo}-${hi} bpm` : `unter ${hi} bpm`;
 }
 /* Untergrenze des Kalorienziels wie in der App (Mifflin-St Jeor × Alltagsfaktor + Training). */
 const MET = s => {

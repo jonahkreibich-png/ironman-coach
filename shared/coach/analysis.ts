@@ -71,7 +71,8 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   else { const own = C.ownLoadSeries(st, weeks, today); const o = own[own.length - 1]; if (o && o.ctl > 0) { ctl = o.ctl; atl = o.atl; tsb = o.tsb; src = 'eigene Einheiten'; const old = own.find((x: any) => x.date === C.addDays(today, -28)); ctl28 = old ? old.ctl : null; } }
   const acwr = ctl && atl != null ? Math.round(atl / ctl * 100) / 100 : null;
   const recentIll = (st.illnessPeriods || []).find((p: any) => p && p.end && p.end >= C.addDays(today, -21) && p.end < today);
-  if (acwr != null && !ill) {
+  // Auftrag 14: erst ab etwas Trainingsverlauf (Fitness ab 15), sonst ergibt eine einzige Einheit Werte wie „483 % über deiner Fitness“
+  if (acwr != null && !ill && (ctl || 0) >= 15) {
     if (acwr > 1.5) add({ id: 'acwr-high', kind: 'load', tone: 'bad', score: 90, title: 'Belastung steigt zu schnell', why: `Müdigkeit (ATL ${Math.round(atl!)}) liegt ${Math.round((acwr - 1) * 100)} % über deiner Fitness (CTL ${Math.round(ctl!)}), ACWR ${de(acwr, 2)}. Über 1,5 steigt das Verletzungsrisiko deutlich.`, tip: 'Die nächsten 2-3 Tage locker, keine Intervalle.' });
     else if (acwr > 1.3) add({ id: 'acwr-up', kind: 'load', tone: 'warn', score: 60, title: 'Belastung ist gerade hoch', why: `ACWR ${de(acwr, 2)} (ATL ${Math.round(atl!)}, CTL ${Math.round(ctl!)}). Gut ist 0,8 bis 1,3.`, tip: 'Achte auf Schlaf und plane nach der nächsten harten Einheit einen lockeren Tag.' });
     else if (acwr < 0.8 && recentIll) add({ id: 'acwr-low-ill', kind: 'load', tone: 'info', score: 55, title: 'Fitness nach der Krankheit gesunken', why: `CTL ${ctl28 != null ? `von ${Math.round(ctl28)} auf ` : ''}${Math.round(ctl!)}, ATL nur ${Math.round(atl!)} (ACWR ${de(acwr, 2)}). Das ist nach einer Pause normal und kommt schnell zurück.`, tip: 'Langsam steigern: der Plan startet mit 15 % weniger und steigert höchstens 10 % pro Woche.' });

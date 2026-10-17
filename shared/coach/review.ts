@@ -74,7 +74,7 @@ function plannedZone(s: any): number | null {
   return C.isHard(s) ? 4 : 2;
 }
 const EASY_T = /(keine|ohne) (intervall|harte)|ganz locker|\blocker(e|er|es)?\b|grundlage|regeneration/i;
-const isHardDone = (d: Done, v: Vals) => d.planned ? C.isHard(d.planned) && !EASY_T.test(d.title || '') : !!(v.intervals && v.intervals.count >= 2) || /intervall|schwelle|tempo|sweet|hart|vo2|test|spiel/i.test(d.title);
+const isHardDone = (d: Done, v: Vals) => d.sport === 'football' && /spiel|match/i.test(d.title || '') ? true : d.planned ? C.isHard(d.planned) && !EASY_T.test(d.title || '') : !!(v.intervals && v.intervals.count >= 2) || /intervall|schwelle|tempo|sweet|hart|vo2|test|spiel/i.test(d.title);
 
 /* Ähnliche frühere Einheit: gleiche Sportart, ähnlich lang (±30 %), gleich hart, mit Puls, in den 8 Wochen davor */
 function similarBefore(ctx: EngineCtx, d: Done, v: Vals): { d: Done; v: Vals } | null {
@@ -118,7 +118,9 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
         let fix = '';
         if (d.sport === 'run' && v.pace) { const rg = W.runPaceRange(pc, z); fix = ` Nächstes Mal langsamer, etwa ${mmss(rg[0])}-${mmss(rg[1])}/km, auch wenn es sich zu ruhig anfühlt.`; }
         if (d.sport === 'bike') fix = ` Nächstes Mal ruhiger treten${pc.bikeKmh && !v.indoor ? `, auf flacher Strecke etwa ${speedRange(pc.bikeKmh, z)}` : ''}, bergauf kleinerer Gang.`;
-        better.push(`Puls Ø ${Math.round(v.hr)} lag in Zone ${hz}, geplant war Zone ${z} (bis ${zr.hi}). Locker trainiert die Grundlage, zu schnell macht nur müde.${fix}`);
+        // Auftrag 14: selbst hinzugefügte Einheit: nichts war geplant – eine harte Einheit ist dann einfach hart
+        if (!s && hz >= 4) better.push(`Puls Ø ${Math.round(v.hr)} in Zone ${hz}: das war eine harte Einheit, keine lockere. Sie zählt als harter Tag, der Tag danach sollte locker sein.`);
+        else better.push(`Puls Ø ${Math.round(v.hr)} lag in Zone ${hz}, ${s ? 'geplant war' : 'für eine lockere Einheit passt'} Zone ${z} (bis ${zr.hi}). Locker trainiert die Grundlage, zu schnell macht nur müde.${fix}`);
         if (hz >= z + 1) fatigue += 0.5;
       }
     } else {
@@ -188,7 +190,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (d.sport === 'run' && !v.pace && v.hr) missing.push('Pace oder Strecke');
   // Gefühl
   if (v.rpe != null) {
-    if (!hard && v.rpe >= 6) { better.push(`Gefühl ${v.rpe}/10 für eine lockere Einheit ist hoch. Das spricht für Müdigkeit, Hitze oder zu schnelles Tempo.`); fatigue += 1; }
+    if (!hard && v.rpe >= 6 && d.sport !== 'football') { better.push(`Gefühl ${v.rpe}/10 für eine lockere Einheit ist hoch. Das spricht für Müdigkeit, Hitze oder zu schnelles Tempo.`); fatigue += 1; }
     else if (hard && v.rpe <= 4) better.push(`Nur ${v.rpe}/10 für eine harte Einheit: da wäre mehr gegangen.`);
     else good.push(`Anstrengung ${v.rpe}/10 passt zur Vorgabe.`);
   } else missing.push('Anstrengung (RPE 1-10)');
