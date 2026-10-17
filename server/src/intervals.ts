@@ -69,6 +69,9 @@ export function mapWellness(w) {
   if (isNum(w.sleepScore) && w.sleepScore > 0) o.sleepQuality = Math.round(w.sleepScore / 10);
   else if (ICU_SLEEP_QUALITY[w.sleepQuality]) o.sleepQuality = ICU_SLEEP_QUALITY[w.sleepQuality];
   if (isNum(w.vo2max) && w.vo2max > 0) o.vo2max = r1(w.vo2max);
+  // Auftrag 14: Muskelkater und Müdigkeit (intervals: 1 niedrig … 4 extrem) für die Ampel
+  if (isNum(w.soreness) && w.soreness >= 1 && w.soreness <= 4) o.soreness = w.soreness - 1;
+  if (isNum(w.fatigue) && w.fatigue >= 1 && w.fatigue <= 4) o.feel = w.fatigue + 1;
   // Zusatzfelder (z. B. von Oura), Namen sind je nach Konto verschieden
   const custom: any[] = [];
   for (const [k, v] of Object.entries(w)) {

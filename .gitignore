@@ -17,3 +17,6 @@ dist/
 pages/wrangler.toml
 AUFTRAG-4.md
 AUFTRAG-5.md
+
+# Hilfsskripte von Claude (nicht ins Repo)
+scratch/

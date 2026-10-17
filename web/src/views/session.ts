@@ -96,6 +96,7 @@ export function structureHtml(s: any): string {
   if (!x || !x.parts.length) return s.description ? `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>` : '';
   const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
   return `<div class="card flat tight structure" data-structure>${when}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${p.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>
+    ${x.drills && x.drills.length ? `<div class="small" data-drills><b>${esc(t('sess.drills'))}:</b><ul>${x.drills.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : ''}${x.sum ? `<div class="small" data-swimsum><b>${esc(x.sum)}</b></div>` : ''}
     ${x.how ? `<div class="small"><b>${esc(t('sess.how'))}:</b> ${esc(x.how)}</div>` : ''}${x.tip ? `<div class="small"><b>${esc(t('sess.tip'))}:</b> ${esc(x.tip)}</div>` : ''}${x.why ? `<div class="small muted"><b>${esc(t('sess.why'))}:</b> ${esc(x.why)}</div>` : ''}
     ${x.derived && s.description ? more(t('sess.original'), `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>`) : ''}</div>`;
 }

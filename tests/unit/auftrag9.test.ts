@@ -10,7 +10,7 @@ import { converse } from '../../shared/coach/dialog';
 import { defaultProfile, withEstimates } from '../../shared/profile';
 
 const today = '2026-11-03';
-const ctx = { breast100: 165 } as W.PaceCtx;
+const ctx = { breast100: 165, gear: ['board', 'buoy'] } as W.PaceCtx;
 const swimS = (id: string, n: number, extra: any = {}) => ({ id, sport: 'swim', ...W.build(W.swimLearn(ctx, { ladder: 'swim', n, breast: true, pull: 50 }, 'x', 50)), ...extra });
 const weeks = [{ weekNumber: 8, startDate: '2026-11-02', endDate: '2026-11-08', days: [
   { date: '2026-11-03', sessions: [swimS('a', 2)] }, { date: '2026-11-07', sessions: [swimS('b', 2)] } ] },
@@ -29,7 +29,8 @@ describe('Schwimm-Stufen', () => {
     const s2 = share(2), s3 = share(3), s5 = share(5);
     expect(s2.crawlLen).toBe(25); expect(s3.crawlLen).toBe(50); expect(s5.crawlLen).toBe(200);
     expect(s2.pull).toBe(true); // 25 m Kraul, 50 m mit Pull Buoy
-    expect(s2.breast).toBeGreaterThan(s3.breast); expect(s3.breast).toBeGreaterThan(s5.breast);
+    // Auftrag 14: ehrliche Zeiten (Beinschlag langsamer, Serienwechsel) – der Brust-Anteil sinkt über die Stufen, nicht zwingend von Stufe zu Stufe
+    expect(s2.breast).toBeGreaterThan(s5.breast); expect(s3.breast).toBeGreaterThan(s5.breast);
     expect(W.build(W.swimLearn(ctx, { ladder: 'swim', n: 2, breast: true, pull: 50 }, 'x', 50)).description).toMatch(/Kraul mit Pull Buoy/);
   });
   test('jede Lern-Einheit fragt am Ende nach der längsten Strecke', () => {

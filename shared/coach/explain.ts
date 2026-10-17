@@ -7,15 +7,16 @@
 import * as C from '../core';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
-import { readinessFacts } from './engine';
+import { readinessFacts, readinessFallback } from './engine';
 import { paceCtx } from '../plangen';
 import { sleepNeed, type Profile } from '../profile';
 import type { Op } from './ops';
 import { joinDe } from './texts';
 import { SPEED_HINT } from '../bikespeed';
 
-export interface Part { part: 'warm' | 'main' | 'cool'; label: string; lines: string[] }
-export interface Structure { title: string; minutes: number | null; km: number | null; parts: Part[]; how: string | null; why: string | null; tip: string | null; derived: boolean }
+export interface Part { part: 'warm' | 'tech' | 'main' | 'cool'; label: string; lines: string[] }
+export interface Structure { title: string; minutes: number | null; km: number | null; parts: Part[]; how: string | null; why: string | null; tip: string | null; derived: boolean;
+  /** Schwimmen (Auftrag 14): Erklärung der Übungen und Summe Meter und Dauer */ drills?: string[]; sum?: string }
 
 const LABELS: Record<string, [string, string, string]> = {
   swim: ['Einschwimmen', 'Hauptteil', 'Ausschwimmen'], run: ['Einlaufen', 'Hauptteil', 'Auslaufen'], bike: ['Einrollen', 'Hauptteil', 'Ausrollen'],
@@ -31,7 +32,7 @@ export function specOf(s: any, prof: Profile, today: string): W.Spec | null {
   if (!s || s.sport === 'rest') return null;
   const indoor = !!(s.spec && s.spec.ctx && s.spec.ctx.indoor) || /rolle|trainer|indoor/i.test(s.title || '');
   const pc = paceCtx(prof, indoor, (s.spec && s.spec.ctx && s.spec.ctx.bikeName) || null, today);
-  if (s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length) return { ...s.spec, ctx: { ...s.spec.ctx, ...pc } };
+  if (s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length) { const sp = { ...s.spec, ctx: { ...s.spec.ctx, ...pc } }; return sp.sport === 'swim' ? W.gearFit(W.poolFit(sp)) : sp; }
   const min = s.plannedMinutes || (s.sport === 'football' ? 90 : 30);
   const z = zoneOf(s);
   const title = String(s.title || ''), desc = String(s.description || '');
@@ -79,6 +80,8 @@ export function structureOf(s: any, prof: Profile, today: string): Structure | n
     const w = spec.steps.find(x => x.part === 'warm');
     if (w) parts.push({ part: 'warm', label: L[0], lines: [`${w.min || 5} min locker bewegen (Seilspringen, Kniebeugen ohne Gewicht, Armkreisen)`] });
     parts.push({ part: 'main', label: L[1], lines: [...(spec.exercises || []).map(e => `${e.name}: ${e.sets}×${e.reps}${e.note ? ` (${e.note})` : ''}`), 'Pause zwischen den Sätzen 60-90 s, saubere Technik vor Gewicht'] });
+  } else if (spec.sport === 'swim') {
+    for (const p of W.swimParts(spec)) parts.push({ part: p.part, label: p.label, lines: p.steps.map(x => W.stepText(spec, x)) });
   } else if (spec.sport === 'football' || spec.kind === 'race') {
     parts.push({ part: 'main', label: L[1], lines: spec.steps.map(x => x.note || `${x.min} min`).filter(Boolean) });
   } else {
@@ -89,11 +92,12 @@ export function structureOf(s: any, prof: Profile, today: string): Structure | n
   }
   const t = W.totals(spec);
   const zmax = Math.max(...spec.steps.filter(x => x.part === 'main').map(x => x.zone || 2), 1);
-  return { title: s.title || W.title(spec), minutes: t.min || s.plannedMinutes || null, km: t.km, parts, how: spec.sport === 'strength' || spec.sport === 'football' ? null : W.FEEL[zmax], why: spec.why || null, tip: [spec.tip, spec.sport === 'bike' && spec.ctx.bikeKmh && !spec.ctx.indoor && spec.kind !== 'race' ? SPEED_HINT : ''].filter(Boolean).join(' ') || null, derived: !(s.spec && s.spec.steps) };
+  return { title: s.title || W.title(spec), minutes: t.min || s.plannedMinutes || null, km: t.km, parts, how: spec.sport === 'strength' || spec.sport === 'football' ? null : W.FEEL[zmax], why: spec.why || null, tip: [spec.tip, spec.sport === 'bike' && spec.ctx.bikeKmh && !spec.ctx.indoor && spec.kind !== 'race' ? SPEED_HINT : ''].filter(Boolean).join(' ') || null, derived: !(s.spec && s.spec.steps),
+    ...(spec.sport === 'swim' ? { drills: W.swimDrillNotes(spec), sum: W.swimSumLine(spec) } : {}) };
 }
 export function structureText(x: Structure): string {
   const n = x.parts.map((p, i) => `${i + 1}. ${p.label}: ${p.lines.join('; dann ')}`);
-  return [...n, x.how ? `Wie hart: ${x.how}.` : '', x.tip ? `Achte auf: ${x.tip}` : '', x.why ? `Warum: ${x.why}` : ''].filter(Boolean).join('\n');
+  return [...n, ...(x.drills && x.drills.length ? ['Übungen: ' + x.drills.join(' ')] : []), x.sum || '', x.how ? `Wie hart: ${x.how}.` : '', x.tip ? `Achte auf: ${x.tip}` : '', x.why ? `Warum: ${x.why}` : ''].filter(Boolean).join('\n');
 }
 
 /* Kürzen auf eine Zeit (auch Lernstufen: weniger Wiederholungen, gleiche Stufe) */
@@ -138,7 +142,7 @@ export function explainDay(ctx: EngineCtx, date: string, sport: string | null, l
   const weekLine = w ? `${w.label || 'Woche ' + w.weekNumber}${w.block ? ` (Block ${w.block}, Woche ${w.blockWeek})` : ''}${w.phase ? `, ${PH[w.phase] || w.phase}` : ''}${w.isRecoveryWeek ? ', Erholungswoche' : ''}` : '';
   const ill = C.illnessAt(ctx.state.illnessPeriods, date);
   const ret = !ill && C.returnStageActive(ctx.state.illnessPeriods, date);
-  const fb = { ...((ctx.state.settings || {}).readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) };
+  const fb = readinessFallback(ctx);
   const R = date === ctx.today ? C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, date, fb) : null;
   const vals = R && R.point ? R.crits.filter((c: any) => c.k === 'Ruhepuls' || c.k === 'HFV').map((c: any) => `${c.k} ${c.v}${c.t && /normal/.test(c.t) ? ` (${c.t.split('·')[0].trim()})` : ''}`) : [];
   const head = `${when} (${fmtD(date)}${weekLine ? ', ' + weekLine : ''}):`;
@@ -197,7 +201,7 @@ Soll ich das so ändern?`, ops, yes: 'Ja, so machen' };
       blocks.push(`Deine Werte sind heute nur mittel (${R.reasons.join(', ')}). Ich schlage vor: statt Intervallen ${W.totals(easy).min} min locker in Zone 2.`); yes = 'Ja, locker machen';
     }
   }
-  const valuesLine = R && !R.point ? (date === ctx.today ? 'Für heute fehlen noch die Morgenwerte. Fühlst du dich nicht fit, sag Bescheid, dann mache ich es lockerer.' : '') : R && R.level !== 3 && !ops.length ? `Deine Werte heute: ${vals.length ? vals.join(', ') + ', ' : ''}Ampel ${['grün', 'gelb', 'rot'][R.level]}${R.level === 0 ? ', du kannst wie geplant trainieren' : ''}.` : ret ? 'Wiedereinstieg nach Krankheit: alles locker, keine Intervalle.' : '';
+  const valuesLine = R && R.level === 3 ? (date === ctx.today ? (R.uncertain === 'few' ? C.readinessLine(R) : 'Für heute fehlen noch die Morgenwerte, die Ampel ist unsicher.') + ' Fühlst du dich nicht fit, sag Bescheid, dann mache ich es lockerer.' : '') : R && R.level !== 3 && !ops.length ? `Deine Werte heute: ${vals.length ? vals.join(', ') + ', ' : ''}Ampel ${['grün', 'gelb', 'rot'][R.level]}${R.level === 0 ? ', du kannst wie geplant trainieren' : ''}.` : ret ? 'Wiedereinstieg nach Krankheit: alles locker, keine Intervalle.' : '';
   const text = [head, ...blocks, valuesLine].filter(Boolean).join('\n\n');
   return ops.length ? { intent: 'explain', text: text + '\n\nSoll ich das so ändern?', ops, yes } : { intent: 'explain', text };
 }

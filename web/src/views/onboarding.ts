@@ -69,7 +69,7 @@ function fromProfile(): Answers {
   if (Object.keys(p.dayLoad || {}).length) a.dayLoad = p.dayLoad;
   if (Object.keys(p.freq || {}).length) a.freq = p.freq;
   if (p.teamSport) { a.teamYes = true; a.teamName = p.teamSport.name; a.teamTrainingDays = p.teamSport.trainingDays; a.teamTrainingMinutes = p.teamSport.trainingMinutes; a.teamGames = (p.teamSport.gameDays || []).length > 0; a.teamGameDays = p.teamSport.gameDays; a.teamGameMinutes = p.teamSport.gameMinutes; a.teamSeasonFrom = p.teamSport.seasonFrom; a.teamSeasonTo = p.teamSport.seasonTo; }
-  const sk = p.skills || {}; Object.assign(a, { swimCrawl: sk.swimCrawl ?? a.swimCrawl, swimCrawlM: sk.swimCrawlM ?? a.swimCrawlM, swimBreast: sk.swimBreast ?? a.swimBreast, runContinuousMin: sk.runContinuousMin ?? a.runContinuousMin, bikeLongestMin: sk.bikeLongestMin ?? a.bikeLongestMin });
+  const sk = p.skills || {}; Object.assign(a, { swimCrawl: sk.swimCrawl ?? a.swimCrawl, swimCrawlM: sk.swimCrawlM ?? a.swimCrawlM, swimBreast: sk.swimBreast ?? a.swimBreast, swimGear: sk.swimGear ?? a.swimGear, runContinuousMin: sk.runContinuousMin ?? a.runContinuousMin, bikeLongestMin: sk.bikeLongestMin ?? a.bikeLongestMin });
   if (sk.poolM) a.poolM = String(sk.poolM); if (sk.openWater != null) { a.openWater = sk.openWater; a.openWaterFrom = sk.openWaterFrom != null ? String(sk.openWaterFrom) : a.openWaterFrom; a.openWaterTo = sk.openWaterTo != null ? String(sk.openWaterTo) : a.openWaterTo; }
   if ((p.bikes || []).length) a.bikes = p.bikes; a.powerMeter = p.powerMeter;
   if (Object.keys(p.bests || {}).length) a.bests = p.bests;

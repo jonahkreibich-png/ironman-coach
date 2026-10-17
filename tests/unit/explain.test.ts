@@ -135,9 +135,10 @@ describe('Struktur jeder Einheit', () => {
   });
   test('alte, von Hand geschriebene Schwimm-Einheit: Text wird in Schritte zerlegt', () => {
     const x = structureOf({ id: 'a', sport: 'swim', title: 'Kraultechnik', plannedMinutes: 55, description: 'Warm-up 200m Brust. Drills 8x50m. Main 6x75m Kraul locker, 20s Pause. Cool-down 200m. Gesamt ca. 1800m.' }, prof, CHAT_TODAY)!;
-    expect(x.parts.map(p => p.label)).toEqual(['Einschwimmen', 'Hauptteil', 'Ausschwimmen']);
+    expect(x.parts.map(p => p.label)).toEqual(['Einschwimmen', 'Technik', 'Hauptteil', 'Ausschwimmen']);
     expect(x.parts[0].lines[0]).toMatch(/200 m Brust/);
-    expect(x.parts[1].lines.join(' ')).toMatch(/8×50 m Technikübungen.*6×75 m Kraul.*20 s Pause/);
+    expect(x.parts[1].lines.join(' ')).toMatch(/8×50 m Kraul-Technik/);
+    expect(x.parts[2].lines.join(' ')).toMatch(/6×75 m Kraul.*20 s Pause – Fokus/);
     expect(x.derived).toBe(true);
   });
   test('alte Kraft-Einheit: Übungen mit Sätzen × Wdh aus dem Text', () => {
@@ -158,7 +159,9 @@ describe('Struktur jeder Einheit', () => {
   test('kürzen: Lernstufe bleibt Lernstufe, Kraft hat weniger Übungen', () => {
     const swim = W.swimLearn({}, { ladder: 'swim', n: 2, breast: true });
     const sh = fitToMinutes(swim, 15);
-    expect(W.totals(sh).min).toBeLessThanOrEqual(17);
+    // Auftrag 14: ehrlich gerechnet (Pausen, Serienwechsel, Beinschlag langsamer) dauert die kürzeste Lern-Einheit etwa 20 min
+    expect(W.totals(sh).min).toBeLessThanOrEqual(21);
+    expect(W.totals(sh).min).toBeLessThan(W.totals(swim).min);
     expect(sh.stage).toEqual(swim.stage);
     const st = W.strengthArea('lower');
     expect((fitToMinutes(st, 15).exercises || []).length).toBeLessThan((st.exercises || []).length);

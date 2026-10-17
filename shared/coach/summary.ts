@@ -2,7 +2,7 @@
    Enthält Profil und Ziele, Plan der nächsten 14 Tage, Werte und Einheiten der letzten 28 Tage, Krankheiten,
    Ampel-Verlauf, letzte Anpassungen und Coach-Notizen. Nicht der ganze Datenbestand. */
 import * as C from '../core';
-import type { EngineCtx } from './engine';
+import { readinessFallback, type EngineCtx } from './engine';
 import { ageOf, sleepNeed } from '../profile';
 import { mainGoal, GOALS } from '../goals';
 import { PLAN_FORMAT_HINT } from './plancode';
@@ -55,7 +55,7 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   }));
   Object.entries(ctx.state.customWorkouts || {}).filter(([d]) => d >= from && d < today).forEach(([d, list]: any) => (list || []).forEach((w: any) => L.push(`${d2(d)} Extra ${SPORT[w.sport] || w.sport} ${w.title}${w.metrics && w.metrics.min ? ' ' + w.metrics.min + ' min' : ''}`)));
   L.push('## Werte (Schlaf h / HFV / Ruhepuls / Temp-Abw. / Ampel)');
-  const hist = C.readinessHistory(ctx.state.trend, ctx.state.illnessPeriods, today, Math.min(days, 21), { ...((ctx.state.settings || {}).readiness || {}), sleepNeed: sleepNeed(p, today) });
+  const hist = C.readinessHistory(ctx.state.trend, ctx.state.illnessPeriods, today, Math.min(days, 21), readinessFallback(ctx));
   hist.forEach(h => {
     const v = (ctx.state.trend || []).find((x: any) => x && x.date === h.date);
     if (!v) return;

@@ -37,6 +37,9 @@ export interface PatternWeekIn {
   /** längstes Kraul-Stück im normalen Training (Strecke am Stück, Auftrag 11) */ repMax?: number;
   strength: { knee?: boolean; back?: boolean; shoulder?: boolean };
   goalName: string;
+  /** Auftrag 14: Niveau, Woche in der Grundlage, keine Zone 5 (unter 18, ab 60) */
+  level?: 'beginner' | 'advanced' | 'experienced'; baseWeek?: number; noZ5?: boolean;
+  /** höchstens so viele harte Tage (Spiele und Wettkämpfe zählen mit) */ maxHard?: number;
 }
 export interface PatternItem { dow: number; s: any; long?: boolean; test?: boolean; hard?: boolean; strength?: boolean }
 
@@ -77,8 +80,14 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
   const goal: GoalType = inp.goalType || 'tri_olympic';
   const easyDay = (d: string) => !!inp.easyDates && inp.easyDates.includes(d);
   // Qualitätslauf (Aufbau, spezifisch, Tapering): an einem Lauftag, der nicht zwischen zwei harten Tagen liegt; sonst im langen Lauf
-  const runQ = !rec && !inp.entry && ph !== 'race' && !inp.tests.has('run') ? K.runQualityStep(ph, goal, (st.runQN || {})[ph] || 0, !!inp.minor) : null;
-  const keySlot = slots.find(x => x.sport === 'bike' && x.role === 'key' && (!x.keyFrom || dateOf(x) >= x.keyFrom));
+  let runQ = !rec && !inp.entry && ph !== 'race' && !inp.tests.has('run') ? K.runQualityStep(ph, goal, (st.runQN || {})[ph] || 0, !!inp.minor, { noZ5: inp.noZ5, baseWeek: inp.baseWeek, level: inp.level }) : null;
+  // Auftrag 14: harte Tage nach Niveau und Alter; reicht es nur für eine Qualität neben den Spielen, wechseln sich Rad und Lauf ab
+  // (Grundlage: das Rad, Tempolauf entfällt)
+  const budget = (inp.maxHard ?? 3) - (inp.hardDows || []).length;
+  let keyOk = budget > 0;
+  if (budget <= 0) runQ = null;
+  else if (budget === 1 && runQ) { if (ph === 'base' || ((st.runQN || {})[ph] || 0) >= ((st.keyN || {})[ph] || 0)) runQ = null; else keyOk = false; }
+  const keySlot = keyOk ? slots.find(x => x.sport === 'bike' && x.role === 'key' && (!x.keyFrom || dateOf(x) >= x.keyFrom)) : undefined;
   const hardDays = new Set<number>([...(inp.hardDows || []), ...(keySlot && !rec && !inp.entry ? [keySlot.dow] : []), ...(bikeTestDow0 >= 0 ? [bikeTestDow0] : [])]);
   const runSlots = slots.filter(x => x.sport === 'run' && x.role !== 'brick');
   const freeRun = runSlots.find(x => x.role !== 'long' && !hardDays.has((x.dow + 6) % 7) && !hardDays.has((x.dow + 1) % 7) && !hardDays.has(x.dow));
@@ -96,7 +105,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
         continue;
       }
       const base = (min: number) => inp.swimStage ? W.swimLearn(inp.swim, { ...inp.swimStage, breast: inp.swimStage.breast }, inp.swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : 'Kraul-Technik in kurzen Stücken, Brust für die Ausdauer im Wasser.', min)
-        : swimEndurance(inp.swim, min, first, ph, inp.repMax ?? 400);
+        : swimEndurance(inp.swim, min, first, ph, inp.repMax ?? 400, st.weekN || 0);
       const make = (min: number) => K.fitSwim(K.swimVariant(base(min), (st.weekN || 0) + (first ? 0 : 1), st.blockWeek || 0, ph), min);
       out.push({ dow: sl.dow, slot: sl, s: null, make, min: swimMin, adj: t && t.swim ? undefined : rec || ph === 'taper' || ph === 'race' ? [30, 40] : [40, inp.caps ? inp.caps.swim : 60] });
     } else if (sl.role === 'lower' || sl.role === 'upper') {
@@ -113,12 +122,12 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
     } else if (sl.sport === 'bike') {
       if (sl.dow === bikeTestDow) { out.push({ dow: sl.dow, slot: sl, s: null, test: true, hard: true, make: () => W.bikeTest({ ...inp.bikeOut, indoor: false, bikeName: null }) }); continue; }
       const range = sl.min || [50, 75];
-      const key = sl.role === 'key' && !rec && !inp.entry && ph !== 'race' && (!sl.keyFrom || date >= sl.keyFrom);
+      const key = keyOk && sl.role === 'key' && !rec && !inp.entry && ph !== 'race' && (!sl.keyFrom || date >= sl.keyFrom);
       if (key && !easyDay(date)) {
         // Fortschritt je Phase: Sweet Spot/Kraftausdauer → Schwelle/Over-Unders → je Ziel VO2max, Schwelle, Wettkampftempo
         const n = ((st.keyN || {})[ph] || 0) + (ph === 'base' ? st.keyWeeks : 0);
-        const core = W.totals(K.bikeKey(inp.bikeIn, ph, goal, n)).min;
-        out.push({ dow: sl.dow, slot: sl, s: null, hard: true, make: (min) => K.bikeKey(inp.bikeIn, ph, goal, n, min), min: Math.max(core, range[0]), adj: [core, Math.max(core, 90)] });
+        const core = W.totals(K.bikeKey(inp.bikeIn, ph, goal, n, undefined, { noZ5: inp.noZ5 })).min;
+        out.push({ dow: sl.dow, slot: sl, s: null, hard: true, make: (min) => K.bikeKey(inp.bikeIn, ph, goal, n, min, { noZ5: inp.noZ5 }), min: Math.max(core, range[0]), adj: [core, Math.max(core, 90)] });
       } else out.push({ dow: sl.dow, slot: sl, s: null, make: (min) => W.bikeEasy(inp.bikeOut, min), min: rec ? range[0] : r5(mid(range)), adj: rec ? [range[0], range[1]] : [range[0], 90] });
     } else if (sl.sport === 'run' && sl.role === 'long') {
       if (inp.tests.has('run')) { out.push({ dow: sl.dow, slot: sl, s: null, test: true, hard: true, make: () => W.runTest(inp.run) }); continue; }
@@ -198,7 +207,7 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
 
 const phaseOf = (items: PatternItem[]) => (items as any).phase || 'base';
 /* Schwimmen für alle, die schon kraulen können: Technik bzw. Ausdauer bis zur Zielzeit; ab Aufbau CSS-Intervalle in der zweiten Einheit */
-function swimEndurance(ctx: W.PaceCtx, min: number, technique: boolean, phase = 'base', repMax = 400): W.Spec {
+function swimEndurance(ctx: W.PaceCtx, min: number, technique: boolean, phase = 'base', repMax = 400, n = 0): W.Spec {
   const css = !technique && (phase === 'build' || phase === 'specific') && !!ctx.css && repMax >= 400;
-  return W.swimNormal(ctx, css ? 'css' : technique ? 'technique' : 'endurance', min, phase, repMax);
+  return W.swimNormal(ctx, css ? 'css' : technique ? 'technique' : 'endurance', min, phase, repMax, n);
 }

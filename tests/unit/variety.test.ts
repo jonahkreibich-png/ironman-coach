@@ -26,7 +26,9 @@ describe.each(plans)('%s', (_id, plan, prof, goals) => {
   });
   test('Intensität passt zur Phase: Aufbau/spezifisch mit Rad-Schlüsseleinheit, Lauf-Qualität, Grundlage mit Steigerungen/Hügeln/Fahrtspiel', () => {
     const runOk = !(prof.rules || []).some((r: any) => r.kind === 'runEasy') && !/knie/i.test(JSON.stringify(prof.notes || []));
-    let bikeWeeks = 0, bikeHard = 0, runWeeks = 0, runQ = 0, baseWeeks = 0, baseVar = 0;
+    let bikeWeeks = 0, bikeHard = 0, runWeeks = 0, runQ = 0, baseWeeks = 0, baseVar = 0, both = 0, either = 0;
+    // Auftrag 14: unter 18 höchstens 2 harte Tage; mit einem Spiel pro Woche wechseln sich Rad- und Lauf-Qualität ab
+    const cautious = (+(String(today).slice(0, 4)) - ((prof as any).birthYear || 1990)) < 18 && !!((prof as any).teamSport && ((prof as any).teamSport.gameDays || []).length);
     for (const w of weeks) {
       if (w.isRecoveryWeek || w.entry || w.reduced || ['taper', 'race'].includes(w.phase)) continue;
       const ss = own(w);
@@ -34,10 +36,14 @@ describe.each(plans)('%s', (_id, plan, prof, goals) => {
       if (w.phase === 'build' || w.phase === 'specific') {
         if (bikes.length >= 2) { bikeWeeks++; if (bikes.some((s: any) => s.hard)) bikeHard++; }
         if (runs.length >= 2 && runOk) { runWeeks++; if (runs.some((s: any) => s.hard)) runQ++; }
+        if (bikes.length >= 2 && runs.length >= 2) { both++; if (bikes.some((s: any) => s.hard) || runs.some((s: any) => s.hard)) either++; }
       } else if (w.phase === 'base' && runs.length >= 2) { baseWeeks++; if (runs.some((s: any) => /Steigerung|Hügel|Fahrtspiel/.test(s.title + ' ' + s.description))) baseVar++; }
     }
-    if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.8);
-    if (runWeeks) expect(runQ / runWeeks).toBeGreaterThanOrEqual(0.6);
+    if (cautious) { if (both) expect(either / both).toBeGreaterThanOrEqual(0.8); if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.35); if (runWeeks) expect(runQ / runWeeks).toBeGreaterThanOrEqual(0.3); }
+    else {
+      if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.8);
+      if (runWeeks) expect(runQ / runWeeks).toBeGreaterThanOrEqual(0.6);
+    }
     if (baseWeeks >= 3) expect(baseVar / baseWeeks).toBeGreaterThanOrEqual(0.5);
   });
   test('nie zwei harte Lauftage hintereinander, kein harter Lauf am Tag nach einem Spiel', () => {
@@ -85,14 +91,19 @@ describe('Rad und Lauf: Fortschritt der Schlüsseleinheiten', () => {
     expect(runs(ol, 'build')).toMatch(/Schwelle/);
     expect(runs(ol, 'specific')).toMatch(/10-km-Tempo/);
   });
-  test('fester Wochenaufbau (Mi Rad hart, Fr Spiel): Lauf-Qualität im langen Lauf am Sonntag, nicht am Donnerstag', () => {
+  test('fester Wochenaufbau (Mi Rad hart, Fr Spiel, 17 Jahre): Lauf-Qualität im langen Lauf am Sonntag, nicht am Donnerstag; Rad und Lauf im Wechsel', () => {
     const p = patternPlan(true).plan;
     const build = p.weeks.filter((w: any) => w.phase === 'build' && !w.isRecoveryWeek && !w.reduced);
     expect(build.length).toBeGreaterThan(0);
     for (const w of build) {
       const sun = w.days.find((d: any) => dow(d.date) === 0), thu = w.days.find((d: any) => dow(d.date) === 4);
       expect(thu.sessions.filter((s: any) => s.sport === 'run').some((s: any) => s.hard)).toBe(false);
-      if (!sun.sessions.some((s: any) => s.race || /test/i.test(s.title))) expect(sun.sessions.find((s: any) => s.sport === 'run').title).toMatch(/Langer Lauf \d+ min mit .*Schwelle/);
+      const wed = w.days.find((d: any) => dow(d.date) === 3);
+      const bikeKey = wed.sessions.some((s: any) => s.sport === 'bike' && s.hard);
+      // höchstens 2 harte Tage (Spiel + eine Qualität)
+      expect(w.days.filter((d: any) => d.sessions.some((s: any) => s.hard || /Spiel/.test(s.title))).length).toBeLessThanOrEqual(2);
+      if (!bikeKey && !sun.sessions.some((s: any) => s.race || /test/i.test(s.title))) expect(sun.sessions.find((s: any) => s.sport === 'run').title).toMatch(/Langer Lauf \d+ min mit .*Schwelle/);
     }
+    expect(build.filter((w: any) => w.days.some((d: any) => dow(d.date) === 0 && d.sessions.some((s: any) => /Langer Lauf \d+ min mit/.test(s.title)))).length).toBeGreaterThanOrEqual(Math.floor(build.length / 3));
   });
 });

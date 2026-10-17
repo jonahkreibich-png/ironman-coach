@@ -35,7 +35,7 @@ function baselineOf(trend, illness, date, key, transform?) {
 }
 
 /* Morgenwerte für einen Tag: heute, sonst bis zu 2 Tage alt (dann "stale"). */
-const RECOVERY_KEYS = ['sleepHours', 'sleepQuality', 'restingHR', 'hrv', 'breathingRate', 'remSleep', 'deepSleep', 'sleepLatency', 'bodyTemp', 'spo2'];
+const RECOVERY_KEYS = ['feel', 'soreness', 'sleepHours', 'sleepQuality', 'restingHR', 'hrv', 'breathingRate', 'remSleep', 'deepSleep', 'sleepLatency', 'bodyTemp', 'spo2'];
 function hasRecovery(p) { return !!p && RECOVERY_KEYS.some(k => p[k] != null); }
 function pointFor(trend, date) {
   const byDate = {}; (trend || []).forEach(p => { if (p) byDate[p.date] = p; });
@@ -48,101 +48,164 @@ function latestLoad(trend, date) {
   return arr.length ? arr[arr.length - 1] : null;
 }
 
+/* Auftrag 14: Bereitschaft als EIN Wert 0-100. Farbe, Wort und Text kommen nur aus diesem Wert:
+   ab 70 grün (normal trainieren), 45-69 gelb (lockerer, Intensität raus), unter 45 rot (Ruhe oder ganz locker).
+   Jeder Einzelwert zieht Punkte ab und hat seine eigene Ampelfarbe; ein gelber Einzelwert begrenzt auf 69, ein roter auf 44.
+   Fehlen die Morgenwerte von heute oder ist nur ein Wert da, ist die Ampel „unsicher“ (Stufe 3) statt grün. */
+const READY_GREEN = 70, READY_YELLOW = 45;
+const CORE_KEYS = ['hrv', 'restingHR', 'sleepHours', 'sleepQuality', 'feel', 'soreness'];
+function levelOfScore(score) { return score >= READY_GREEN ? 0 : score >= READY_YELLOW ? 1 : 2; }
+
 /**
- * Bewertet einen Tag. Liefert Stufe (0 grün, 1 gelb, 2 rot, 3 keine Werte), Score 0-100,
- * 1-3 Gründe in einfachen Worten und die einzelnen Kriterien.
- * fallback: { rhrMax, hrvMin, tempMax } aus den eigenen Einstellungen. Fehlen sie, gibt es in den ersten 7 Tagen
- * keine feste Grenze: die App lernt den persönlichen Normalbereich und bewertet HFV und Ruhepuls erst danach.
+ * Bewertet einen Tag. Liefert Stufe (0 grün, 1 gelb, 2 rot, 3 unsicher), Score 0-100 (bei 3: null),
+ * 1-3 Gründe in einfachen Worten und die Einzelwerte (crits, jeweils mit st: ok | warn | bad | none).
+ * fallback: { rhrMax, hrvMin, tempMax, sleepNeed, load: { ctl, atl } } aus Einstellungen und Plan.
+ * Persönliche Basis: 28 Tage (ab 7 Tagen Werte), vorläufig ab 3 Tagen mit weiteren Grenzen, sonst feste Grenzen aus den Einstellungen.
  */
 function readinessFor(trend, illness, date, fallback) {
   fallback = fallback || {};
   const { p, stale } = pointFor(trend, date);
   const crits = [], reasons = [];
-  let level = 0, score = 100;
-  const bump = (l, why, weight) => { if (l > level) level = l; if (why) reasons.push({ l, why, w: weight || l }); };
-  let personal = false;
+  let score = 100, cap = 100, personal = false;
+  const add = (c) => { crits.push(c); if (c.st === 'warn') cap = Math.min(cap, READY_GREEN - 1); if (c.st === 'bad') cap = Math.min(cap, READY_YELLOW - 1); };
+  const why = (st, text, w) => { if (st === 'warn' || st === 'bad') reasons.push({ l: st === 'bad' ? 2 : 1, why: text, w: w || 1 }); };
+  const ill = illnessAt(illness, date);
+  const ret = !ill && returnStageActive(illness, date);
 
-  if (p) {
+  // Krankheit
+  if (ill) { add({ k: 'Krankheit', v: 'krank', t: 'seit ' + dm(ill.start), st: 'bad' }); why('bad', 'Du bist krank eingetragen', 5); score -= 80; }
+  else if (ret) { add({ k: 'Krankheit', v: 'Wiedereinstieg', t: 'nach Krankheit nur locker', st: 'warn' }); why('warn', 'Wiedereinstieg nach Krankheit', 3); score -= 15; }
+
+  const q = p && !stale ? p : null;   // nur Werte von heute zählen
+  if (q) {
     // HFV: ln(HFV), 3-Tage-Schnitt gegen Ausreißer, z-Wert gegen den persönlichen Normalbereich
-    if (num(p.hrv) != null && p.hrv > 0) {
-      const base = baselineOf(trend, illness, p.date, 'hrv', Math.log);
+    if (num(q.hrv) != null && q.hrv > 0) {
+      const base = baselineOf(trend, illness, q.date, 'hrv', Math.log);
       if (base && base.n >= MIN_DAYS && base.sd > 0) {
         personal = true;
-        const recent = (trend || []).filter(q => q && q.date <= p.date && q.date > addDays(p.date, -3) && num(q.hrv) > 0 && !illnessAt(illness, q.date)).map(q => Math.log(q.hrv));
-        const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : Math.log(p.hrv);
+        const recent = (trend || []).filter(x => x && x.date <= q.date && x.date > addDays(q.date, -3) && num(x.hrv) > 0 && !illnessAt(illness, x.date)).map(x => Math.log(x.hrv));
+        const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : Math.log(q.hrv);
         const z = (avg - base.mean) / base.sd;
         const st = z < -1.5 ? 'bad' : z < -1 ? 'warn' : 'ok';
-        crits.push({ k: 'HFV', v: fmt(p.hrv, 0) + ' ms', t: `normal ${fmt(Math.exp(base.mean), 0)} · z ${sign(z, 1)}`, st });
+        add({ k: 'HFV', v: fmt(q.hrv, 0) + ' ms', t: `normal ${fmt(Math.exp(base.mean), 0)} · z ${sign(z, 1)}`, st });
         score -= Math.max(0, -z) * 15;
-        if (st === 'bad') bump(2, 'HFV deutlich unter deinem Normalbereich', 3);
-        else if (st === 'warn') bump(1, 'HFV etwas unter deinem Normalbereich', 2);
+        why(st, st === 'bad' ? 'HFV deutlich unter deinem Normalbereich' : 'HFV etwas unter deinem Normalbereich', st === 'bad' ? 3 : 2);
+      } else if (base && base.n >= 3 && num(fallback.hrvMin) == null) {
+        // vorläufige Basis (3-6 Tage): nur deutliche Abweichungen zählen
+        const norm = Math.exp(base.mean); const pct = (q.hrv / norm - 1) * 100;
+        const st = pct <= -30 ? 'bad' : pct <= -20 ? 'warn' : 'ok';
+        add({ k: 'HFV', v: fmt(q.hrv, 0) + ' ms', t: `vorläufig normal ${fmt(norm, 0)} (${base.n}/${MIN_DAYS} Tage)`, st });
+        score -= Math.max(0, -pct) * 0.6;
+        why(st, st === 'bad' ? 'HFV deutlich unter den letzten Tagen' : 'HFV unter den letzten Tagen', st === 'bad' ? 3 : 2);
       } else if (num(fallback.hrvMin) == null) {
-        crits.push({ k: 'HFV', v: fmt(p.hrv, 0) + ' ms', t: `Normalbereich wird gelernt (${base ? base.n : 0}/${MIN_DAYS} Tage)`, st: 'ok' });
+        add({ k: 'HFV', v: fmt(q.hrv, 0) + ' ms', t: `Normalbereich wird gelernt (${base ? base.n : 0}/${MIN_DAYS} Tage)`, st: 'none' });
       } else {
-        const st = p.hrv >= fallback.hrvMin ? 'ok' : (p.hrv >= fallback.hrvMin - 7 ? 'warn' : 'bad');
-        crits.push({ k: 'HFV', v: fmt(p.hrv, 0) + ' ms', t: `Ziel ≥${fallback.hrvMin}`, st });
+        const st = q.hrv >= fallback.hrvMin ? 'ok' : (q.hrv >= fallback.hrvMin - 7 ? 'warn' : 'bad');
+        add({ k: 'HFV', v: fmt(q.hrv, 0) + ' ms', t: `Ziel ≥${fallback.hrvMin}`, st });
         if (st !== 'ok') score -= st === 'bad' ? 25 : 12;
-        if (st === 'warn') bump(1, 'HFV etwas niedrig', 2); if (st === 'bad') bump(2, 'HFV deutlich niedrig', 3);
+        why(st, st === 'bad' ? 'HFV deutlich niedrig' : 'HFV etwas niedrig', st === 'bad' ? 3 : 2);
       }
     }
     // Ruhepuls: heute minus Normalwert
-    if (num(p.restingHR) != null && p.restingHR > 0) {
-      const base = baselineOf(trend, illness, p.date, 'restingHR');
+    if (num(q.restingHR) != null && q.restingHR > 0) {
+      const base = baselineOf(trend, illness, q.date, 'restingHR');
       if (base && base.n >= MIN_DAYS) {
         personal = true;
-        const d = p.restingHR - base.mean;
+        const d = q.restingHR - base.mean;
         const st = d >= 5 ? 'bad' : d >= 3 ? 'warn' : 'ok';
-        crits.push({ k: 'Ruhepuls', v: fmt(p.restingHR, 0), t: `normal ${fmt(base.mean, 0)} · ${sign(d, 0)}`, st });
+        add({ k: 'Ruhepuls', v: fmt(q.restingHR, 0), t: `normal ${fmt(base.mean, 0)} · ${sign(d, 0)}`, st });
         score -= Math.max(0, d) * 4;
-        if (st === 'bad') bump(2, `Ruhepuls ${fmt(d, 0)} Schläge über normal`, 3);
-        else if (st === 'warn') bump(1, `Ruhepuls ${fmt(d, 0)} Schläge über normal`, 2);
+        why(st, `Ruhepuls ${fmt(d, 0)} Schläge über normal`, st === 'bad' ? 3 : 2);
+      } else if (base && base.n >= 3 && num(fallback.rhrMax) == null) {
+        const d = q.restingHR - base.mean;
+        const st = d >= 8 ? 'bad' : d >= 5 ? 'warn' : 'ok';
+        add({ k: 'Ruhepuls', v: fmt(q.restingHR, 0), t: `vorläufig normal ${fmt(base.mean, 0)} · ${sign(d, 0)} (${base.n}/${MIN_DAYS} Tage)`, st });
+        score -= Math.max(0, d - 2) * 3;
+        why(st, `Ruhepuls ${fmt(d, 0)} Schläge über den letzten Tagen`, st === 'bad' ? 3 : 2);
       } else if (num(fallback.rhrMax) == null) {
-        crits.push({ k: 'Ruhepuls', v: fmt(p.restingHR, 0), t: `Normalbereich wird gelernt (${base ? base.n : 0}/${MIN_DAYS} Tage)`, st: 'ok' });
+        add({ k: 'Ruhepuls', v: fmt(q.restingHR, 0), t: `Normalbereich wird gelernt (${base ? base.n : 0}/${MIN_DAYS} Tage)`, st: 'none' });
       } else {
-        const st = p.restingHR <= fallback.rhrMax ? 'ok' : (p.restingHR <= fallback.rhrMax + 2 ? 'warn' : 'bad');
-        crits.push({ k: 'Ruhepuls', v: fmt(p.restingHR, 0), t: `Ziel ≤${fallback.rhrMax}`, st });
+        const st = q.restingHR <= fallback.rhrMax ? 'ok' : (q.restingHR <= fallback.rhrMax + 2 ? 'warn' : 'bad');
+        add({ k: 'Ruhepuls', v: fmt(q.restingHR, 0), t: `Ziel ≤${fallback.rhrMax}`, st });
         if (st !== 'ok') score -= st === 'bad' ? 20 : 10;
-        if (st === 'warn') bump(1, 'Ruhepuls leicht erhöht', 2); if (st === 'bad') bump(2, 'Ruhepuls deutlich erhöht', 3);
+        why(st, st === 'bad' ? 'Ruhepuls deutlich erhöht' : 'Ruhepuls leicht erhöht', st === 'bad' ? 3 : 2);
       }
     }
     // Temperatur-Abweichung
-    if (num(p.bodyTemp) != null) {
-      const v = p.bodyTemp;
+    if (num(q.bodyTemp) != null) {
+      const v = q.bodyTemp;
       const st = v >= 0.5 ? 'bad' : v >= 0.3 ? 'warn' : 'ok';
-      crits.push({ k: 'Temp.', v: sign(v, 1) + ' °C', t: 'Grenze +0,3', st });
+      add({ k: 'Temp.', v: sign(v, 1) + ' °C', t: 'Grenze +0,3', st });
       score -= Math.max(0, v) * 40;
-      if (st === 'bad') bump(2, 'Temperatur erhöht. Wirst du krank?', 4);
-      else if (st === 'warn') bump(1, 'Temperatur leicht erhöht', 2);
+      why(st, st === 'bad' ? 'Temperatur erhöht. Wirst du krank?' : 'Temperatur leicht erhöht', st === 'bad' ? 4 : 2);
     }
     // Schlaf: Bedarf aus dem Profil (Jugendliche brauchen mehr)
-      const SLEEP_NEED = (fallback.sleepNeed && fallback.sleepNeed.length === 2) ? fallback.sleepNeed : DEFAULT_SLEEP_NEED;
-      const needTxt = fmt(SLEEP_NEED[0]) + '-' + fmt(SLEEP_NEED[1]) + ' h';
-    if (num(p.sleepHours) != null || num(p.sleepQuality) != null) {
-      const h = num(p.sleepHours), q = num(p.sleepQuality);
-      const short = h != null && h < 7, poor = q != null && q < 5;
-      const st = (short || poor) ? 'warn' : ((h != null && h < SLEEP_NEED[0]) ? 'mid' : 'ok');
-      crits.push({ k: 'Schlaf', v: h != null ? fmt(h, 1) + ' h' : fmt(q, 0) + '/10', t: (h != null && q != null ? 'Qualität ' + fmt(q, 0) + ' · ' : '') + 'Bedarf ' + needTxt, st: st === 'mid' ? 'ok' : st });
-      if (h != null && h < SLEEP_NEED[0]) score -= (SLEEP_NEED[0] - h) * 8;
-      if (q != null && q < 7) score -= (7 - q) * 3;
-      if (short) bump(1, `Nur ${fmt(h, 1)} h geschlafen (du brauchst ${needTxt})`, 2);
-      else if (poor) bump(1, 'Schlecht geschlafen', 1);
+    const NEED = (fallback.sleepNeed && fallback.sleepNeed.length === 2) ? fallback.sleepNeed : DEFAULT_SLEEP_NEED;
+    const needTxt = fmt(NEED[0]) + '-' + fmt(NEED[1]) + ' h';
+    if (num(q.sleepHours) != null || num(q.sleepQuality) != null) {
+      const h = num(q.sleepHours), sq = num(q.sleepQuality);
+      const veryShort = h != null && h < Math.min(5, NEED[0] - 2.5);
+      const short = h != null && h < Math.min(7, NEED[0] - 0.5), poor = sq != null && sq < 5;
+      const st = veryShort ? 'bad' : (short || poor) ? 'warn' : 'ok';
+      add({ k: 'Schlaf', v: h != null ? fmt(h, 1) + ' h' : fmt(sq, 0) + '/10', t: (h != null && sq != null ? 'Qualität ' + fmt(sq, 0) + ' · ' : '') + 'Bedarf ' + needTxt, st });
+      if (h != null && h < NEED[0]) score -= (NEED[0] - h) * 8;
+      if (sq != null && sq < 7) score -= (7 - sq) * 3;
+      if (st === 'bad' || short) why(st, `Nur ${fmt(h, 1)} h geschlafen (du brauchst ${needTxt})`, st === 'bad' ? 3 : 2);
+      else if (poor) why('warn', 'Schlecht geschlafen', 1);
+    }
+    // Gefühl und Muskelkater (Morgen-Eingabe oder intervals.icu): Gefühl 1 sehr frisch … 5 sehr müde, Muskelkater 0 keiner … 3 stark
+    const feel = num(q.feel), sore = num(q.soreness);
+    if (feel != null || sore != null) {
+      const fSt = feel == null ? 'ok' : feel >= 4 ? 'warn' : 'ok';
+      const sSt = sore == null ? 'ok' : sore >= 2 ? 'warn' : 'ok';
+      const st = fSt === 'warn' || sSt === 'warn' ? 'warn' : 'ok';
+      const FEEL_TXT = ['', 'sehr frisch', 'frisch', 'normal', 'müde', 'sehr müde'], SORE_TXT = ['kein Muskelkater', 'leichter Muskelkater', 'Muskelkater', 'starker Muskelkater'];
+      const parts = [feel != null ? FEEL_TXT[Math.round(feel)] || '' : '', sore != null ? SORE_TXT[Math.round(sore)] || '' : ''].filter(Boolean);
+      add({ k: 'Gefühl', v: parts[0] || '–', t: parts.slice(1).join(' · ') || 'dein Gefühl am Morgen', st });
+      if (feel != null && feel >= 4) score -= feel >= 5 ? 22 : 12;
+      if (sore != null && sore >= 2) score -= sore >= 3 ? 20 : 10;
+      if (st === 'warn') why('warn', [feel != null && feel >= 4 ? (feel >= 5 ? 'Du fühlst dich sehr müde' : 'Du fühlst dich müde') : '', sore != null && sore >= 2 ? (sore >= 3 ? 'starker Muskelkater' : 'Muskelkater') : ''].filter(Boolean).join(', '), 2);
     }
   }
-  // Belastung: ATL/CTL
-  const L = latestLoad(trend, date);
-  if (L && !illnessAt(illness, date)) {
-    const r = L.atl / L.ctl;
-    const st = r > 1.5 ? 'warn' : 'ok';
-    crits.push({ k: 'Belastung', v: fmt(r, 2), t: 'ATL/CTL · gut 0,8-1,3', st });
-    if (r > 1.3) score -= (r - 1.3) * 50;
-    if (st === 'warn') bump(1, 'Belastung zuletzt sehr hoch (ATL/CTL über 1,5)', 2);
+
+  // Belastung: Form (TSB = Fitness − Müdigkeit) und ACWR (Müdigkeit / Fitness), erst ab etwas Trainingsverlauf (Fitness ≥ 15)
+  const LF = fallback.load && num(fallback.load.ctl) != null && num(fallback.load.atl) != null ? fallback.load : latestLoad(trend, date);
+  if (LF && !ill) {
+    const ctl = LF.ctl, atl = LF.atl, tsb = ctl - atl;
+    if (ctl >= 15) {
+      const r = atl / ctl, rel = tsb / ctl;
+      const st = (r > 2 || rel < -0.6) ? 'bad' : (r > 1.5 || rel < -0.35) ? 'warn' : 'ok';
+      add({ k: 'Belastung', v: 'Form ' + sign(tsb, 0), t: `ACWR ${fmt(r, 2)} · gut 0,8-1,3`, st });
+      if (r > 1.3) score -= (r - 1.3) * 50;
+      if (rel < -0.2) score -= (-rel - 0.2) * 40;
+      why(st, st === 'bad' ? 'Belastung zuletzt viel zu hoch (Form ' + sign(tsb, 0) + ', ACWR ' + fmt(r, 2) + ')' : 'Belastung zuletzt sehr hoch (ATL/CTL ' + fmt(r, 2) + ')', st === 'bad' ? 3 : 2);
+    } else add({ k: 'Belastung', v: 'Form ' + sign(tsb, 0), t: 'noch zu wenig Trainingsverlauf', st: 'none' });
   }
 
-  if (!p && !L) level = 3;
-  score = Math.max(0, Math.min(100, Math.round(score)));
-  if (level === 2) score = Math.min(score, 40); else if (level === 1) score = Math.min(score, 70); else if (level === 0) score = Math.max(score, 71);
+  score = Math.max(0, Math.min(cap, Math.round(score)));
+  // Sicherheit: Werte von heute, mindestens zwei (HFV, Ruhepuls, Schlaf, Gefühl). Rote oder gelbe Zeichen gelten auch einzeln.
+  const have = q ? CORE_KEYS.filter(k => num(q[k]) != null && !(k === 'sleepQuality' && num(q.sleepHours) != null) && !(k === 'soreness' && num(q.feel) != null)).length : 0;
+  let level = levelOfScore(score), uncertain = '';
+  if (!ill && !ret && level === 0 && have < 2) { uncertain = q ? 'few' : 'none'; level = 3; }
   reasons.sort((a, b) => b.l - a.l || b.w - a.w);
-  return { level, score: level === 3 ? null : score, reasons: reasons.slice(0, 3).map(r => r.why), crits, personal, point: p, stale };
+  // Für „unsicher“: wie es nach den letzten (alten) Werten aussah
+  let staleLevel = null;
+  if (level === 3 && p && stale) { const old = readinessFor(trend, illness, p.date, fallback); staleLevel = old.level; }
+  return { level, score: level === 3 ? null : score, reasons: reasons.slice(0, 3).map(r => r.why), crits, personal, point: q || p, stale: !q && !!p, uncertain, staleLevel, have };
+}
+
+/* Wort, Satz und Farbe zur Bereitschaft: überall dieselben (Heute, Morgen-Nachricht, Coach). */
+const READY_WORDS = ['Bereit', 'Locker', 'Ruhe', 'Unsicher'];
+const READY_ACTION = ['normal trainieren', 'lockerer trainieren, Intensität raus', 'Ruhe oder nur ganz locker', ''];
+function readinessLine(R) {
+  if (!R) return '';
+  if (R.level === 3) {
+    const base = R.uncertain === 'few' ? `Ampel unsicher – nur ${R.crits.filter(c => ['HFV', 'Ruhepuls', 'Schlaf', 'Gefühl'].includes(c.k)).map(c => c.k === 'Gefühl' ? 'dein Gefühl' : c.k).join(', ') || 'ein Wert'} von heute.` : 'Ampel unsicher – keine Morgenwerte.';
+    return base + ' ' + (R.uncertain === 'few' ? 'Mit Schlaf und Ruhepuls oder HFV wird sie sicher.' : 'Trag Schlaf und Ruhepuls ein oder verbinde Uhr oder Ring.');
+  }
+  const head = `${['Grün', 'Gelb', 'Rot'][R.level]} (${R.score}/100): ${READY_ACTION[R.level]}.`;
+  if (R.level === 0) return head + ' Alles im grünen Bereich.';
+  return head + ' ' + (R.reasons.join(', ') || 'Einige Werte sind auffällig') + '.';
 }
 
 /* Verlauf der letzten n Tage (nur Tage mit Morgenwerten). */
@@ -152,7 +215,7 @@ function readinessHistory(trend, illness, date, n, fallback) {
     const d = addDays(date, -i);
     const own = (trend || []).find(p => p && p.date === d);
     if (!hasRecovery(own)) { out.push({ date: d, level: null, score: null, ill: !!illnessAt(illness, d) }); continue; }
-    const r = readinessFor(trend, illness, d, fallback);
+    const r = readinessFor(trend, illness, d, i === 0 ? fallback : { ...(fallback || {}), load: null });
     out.push({ date: d, level: r.level, score: r.score, ill: !!illnessAt(illness, d) });
   }
   return out;
@@ -736,7 +799,7 @@ function bests(entries) {
 export {
   ruleOk,
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
-  addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, baselineOf, BASE_DAYS, MIN_DAYS,
+  addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
   isLocked, stageVerdict, stageSession

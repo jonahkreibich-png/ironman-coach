@@ -77,7 +77,10 @@ export interface Skills {
   poolM?: 25 | 50 | 'both' | null;
   /** schwimmt auch im Freiwasser, Saison von … bis (Monat 1-12) */
   openWater?: boolean | null; openWaterFrom?: number | null; openWaterTo?: number | null;
+  /** Schwimm-Hilfsmittel (Auftrag 14): board Kickbrett, buoy Pull Buoy, fins Flossen, paddles, snorkel Frontschnorchel. Fehlt die Angabe: keine */
+  swimGear?: SwimGear[] | null;
 }
+export type SwimGear = 'board' | 'buoy' | 'fins' | 'paddles' | 'snorkel';
 /** Bestzeiten in Sekunden */
 export interface Bests { run5k?: number | null; run10k?: number | null; runHalf?: number | null; runMarathon?: number | null; swim400?: number | null }
 export const BIKE_TYPES = ['road', 'gravel', 'mtb', 'tt', 'trekking', 'ebike', 'trainer', 'spin'] as const;

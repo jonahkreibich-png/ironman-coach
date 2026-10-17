@@ -1,7 +1,7 @@
 /* Schnellfragen: die Engine beantwortet sie aus den Daten, ganz ohne KI. */
 import * as C from '../core';
 import type { EngineCtx } from './engine';
-import { readinessFacts } from './engine';
+import { readinessFacts, readinessFallback } from './engine';
 import { joinDe, de, dowName, mmss } from './texts';
 import { mainGoal, GOALS } from '../goals';
 import { sleepNeed } from '../profile';
@@ -15,7 +15,7 @@ export const QUICK = [
 ] as const;
 export type QuickId = typeof QUICK[number]['id'];
 
-function fb(ctx: EngineCtx) { return { ...((ctx.state.settings || {}).readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) }; }
+const fb = readinessFallback;
 function weeks(ctx: EngineCtx) { return C.applyAdjustments(ctx.baseWeeks, ctx.state.adjustments || {}); }
 
 export function answerQuick(ctx: EngineCtx, id: QuickId, extra?: { scores?: any[]; prognosis?: any }): string {

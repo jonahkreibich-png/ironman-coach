@@ -15,45 +15,78 @@ const r5 = (x: number) => Math.max(5, Math.round(x / 5) * 5);
 export const short = (g: GoalType) => (DIST_RANK[g] ?? 4) <= 4 && g !== 'bike_event';
 
 /* Reihenfolge der Arten je Phase (zyklisch) und Leitern je Art [Wiederholungen, Minuten] */
-const BIKE_ORDER: Record<string, string[]> = { base: ['ss', 'ss', 'force'], build: ['thr', 'ou', 'thr'], specShort: ['vo2', 'thr', 'rp'], specLong: ['rp', 'thr', 'rp'] };
+const BIKE_ORDER: Record<string, string[]> = { base: ['ss', 'ss', 'force'], build: ['thr', 'ou', 'thr'], specShort: ['vo2', 'thr', 'rp'], specLong: ['rp', 'thr', 'rp'],
+  // Auftrag 14: Rad-Event mit Schwelle und langen Anstiegen
+  buildEvent: ['thr', 'climb', 'thr'], specEvent: ['climb', 'rp', 'thr'] };
 const BIKE_LADDER: Record<string, [number, number][]> = {
-  ss: [[3, 8], [3, 12], [2, 20], [3, 15], [2, 25], [2, 30]], force: [[3, 8], [3, 10], [4, 10], [3, 15]],
-  thr: [[4, 8], [3, 10], [3, 12], [2, 15], [2, 20]], ou: [[3, 6], [3, 8], [4, 8], [3, 10]],
-  vo2: [[5, 3], [6, 3], [4, 4], [5, 4]], rpShort: [[4, 5], [3, 8], [2, 12], [3, 10]], rpLong: [[3, 15], [3, 20], [2, 30], [4, 20]]
+  ss: [[3, 8], [3, 12], [2, 20], [3, 15], [2, 25], [2, 30], [3, 20], [1, 45]], force: [[3, 8], [3, 10], [4, 10], [3, 15], [4, 12]],
+  thr: [[4, 8], [3, 10], [3, 12], [2, 15], [2, 20], [3, 15], [1, 30]], ou: [[3, 6], [3, 8], [4, 8], [3, 10], [4, 10]],
+  vo2: [[5, 3], [6, 3], [4, 4], [5, 4], [6, 4]], rpShort: [[4, 5], [3, 8], [2, 12], [3, 10], [2, 15]], rpLong: [[3, 15], [3, 20], [2, 30], [4, 20], [2, 40]],
+  climb: [[3, 8], [3, 10], [3, 12], [2, 20], [3, 15], [2, 25]]
 };
-/* n: wie viele Schlüsseleinheiten Rad es in dieser Phase schon gab. total: gewünschte Dauer (Ein-/Ausrollen füllen auf) */
-export function bikeKey(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, total?: number): W.Spec {
+/* Stufe einer Leiter (Auftrag 14): steigt mit jeder Einheit; oben angekommen wechseln sich die letzten drei Stufen ab,
+   damit nie dieselbe Einheit zweimal hintereinander kommt. */
+export function ladderStep<T>(lad: T[], lvl: number): T { const n = lad.length; if (lvl < n) return lad[Math.max(0, lvl)]; const k = Math.min(3, n); return lad[n - k + ((lvl - n) % k + 1) % k]; }
+/* n: wie viele Schlüsseleinheiten Rad es in dieser Phase schon gab. total: gewünschte Dauer (Ein-/Ausrollen füllen auf).
+   o.noZ5: unter 18 und ab 60 kein Zone-5-Block (statt VO2max die Schwelle). */
+export function bikeKey(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, total?: number, o: { noZ5?: boolean } = {}): W.Spec {
   const ph = phase === 'taper' || phase === 'race' ? 'build' : phase;
-  const order = ph === 'specific' ? BIKE_ORDER[short(goal) ? 'specShort' : 'specLong'] : BIKE_ORDER[ph] || BIKE_ORDER.base;
-  const type = order[n % order.length];
+  const ev = goal === 'bike_event';
+  const order = ph === 'specific' ? BIKE_ORDER[ev ? 'specEvent' : short(goal) ? 'specShort' : 'specLong'] : ph === 'build' && ev ? BIKE_ORDER.buildEvent : BIKE_ORDER[ph] || BIKE_ORDER.base;
+  let type = order[n % order.length];
+  if (type === 'vo2' && o.noZ5) type = 'thr';
   const lad = type === 'rp' ? BIKE_LADDER[short(goal) ? 'rpShort' : 'rpLong'] : BIKE_LADDER[type];
-  const lvl = Math.max(0, Math.min(lad.length - 1, Math.floor(n / order.length) * 2 + order.slice(0, n % order.length).filter(x => x === type).length - (phase === 'taper' ? 2 : 0)));
-  const [reps, min] = lad[lvl];
+  const lvl0 = Math.floor(n / order.length) * 2 + order.slice(0, n % order.length).filter(x => x === type).length;
+  // Tapering: kurze, scharfe Reize (niedrige Stufe)
+  const [reps, min] = phase === 'taper' ? lad[Math.max(0, Math.min(1, lvl0 - 2))] : ladderStep(lad, lvl0);
   const rest = type === 'vo2' ? min : min >= 15 ? 5 : 4;
-  const zone = type === 'vo2' ? 5 : type === 'thr' || type === 'ou' ? 4 : type === 'rp' ? (short(goal) ? 4 : 3) : 3;
-  const note = { ss: 'gleichmäßig im oberen Bereich von Zone 3 (Sweet Spot), Trittfrequenz 85-95', force: 'niedrige Trittfrequenz 60-70, im Sitzen, Oberkörper ruhig (Kraftausdauer)', thr: 'an der Schwelle, gleichmäßig, nicht zu schnell anfangen', ou: 'je 2 min knapp über und 2 min knapp unter der Schwelle im Wechsel', vo2: 'hart, aber jede Wiederholung gleich stark', rp: short(goal) ? 'Wettkampftempo für die kurze Distanz' : 'Wettkampftempo für die lange Distanz: gleichmäßig, mit Essen und Trinken' }[type];
-  const kind: W.Kind = ({ ss: 'sweetspot', force: 'force', thr: 'threshold', ou: 'overunder', vo2: 'vo2', rp: 'racepace' } as Record<string, W.Kind>)[type];
+  const zone = type === 'vo2' ? 5 : type === 'thr' || type === 'ou' || type === 'climb' ? 4 : type === 'rp' ? (short(goal) ? 4 : 3) : 3;
+  const note = { ss: 'gleichmäßig im oberen Bereich von Zone 3 (Sweet Spot), Trittfrequenz 85-95', force: 'niedrige Trittfrequenz 60-70, im Sitzen, Oberkörper ruhig (Kraftausdauer)', thr: 'an der Schwelle, gleichmäßig, nicht zu schnell anfangen', ou: 'je 2 min knapp über und 2 min knapp unter der Schwelle im Wechsel', vo2: 'hart, aber jede Wiederholung gleich stark', rp: short(goal) ? 'Wettkampftempo für die kurze Distanz' : 'Wettkampftempo für die lange Distanz: gleichmäßig, mit Essen und Trinken', climb: 'am Anstieg (oder auf der Rolle mit Steigung) knapp unter der Schwelle, Trittfrequenz 70-80, im Sitzen; bergab locker zurück' }[type];
+  const kind: W.Kind = ({ ss: 'sweetspot', force: 'force', thr: 'threshold', ou: 'overunder', vo2: 'vo2', rp: 'racepace', climb: 'climb' } as Record<string, W.Kind>)[type];
   const core = reps * min + (reps - 1) * rest;
   const extra = total ? Math.max(0, r5(total) - core - 25) : 0;
   const add = Math.round(extra / 2 / 5) * 5;
-  const why = { ss: 'Sweet Spot hebt die Schwelle, ohne so müde zu machen wie Schwellen-Intervalle.', force: 'Kraftausdauer auf dem Rad: wichtig für Anstiege und lange Strecken.', thr: 'Schwellen-Intervalle heben das Tempo, das du lange halten kannst.', ou: 'Over-Unders lehren den Körper, Laktat bei Tempo abzubauen: wichtig für Tempowechsel im Rennen.', vo2: 'Kurz und hart: hebt die maximale Sauerstoffaufnahme, gut für kurze Distanzen.', rp: 'Wettkampftempo üben: so fühlt sich das Rennen an.' }[type];
+  const why = { climb: 'Lange Anstiege üben: Kraft und Tempo an der Schwelle, so wie am Berg im Rennen.', ss: 'Sweet Spot hebt die Schwelle, ohne so müde zu machen wie Schwellen-Intervalle.', force: 'Kraftausdauer auf dem Rad: wichtig für Anstiege und lange Strecken.', thr: 'Schwellen-Intervalle heben das Tempo, das du lange halten kannst.', ou: 'Over-Unders lehren den Körper, Laktat bei Tempo abzubauen: wichtig für Tempowechsel im Rennen.', vo2: 'Kurz und hart: hebt die maximale Sauerstoffaufnahme, gut für kurze Distanzen.', rp: 'Wettkampftempo üben: so fühlt sich das Rennen an.' }[type];
   return { sport: 'bike', kind, ctx, why, noDistance: !!ctx.indoor,
     steps: [S('warm', { min: 15 + add, zone: 1, note: 'mit 3 kurzen Antritten' }), S('main', { reps, min, zone, restMin: rest, note }), S('cool', { min: 10 + Math.max(0, extra - add), zone: extra - add > 5 ? 2 : 1 })] };
 }
 
 /* Lauf: Qualität je Phase. n: Anzahl Qualitätsläufe in dieser Phase. minor: unter 18 (nie Zone 5). */
-const RUN_LADDER: Record<string, [number, number][]> = { thr: [[3, 8], [3, 10], [2, 12], [2, 15], [3, 12]], rp10: [[5, 4], [4, 6], [5, 5], [3, 8]], rpHalf: [[2, 15], [2, 20], [3, 15]], rpLong: [[2, 20], [3, 20], [2, 30]] };
-export function runQualityStep(phase: Ph, goal: GoalType, n: number, minor: boolean): { reps: number; min: number; zone: number; rest: number; label: string; why: string } | null {
-  if (phase === 'base' || phase === 'race') return null;
-  if (phase === 'build' || phase === 'taper') { const [reps, min] = RUN_LADDER.thr[Math.max(0, Math.min(4, n - (phase === 'taper' ? 2 : 0)))]; return { reps, min, zone: 4, rest: 2, label: 'Schwelle', why: 'Schwellenläufe heben das Tempo, das du lange halten kannst.' }; }
+const RUN_LADDER: Record<string, [number, number][]> = { thr: [[3, 8], [3, 10], [2, 12], [2, 15], [3, 12], [4, 10], [2, 20]], rp10: [[5, 4], [4, 6], [5, 5], [3, 8], [4, 8]], rpHalf: [[2, 15], [2, 20], [3, 15], [2, 25]], rpLong: [[2, 20], [3, 20], [2, 30], [3, 25]],
+  vo2: [[5, 3], [6, 3], [5, 4], [6, 4], [4, 5]], tempo: [[2, 8], [3, 8], [2, 12], [3, 10], [2, 15], [1, 25]] };
+export interface RunQ { reps: number; min: number; zone: number; rest: number; label: string; why: string; kind?: 'threshold' | 'racepace' | 'vo2' | 'tempo' }
+/* Lauf-Qualität je Phase, Ziel und Niveau (Auftrag 14):
+   Grundlage: ab der 5. Grundlagenwoche für Fortgeschrittene und Erfahrene jede zweite Woche ein Tempolauf (Zone 3), sonst nichts Hartes
+   (dafür Hügelsprints, Fahrtspiel, Steigerungen); Aufbau: Schwelle (3×8 → 2×15 min), für 5/10 km im Wechsel mit VO2max (5×3 min);
+   spezifisch: Wettkampftempo der Zieldistanz (5/10 km im Wechsel mit VO2max); Tapering: kurze Stücke im Wettkampftempo.
+   minor/o.noZ5: unter 18 und ab 60 keine Zone 5. */
+export function runQualityStep(phase: Ph, goal: GoalType, n: number, minor: boolean, o: { noZ5?: boolean; baseWeek?: number; level?: 'beginner' | 'advanced' | 'experienced' } = {}): RunQ | null {
+  const noZ5 = minor || !!o.noZ5;
+  const fast = goal === 'run_5k' || goal === 'run_10k';
+  if (phase === 'race') return null;
+  if (phase === 'base') {
+    const bw = o.baseWeek ?? 0;
+    if (!o.level || o.level === 'beginner' || minor || bw < 4 || bw % 2 === 1) return null;
+    const [reps, min] = ladderStep(RUN_LADDER.tempo, n);
+    return { reps, min, zone: 3, rest: 2, label: 'Tempo', kind: 'tempo', why: 'Tempoläufe in der späten Grundlage bereiten auf die Schwelle vor: zügig, aber kontrolliert.' };
+  }
+  if (phase === 'taper') { const sh = fast || short(goal); return { reps: 4, min: sh ? 2 : 3, zone: sh ? 4 : 3, rest: 2, label: 'Wettkampftempo, kurz', kind: 'racepace', why: 'Kurze Reize im Wettkampftempo halten die Beine wach, ohne müde zu machen.' }; }
+  const vo2 = (k: number): RunQ => { const [reps, min] = ladderStep(RUN_LADDER.vo2, k); return { reps, min, zone: 5, rest: min, label: 'VO2max', kind: 'vo2', why: 'Kurz und hart: hebt die maximale Sauerstoffaufnahme, wichtig für 5 und 10 km.' }; };
+  if (phase === 'build') {
+    if (fast && n % 2 === 1 && !noZ5) return vo2(Math.floor(n / 2));
+    const [reps, min] = ladderStep(RUN_LADDER.thr, fast ? Math.ceil(n / 2) : n);
+    return { reps, min, zone: 4, rest: 2, label: 'Schwelle', kind: 'threshold', why: 'Schwellenläufe heben das Tempo, das du lange halten kannst.' };
+  }
+  if (fast && n % 2 === 1 && !noZ5) return vo2(2 + Math.floor(n / 2));
   const kind = /half|middle/.test(goal) ? 'rpHalf' : /marathon|long/.test(goal) ? 'rpLong' : 'rp10';
-  const lad = RUN_LADDER[kind]; const [reps, min] = lad[Math.min(lad.length - 1, n)];
+  const [reps, min] = ladderStep(RUN_LADDER[kind], fast ? Math.ceil(n / 2) : n);
   const zone = kind === 'rp10' ? 4 : 3;
-  return { reps, min, zone: minor ? Math.min(zone, 4) : zone, rest: kind === 'rp10' ? 2 : 3, label: kind === 'rp10' ? '10-km-Tempo' : kind === 'rpHalf' ? 'Halbmarathon-Tempo' : 'Marathon-Tempo', why: 'Wettkampftempo üben: so fühlt sich das Rennen an.' };
+  return { reps, min, zone: noZ5 ? Math.min(zone, 4) : zone, rest: kind === 'rp10' ? 2 : 3, label: kind === 'rp10' ? (goal === 'run_5k' ? '5-km-Tempo' : '10-km-Tempo') : kind === 'rpHalf' ? 'Halbmarathon-Tempo' : 'Marathon-Tempo', kind: 'racepace', why: 'Wettkampftempo üben: so fühlt sich das Rennen an.' };
 }
 /* Qualitätslauf als eigene Einheit (Ein-/Auslaufen dazu) */
-export function runQuality(ctx: W.PaceCtx, q: NonNullable<ReturnType<typeof runQualityStep>>): W.Spec {
-  return { sport: 'run', kind: q.zone >= 4 ? 'threshold' : 'racepace', ctx, why: q.why, steps: [S('warm', { min: 15, zone: 1, note: 'mit 3 Steigerungen' }), S('main', { reps: q.reps, min: q.min, zone: q.zone, restMin: q.rest, note: q.label }), S('cool', { min: 10, zone: 1 })] };
+export function runQuality(ctx: W.PaceCtx, q: NonNullable<ReturnType<typeof runQualityStep>>, o: { short?: boolean } = {}): W.Spec {
+  const kind: W.Kind = q.kind === 'vo2' ? 'vo2' : q.kind === 'tempo' ? 'tempo' : q.kind === 'racepace' ? 'racepace' : q.zone >= 4 ? 'threshold' : 'racepace';
+  return { sport: 'run', kind, ctx, why: q.why, steps: [S('warm', { min: o.short ? 10 : 15, zone: 1, note: 'mit 3 Steigerungen' }), S('main', { reps: q.reps, min: q.min, zone: q.zone, restMin: q.rest, note: q.label }), S('cool', { min: o.short ? 5 : 10, zone: 1 })] };
 }
 /* Qualität im langen Lauf (wenn unter der Woche kein Tag zwischen zwei harten Tagen frei ist) */
 export function longRunWithQuality(ctx: W.PaceCtx, min: number, q: NonNullable<ReturnType<typeof runQualityStep>>): W.Spec {
@@ -87,6 +120,8 @@ export const SWIM_VARIANTS = ['Technik', 'Pull Buoy', 'zügige Bahnen'];
 export function swimVariant(spec: W.Spec, k: number, weekInBlock: number, phase: Ph): W.Spec {
   const out: W.Spec = JSON.parse(JSON.stringify(spec));
   let v = SWIM_VARIANTS[k % SWIM_VARIANTS.length];
+  // Auftrag 14: Pull Buoy nur, wenn die Person einen hat
+  if (v === 'Pull Buoy' && !((out.ctx && out.ctx.gear) || []).includes('buoy')) v = 'Technik';
   const rest = Math.max(15, 30 - 5 * weekInBlock);
   out.steps.forEach(s => { if (s.part === 'main' && (s.reps || 1) > 1 && s.restSec && s.restSec >= 20 && s.mode !== 'drill') s.restSec = rest; });
   // „Pull Buoy“ nur, wenn die Einheit auch Pull-Buoy-Stücke hat (Auftrag 11: vorher stand es manchmal nur im Titel).

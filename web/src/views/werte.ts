@@ -15,6 +15,9 @@ const FIELDS: [string, string, number][] = [
   ['sleepHours', 'v.sleepH', 1], ['sleepQuality', 'v.sleepQ', 0], ['hrv', 'v.hrvMs', 0], ['restingHR', 'v.rhr', 0], ['bodyTemp', 'v.temp', 2],
   ['breathingRate', 'v.breath', 1], ['spo2', 'v.spo2', 1], ['remSleep', 'v.rem', 0], ['deepSleep', 'v.deep', 0], ['sleepLatency', 'v.latency', 0]
 ];
+/* Auftrag 14: Gefühl (1 sehr frisch … 5 sehr müde) und Muskelkater (0 keiner … 3 stark) zählen für die Ampel */
+const MORNING_FEEL: [string, string][] = [['1', 'v.feel1'], ['2', 'v.feel2'], ['3', 'v.feel3'], ['4', 'v.feel4'], ['5', 'v.feel5']];
+const SORENESS: [string, string][] = [['0', 'v.sore0'], ['1', 'v.sore1'], ['2', 'v.sore2'], ['3', 'v.sore3']];
 const pointOf = (date: string) => (STATE.trend || []).find((p: any) => p.date === date) || null;
 
 function tile(field: string, label: string, unit: string, dec: number): string {
@@ -68,6 +71,8 @@ function checkinSheet(): string {
   const p: any = pointOf(CHECK_DATE) || {};
   return `<div class="stack">
     <div class="fld"><label for="ck-date">${esc(t('common.date'))}</label><input class="inp" type="date" id="ck-date" value="${CHECK_DATE}" max="${todayStr()}" data-ch="ck-date"></div>
+    <div class="fld wide"><span class="lab">${esc(t('v.feelMorning'))} ${srcBadge((p._src || {}).feel)}</span><div class="chips" style="flex-wrap:wrap">${MORNING_FEEL.map(([v, l]) => `<button class="chip ${String(p.feel ?? '') === v ? 'on' : ''}" aria-pressed="${String(p.feel ?? '') === v}" data-act="ck-chip" data-k="feel" data-v="${v}">${esc(t(l))}</button>`).join('')}</div></div>
+    <div class="fld wide"><span class="lab">${esc(t('v.soreness'))} ${srcBadge((p._src || {}).soreness)}</span><div class="chips" style="flex-wrap:wrap">${SORENESS.map(([v, l]) => `<button class="chip ${String(p.soreness ?? '') === v ? 'on' : ''}" aria-pressed="${String(p.soreness ?? '') === v}" data-act="ck-chip" data-k="soreness" data-v="${v}">${esc(t(l))}</button>`).join('')}</div></div>
     <div class="fgrid">${FIELDS.map(([k, lk]) => {
       const src = (p._src || {})[k];
       const orig = hasOriginal(p, k) ? bestAuto(p, k, STATE.settings) : null;
@@ -93,6 +98,12 @@ onChange('ck-note', el => {
   const p = { ...(pointOf(CHECK_DATE) || { date: CHECK_DATE }) };
   p.illness = (el as HTMLInputElement).value.trim() || null;
   savePoint(p);
+});
+on('ck-chip', el => {
+  const k = el.dataset.k!; const p: any = pointOf(CHECK_DATE) || {};
+  const v = String(p[k] ?? '') === el.dataset.v ? null : Number(el.dataset.v);
+  savePoint(setManual(pointOf(CHECK_DATE), CHECK_DATE, k, v));
+  refreshSheet();
 });
 on('ck-reset', el => { savePoint(resetToOriginal(pointOf(CHECK_DATE), el.dataset.k!, STATE.settings)); refreshSheet(); toast(t('common.resetDone')); });
 on('checkin-open', el => openCheckin(el.dataset.date || D().today));

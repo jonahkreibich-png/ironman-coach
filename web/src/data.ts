@@ -72,7 +72,8 @@ function compute(): Derived {
   const prof = profile();
   const gl = goals();
   const goal = mainGoal(gl, today);
-  const fallback = { ...(STATE.settings.readiness || {}), sleepNeed: sleepNeed(prof, today) };
+  const fallback: any = { ...(STATE.settings.readiness || {}), sleepNeed: sleepNeed(prof, today) };
+  try { const L = C.loadBaseline(STATE, PLAN.weeks || [], today); fallback.load = L.ctl != null && L.atl != null ? { ctl: L.ctl, atl: L.atl } : null; } catch (e) { fallback.load = null; }
   const readiness = C.readinessFor(STATE.trend, STATE.illnessPeriods, today, fallback);
   const history = C.readinessHistory(STATE.trend, STATE.illnessPeriods, today, 14, fallback);
   const ill = C.illnessAt(STATE.illnessPeriods, today);

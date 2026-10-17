@@ -119,7 +119,7 @@ describe('Erholung und Ampel', () => {
   });
   test('14 Keine Morgenwerte → Briefing bittet darum, keine Anpassung', () => {
     const out = runEngine(ctx({ todayValues: null }), { type: 'daily' });
-    expect(out.messages.find(m => m.kind === 'briefing')!.text).toMatch(/Noch keine Morgenwerte/);
+    expect(out.messages.find(m => m.kind === 'briefing')!.text).toMatch(/Ampel unsicher – noch keine Morgenwerte/);
   });
   test('15 Warum heute locker? bei gelb → Gründe mit Zahlen', () => {
     const c = ctx({ todayValues: { hrv: 56, restingHR: 54, sleepHours: 8.6 } });

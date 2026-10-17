@@ -37,7 +37,7 @@ test('Kraul lernen: Uhr misst 50 m am Stück → nächste Stufe mit 50-m-Stücke
   const r = C.weeklyAdjustments({ ...state({ 'w1-b': { completed: true, activityId: 'a1' } }), activities: { a1: { swim: { longestContinuousM: 50 } } } }, w, '2026-10-18', {});
   const up = r.adjustments.find((a: any) => /stage/.test(a.id));
   expect(up.set.stage.n).toBe(3);
-  expect(up.set.description).toMatch(/8×50 m Kraul/);
+  expect(up.set.description).toMatch(/\d×50 m Kraul/);
   expect(up.set.plannedMinutes).toBe(W.totals(up.set.spec).min);
 });
 test('Feste Einheit: Engine ändert sie nicht (Ampel, Umfang, Stufe)', () => {

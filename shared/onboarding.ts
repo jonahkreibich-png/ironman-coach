@@ -18,6 +18,7 @@ export interface Block { id: string; title: string; intro: string; questions: Qu
 export type Answers = Record<string, any>;
 
 export const SPORT_OPTIONS: [string, string][] = [['swim', 'Schwimmen'], ['bike', 'Rad'], ['run', 'Laufen'], ['strength', 'Kraft']];
+export const SWIM_GEAR_OPTIONS: [string, string][] = [['board', 'Kickbrett'], ['buoy', 'Pull Buoy'], ['fins', 'Flossen'], ['paddles', 'Paddles'], ['snorkel', 'Frontschnorchel']];
 export const BIKE_OPTIONS: [string, string][] = [['road', 'Rennrad'], ['gravel', 'Gravelbike'], ['mtb', 'Mountainbike'], ['tt', 'Triathlon-/Zeitfahrrad'], ['trekking', 'Trekking-/Stadtrad'], ['ebike', 'E-Bike'], ['trainer', 'Rollentrainer/Smarttrainer'], ['spin', 'Indoor-Bike/Spinning']];
 export const DAYLOAD_OPTIONS: [DayLoad, string][] = [[0, 'kein Training'], [1, 'kurz (bis 45 min)'], [2, 'mittel (bis 90 min)'], [3, 'lang (mehr als 90 min)']];
 const has = (a: Answers, s: string) => (a.sports || []).includes(s);
@@ -49,6 +50,8 @@ export const BLOCKS: Block[] = [
     { id: 'swimBreast', label: 'Kannst du Brust schwimmen?', type: 'yesno', show: a => has(a, 'swim') && a.swimCrawl !== 'yes' },
     // Auftrag 11: Beckenlänge (Stücke gehen auf) und Freiwasser
     { id: 'poolM', label: 'Wie lang ist dein Becken?', type: 'select', options: [['25', '25 m'], ['50', '50 m'], ['both', 'beides']], show: a => has(a, 'swim'), hint: 'Danach richten sich die Stücke, z. B. keine 75 m im 25-m-Becken.' },
+    // Auftrag 14: nur vorhandene Hilfsmittel werden eingeplant
+    { id: 'swimGear', label: 'Welche Hilfsmittel hast du?', type: 'multi', options: SWIM_GEAR_OPTIONS, show: a => has(a, 'swim'), hint: 'Nur was du hast (oder im Bad leihen kannst), kommt in den Plan. Nichts davon? Einfach nichts antippen.' },
     { id: 'openWater', label: 'Schwimmst du auch im Freiwasser (See, Meer)?', type: 'yesno', show: a => has(a, 'swim') },
     { id: 'openWaterFrom', label: 'Freiwasser-Saison von', type: 'select', options: MONTHS, show: a => has(a, 'swim') && a.openWater === true },
     { id: 'openWaterTo', label: 'Freiwasser-Saison bis', type: 'select', options: MONTHS, show: a => has(a, 'swim') && a.openWater === true, hint: 'In der Saison und vor Triathlons plant die App ab und zu Freiwasser-Einheiten (Sichten, Orientierung, Start, Neopren).' },
@@ -206,6 +209,7 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
     poolM: a.poolM === '50' || a.poolM === 50 ? 50 : a.poolM === 'both' ? 'both' : a.poolM === '25' || a.poolM === 25 ? 25 : null,
     openWater: a.openWater === true ? true : a.openWater === false ? false : null,
     openWaterFrom: a.openWater === true ? num(a.openWaterFrom) || 6 : null, openWaterTo: a.openWater === true ? num(a.openWaterTo) || 9 : null,
+    swimGear: Array.isArray(a.swimGear) ? a.swimGear.filter((g: string) => ['board', 'buoy', 'fins', 'paddles', 'snorkel'].includes(g)) as any : (base && base.skills && base.skills.swimGear) || null,
     // „ja“ ohne Meterangabe: wie 100 m (Auftrag 11), nie Technik-Stufe 0
     ...(a.swimPullM != null ? { swimPullM: num(a.swimPullM) } : {})
   };

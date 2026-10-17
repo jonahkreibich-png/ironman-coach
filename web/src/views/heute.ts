@@ -19,29 +19,32 @@ import { syncStatusLine } from '../sync';
 
 const STATUS_KEY = ['heute.st.ready', 'heute.st.easy', 'heute.st.rest', 'heute.st.novalues'];
 
+/* Auftrag 14: Ring, Wort, Farbe und Satz kommen alle aus demselben Bereitschafts-Wert (nie aus einer älteren Morgen-Nachricht). */
 export function todayStatus() {
   const d = D(); const R = d.readiness;
   if (d.ill) return { level: 2, word: t('heute.st.sick'), line: t('heute.sickLine') };
-  if (d.ret && d.ret.stage < 3) return { level: 1, word: t('heute.st.return'), line: t(RETURN_STAGES[d.ret.stage]) };
-  const own = (STATE.trend || []).find((p: any) => p.date === d.today);
+  if (d.ret && d.ret.stage < 3) return { level: Math.max(1, R.level === 3 ? 1 : R.level), word: t('heute.st.return'), line: t(RETURN_STAGES[d.ret.stage]) };
   const level = R.level;
-  const brief = (STATE.coachMsgs || {})['msg-brief-' + d.today];
-  let line = '';
-  if (brief && C.hasRecovery(own)) line = brief.text.replace(/^[^.!?]*[!?.,]\s*/, '').split(/(?<=[.!?])\s+/).slice(0, 2).join(' ');
-  if (!line) line = level === 3 ? t('heute.noValuesLine') : !C.hasRecovery(own) ? t('heute.staleLine') : level === 0 ? t('heute.greenLine') : (R.reasons.join(', ') || t('heute.yellowLine')) + '.';
+  const reasons = R.reasons.join(', ');
+  let line: string;
+  if (level === 3) {
+    const few = R.uncertain === 'few' ? R.crits.filter((c: any) => ['HFV', 'Ruhepuls', 'Schlaf', 'Gefühl'].includes(c.k)).map((c: any) => t(CRIT_LABEL[c.k] || c.k)).join(', ') : '';
+    line = few ? t('heute.unsureFew', { v: few }) : t('heute.unsureNone') + (R.staleLevel != null ? ' ' + t('heute.unsureStale', { c: t(['heute.c.green', 'heute.c.yellow', 'heute.c.red'][R.staleLevel] || 'heute.c.green') }) : '');
+  } else line = t(['heute.line.green', 'heute.line.yellow', 'heute.line.red'][level], { s: R.score }) + (level > 0 ? ' ' + (reasons || t('heute.yellowLine')) + '.' : '');
   return { level, word: t(STATUS_KEY[level] || STATUS_KEY[3]), line };
 }
 
+const CRIT_LABEL: Record<string, string> = { HFV: 'v.hrv', Ruhepuls: 'v.rhr', Schlaf: 'v.sleep', 'Gefühl': 'v.feel', Belastung: 'v.load', 'Temp.': 'v.tempShort', Krankheit: 'v.ill' };
+const CRIT_FIELD: Record<string, string> = { HFV: 'hrv', Ruhepuls: 'restingHR', Schlaf: 'sleepHours', 'Gefühl': 'feel', 'Temp.': 'bodyTemp' };
+/* Einzelwerte unter „Warum?“, jeder mit eigener Ampelfarbe (grau = fehlt oder wird noch gelernt) */
 function critTiles(): string {
-  const d = D(); const p = d.readiness.point || {};
-  const st = (k: string) => { const c = d.readiness.crits.find((x: any) => x.k === k); return c ? c.st : ''; };
-  const tile = (k: string, label: string, v: string, field: string, note = '') => `<button class="crit ${st(k)}" data-act="go-sub" data-sub="werte"><div class="k"><i></i>${esc(label)} ${srcBadge((p._src || {})[field])}</div><div class="v">${v}</div><div class="n">${esc(note)}</div></button>`;
-  const crit = (k: string) => d.readiness.crits.find((x: any) => x.k === k);
-  return `<div class="crit-grid">
-    ${tile('HFV', t('v.hrv'), p.hrv != null ? `${p.hrv}<small class="xs"> ms</small>` : '–', 'hrv', crit('HFV') ? crit('HFV').t.replace(/ · z.*$/, '') : '')}
-    ${tile('Ruhepuls', t('v.rhr'), p.restingHR != null ? String(p.restingHR) : '–', 'restingHR', crit('Ruhepuls') ? crit('Ruhepuls').t.replace(/ · .*$/, '') : '')}
-    ${tile('Schlaf', t('v.sleep'), p.sleepHours != null ? `${num(p.sleepHours, 1)}<small class="xs"> h</small>` : '–', 'sleepHours', t('v.need', { h: d.fallback.sleepNeed.map((x: number) => num(x, x % 1 ? 1 : 0)).join('-') }))}
-  </div>`;
+  const d = D(); const R = d.readiness; const p = (R.stale ? null : R.point) || {};
+  const list: any[] = [...R.crits];
+  for (const k of ['HFV', 'Ruhepuls', 'Schlaf']) if (!list.some(c => c.k === k)) list.push({ k, v: '–', t: t('heute.critMissing'), st: 'none' });
+  const order = ['Krankheit', 'HFV', 'Ruhepuls', 'Schlaf', 'Gefühl', 'Belastung', 'Temp.'];
+  list.sort((a, b) => order.indexOf(a.k) - order.indexOf(b.k));
+  const stWord: Record<string, string> = { ok: 'heute.c.green', warn: 'heute.c.yellow', bad: 'heute.c.red', none: 'heute.c.none' };
+  return `<div class="crit-grid">${list.map(c => `<button class="crit ${c.st}" data-act="checkin-open" aria-label="${esc(t(CRIT_LABEL[c.k] || c.k) + ': ' + c.v + ', ' + t(stWord[c.st] || 'heute.c.none'))}"><div class="k"><i></i>${esc(t(CRIT_LABEL[c.k] || c.k))} ${CRIT_FIELD[c.k] ? srcBadge((p._src || {})[CRIT_FIELD[c.k]]) : ''}</div><div class="v">${esc(c.v)}</div><div class="n">${esc(c.t || '')}</div></button>`).join('')}</div>`;
 }
 
 function historyBars(): string {

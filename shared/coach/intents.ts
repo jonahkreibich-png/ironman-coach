@@ -4,7 +4,7 @@
    die erst nach Bestätigung im Chat ausgeführt werden. Versteht sie etwas nicht, sagt sie ehrlich, was sie kann. */
 import * as C from '../core';
 import type { EngineCtx } from './engine';
-import { readinessFacts } from './engine';
+import { readinessFacts, readinessOf } from './engine';
 import { answerQuick } from './quick';
 import { checkMessage } from './safety';
 import { joinDe, de, dowName } from './texts';
@@ -125,7 +125,7 @@ export const INTENTS: Intent[] = [
     answer: ctx => { const p = ctx.profile.thresholds.thresholdPaceRunSec; const m = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
       return `Locker (Zone 2) etwa ${m(p * 1.15)}-${m(p * 1.26)} pro km, an der Schwelle etwa ${m(p * 0.99)}-${m(p * 1.04)} pro km. Wichtiger als das Tempo ist das Gefühl: locker heißt, du kannst reden.`; } },
   { id: 'can-intervals', when: t => has(t, ['kann', 'darf', 'soll', 'koennte']) && has(t, ['intervall', 'intervalle', 'hart', 'intensiv', 'schnell', 'tempo', 'vollgas']),
-    answer: ctx => { const R = C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, ctx.today, { ...((ctx.state.settings || {}).readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) });
+    answer: ctx => { const R = readinessOf(ctx);
       const pain = C.painFlag(ctx.state, weeksOf(ctx), ctx.today);
       if (C.illnessAt(ctx.state.illnessPeriods, ctx.today) || C.returnStageActive(ctx.state.illnessPeriods, ctx.today)) return 'Heute nicht: nach oder während einer Krankheit gibt es zuerst nur lockere Einheiten.';
       if (pain) return `Lieber nicht: in deinen Notizen steht ${pain} über 2/10. Locker bewegen ist okay.`;
@@ -141,9 +141,9 @@ export const INTENTS: Intent[] = [
   { id: 'tomorrow', when: t => has(t, ['morgen']) && !has(t, ['guten']) && has(t, ['was', 'steht', 'training', 'plan', 'mache']),
     answer: ctx => { const d = C.addDays(ctx.today, 1); const l = live(dayOf(ctx, d)); return l.length ? `Morgen: ${joinDe(l.map(sessLine))}.` : 'Morgen ist Ruhetag.'; } },
   { id: 'readiness', when: t => has(t, ['ampel', 'erholt', 'wie geht es mir', 'readiness', 'bereit', 'form heute']),
-    answer: ctx => { const R = C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, ctx.today, { ...((ctx.state.settings || {}).readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) });
-      if (R.level === 3) return 'Für heute fehlen Morgenwerte (Schlaf, Ruhepuls, HFV). Trag sie kurz ein oder verbinde deine Uhr.';
-      return `Ampel ${['grün', 'gelb', 'rot'][R.level]} (${R.score}/100).${R.reasons.length ? ' ' + R.reasons.join(', ') + '.' : ' Alles im grünen Bereich.'}${R.personal ? '' : ' Dein persönlicher Normalbereich wird noch gelernt.'}`; } },
+    answer: ctx => { const R = readinessOf(ctx);
+      if (R.level === 3) return C.readinessLine(R);
+      return `Ampel ${C.readinessLine(R).replace(/^Grün/, 'grün').replace(/^Gelb/, 'gelb').replace(/^Rot/, 'rot')}${R.personal ? '' : ' Dein persönlicher Normalbereich wird noch gelernt.'}`; } },
   { id: 'sleep', when: t => has(t, ['schlaf', 'geschlafen', 'schlafen']) && !has(t, ['wie viel schlaf brauche']),
     answer: ctx => { const p = (ctx.state.trend || []).filter((x: any) => x && x.sleepHours != null).slice(-7); const need = sleepNeed(ctx.profile, ctx.today);
       if (!p.length) return `Ich habe noch keine Schlafwerte. Du brauchst etwa ${de(need[0])}-${de(need[1])} h.`;

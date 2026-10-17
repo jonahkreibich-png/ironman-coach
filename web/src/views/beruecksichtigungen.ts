@@ -7,7 +7,7 @@ import { stage, draftProfile, stageBarHtml, lastApplied } from '../staged';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, field, select, toggle } from '../kit';
-import { BIKE_OPTIONS } from '../../../shared/onboarding';
+import { BIKE_OPTIONS, SWIM_GEAR_OPTIONS } from '../../../shared/onboarding';
 import { invalidate } from '../data';
 import { replanFuture } from '../replan';
 import { nav } from '../nav';
@@ -50,6 +50,7 @@ export function renderBeruecksichtigungen(): string {
     ${p.sports.includes('run') ? field('cs-run', t('cons.runMin'), sk.runContinuousMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="runContinuousMin" data-num="1"' }) : ''}
     ${p.sports.includes('bike') ? field('cs-bike', t('cons.bikeMin'), sk.bikeLongestMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="bikeLongestMin" data-num="1"' }) : ''}</div>
     ${p.sports.includes('swim') ? `<div class="fgrid">${select('cs-pool', t('cons.pool'), String(sk.poolM || ''), [['', '–'], ['25', '25 m'], ['50', '50 m'], ['both', t('cons.poolBoth')]], 'data-ch="cs" data-k="poolM"')}</div>${toggle('cs-ow', t('cons.openWater'), !!sk.openWater, 'data-ch="cs" data-k="openWater" data-bool="1"')}${sk.openWater ? `<div class="fgrid">${select('cs-owf', t('cons.owFrom'), String(sk.openWaterFrom || 6), MONTH_OPTS(), 'data-ch="cs" data-k="openWaterFrom" data-num="1"')}${select('cs-owt', t('cons.owTo'), String(sk.openWaterTo || 9), MONTH_OPTS(), 'data-ch="cs" data-k="openWaterTo" data-num="1"')}</div>` : ''}` : ''}
+    ${p.sports.includes('swim') ? `<div class="lbl">${esc(t('cons.swimGear'))}</div><div class="chips" style="flex-wrap:wrap" data-swimgear>${SWIM_GEAR_OPTIONS.map(([k, l]) => `<button class="chip ${((sk.swimGear || []) as string[]).includes(k) ? 'on' : ''}" aria-pressed="${((sk.swimGear || []) as string[]).includes(k)}" data-act="cs-gear" data-v="${k}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t(sk.swimGear == null ? 'cons.swimGearNone' : 'cons.swimGearHint'))}</div>` : ''}
     ${p.sports.includes('swim') && sk.swimCrawl !== 'yes' ? toggle('cs-breast', t('cons.breast'), !!sk.swimBreast, 'data-ch="cs" data-k="swimBreast" data-bool="1"') : ''}
     ${p.sports.includes('bike') ? `<div class="lbl">${esc(t('cons.bikes'))}</div><div class="chips" style="flex-wrap:wrap">${BIKE_OPTIONS.map(([k, l]) => `<button class="chip ${(p.bikes || []).includes(k) ? 'on' : ''}" aria-pressed="${(p.bikes || []).includes(k)}" data-act="cs-bike" data-v="${k}">${esc(l)}</button>`).join('')}</div>` : ''}</div>`);
   if (!LAST && HAS_PLAN) h += `<div class="hint">${esc(t('cons.replanHint'))}</div>`;
@@ -63,6 +64,7 @@ onChange('cs', el => {
   if (k === 'openWater' && v) { stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), openWater: true, openWaterFrom: (p.skills || {}).openWaterFrom || 6, openWaterTo: (p.skills || {}).openWaterTo || 9 }; }); return; }
   stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), [k]: v || (v === 0 ? 0 : null) }; });
 });
+on('cs-gear', el => { const v = el.dataset.v!; stage(SCREEN, (p: any) => { const cur: string[] = (p.skills || {}).swimGear || []; p.skills = { ...(p.skills || {}), swimGear: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] }; }); });
 on('cs-bike', el => { const v = el.dataset.v!; stage(SCREEN, p => { p.bikes = (p.bikes || []).includes(v) ? p.bikes.filter(x => x !== v) : [...(p.bikes || []), v]; }); });
 
 /* Teamsport mit derselben Logik wie im Fragebogen (Auftrag 11): erst „Gibt es Spiele?“, nur dann Spieltage und Dauer */

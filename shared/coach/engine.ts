@@ -20,6 +20,7 @@ export interface CoachMsg {
   important?: boolean;
   refs?: { sessionId?: string; activityId?: string; adjustmentIds?: string[] };
   proposal?: { changes: any[]; status: 'open' | 'accepted' | 'rejected' } | null;
+  readiness?: { level: number; score: number | null };
 }
 export interface EngineCtx {
   today: string; now: number;
@@ -34,7 +35,14 @@ export interface EngineOut { adjustments: any[]; messages: CoachMsg[] }
 
 const has = (ctx: EngineCtx, id: string) => !!(ctx.state.coachMsgs || {})[id];
 function msg(ctx: EngineCtx, m: Omit<CoachMsg, 'at' | 'from'> & { from?: CoachMsg['from'] }): CoachMsg { return { from: 'coach', at: ctx.now, ...m }; }
-function fallback(ctx: EngineCtx) { return { ...(ctx.state.settings && ctx.state.settings.readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) }; }
+/* Eingabe für die Ampel: eigene Grenzen, Schlafbedarf und Belastung (Fitness/Müdigkeit aus intervals.icu, sonst aus den Einheiten) */
+export function readinessFallback(ctx: EngineCtx) {
+  const fb: any = { ...(ctx.state.settings && ctx.state.settings.readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) };
+  if (fb.load === undefined) { try { const L = C.loadBaseline(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.today); fb.load = L.ctl != null && L.atl != null ? { ctl: L.ctl, atl: L.atl } : null; } catch (e) { fb.load = null; } }
+  return fb;
+}
+export function readinessOf(ctx: EngineCtx, date = ctx.today) { return C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, date, readinessFallback(ctx)); }
+const fallback = readinessFallback;
 function effWeeks(ctx: EngineCtx, extra?: any[]) { return C.applyAdjustments(ctx.baseWeeks, Object.assign({}, ctx.state.adjustments, Object.fromEntries((extra || []).map(a => [a.id, a])))); }
 function dayOf(weeks: any[], date: string) { return C.planDays(weeks).find((d: any) => d.date === date) || null; }
 function live(day: any) { return day ? day.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled) : []; }
@@ -125,18 +133,19 @@ export function morningBriefing(ctx: EngineCtx, date: string, adjustments: any[]
   const name = (ctx.profile.name || '').split(' ')[0];
   const lines: string[] = [T.greet(seed, name)];
   if (ill) lines.push('Heute kein Training. Schlafen, trinken, genug essen. Sag mir Bescheid, wenn es dir besser geht.');
-  else if (R.level === 3 || !C.hasRecovery((ctx.state.trend || []).find((x: any) => x && x.date === date))) {
-    lines.push('Noch keine Morgenwerte für heute. Sobald Schlaf und Ruhepuls da sind, sage ich dir, wie hart es heute sein darf.' + (R.level !== 3 && R.stale ? ` Nach den Werten von gestern sah es ${['gut', 'eher nach locker', 'nach Ruhe'][R.level] || 'unklar'} aus.` : ''));
+  else if (R.level === 3) {
+    lines.push(R.uncertain === 'few' ? C.readinessLine(R) : 'Ampel unsicher – noch keine Morgenwerte. Sobald Schlaf und Ruhepuls da sind, sage ich dir, wie hart es heute sein darf.' + (R.staleLevel != null ? ` Nach den letzten Werten sah es ${['gut', 'eher nach locker', 'nach Ruhe'][R.staleLevel] || 'unklar'} aus.` : ''));
   }
   else {
+    // Auftrag 14: derselbe Wert wie im Ring auf „Heute“ (Farbe aus dem Wert)
     const facts = readinessFacts(ctx, date);
-    if (R.level === 0) lines.push(`${T.green(seed)} Ampel grün (${R.score}/100).`);
-    else lines.push(`${R.level === 1 ? T.yellow(seed) : T.red(seed)} ${facts.length ? joinDe(facts).replace(/^d/, 'D') + '.' : (R.reasons.join(', ') + '.')}`);
+    if (R.level === 0) lines.push(`${T.green(seed)} Ampel grün (${R.score}/100): normal trainieren.`);
+    else lines.push(`Ampel ${R.level === 1 ? 'gelb' : 'rot'} (${R.score}/100): ${R.level === 1 ? 'lockerer trainieren, Intensität raus' : 'Ruhe oder nur ganz locker'}. ${facts.length ? joinDe(facts).replace(/^d/, 'D') + '.' : (R.reasons.join(', ') + '.')}`);
   }
   if (!ill) lines.push(list.length ? `Heute: ${joinDe(list.map(sessLabel))}.` : 'Heute ist kein Training geplant. Genieß den Ruhetag.');
   const zoneTip = list.find((s: any) => C.zoneBpm(s, ctx.profile.thresholds, null));
   if (zoneTip && !ill) lines.push(`Puls für ${zoneTip.title}: ${C.zoneBpm(zoneTip, ctx.profile.thresholds, null)}.`);
-  return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 || !C.hasRecovery((ctx.state.trend || []).find((x: any) => x && x.date === date)) ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2 });
+  return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2, readiness: { level: R.level, score: R.score } });
 }
 
 export function weeklyReview(ctx: EngineCtx, date: string, adjustments: any[], summary: any): CoachMsg {
@@ -198,16 +207,25 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
   if (ev.type === 'trend' || ev.type === 'daily' || ev.type === 'illness') {
     const p = (ctx.state.trend || []).find((x: any) => x && x.date === today);
     const haveValues = C.hasRecovery(p);
-    const dailyDone = Object.values(ctx.state.adjustments || {}).some((a: any) => a && a.group === 'daily-' + today) || has(ctx, 'msg-brief-' + today);
+    // Auftrag 14: Kommen später am Morgen weitere Werte (z. B. erst Ruhepuls, dann Schlaf), wird die Morgen-Nachricht mit dem neuen Wert erneuert
+    const brief: any = (ctx.state.coachMsgs || {})['msg-brief-' + today];
+    const Rnow = C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, today, ctx.state.settings.readiness);
+    const changedR = !!brief && haveValues && (!brief.readiness || brief.readiness.level !== Rnow.level || brief.readiness.score !== Rnow.score);
+    const dailyDone = (Object.values(ctx.state.adjustments || {}).some((a: any) => a && a.group === 'daily-' + today) || !!brief) && !changedR;
     if ((haveValues || ev.type === 'daily') && !dailyDone) {
       const adj = C.dailyAdjustments(ctx.state, ctx.baseWeeks, today, { planMeta: ctx.planMeta, now: ctx.now });
       out.adjustments.push(...adj);
       const groups: Record<string, any[]> = {};
       adj.forEach(a => { (groups[a.group || a.id] = groups[a.group || a.id] || []).push(a); });
       Object.entries(groups).forEach(([g, list]) => push(msg(ctx, { id: 'msg-adj-' + g, date: today, kind: 'adjust', title: 'Plan angepasst', text: adjustmentText(ctx, list, today), important: true, refs: { adjustmentIds: list.map(a => a.id) } })));
-      push(morningBriefing(ctx, today, adj));
+      const b = morningBriefing(ctx, today, adj);
+      if (changedR) out.messages.push({ ...b, at: brief.at || b.at }); else push(b);
     }
   }
+
+  // Auftrag 14: Schwimm-Hilfsmittel fehlen noch → einmal fragen (bis dahin plant die App ohne Hilfsmittel)
+  if ((ev.type === 'daily' || ev.type === 'trend') && (ctx.profile.sports || []).includes('swim') && (ctx.profile.skills || {}).swimGear == null)
+    push(msg(ctx, { id: 'msg-swimgear', date: today, kind: 'info', title: 'Welche Schwimm-Hilfsmittel hast du?', text: 'Damit deine Schwimmeinheiten passen: Hast du Kickbrett, Pull Buoy, Flossen, Paddles oder Frontschnorchel (oder kannst du sie im Bad leihen)? Tipp sie unter Mehr → Berücksichtigungen → Können und Ausrüstung an. Bis dahin plane ich ohne Hilfsmittel, z. B. Beinschlag in Seitlage statt mit Brett.' }));
 
   if (ev.type === 'illness') {
     const ill = C.illnessAt(ctx.state.illnessPeriods, today);
