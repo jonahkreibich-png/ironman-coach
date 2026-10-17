@@ -12,6 +12,7 @@ import { parseFor, parseRules } from '../ruleparse';
 import { explainDay } from './explain';
 import { analyze, doneSessions } from './analysis';
 import { zoneVerdict } from '../fields';
+import { sportAllowed } from '../sports';
 
 export const TOOL_DEFS = [
   { name: 'get_data', description: 'Liest Daten des Athleten. what: "day" (Plan und Status eines Tages), "week" (Woche um ein Datum), "values" (Morgenwerte der letzten Tage), "sessions" (erledigte Einheiten mit allen Feldern: Dauer, Distanz, Pace, Puls, max. Puls, Pulszone, Entkopplung, Effizienz, Kadenz, Watt, Schwimm-Technik, RPE, Gefühl, geplant vs. gemacht).',
@@ -105,6 +106,8 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
       a = { id: adjId('cancel', ctx), type: 'cancel', sessionId: hit.s.id, what: `${hit.s.title} entfällt`, reason };
     } else {
       const set: any = {};
+      // Auftrag 15: nur Sportarten, die der Athlet gewählt hat (Teamsport nur, wenn angegeben)
+      if (input.sport && !sportAllowed(ctx.profile, input.sport)) return err(`Abgelehnt: ${input.sport} hat der Athlet nicht gewählt. Plane nur mit seinen Sportarten (${(ctx.profile.sports || []).join(', ')}).`);
       if (input.sport) set.sport = input.sport;
       if (input.title) set.title = String(input.title).slice(0, 80);
       if (input.planned_minutes) set.plannedMinutes = input.planned_minutes;
@@ -138,6 +141,8 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
     return { result: 'Erledigt: ' + a.what + '.', isError: false, changes: [change] };
   }
   if (name === 'rebuild_week') {
+    const wrong = (input.days || []).flatMap((d: any) => (d.sessions || []).map((x: any) => x && x.sport)).filter((sp: any) => sp && !sportAllowed(ctx.profile, sp));
+    if (wrong.length) return err(`Abgelehnt: ${[...new Set(wrong)].join(', ')} hat der Athlet nicht gewählt. Plane nur mit seinen Sportarten (${(ctx.profile.sports || []).join(', ')}).`);
     const code = JSON.stringify({ mode: 'merge', weeks: [{ weekNumber: input.week_number, label: 'Woche ' + input.week_number, startDate: input.start_date, focus: input.focus || '', days: (input.days || []).map((d: any) => ({ date: d.date, sessions: (d.sessions || []).map((s: any, i: number) => ({ id: `ai-w${input.week_number}-${d.date}-${i + 1}`, ...s })) })) }] });
     const chk = checkPlanCode(code, { meta: ctx.planMeta, weeks: ctx.baseWeeks }, { minor: isMinor(ctx.profile, today) });
     if (!chk.ok) return err('Abgelehnt: ' + chk.errors.join(' ') + ' Bitte anders planen.');

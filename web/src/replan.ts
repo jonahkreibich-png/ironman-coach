@@ -15,6 +15,8 @@ import type { Profile } from '../../shared/profile';
 import type { Goal } from '../../shared/goals';
 import { t } from '../../shared/i18n';
 import { sportLabel } from './kit';
+import { checkPlanRules } from '../../shared/planrules';
+import { chosenSports, sportAllowed } from '../../shared/sports';
 
 /* Aktuelle Lernstufen aus dem Plan (die zuletzt geplante Stufe je Lernweg) */
 export function currentStages(): { swim?: any; runwalk?: number | null } {
@@ -104,4 +106,36 @@ export function calibrateIfDue(): boolean {
   const h = (Math.round(due.minutes / 6) / 10).toString().replace('.', ',');
   const r = replanFuture('deine ersten 2 Wochen', `Du hattest beim Start nicht gewusst, wie viel du bisher trainierst. In den ersten 2 Wochen waren es etwa ${h} h pro Woche: daran richtet sich der Plan jetzt aus.`, { measuredStartMin: due.minutes });
   return r.ok;
+}
+
+/* Auftrag 15 (für alle): Der Plan enthält nur gewählte Sportarten, und dieselbe Sportart liegt nicht an zwei Tagen hintereinander.
+   Beim Start prüft die App den Plan ab heute; bei Befund plant sie ab heute neu (Vergangenes und Erledigtes bleibt) und sagt es im Coach.
+   Einmal je Befund: bleibt nach dem Neuplanen etwas übrig (z. B. zwei feste Termine), fragt die App nicht bei jedem Start erneut. */
+export function planRulesOnStart(): boolean {
+  const plan = readPlan(); if (!plan) return false;
+  const p = profile(); const from = replanFrom();
+  const eff = C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {});
+  const issues = checkPlanRules(eff, p, { from }).filter(i => !(i.rule !== 'sport' && i.date && i.date > addDays(from, 56)));
+  const sig = issues.map(i => i.msg).join('|');
+  if (!issues.length || STATE.settings.planRules15 === sig) return false;
+  const sportIss = issues.filter(i => i.rule === 'sport');
+  const names = [...new Set(sportIss.map(i => (/\((Laufen|Rad|Schwimmen|Kraft|Teamsport)\)/.exec(i.msg) || [])[1]).filter(Boolean))];
+  const mine = chosenSports(p).map(s => sportLabel(s)).join(', ');
+  const why = sportIss.length
+    ? `In deinem Plan standen Einheiten, die du nicht gewählt hast (${names.join(', ') || 'andere Sportarten'}). Ab jetzt plane ich nur mit deinen Sportarten: ${mine}.`
+    : 'Neue Regel: dieselbe Sportart liegt nicht mehr an zwei Tagen hintereinander. Geht es wegen Zeit, Schwimmbad oder festen Terminen nicht anders, ist eine der beiden Einheiten locker und kurz.';
+  const r = replanFuture(sportIss.length ? 'nur deine Sportarten' : 'Abstand zwischen gleichen Sportarten', why);
+  if (!r.ok && sportIss.length) {
+    // ohne Ziel kein Neuplanen: dann fallen die Einheiten weg (mit Rückgängig)
+    const now = Date.now();
+    C.planDays(eff).filter((d: any) => d.date >= from).forEach((d: any) => (d.sessions || []).forEach((s: any, i: number) => {
+      if (!s || s.race || s.cancelled || sportAllowed(p, s.sport) || (STATE.sessions[s.id] && STATE.sessions[s.id].completed)) return;
+      const id = `nosport-${s.id}`; STATE.adjustments[id] = { id, group: 'nosport-' + todayStr(), type: 'cancel', removed: true, sessionId: s.id, date: todayStr(), createdAt: now + i, what: `${s.title} entfällt`, reason: 'Sportart nicht gewählt' };
+    }));
+    rebuildPlanIndex();
+  }
+  const after = checkPlanRules(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), profile(), { from }).filter(i => !(i.rule !== 'sport' && i.date && i.date > addDays(from, 56)));
+  STATE.settings.planRules15 = after.map(i => i.msg).join('|') || sig;
+  saveState();
+  return true;
 }

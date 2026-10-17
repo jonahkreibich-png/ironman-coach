@@ -34,10 +34,10 @@ import './views/planedit';
 import { checkForUpdate, startPwa } from './pwa';
 import { initErrorLog } from './errlog';
 import { nav } from './nav';
-import { calibrateIfDue } from './replan';
+import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
-import { isSyncOn, loadAiState, loadMe, entitled } from './sync';
+import { isSyncOn, loadAiState, loadMe, entitled, onSynced } from './sync';
 export const canGenerate = () => FEATURES.generator || entitled('generator');
 
 initErrorLog();
@@ -181,6 +181,10 @@ function updateBadge() {
 try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } catch (e) {}
 // „Stunden bisher: weiß ich nicht“: nach 2 Wochen an die echten Daten anpassen (Auftrag 11)
 try { if (HAS_PLAN) calibrateIfDue(); } catch (e) { /* nie den Start verhindern */ }
+// Auftrag 15: nur gewählte Sportarten, gleiche Sportart nicht an zwei Tagen hintereinander. Mit Sync erst nach dem ersten Abgleich
+// (sonst könnte ein alter Stand auf diesem Gerät den neueren Plan vom Server überschreiben).
+{ let ran = false; const check = () => { if (ran) return; ran = true; try { if (HAS_PLAN && planRulesOnStart()) rerender(); } catch (e) { /* nie den Start verhindern */ } };
+  if (isSyncOn()) onSynced(check); else check(); }
 render();
 openFromUrl(location.href);
 startPwa();

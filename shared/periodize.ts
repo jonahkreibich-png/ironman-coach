@@ -94,12 +94,13 @@ export function macroPhases(start: string, nTotal: number, anchors: Anchor[], re
     // sehr lange Grundlage (kein Zwischenziel): in Zwischenzyklen aus 10 Wochen Grundlage und 6 Wochen Aufbau teilen, die letzte Grundlage bleibt
     const pre: MPhase[] = [];
     while (base > 28) { pre.push(...Array(10).fill('base'), ...Array(6).fill('build')); base -= 16; }
-    const seq: MPhase[] = [...pre, ...Array(base).fill('base'), ...Array(build).fill('build'), ...Array(spec).fill('specific'), ...Array(taper).fill('taper'), 'race'];
+    // Allgemeine Fitness (Auftrag 15): kein Wettkampf, kein Tapering – durchgehend Grundlage (mit Erholungswochen)
+    const seq: MPhase[] = a.type === 'fitness' ? Array(len).fill('base') : [...pre, ...Array(base).fill('base'), ...Array(build).fill('build'), ...Array(spec).fill('specific'), ...Array(taper).fill('taper'), 'race'];
     seq.forEach((p, k) => {
       if (s + k >= nTotal) return;
       since++;
       // Erholung im Rhythmus, nicht direkt vor dem Tapering
-      const recovery = (p === 'base' || p === 'build' || p === 'specific') && since >= recoveryEvery && k < seq.length - race - taper - 1;
+      const recovery = (p === 'base' || p === 'build' || p === 'specific') && since >= recoveryEvery && (a.type === 'fitness' || k < seq.length - race - taper - 1);
       if (recovery) since = 0;
       out.push({ phase: p, recovery, goalId: a.id, goalType: a.type, goalName: a.name, priority: a.priority });
     });

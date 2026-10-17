@@ -391,7 +391,8 @@ export function generatePlan(inp: GenInput): GenResult {
     const month = +addDays(mon, 3).slice(5, 7);
     const dates = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
     const raceOn: Record<string, Goal> = {};
-    allGoals.forEach(g => { if (dates.includes(g.date!)) raceOn[g.date!] = g; });
+    // Allgemeine Fitness ist kein Wettkampf (Auftrag 15: vorher stand am Zieldatum ein „Lauf“-Wettkampf im Plan)
+    allGoals.forEach(g => { if (dates.includes(g.date!) && g.type !== 'fitness') raceOn[g.date!] = g; });
     // Tage: Zeit, Teamsport, Wettkampf, Tapering vor und Erholung nach B/A-Rennen
     const part = midWeek && wi === 0;
     const slots = dates.map((date, i) => {
@@ -401,7 +402,7 @@ export function generatePlan(inp: GenInput): GenResult {
       const tsOn = teamActive(ts, date);
       const lim = dayLimit(rules, date);
       let cap = Math.min(dayCap(profile, dow), lim.cap), noHard = lim.noHard;
-      for (const g of allGoals) {
+      for (const g of allGoals.filter(x => x.type !== 'fitness')) {
         const d = daysBetween(g.date!, date); // >0: nach dem Rennen
         if (g.priority !== 'C' && d < 0 && d >= -(g.priority === 'A' ? 3 : 4)) { noHard = true; cap = Math.round(cap * 0.7); }
         if (d > 0 && d <= easyAfterDays(g.type)) { noHard = true; cap = Math.min(cap, d <= 2 ? 45 : 60); }
@@ -460,7 +461,7 @@ export function generatePlan(inp: GenInput): GenResult {
       const cOut = bikeChoice(profile, false, month, eff), cIn = bikeChoice(profile, true, month, eff);
       const sgP = segGoal(wi);
       // lockere Tage nach einem Wettkampf (Sprint 3, Olympisch 5, Mittel 10, Lang/Marathon 14 Tage)
-      const easyDates = dates.filter(d => goals.some(g => g.date && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type)));
+      const easyDates = dates.filter(d => goals.some(g => g.date && g.type !== 'fitness' && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type)));
       const items = WP.patternWeek(pat, { mon, dates, recovery: ph.recovery, entry: entryWeek[wi], ownMin: ownVols[wi], target: tg, tests, phase: ph.phase,
         goalType: sgP.goalType, minor: (ageOf(profile, mon) ?? 30) < 18, easyDates,
         hardDows: slots.filter(x => x.game || x.race).map(x => x.dow),
@@ -784,7 +785,7 @@ export function generatePlan(inp: GenInput): GenResult {
     if (ph.recovery) { blockNo++; blockWeek = 0; }
     weeks.push({
       weekNumber: wn, label: 'Woche ' + wn, headline, ...blk, target: { goalId: A.id, name: A.name, weeks: nTotal, n: wi + 1 }, races,
-      startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || dates.some(d => goals.some(g => g.date && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type))) || undefined,
+      startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || dates.some(d => goals.some(g => g.date && g.type !== 'fitness' && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type))) || undefined,
       entry: entryWeek[wi] || undefined, ...(part ? { partial: true, from } : {}), vorgabe: pat && WP.targetFor(pat, mon) ? true : undefined,
       phase: ph.phase, focus: ph.recovery ? 'Erholung: weniger Umfang, Körper verarbeitet das Training' : entryWeek[wi] ? 'Wiedereinstieg: locker, Umfang steigt in Stufen' : focusText(ph.phase, GOALS[A.type].group, sports.includes('strength')),
       important: patImportant || weekImportant(ph, otherRaces, wi, inp, runStage, swimStage, afterIllness), days

@@ -102,7 +102,7 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
   const lastDate = weeks.length ? weeks[weeks.length - 1].endDate : today;
   const firstDate = weeks.length ? weeks[0].startDate : today;
   for (const g of goals) {
-    if (!g.date || g.result || g.date < firstDate || g.date > lastDate) continue;
+    if (!g.date || g.result || g.date < firstDate || g.date > lastDate || g.type === 'fitness') continue;
     const day = weeks.flatMap(w => w.days).find((d: any) => d.date === g.date);
     if (!day || !day.sessions.some((s: any) => s.race && s.goalId === g.id)) out.push({ rule: 'goals', date: g.date, msg: `${g.name} am ${g.date} fehlt im Plan.` });
   }
