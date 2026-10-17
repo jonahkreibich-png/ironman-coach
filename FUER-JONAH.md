@@ -6,9 +6,9 @@ Nur das, was du selbst tun musst.
 
 Mehr → Berücksichtigungen → Können und Ausrüstung → **Schwimm-Hilfsmittel** antippen (Kickbrett, Pull Buoy, Flossen, Paddles, Frontschnorchel). Nur was ihr habt (oder im Bad leihen könnt), kommt in die Einheiten. Bis dahin plant die App ohne Hilfsmittel. Der Coach erinnert euch auch.
 
-## B. Dropbox-Schlüssel (mit Claude im Chat, 5 min)
+## B. Dropbox: erledigt (17.10.)
 
-Die echte App liest Dropbox schon seit 16.10. (eine echte FIT-Datei wurde übernommen). Wenn du eine neue Dropbox-App mit „Full Dropbox“ anlegst, führt dich Claude durch das Setzen von App key und App secret (Wert kopieren, „kopiert“ schreiben, Claude setzt ihn, ohne ihn anzuzeigen). Redirect URIs der App: `https://coach-app-efc7.pages.dev/api/connect/dropbox/callback` und `https://stamio-test.pages.dev/api/connect/dropbox/callback`.
+Schlüssel gesetzt, Verbindung getestet. Achte nur darauf, dass HealthFit unter Einstellungen → Automatischer Export → Dropbox (Format FIT) eingeschaltet bleibt.
 
 ## 1. KI-Coach einschalten (wenn du willst)
 
