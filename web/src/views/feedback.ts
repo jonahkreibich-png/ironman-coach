@@ -20,11 +20,10 @@ import { parseFor } from '../../../shared/ruleparse';
 let KIND: 'bug' | 'idea' = 'bug';
 let LIST: any[] | null = null;
 let MINE: any[] | null = null;
-let ERRS: any[] | null = null;
+let ERRS: { groups: any[]; operator: any[] } | null = null;
 let SENT: '' | 'sent' | 'queued' = '';
 let SHOT: string | null = null;
 let SHARE = false;
-let FILTER: 'neu' | 'arbeit' | 'erledigt' | 'alle' = 'neu';
 /* Entwurf: übersteht jedes Neuzeichnen (z. B. wenn im Hintergrund die eigenen Meldungen geladen werden) */
 let DRAFT = '';
 document.addEventListener('input', e => { const el = e.target as HTMLElement; if (el && el.id === 'fb-text') DRAFT = (el as HTMLTextAreaElement).value; });
@@ -73,7 +72,7 @@ onSynced(() => { flushOutbox(); });
 /* Neu zeichnen, aber nie, während jemand in ein Feld tippt (sonst geht der Text verloren) */
 function safeRerender() { const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { setTimeout(safeRerender, 800); return; } nav.rerender(); }
 /* ---------- Ansicht ---------- */
-const statusPill = (s: string) => pill(t('fb.st.' + (s || 'neu')), s === 'erledigt' ? 'good' : s === 'arbeit' ? 'info' : 'warn');
+const statusPill = (s: string) => pill(t('fb.st.' + (s || 'neu')), s === 'erledigt' ? 'good' : s === 'arbeit' ? 'info' : s === 'verworfen' ? '' : 'warn');
 export function renderFeedback(): string {
   const c = context();
   const queued = outbox().length;
@@ -96,28 +95,38 @@ function mineHtml(): string {
     <div class="fb-text">${esc(f.text)}</div>${f.reply ? `<div class="banner info fb-reply"><b>${esc(t('fb.replyFrom'))}</b> ${esc(f.reply)}</div>` : ''}</div>`).join('')}</div>`);
 }
 /* ---------- Posteingang des Betreibers ---------- */
-function inboxHtml(): string {
-  if (LIST == null) { LIST = []; apiCall('GET', '/api/admin/feedback').then(r => { LIST = r.feedback || []; if (LIST!.length) safeRerender(); focus(); }).catch(() => {}); }
-  if (ERRS == null) { ERRS = []; apiCall('GET', '/api/admin/errors').then(r => { ERRS = r.users || []; if (ERRS!.length) safeRerender(); }).catch(() => {}); }
-  const count = (s: string) => LIST!.filter(f => (f.status || 'neu') === s).length;
-  const shown = LIST.filter(f => FILTER === 'alle' || (f.status || 'neu') === FILTER);
-  const filt = `<div class="seg" role="group" aria-label="${esc(t('fb.filter'))}">${(['neu', 'arbeit', 'erledigt', 'alle'] as const).map(k => `<button class="${FILTER === k ? 'on' : ''}" data-act="fb-filter" data-v="${k}">${esc(t('fb.st.' + k))}${k !== 'alle' ? ` ${count(k)}` : ''}</button>`).join('')}</div>`;
-  const items = shown.map(f => `<div class="li fb-item" style="display:block" data-fb="${f.id}">
-    <div class="spread"><span class="t">${esc(f.user)} · ${fmtDate(ymd(new Date(f.at)))}</span>${pill(f.kind === 'idea' ? t('fb.idea') : t('fb.bug'), f.kind === 'idea' ? 'accent' : 'warn')}</div>
+/* Auftrag 14: Offen (neu, in Arbeit) oben, Erledigt (erledigt, verworfen) zuklappbar darunter. Status per Knopf oder Wischen
+   (nach links: erledigt, nach rechts: in Arbeit). Fehler bei Testern zu einer Zeile je Fehler zusammengefasst, mit „Erledigt“;
+   Einstellungsfehler des Servers stehen getrennt als Hinweis für den Betreiber. */
+const isDone = (f: any) => f.status === 'erledigt' || f.status === 'verworfen';
+function itemHtml(f: any): string {
+  const st = f.status || 'neu';
+  const btn = (v: string, label: string, cls = 'ghost') => `<button class="btn ${cls} sm" data-act="fb-status" data-id="${f.id}" data-v="${v}">${esc(label)}</button>`;
+  return `<div class="li fb-item" style="display:block" data-fb="${f.id}" data-fb-status="${st}">
+    <div class="spread"><span class="t">${esc(f.user)} · ${fmtDate(ymd(new Date(f.at)))}</span><span class="row" style="gap:4px">${pill(f.kind === 'idea' ? t('fb.idea') : t('fb.bug'), f.kind === 'idea' ? 'accent' : 'warn')}${statusPill(st)}</span></div>
     <div class="fb-text">${esc(f.text)}</div><div class="xs muted fb-meta">${esc([f.screen, f.version, f.device].filter(Boolean).join(' · '))}</div>
     ${f.errors && f.errors.length ? `<div class="xs muted fb-meta">${esc(f.errors.map((e: any) => e.msg).join(' | '))}</div>` : ''}
     ${f.hasScreenshot ? (SHOTS[f.id] ? `<img src="${SHOTS[f.id]}" alt="${esc(t('fb.shot'))}" class="fb-shot">` : `<button class="link" data-act="fb-shot-load" data-id="${f.id}">${esc(t('fb.shotShow'))}</button>`) : ''}
     ${f.shared ? `<details class="more"><summary>${esc(t('fb.sharedData'))}</summary><div class="body small fb-meta">${esc(JSON.stringify(f.shared, null, 1))}</div></details>` : ''}
     ${f.reply ? `<div class="banner info fb-reply"><b>${esc(t('fb.yourReply'))}</b> ${esc(f.reply)}</div>` : ''}
-    <div class="seg sm" role="group" aria-label="${esc(t('fb.status'))}" style="margin-top:6px">${['neu', 'arbeit', 'erledigt'].map(s => `<button class="${(f.status || 'neu') === s ? 'on' : ''}" data-act="fb-status" data-id="${f.id}" data-v="${s}">${esc(t('fb.st.' + s))}</button>`).join('')}</div>
-    <div class="row wrap" style="margin-top:6px"><button class="btn ghost sm" data-act="fb-copy" data-id="${f.id}">${esc(t('fb.copyText'))}</button></div>
-    <div class="fld" style="margin-top:6px"><label for="fb-reply-${f.id}">${esc(t('fb.reply'))}</label><textarea class="inp" id="fb-reply-${f.id}" rows="2"></textarea></div>
-    <button class="btn sm" data-act="fb-reply" data-id="${f.id}">${esc(t('fb.replySend'))}</button></div>`).join('');
-  const errs = ERRS && ERRS.length ? sec(t('fb.errorsTitle'), `<div class="list" data-tester-errors>${ERRS.map(u => `<div class="li" style="display:block"><div class="spread"><span class="t">${esc(u.user)}</span>${pill(t('fb.errCount', { n: u.count }), 'bad')}</div><div class="xs muted fb-meta">${esc((u.recent || []).map((e: any) => `${e.msg}${e.place ? ' @ ' + e.place : ''}${e.version ? ' (' + e.version + ')' : ''}`).join(' | '))}</div></div>`).join('')}</div>`, t('fb.allAside')) : '';
-  return sec(t('fb.inbox'), `${filt}<div class="list" data-feedback-list style="margin-top:var(--s2)">${items || `<div class="li">${empty(t('fb.none'))}</div>`}</div>`, t('fb.allAside')) + errs;
+    <div class="row wrap" style="margin-top:6px;gap:6px">${isDone(f) ? btn('neu', t('fb.reopen')) : `${st === 'neu' ? btn('arbeit', t('fb.toWork')) : ''}${btn('erledigt', t('fb.markDone'), '')}${btn('verworfen', t('fb.discard'))}`}<button class="btn ghost sm" data-act="fb-copy" data-id="${f.id}">${esc(t('fb.copyText'))}</button></div>
+    ${isDone(f) ? '' : `<div class="fld" style="margin-top:6px"><label for="fb-reply-${f.id}">${esc(t('fb.reply'))}</label><textarea class="inp" id="fb-reply-${f.id}" rows="2"></textarea></div>
+    <button class="btn sm" data-act="fb-reply" data-id="${f.id}">${esc(t('fb.replySend'))}</button>`}</div>`;
+}
+function inboxHtml(): string {
+  if (LIST == null) { LIST = []; apiCall('GET', '/api/admin/feedback').then(r => { LIST = r.feedback || []; if (LIST!.length) safeRerender(); focus(); }).catch(() => {}); }
+  if (ERRS == null) { ERRS = { groups: [], operator: [] } as any; apiCall('GET', '/api/admin/errors').then(r => { ERRS = { groups: r.groups || [], operator: r.operator || [] } as any; if ((ERRS as any).groups.length || (ERRS as any).operator.length) safeRerender(); }).catch(() => {}); }
+  const open = LIST.filter(f => !isDone(f)), done = LIST.filter(isDone);
+  const nNew = LIST.filter(f => (f.status || 'neu') === 'neu').length;
+  const openHtml = open.length ? open.map(itemHtml).join('') : `<div class="li">${empty(t('fb.none'))}</div>`;
+  const doneHtml = done.length ? `<details class="more" data-feedback-done style="margin-top:var(--s2)"><summary>${esc(t('fb.doneList', { n: done.length }))}<span class="chev">${ic('down')}</span></summary><div class="body"><div class="list">${done.map(itemHtml).join('')}</div></div></details>` : '';
+  const E: any = ERRS || { groups: [], operator: [] };
+  const ops = E.operator && E.operator.length ? sec(t('fb.opTitle'), `<div class="stack" data-operator-hints>${E.operator.map((o: any) => `<div class="banner warn" style="display:block"><b>${esc(o.text)}</b><div class="small">${esc(o.help)}</div><div class="row spread" style="margin-top:6px"><span class="xs muted">${esc(t('fb.errTimes', { n: o.count }))} · ${fmtDate(ymd(new Date(o.lastAt)))}</span><button class="btn ghost sm" data-act="fb-err-ack" data-key="${esc(o.key)}">${esc(t('fb.markDone'))}</button></div></div>`).join('')}</div>`, t('fb.allAside')) : '';
+  const errs = E.groups && E.groups.length ? sec(t('fb.errorsTitle'), `<div class="list" data-tester-errors>${E.groups.map((g: any) => `<div class="li" style="display:block" data-err-group><div class="spread"><span class="t">${g.count}× ${esc(g.label)}: ${esc(g.text)}</span><button class="btn ghost sm" data-act="fb-err-ack" data-key="${esc(g.key)}">${esc(t('fb.markDone'))}</button></div><div class="xs muted">${esc(t('fb.errWho', { u: g.users.join(', ') }))}${g.versions.length ? ' · ' + esc(g.versions.slice(0, 3).join(', ')) : ''} · ${fmtDate(ymd(new Date(g.lastAt)))}</div></div>`).join('')}</div>`, t('fb.allAside')) : '';
+  return sec(t('fb.inbox'), `<div class="hint" style="margin-bottom:var(--s2)">${esc(t('fb.openCount', { n: open.length, neu: nNew }))} · ${esc(t('fb.swipeHint'))}</div><div class="list" data-feedback-list>${openHtml}</div>${doneHtml}`, t('fb.allAside')) + ops + errs;
 }
 function focus() { const id = UI.fbFocus; if (!id) return; UI.fbFocus = null; saveUi(); setTimeout(() => { const el = document.querySelector(`[data-fb="${id}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('hl'); } }, 50); }
-export function focusFeedback(id: string) { UI.fbFocus = id; FILTER = 'alle'; LIST = null; saveUi(); }
+export function focusFeedback(id: string) { UI.fbFocus = id; LIST = null; saveUi(); }
 /* Für Claude Code: alles Nötige in einem Block */
 export function asText(f: any): string {
   return [`Meldung #${f.id} von ${f.user} (${f.kind === 'idea' ? 'Idee' : 'Fehler'}), ${new Date(f.at).toLocaleString('de-DE')}`,
@@ -129,7 +138,6 @@ export function asText(f: any): string {
 
 /* ---------- Aktionen ---------- */
 on('fb-kind', el => { KIND = el.dataset.v === 'idea' ? 'idea' : 'bug'; SENT = ''; nav.rerender(); });
-on('fb-filter', el => { FILTER = el.dataset.v as any; nav.rerender(); });
 onChange('fb-share', el => { SHARE = (el as HTMLInputElement).checked; });
 onChange('fb-shot', async el => {
   const f = (el as HTMLInputElement).files && (el as HTMLInputElement).files![0]; if (!f) return;
@@ -167,7 +175,13 @@ on('fb-copy-own', async () => {
   const c = context(); const txt = `${KIND === 'bug' ? 'Fehler' : 'Idee'}: ${text}\n${c.screen} · ${c.version} · ${c.device}`;
   try { await navigator.clipboard.writeText(txt); toast(t('fb.copied')); } catch (e) { toast(t('common.copyManual')); }
 });
-on('fb-status', async el => { try { await apiCall('POST', '/api/admin/feedback/' + el.dataset.id, { status: el.dataset.v }); const f = (LIST || []).find(x => String(x.id) === el.dataset.id); if (f) f.status = el.dataset.v; nav.rerender(); } catch (e: any) { toast(e.message); } });
+async function setStatus(id: string, v: string) { try { await apiCall('POST', '/api/admin/feedback/' + id, { status: v }); const f = (LIST || []).find(x => String(x.id) === id); if (f) f.status = v; nav.rerender(); toast(t('fb.statusSet', { s: t('fb.st.' + v) })); } catch (e: any) { toast(e.message); } }
+on('fb-status', el => setStatus(el.dataset.id!, el.dataset.v!));
+on('fb-err-ack', async el => { const key = el.dataset.key!; try { await apiCall('POST', '/api/admin/errors/ack', { key }); if (ERRS) ERRS = { groups: ERRS.groups.filter(g => g.key !== key), operator: ERRS.operator.filter(o => o.key !== key) }; nav.rerender(); } catch (e: any) { toast(e.message); } });
+/* Wischen auf einer offenen Meldung: nach links erledigt, nach rechts in Arbeit */
+let SWIPE: { id: string; x: number; y: number } | null = null;
+document.addEventListener('touchstart', e => { const el = (e.target as HTMLElement).closest && (e.target as HTMLElement).closest('[data-fb]') as HTMLElement; if (!el || /^(INPUT|TEXTAREA|BUTTON)$/.test((e.target as HTMLElement).tagName)) { SWIPE = null; return; } const tt = e.touches[0]; SWIPE = { id: el.dataset.fb!, x: tt.clientX, y: tt.clientY }; }, { passive: true });
+document.addEventListener('touchend', e => { if (!SWIPE) return; const tt = e.changedTouches[0]; const dx = tt.clientX - SWIPE.x, dy = tt.clientY - SWIPE.y; const id = SWIPE.id; SWIPE = null; if (Math.abs(dx) < 80 || Math.abs(dy) > 50) return; const f = (LIST || []).find(x => String(x.id) === id); if (!f || f.status === 'erledigt' || f.status === 'verworfen') return; setStatus(id, dx < 0 ? 'erledigt' : 'arbeit'); }, { passive: true });
 on('fb-reply', async el => {
   const id = el.dataset.id!; const ta = document.getElementById('fb-reply-' + id) as HTMLTextAreaElement; const reply = (ta?.value || '').trim(); if (!reply) return;
   try { await apiCall('POST', '/api/admin/feedback/' + id, { reply, status: 'arbeit' }); const f = (LIST || []).find(x => String(x.id) === id); if (f) { f.reply = reply; if (f.status === 'neu') f.status = 'arbeit'; } nav.rerender(); toast(t('fb.replied')); } catch (e: any) { toast(e.message); }

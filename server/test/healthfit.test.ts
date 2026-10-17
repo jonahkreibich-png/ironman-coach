@@ -134,7 +134,7 @@ describe('Verständliche Fehler', () => {
     expect(st.status).toBe('error');
     expect(st.error).toMatch(/nur ihren eigenen, leeren Ordner/);
     expect(st.error).toMatch(/Full Dropbox/);
-    expect(st.stats.errorCode).toBe('folder');
+    expect(st.stats.errorCode).toBe('appfolder') // Auftrag 14: eigener Code für den Betreiber-Hinweis;
     expect(st.stats.diag).toEqual({ root: 0, apps: false });
     expect(calls.filter(c => c.includes('get_metadata')).length).toBeGreaterThanOrEqual(3); // übliche Orte durchsucht
     // Jetzt abrufen: gleicher, klarer Grund

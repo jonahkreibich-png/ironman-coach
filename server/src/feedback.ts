@@ -2,13 +2,37 @@
    einem Screenshot. Jede neue Meldung schickt sofort eine Mitteilung an alle Geräte des Betreibers. Der Betreiber hat einen
    Posteingang (neu / in Arbeit / erledigt) und kann antworten; die Antwort erscheint beim Nutzer als Coach-Nachricht.
    Gesundheits- oder Trainingsdaten gehen nur mit, wenn der Nutzer sie für diese Meldung bewusst freigibt (shared). */
-import { type Env, putRecords } from './store';
+import { type Env, putRecords, getMeta, setMeta } from './store';
 import type { Auth } from './auth';
 import { HttpError, readJson } from './http';
 import { deliver } from './notify';
 import { scrub } from './errlog';
 
-const STATUS = ['neu', 'arbeit', 'erledigt'];
+const STATUS = ['neu', 'arbeit', 'erledigt', 'verworfen'];
+/* Auftrag 14: gleiche Fehler zu einer Zeile zusammenfassen („9× Dropbox: …“), kurzer verständlicher Text.
+   Einstellungsfehler des Servers (Dropbox-App nur mit App-Ordner-Zugriff, fehlende Schlüssel) sind keine Tester-Fehler,
+   sondern ein Hinweis für den Betreiber. */
+const PLACE_LABEL: Record<string, string> = { 'sync-dropbox': 'Dropbox', 'sync-oura': 'Oura', 'sync-whoop': 'WHOOP', 'sync-polar': 'Polar', 'sync-withings': 'Withings', 'sync-intervals': 'intervals.icu', backup: 'Sicherung', push: 'Mitteilungen' };
+export function errorKey(place: unknown, msg: unknown): string {
+  return `${String(place || '')}|${String(msg || '').replace(/\s*\[[^\]]*\]\s*$/, '').replace(/^\w+:\s*/, '').replace(/\d+/g, '#').slice(0, 100)}`;
+}
+export function errorLabel(place: unknown): string { const p = String(place || ''); return PLACE_LABEL[p] || (p.startsWith('sync-') ? p.slice(5) : p ? p : 'App'); }
+/* kurzer Text: erster Satz ohne technische Klammern, höchstens 90 Zeichen */
+export function errorShort(msg: unknown): string {
+  let t = String(msg || '').replace(/\s*\[[^\]]*\]\s*$/, '').replace(/^\w+:\s*/, '').trim();
+  const first = t.split(/(?<=[.!?])\s+/)[0] || t;
+  t = first.length > 90 ? first.slice(0, 87).replace(/\s+\S*$/, '') + ' …' : first;
+  return t;
+}
+/* Betreiber-Hinweis statt Tester-Fehler */
+export function operatorHint(place: unknown, msg: unknown): { key: string; text: string; help: string } | null {
+  const m = String(msg || ''), p = String(place || '');
+  if (p === 'sync-dropbox' && /App folder|eigenen, leeren Ordner|nur ihren eigenen/i.test(m)) return { key: 'op-dropbox-appfolder', text: 'Dropbox: Die Server-App hat nur „App folder“-Zugriff und sieht /Apps/HealthFit nicht.', help: 'Neue Dropbox-App mit „Full Dropbox“ anlegen und DROPBOX_APP_KEY und DROPBOX_APP_SECRET neu setzen (FUER-JONAH.md). Danach neu verbinden.' };
+  if (/TOKEN_KEY (fehlt|zu kurz)/.test(m.replace(/\[[^\]]*\]/g, ''))) return { key: 'op-token-key', text: 'Server-Schlüssel TOKEN_KEY fehlt oder ist zu kurz.', help: 'TOKEN_KEY mit scripts/set-secret.mjs setzen (32 Byte, hex).' };
+  if (/(APP_KEY|APP_SECRET|CLIENT_ID|CLIENT_SECRET)\b.*(fehlt|nicht gesetzt)|nicht eingerichtet/i.test(m)) return { key: 'op-app-keys-' + p, text: `${errorLabel(p)}: Die App-Schlüssel des Dienstes fehlen auf dem Server.`, help: 'Schlüssel setzen (VERBINDUNGEN.md), danach neu verbinden.' };
+  return null;
+}
+
 const cleanVersion = (v: unknown) => String(v == null ? '' : v).replace(/[^\w.+-]/g, '').slice(0, 40);
 const SHOT_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 const MAX_SHOT = 600_000;
@@ -53,12 +77,12 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
     await env.DB.prepare('UPDATE feedback SET reply_seen = 1 WHERE user_id = ? AND reply IS NOT NULL').bind(a.uid).run();
     return { ok: true };
   }
-  if (!p.startsWith('/api/admin/feedback') && p !== '/api/admin/errors') return undefined;
+  if (!p.startsWith('/api/admin/feedback') && !p.startsWith('/api/admin/errors')) return undefined;
   if (a.role !== 'admin') throw new HttpError(403, 'Nur der Betreiber darf das.');
   if (p === '/api/admin/feedback' && M === 'GET') {
     const rows = await env.DB.prepare('SELECT f.id, f.user_id, f.at, f.kind, f.text, f.screen, f.version, f.device, f.errors, f.status, f.shared, f.reply, f.reply_at, f.screenshot IS NOT NULL AS shot, u.name FROM feedback f LEFT JOIN users u ON u.id = f.user_id ORDER BY f.at DESC LIMIT 300').all();
     return { feedback: (rows.results || []).map((r: any) => ({ id: r.id, userId: r.user_id, user: r.name || 'Nutzer ' + r.user_id, at: r.at, kind: r.kind, text: r.text, screen: r.screen, version: r.version, device: r.device,
-      errors: JSON.parse(r.errors || '[]'), status: r.status || 'neu', done: r.status === 'erledigt', shared: r.shared ? JSON.parse(r.shared) : null, reply: r.reply || null, replyAt: r.reply_at || null, hasScreenshot: !!r.shot })) };
+      errors: JSON.parse(r.errors || '[]'), status: r.status || 'neu', done: r.status === 'erledigt' || r.status === 'verworfen', shared: r.shared ? JSON.parse(r.shared) : null, reply: r.reply || null, replyAt: r.reply_at || null, hasScreenshot: !!r.shot })) };
   }
   const shot = /^\/api\/admin\/feedback\/(\d+)\/screenshot$/.exec(p);
   if (shot && M === 'GET') {
@@ -72,7 +96,7 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
     const row = await env.DB.prepare('SELECT user_id, text FROM feedback WHERE id = ?').bind(id).first();
     if (!row) throw new HttpError(404, 'Meldung nicht gefunden.');
     const status = STATUS.includes(b.status) ? b.status : b.done === true ? 'erledigt' : b.done === false ? 'neu' : null;
-    if (status) await env.DB.prepare('UPDATE feedback SET status = ?, done = ? WHERE id = ?').bind(status, status === 'erledigt' ? 1 : 0, id).run();
+    if (status) await env.DB.prepare('UPDATE feedback SET status = ?, done = ? WHERE id = ?').bind(status, status === 'erledigt' || status === 'verworfen' ? 1 : 0, id).run();
     const reply = typeof b.reply === 'string' ? b.reply.trim().slice(0, 2000) : '';
     if (reply) {
       const now = Date.now();
@@ -85,17 +109,35 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
     }
     return { ok: true };
   }
-  /* Fehler bei Testern, auch ohne Meldung: je Nutzer der letzten 14 Tage (Fehlertexte sind ohne Zahlen und Gesundheitsdaten) */
+  /* Fehler bei Testern der letzten 14 Tage, gleiche Fehler zusammengefasst; „Erledigt“ blendet eine Gruppe aus, bis der Fehler wieder auftritt.
+     Einstellungsfehler des Servers stehen getrennt als Hinweis für den Betreiber. */
   if (p === '/api/admin/errors' && M === 'GET') {
     const since = Date.now() - 14 * 86400000;
-    const rows = await env.DB.prepare('SELECT e.user_id, u.name, COUNT(*) AS n, MAX(e.at) AS last_at FROM error_log e LEFT JOIN users u ON u.id = e.user_id WHERE e.at > ? AND e.user_id IS NOT NULL GROUP BY e.user_id ORDER BY last_at DESC').bind(since).all();
-    const users: any[] = [];
-    for (const r of rows.results || []) {
-      const last = await env.DB.prepare('SELECT msg, place, version, view, at FROM error_log WHERE user_id = ? AND at > ? ORDER BY id DESC LIMIT 5').bind((r as any).user_id, since).all();
-      const list = (last.results || []) as any[];
-      users.push({ userId: (r as any).user_id, user: (r as any).name || 'Nutzer ' + (r as any).user_id, count: (r as any).n, lastAt: (r as any).last_at, last: list[0] ? list[0].msg : '', recent: list });
+    const acks: Record<string, number> = (await getMeta(env, a.uid, 'err_ack')) || {};
+    const rows = await env.DB.prepare('SELECT e.user_id, u.name, e.msg, e.place, e.version, e.at FROM error_log e LEFT JOIN users u ON u.id = e.user_id WHERE e.at > ? AND e.user_id IS NOT NULL ORDER BY e.id DESC LIMIT 500').bind(since).all();
+    const groups: Record<string, any> = {}; const ops: Record<string, any> = {};
+    for (const r of (rows.results || []) as any[]) {
+      const op = operatorHint(r.place, r.msg);
+      const key = op ? op.key : errorKey(r.place, r.msg);
+      if (acks[key] && r.at <= acks[key]) continue;
+      const tgt = op ? ops : groups;
+      const g = tgt[key] = tgt[key] || (op ? { key, text: op.text, help: op.help, count: 0, lastAt: 0 } : { key, label: errorLabel(r.place), text: errorShort(r.msg), count: 0, lastAt: 0, users: [] as string[], versions: [] as string[] });
+      g.count++; g.lastAt = Math.max(g.lastAt, r.at);
+      if (!op) { const n = r.name || 'Nutzer ' + r.user_id; if (!g.users.includes(n)) g.users.push(n); if (r.version && !g.versions.includes(r.version)) g.versions.push(r.version); }
     }
-    return { users };
+    const byLast = (x: any, y: any) => y.lastAt - x.lastAt;
+    return { groups: Object.values(groups).sort(byLast), operator: Object.values(ops).sort(byLast) };
+  }
+  if (p === '/api/admin/errors/ack' && M === 'POST') {
+    const b = await readJson(req);
+    const key = String(b.key || '').slice(0, 160);
+    if (!key) throw new HttpError(400, 'Welcher Fehler?');
+    const acks: Record<string, number> = (await getMeta(env, a.uid, 'err_ack')) || {};
+    acks[key] = Date.now();
+    // alte Einträge (älter als 30 Tage) aufräumen
+    for (const k of Object.keys(acks)) if (acks[k] < Date.now() - 30 * 86400000) delete acks[k];
+    await setMeta(env, a.uid, 'err_ack', acks);
+    return { ok: true };
   }
   return undefined;
 }

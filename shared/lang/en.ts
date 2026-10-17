@@ -11,6 +11,8 @@ export const en: Record<string, string> = {
   'heute.c.green': 'green', 'heute.c.yellow': 'yellow', 'heute.c.red': 'red', 'heute.c.none': 'missing or still learning', 'heute.critMissing': 'missing today',
   'v.feelMorning': 'How do you feel?', 'v.soreness': 'Muscle soreness', 'v.feel1': 'very fresh', 'v.feel2': 'fresh', 'v.feel3': 'normal', 'v.feel4': 'tired', 'v.feel5': 'very tired', 'v.sore0': 'none', 'v.sore1': 'light', 'v.sore2': 'clear', 'v.sore3': 'strong',
   'sess.drills': 'Drills explained', 'cons.swimGear': 'Swim equipment', 'cons.swimGearHint': 'Only this equipment is used in your swim sessions.', 'cons.swimGearNone': 'Not set yet: your sessions use no equipment. Tap what you have.',
+  'fb.st.verworfen': 'discarded', 'fb.toWork': 'In progress', 'fb.discard': 'Discard', 'fb.doneList': 'Done ({n})', 'fb.openCount': '{n} open, {neu} new', 'fb.swipeHint': 'Swipe left: done, right: in progress', 'fb.statusSet': 'Status: {s}', 'fb.opTitle': 'Notes for you as operator', 'fb.errTimes': '{n}×', 'fb.errWho': 'for {u}',
+  'conn.appfolderAdminTitle': 'Operator: Dropbox app has App-folder access only', 'conn.appfolderAdmin': 'It cannot see /Apps/HealthFit. Create a new Dropbox app with Full Dropbox, set DROPBOX_APP_KEY and DROPBOX_APP_SECRET again, then reconnect here.', 'conn.appfolderUser': 'Dropbox is not fully set up on the server yet. The operator is on it, nothing to do for you. Then reconnect once.',
   'v.feel': 'Feeling', 'v.load': 'Load', 'v.ill': 'Illness', 'heute.restDay': 'Rest day',
   'heute.goalIn': '{name} in {n} days', 'heute.week': 'This week', 'heute.values': 'Metrics',
   'sub.werte': 'Metrics', 'sub.essen': 'Nutrition', 'sub.profil': 'Profile and goals', 'sub.verbindungen': 'Connections',

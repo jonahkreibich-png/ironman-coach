@@ -56,7 +56,7 @@ const RUN_LADDER: Record<string, [number, number][]> = { thr: [[3, 8], [3, 10], 
   vo2: [[5, 3], [6, 3], [5, 4], [6, 4], [4, 5]], tempo: [[2, 8], [3, 8], [2, 12], [3, 10], [2, 15], [1, 25]] };
 export interface RunQ { reps: number; min: number; zone: number; rest: number; label: string; why: string; kind?: 'threshold' | 'racepace' | 'vo2' | 'tempo' }
 /* Lauf-Qualität je Phase, Ziel und Niveau (Auftrag 14):
-   Grundlage: ab der 5. Grundlagenwoche für Fortgeschrittene und Erfahrene jede zweite Woche ein Tempolauf (Zone 3), sonst nichts Hartes
+   Grundlage: ab der 5. Grundlagenwoche ein Tempolauf (Zone 3, Erfahrene jede Woche, Fortgeschrittene jede zweite), sonst nichts Hartes
    (dafür Hügelsprints, Fahrtspiel, Steigerungen); Aufbau: Schwelle (3×8 → 2×15 min), für 5/10 km im Wechsel mit VO2max (5×3 min);
    spezifisch: Wettkampftempo der Zieldistanz (5/10 km im Wechsel mit VO2max); Tapering: kurze Stücke im Wettkampftempo.
    minor/o.noZ5: unter 18 und ab 60 keine Zone 5. */
@@ -66,7 +66,8 @@ export function runQualityStep(phase: Ph, goal: GoalType, n: number, minor: bool
   if (phase === 'race') return null;
   if (phase === 'base') {
     const bw = o.baseWeek ?? 0;
-    if (!o.level || o.level === 'beginner' || minor || bw < 4 || bw % 2 === 1) return null;
+    // Erfahrene jede Woche, Fortgeschrittene jede zweite Woche
+    if (!o.level || o.level === 'beginner' || minor || bw < 4 || (o.level === 'advanced' && bw % 2 === 1)) return null;
     const [reps, min] = ladderStep(RUN_LADDER.tempo, n);
     return { reps, min, zone: 3, rest: 2, label: 'Tempo', kind: 'tempo', why: 'Tempoläufe in der späten Grundlage bereiten auf die Schwelle vor: zügig, aber kontrolliert.' };
   }

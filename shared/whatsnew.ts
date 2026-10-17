@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.1.0', items: [
+    'Die Ampel auf „Heute“ zeigt jetzt einen klaren Wert: Ring, Wort, Farbe und Satz passen immer zusammen. Unter „Warum?“ hat jeder Einzelwert seine eigene Farbe. Fehlen die Morgenwerte, steht dort „Ampel unsicher“. Neu: Gefühl und Muskelkater am Morgen eintragen.',
+    'Schwimmen ehrlich gerechnet: Meter und Dauer passen zu deinem Tempo, mit Pausen. Jede Einheit als Liste (Einschwimmen, Technik, Hauptteil, Ausschwimmen) mit erklärten Übungen. Trag unter Berücksichtigungen deine Hilfsmittel ein (Kickbrett, Pull Buoy …).',
+    'Der Plan hat jetzt feste Regeln für harte Einheiten: passend zu Ziel, Phase, Niveau und Alter, nie zwei harte Tage hintereinander, Intervalle steigen von Woche zu Woche.'
+  ] },
   { version: '3.0.0', items: [
     'Neues Design „Glas“: Karten wie Glas über einem weichen Farbverlauf, die Tab-Leiste schwebt unten, große Zahlen, Knöpfe, die beim Drücken federn. Hell und dunkel, mit „Bewegung reduzieren“ und „Transparenz reduzieren“ aus den iPhone-Einstellungen.',
     'Unter Fortschritt gibt es jetzt Trends (Erholung, Fitness, Effizienz, locker/hart, Schwimmen, Bestwerte), je mit einem Satz, was sie bedeuten.',

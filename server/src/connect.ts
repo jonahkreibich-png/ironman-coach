@@ -318,7 +318,7 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
     const found = await findDropboxFolder(env, uid, B, meta.folderSet ? folder : null, diag);
     if (!found) {
       await saveConn(env, uid, 'dropbox', { stats: JSON.stringify({ ...meta, folder: null, diag }) });
-      if (diag.root === 0 && !diag.apps) throw new DbxError(404, 'Die Dropbox-App des Servers sieht nur ihren eigenen, leeren Ordner („App folder“). HealthFit speichert aber in /Apps/HealthFit. Der Betreiber muss eine Dropbox-App mit Zugriff „Full Dropbox“ anlegen; danach hier neu verbinden.', 'folder');
+      if (diag.root === 0 && !diag.apps) throw new DbxError(404, 'Die Dropbox-App des Servers sieht nur ihren eigenen, leeren Ordner („App folder“). HealthFit speichert aber in /Apps/HealthFit. Der Betreiber muss eine Dropbox-App mit Zugriff „Full Dropbox“ anlegen; danach hier neu verbinden.', 'appfolder');
       throw new DbxError(404, 'Der HealthFit-Ordner ist in deiner Dropbox nicht zu finden. Entweder hat HealthFit noch nichts exportiert (in HealthFit: Automatischer Export → Dropbox einschalten), oder die Dropbox-App des Servers hat nur Zugriff auf ihren eigenen Ordner („App folder“) statt auf die ganze Dropbox.', 'folder');
     }
     folder = found;
