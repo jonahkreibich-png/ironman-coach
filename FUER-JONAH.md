@@ -6,9 +6,15 @@ Nur das, was du selbst tun musst.
 
 Mehr → Berücksichtigungen → Können und Ausrüstung → **Schwimm-Hilfsmittel** antippen (Kickbrett, Pull Buoy, Flossen, Paddles, Frontschnorchel). Nur was ihr habt (oder im Bad leihen könnt), kommt in die Einheiten. Bis dahin plant die App ohne Hilfsmittel. Der Coach erinnert euch auch.
 
-## B. Dropbox: erledigt (17.10.)
+## B. HealthFit muss deine Trainings nach Dropbox schicken (5 min, neu am 17.10.)
 
-Schlüssel gesetzt, Verbindung getestet. Achte nur darauf, dass HealthFit unter Einstellungen → Automatischer Export → Dropbox (Format FIT) eingeschaltet bleibt.
+Die App liest Dropbox richtig, aber dort liegt nur eine Datei (16.10.). So bekommst du die Trainings rüber:
+1. HealthFit öffnen → unten **Einstellungen** (Zahnrad) → **Automatischer Export** → **Dropbox** einschalten (anmelden, falls gefragt), Format **FIT**.
+2. Bei „Exportieren ab“ ein Datum vor deinen letzten Trainings wählen (falls es die Einstellung gibt), sonst die letzten Trainings einzeln: Training antippen → Teilen (Pfeil) → **Dropbox**.
+3. iPhone: Einstellungen → Allgemein → **Hintergrundaktualisierung** für HealthFit an. HealthFit nach dem Training einmal kurz öffnen, dann geht der Export sicher raus.
+4. In der App: Mehr → Verbindungen → Dropbox → „Jetzt abrufen“. Dort steht jetzt auch, wie viele FIT-Dateien die App in deiner Dropbox findet.
+
+Klappt Dropbox nicht: HealthFit → Einstellungen → **Intervals.icu** einschalten und in der App intervals.icu verbinden (Athleten-ID und API-Schlüssel unter intervals.icu → Settings → Developer Settings).
 
 ## 1. KI-Coach einschalten (wenn du willst)
 

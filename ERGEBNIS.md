@@ -1,5 +1,19 @@
 # Ergebnis
 
+## Fehlersuche (17.10. abends)
+
+Warum dein Training nicht ankommt: Die App holt alle FIT-Dateien ab, aber in deiner ganzen Dropbox liegt nur eine (Rad indoor, 16.10.). HealthFit exportiert deine Trainings nicht nach Dropbox. Was du tun musst, steht in FUER-JONAH.md, Abschnitt B. Die App sucht jetzt selbst in der ganzen Dropbox nach FIT-Dateien, wechselt bei Bedarf den Ordner und zeigt unter Verbindungen, was sie findet und wann die letzte Datei kam.
+
+Behoben:
+- Dropbox: Wurde der Ordner neu aufgelistet, kamen schon übernommene Dateien erneut in die Warteschlange. Jetzt merkt sich die App übernommene Dateien. Ein alter Fehlercode blieb nach Erfolg stehen, das ist weg.
+- Coach: Warnung „Müdigkeit 483 % über deiner Fitness“ bei neuen Nutzern (Papa) kommt erst ab etwas Trainingsverlauf.
+- Coach: Papas Extra-Lauf hieß „geplant war Zone 2“, obwohl nichts geplant war; jetzt „harte Einheit, zählt als harter Tag“.
+- Coach: Dein „Fussballspiel“ galt als lockere Einheit („Gefühl 7/10 ist hoch“); jetzt zählt es als Spiel und harter Tag, auch im Plan.
+- „Puls 0-150 bpm“ heißt jetzt „unter 150 bpm“.
+- Die Meldung „Lockerer Lauf entfällt (Wettkampf)“ (dein Sprint im Juni 2027, richtig so) steht nicht mehr unter „Nicht alles passte“.
+
+Keine weiteren Fehler im Protokoll der letzten 7 Tage (nur die alten Dropbox-Meldungen vom 16.10.). Papas intervals.icu läuft (sein Schwimmen vom 17.10. ist da). Tests: 1397 Unit/Server, 158 Browser.
+
 ## Auftrag 14: Ampel, Fehler melden, Dropbox, Schwimmen, Intensität (17.10.)
 
 Live in der echten App (Version 3.1.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag14.sql`, `prod-vor-auftrag14b.sql`, `test-vor-auftrag14.sql`. Geändert wurden nur Papas und dein Plan (neu berechnet ab heute, Vergangenes und Erledigtes bleibt) plus je eine Coach-Nachricht „Plan korrigiert“.
