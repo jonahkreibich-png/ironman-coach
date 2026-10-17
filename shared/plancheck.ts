@@ -138,7 +138,9 @@ export function checkSession(s: any, week?: number, date?: string): CheckIssue[]
   // „8×50 m“ usw.: Summe der Serien höchstens die Gesamtdistanz
   if (s.sport === 'swim' && s.plannedKm) {
     let sum = 0; const re = /(\d+)×(\d+) m|(?:^|[^×\d])(\d{2,4}) m (?:Kraul|Brust|locker|Lage|Technik|Beinschlag)/g; let m;
-    while ((m = re.exec(desc))) sum += m[1] ? +m[1] * +m[2] : +m[3];
+    // Auftrag 15: Hinweise in Klammern („25 m Kraul, den Rest der Bahn Brust“) und die Begriffe-Zeile zählen nicht als Serien
+    let flat = desc.split('\n').filter(l => !/^Begriffe:/.test(l)).join('\n'); for (let k = 0; k < 4; k++) flat = flat.replace(/\([^()]*\)/g, '');
+    while ((m = re.exec(flat))) sum += m[1] ? +m[1] * +m[2] : +m[3];
     if (sum > s.plannedKm * 1000 + 1) bad(`Serien ergeben ${sum} m, geplant sind ${Math.round(s.plannedKm * 1000)} m.`);
     if (sum && sum < s.plannedKm * 1000 - 1) bad(`Serien ergeben ${sum} m, geplant sind ${Math.round(s.plannedKm * 1000)} m.`);
   }

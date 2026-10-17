@@ -218,7 +218,7 @@ function scaleWeek(ctx: EngineCtx, f: number): any[] {
 /* Hauptfunktion: Text → Antwort */
 export function understand(ctx: EngineCtx, text: string, extra: Extra = {}): ChatReply {
   const raw = String(text || '').slice(0, 500);
-  const hits = checkMessage(raw);
+  const hits = checkMessage(raw, { minor: isMinor(ctx.profile, ctx.today) });
   if (hits.length) {
     const h = hits[0];
     if (h.flag === 'fever' && !C.illnessAt(ctx.state.illnessPeriods, ctx.today)) return { intent: 'sick', text: h.text + ' Soll ich ab heute eine Krankheitsphase eintragen?', actions: [{ label: 'Ja, Krankheit eintragen', kind: 'illness-start' }] };

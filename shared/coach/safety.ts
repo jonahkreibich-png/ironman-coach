@@ -10,17 +10,20 @@ const EMERGENCY_RE = /brust(schmerz|enge|druck)|herz(rasen|stolpern|schmerz)|ate
 const FEVER_RE = /fieber|fever|\b(38|39|40)[.,]\d\s*°?/i;
 const MED_RE = /\b(ibuprofen|paracetamol|aspirin|diclofenac|voltaren|antibiotik|medikament|tablette|schmerzmittel|cortison|kortison|spray|inhalier|dosis|dosierung|wie viel .* nehmen|was soll ich nehmen|welche(s)? (mittel|medikament))/i;
 const DIAG_RE = /(was habe ich|ist das (ein|eine)|hab ich (einen|eine|ein)|diagnos|ist es (ein|eine)|bänderriss|ermüdungsbruch|sehnenentzündung|meniskus)/i;
-const EATING_RE = /(nichts gegessen|kaum gegessen|will abnehmen|muss abnehmen|zu dick|fasten|kalorien sparen|erbrech|hungern|essen ausfallen lassen)/i;
+const EATING_RE = /(nichts gegessen|kaum gegessen|fasten|erbrech|hungern|essen ausfallen lassen)/i;
+/* Abnehmen-Wunsch: bei Jugendlichen ein Warnzeichen (kein Gewichtsziel unter 18), bei Erwachsenen ein normales Thema (Auftrag 15:
+   Erwachsene bekamen „sprich mit deinen Eltern“) */
+const WEIGHT_RE = /(will abnehmen|muss abnehmen|zu dick|kalorien sparen|weniger essen)/i;
 
 export const DOCTOR_TEXT = 'Bitte lass das ärztlich abklären. Ich bin ein Trainings-Coach und kann keine Diagnosen stellen oder Medikamente empfehlen.';
 export const EMERGENCY_TEXT = 'Das klingt nach einem Warnzeichen. Hör sofort mit dem Training auf. Bei Brustschmerz, Atemnot oder Ohnmacht ruf den Notruf 112. Sonst bitte heute noch zum Arzt.';
 
 /* Prüft eine Nachricht des Nutzers */
-export function checkMessage(text: string): SafetyHit[] {
+export function checkMessage(text: string, o: { minor?: boolean } = {}): SafetyHit[] {
   const out: SafetyHit[] = [];
   if (EMERGENCY_RE.test(text)) out.push({ flag: 'emergency', urgent: true, text: EMERGENCY_TEXT });
   if (MED_RE.test(text) || DIAG_RE.test(text)) out.push({ flag: 'medication', urgent: false, text: DOCTOR_TEXT });
-  if (EATING_RE.test(text)) out.push({ flag: 'eating', urgent: false, text: 'Genug zu essen ist fürs Training wichtiger als jedes Gewicht. Wenn dir Essen gerade schwerfällt, sprich bitte mit deinen Eltern, deinem Arzt oder ruf das BZgA-Telefon zu Essstörungen an (0221 892031). Für Jugendliche gibt es auch die Nummer gegen Kummer: 116 111.' });
+  if (EATING_RE.test(text) || (o.minor !== false && WEIGHT_RE.test(text))) out.push({ flag: 'eating', urgent: false, text: 'Genug zu essen ist fürs Training wichtiger als jedes Gewicht. Wenn dir Essen gerade schwerfällt, sprich bitte mit deinen Eltern, deinem Arzt oder ruf das BZgA-Telefon zu Essstörungen an (0221 892031). Für Jugendliche gibt es auch die Nummer gegen Kummer: 116 111.' });
   if (FEVER_RE.test(text)) out.push({ flag: 'fever', urgent: false, text: 'Mit Fieber kein Training, auch nicht locker. Erst 24-48 h fieberfrei, dann der Stufenplan. Bei Fieber über 39 °C oder länger als 2-3 Tage bitte zum Arzt.' });
   return out;
 }

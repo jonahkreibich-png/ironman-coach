@@ -52,7 +52,8 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
     const ref = all[j];
     // eigenes Training (Teamsport ist ein fester Termin und steigt nicht)
     const refMin = ownWeekMinutes(ref), cur = ownWeekMinutes(w);
-    if (refMin >= 60 && cur > refMin * maxInc + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
+    // Auftrag 15: bei kleinem Umfang bis +15 min (eine kurze Einheit mehr), sonst +10 % (unter 18 +8 %)
+    if (refMin >= 60 && cur > Math.max(refMin * maxInc, refMin + 15) + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
     // Laufumfang ohne Wettkampf (der Wettkampf selbst ist keine Steigerung)
     const runOf = (x: any) => (x.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport === 'run' && !s.race && !s.cancelled).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
     const refRun = runOf(ref), curRun = runOf(w);

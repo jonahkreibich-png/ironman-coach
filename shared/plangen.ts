@@ -369,6 +369,8 @@ export function generatePlan(inp: GenInput): GenResult {
   let prevSundayHard = false, prevSundayStrength = false;
   /* Einheiten vom Sonntag davor (gleiche Sportart nicht So → Mo) */
   let prevSunday: any[] = [];
+  /* Lauf-Geh-Stufen: so viele Einheiten wie in der ersten Woche (nicht kürzbar, eine mehr wären +33-50 % Laufumfang) */
+  let runStageN: number | null = null;
   let lastLR: number | null = cont && cont.lastLongRun ? cont.lastLongRun : null;
   const gq: { bikeN: Record<string, number>; runQN: Record<string, number>; swimN: Record<string, number> } = { bikeN: {}, runQN: {}, swimN: {} };
   const blockWeekOf = (wi: number) => { let k = 0; for (let i = wi - 1; i >= 0 && !phases[i].recovery; i--) k++; return k; };
@@ -560,7 +562,8 @@ export function generatePlan(inp: GenInput): GenResult {
       }
       if (sport === 'run') {
         // Gehen/Laufen-Stufen steigen erst, wenn die aktuelle Stufe geklappt hat (Wochenplanung nach den Daten)
-        if (runStage != null) { for (let k = 0; k < n; k++) add(W.runWalk(pc(false, null), runStage, `bringt dich Schritt für Schritt zu 30 min am Stück, die Grundlage für ${target.name}.`)); continue; }
+        // Lauf-Geh-Stufen: gleich viele Einheiten jede Woche (die Stufen lassen sich nicht kürzen, eine Einheit mehr wären +50 % Laufumfang)
+        if (runStage != null) { const nS = runStageN == null || part ? n : Math.min(n, runStageN); if (runStageN == null && !ph.recovery && !part) runStageN = n; for (let k = 0; k < nS; k++) add(W.runWalk(pc(false, null), runStage, `bringt dich Schritt für Schritt zu 30 min am Stück, die Grundlage für ${target.name}.`)); continue; }
         const ctx = pc(false, null);
         const cap = abilityCap(profile, 'run', wi);
         const longCap = Math.min(capsW(false).run, cap ?? 999, ph.phase === 'taper' ? 50 : 999);
@@ -592,7 +595,8 @@ export function generatePlan(inp: GenInput): GenResult {
         if (hardOk && hardLeft > 0 && left >= 1 && !(lv === 'beginner' && ph.phase === 'base')) {
           const c = bikeChoice(profile, true, month, eff);
           // Fortschritt je Phase: Sweet Spot/Kraftausdauer → Schwelle/Over-Unders → je Ziel VO2max, Schwelle, Wettkampftempo
-          const spec = K.bikeKey(pc(c.indoor, c.name), ph.phase, sg.goalType, gq.bikeN[ph.phase] || 0, undefined, { noZ5 });
+          // nicht länger als die längste Fahrt, die zum Können passt (Auftrag 15)
+          const spec = K.bikeKey(pc(c.indoor, c.name), ph.phase, sg.goalType, gq.bikeN[ph.phase] || 0, cap != null && cap < 75 ? Math.max(35, cap) : undefined, { noZ5 });
           gq.bikeN[ph.phase] = (gq.bikeN[ph.phase] || 0) + 1;
           add(spec, { hard: true, prio: 2, easy: W.bikeEasy(pc(c.indoor, c.name), Math.min(90, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--;
         }
@@ -616,10 +620,11 @@ export function generatePlan(inp: GenInput): GenResult {
     if (wi >= tw && wi <= tw + 1 && inp.needTests) {
       const ctx = pc(false, null);
       const swap = (sport: string, spec: W.Spec) => { const i = cands.findIndex(c => c.s.sport === sport && c.hard) ; const j = i >= 0 ? i : cands.findIndex(c => c.s.sport === sport && !c.long); const soft = /Kraul-Check/.test(spec.title || ''); const b = W.build(spec); if (soft) delete b.hard; const c: Cand = { s: b, hard: !soft, prio: 0.8, test: true }; if (j >= 0) cands[j] = c; else cands.push(c); };
-      if (wi === tw && inp.needTests.run && runStage == null && sports.includes('run')) swap('run', W.runTest(ctx));
+      // Lauftest (30 min hart + Ein-/Auslaufen) erst, wer mindestens 45 min am Stück läuft (Auftrag 15)
+      if (wi === tw && inp.needTests.run && runStage == null && sports.includes('run') && !(skS.runContinuousMin != null && skS.runContinuousMin < 45)) swap('run', W.runTest(ctx));
       if (wi === tw + 1 && inp.needTests.bike && sports.includes('bike') && !(skS.bikeLongestMin != null && skS.bikeLongestMin < 75)) { const c = bikeChoice(profile, true, month, eff); swap('bike', W.bikeTest(pc(c.indoor, c.name))); }
       // Schwimmtest 400/200 m nur, wer 400 m am Stück krault; sonst der Kraul-Check (Auftrag 11: vorher auch für Anfänger)
-      if (wi === tw && inp.needTests.swim && sports.includes('swim') && !swimBlocked && !(swimStage && (swimStage.ladder === 'swimBreast' || swimStage.n < 2))) swap('swim', crawl400 ? W.swimTest(ctx) : W.swimCheck(ctx, swimStage as any, 40));
+      if (wi === tw && inp.needTests.swim && sports.includes('swim') && !swimBlocked && !(swimStage && (swimStage.ladder === 'swimBreast' || swimStage.n < 2))) swap('swim', crawl400 ? W.swimTest(ctx) : W.swimCheck(ctx, swimStage as any, 40, swimStage ? 25 : repMax));
     }
     // Kraft nach Körperbereich an festen Tagen (z. B. Unterkörper Di, Oberkörper Fr), nie Beine am Spieltag oder am Tag davor
     const sp = profile.strengthPlan;
@@ -722,7 +727,14 @@ export function generatePlan(inp: GenInput): GenResult {
           const f = room / Math.max(1, s.plannedMinutes);
           let sp = W.scaleSpec(s.spec, f);
           for (let k = 0; k < 6 && W.totals(sp).min > room; k++) sp = W.scaleSpec(sp, 0.85);
-          if (W.totals(sp).min <= room) placed = { ...W.build(sp) }; else idx = undefined as any;
+          if (W.totals(sp).min <= room) placed = { ...W.build(sp) };
+          else if (!c.hard && room >= 25 && ['swim', 'run', 'bike'].includes(s.sport)) {
+            // Auftrag 15: lässt sich die Einheit nicht weit genug kürzen (z. B. Schwimm-Serien), eine lockere Einheit in der freien Zeit statt gar nichts
+            const ctx0 = s.spec.ctx; const e = s.sport === 'swim' ? W.swimNormal(ctx0, 'endurance', room, ph.phase, repMax) : s.sport === 'run' ? W.runEasy(ctx0, room) : W.bikeEasy(ctx0, room);
+            e.why = s.spec.why; let b = W.build(e);
+            for (let k = 0; k < 4 && b.plannedMinutes > room; k++) b = W.build(W.scaleSpec(b.spec, room / b.plannedMinutes * 0.95));
+            if (b.plannedMinutes <= room) placed = { ...b }; else idx = undefined as any;
+          } else idx = undefined as any;
         }
       }
       if (idx == null && c.easy) {
@@ -828,8 +840,11 @@ export function generatePlan(inp: GenInput): GenResult {
       allowed: (s: any, date: string) => !evaluate(rules, { ...s, long: !!s.long, hard: !!s.hard }, date).hard.length && dayLimit(rules, date).cap > 0 && !(s.sport === 'swim' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, date)) }) ];
   // Umfang in einem Durchgang begrenzen: jede Woche höchstens +10 % (unter 18 +8 %) gegenüber der letzten normalen Woche
   const prevRef = cont && cont.lastNormalWeek ? [cont.lastNormalWeek] : [];
-  enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null);
+  // langer Lauf zuerst (kürzt nur), damit die Steigerung danach gegen die endgültigen Wochen geprüft wird (Auftrag 15)
   enforceLongRun(weeks, cont && cont.lastLongRun ? cont.lastLongRun : null);
+  enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null);
+  // Auftrag 15: Erholungswochen spürbar leichter als die letzte normale Woche (vorher oft gleich viel, weil das Ziel über dem lag, was die Einheiten hergeben)
+  enforceRecovery(weeks, prevRef[0] || null);
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
     const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };
@@ -920,10 +935,12 @@ function keyRun(ctx: W.PaceCtx, type: GoalType, phase: Phase, wi: number): W.Spe
 }
 
 const ownMin = (w: any, sport?: string) => sport ? weekMinutes(w, sport) : ownWeekMinutes(w);
+/* Auftrag 15: bei kleinem Umfang ist +10 % kleiner als eine kurze Einheit (z. B. 78 min + 15 min Kraft); dann sind bis +15 min erlaubt */
+export const SMALL_STEP = 15;
 function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev: any = null) {
   const scaleWeek = (w: any, sport: string | undefined, f: number) => w.days.forEach((d: any) => { d.sessions = d.sessions.map((s: any) => {
     if (s.fixed || s.race || !s.plannedMinutes || (sport && s.sport !== sport) || s.sport === 'rest' || (s.spec && s.spec.title)) return s;
-    if (s.spec && !s.stage) { const r = W.rebuildScaled(s, f); return r ? { ...s, ...r, plannedKm: r.plannedKm ?? undefined } : s; }
+    if (s.spec && (!s.stage || (s.sport === 'swim' && f < 1))) { const r = W.rebuildScaled(s, f); return r ? { ...s, ...r, plannedKm: r.plannedKm ?? undefined } : s; }
     return s;
   }); });
   // Zeitbudget pro Woche (ohne feste Termine wie Teamsport und Wettkampf)
@@ -940,9 +957,10 @@ function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev:
     for (const sport of [undefined, 'run'] as (string | undefined)[]) {
       for (let guard = 0; guard < 6; guard++) {
         const ref = ownMin(all[j], sport), cur = ownMin(all[i], sport);
-        if (ref < (sport ? 40 : 60) || cur <= ref * maxInc) break;
+        const allow = sport ? ref * maxInc : Math.max(ref * maxInc, ref + SMALL_STEP);
+        if (ref < (sport ? 40 : 60) || cur <= allow) break;
         const fixed = all[i].days.reduce((a: number, d: any) => a + d.sessions.filter((s: any) => (s.fixed || s.stage) && !s.race && s.sport !== 'football' && !s.cancelled && (!sport || s.sport === sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
-        const f = Math.max(0.3, (ref * maxInc - fixed) / Math.max(1, cur - fixed) * 0.98);
+        const f = Math.max(0.3, (allow - fixed) / Math.max(1, cur - fixed) * 0.98);
         const before = ownMin(all[i], sport);
         scaleWeek(all[i], sport, f);
         if (ownMin(all[i], sport) >= before) {
@@ -951,6 +969,31 @@ function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev:
           if (rb && rb.plannedMinutes < cand.plannedMinutes) Object.assign(cand, rb, { plannedKm: rb.plannedKm ?? undefined }); else break;
         }
       }
+    }
+  }
+}
+/* Erholungswoche: höchstens 80 % der letzten normalen Woche (eigenes Training; feste Termine, Tests und Lernstufen bleiben) */
+function enforceRecovery(weeks: any[], prev: any = null) {
+  const all = prev ? [prev, ...weeks] : weeks;
+  for (let i = 1; i < all.length; i++) {
+    const w = all[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe) continue;
+    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race')) j--;
+    const ref = ownWeekMinutes(all[j]); if (ref < 90 || all[j].isRecoveryWeek || all[j].partial) continue;
+    for (let guard = 0; guard < 5 && ownWeekMinutes(w) > ref * 0.82; guard++) {
+      const cur = ownWeekMinutes(w);
+      const flex = w.days.flatMap((d: any) => d.sessions).filter((s: any) => s.spec && (!s.stage || s.sport === 'swim') && !s.fixed && !s.race && !s.cancelled && s.sport !== 'football' && !/test|Kraul-Check/i.test(s.title || ''));
+      const flexMin = flex.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0); if (!flexMin) break;
+      const f = Math.max(0.4, 1 - (cur - ref * 0.78) / flexMin);
+      let changed = false;
+      for (const s of flex) { const rb = W.rebuildScaled(s, f); if (rb && rb.plannedMinutes < s.plannedMinutes) { Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); changed = true; } }
+      if (!changed) break;
+    }
+    // reicht Kürzen nicht (kurze Einheiten, Lernstufen): eine Einheit einer Sportart weniger, die in der Woche mehrfach vorkommt
+    if (ownWeekMinutes(w) > ref * 0.9) {
+      const own = w.days.flatMap((d: any) => d.sessions.map((s: any) => ({ d, s }))).filter(({ s }: any) => s && !s.fixed && !s.race && !s.cancelled && s.sport !== 'rest' && s.sport !== 'football' && !/test|Kraul-Check/i.test(s.title || ''));
+      const many = (sp: string) => own.filter(({ s }: any) => s.sport === sp).length >= 2;
+      const x = own.filter(({ s }: any) => many(s.sport) && !s.long).sort((a: any, b: any) => (a.s.plannedMinutes || 0) - (b.s.plannedMinutes || 0))[0];
+      if (x) { x.d.sessions = x.d.sessions.filter((s: any) => s !== x.s); if (!x.d.sessions.length) x.d.sessions = [{ id: x.s.id + '-rest', sport: 'rest', title: 'Ruhetag' }]; }
     }
   }
 }

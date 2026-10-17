@@ -5,6 +5,7 @@
    Formulieren, die Änderungen laufen aber durch dieselben Aktionen und Regeln.
    Versteht der Coach etwas nicht, fragt er gezielt nach und zeigt Knöpfe, statt mit einer Floskel zu antworten. */
 import * as C from '../core';
+import { withTerms } from '../glossary';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
 import { understand as answerQuestion, norm, has, dayIn, sportIn, bodyIn, weeksOf, dayOf, live, fmtD, sessLine, easyToday } from './intents';
@@ -15,6 +16,7 @@ import { parseRules, parseFor } from '../ruleparse';
 import { paceCtx } from '../plangen';
 import { GOALS, mainGoal, type Goal, type GoalType } from '../goals';
 import { isMinor } from '../profile';
+import { sportAllowed } from '../sports';
 import type { Op } from './ops';
 import { explainDay, explainWanted, limitIn } from './explain';
 import { parseSwimSkill, swimSkillUpdate } from '../swimskill';
@@ -193,20 +195,37 @@ export function converse(ctx: EngineCtx, dialog: DialogState, input: string, ext
   try { reply = step(ctx, next, String(input || '').slice(0, 500), extra); }
   catch (e) { reply = clarify(ctx, [], 'Da ist bei mir etwas schiefgelaufen.'); }
   if (!reply || !reply.text || !reply.text.trim()) reply = clarify(ctx, [], '');
+  reply = { ...reply, text: withTerms(reply.text) };
   next.pending = reply.pending === undefined ? null : reply.pending;
   return { reply, dialog: next };
 }
 
+const SPORT_ASK: Record<string, [RegExp, string, string]> = {
+  run: [/\b(lauf|laufen|laufe|joggen|jogge|laeufe|dauerlauf)\b/, 'Laufen', 'laufen'], bike: [/\b(rad|radfahren|radeln|fahrrad|rennrad|ausfahrt)\b/, 'Rad', 'Rad fahren'],
+  swim: [/\b(schwimmen|schwimme|kraulen|bahnen)\b/, 'Schwimmen', 'schwimmen'], strength: [/\b(kraft|krafttraining|kraftraum)\b/, 'Kraft', 'Kraft trainieren']
+};
+function notChosenRequest(ctx: EngineCtx, raw: string): string | null {
+  const t = norm(raw);
+  // nur echte Wünsche nach einer Einheit (nicht „kann mittwochs nicht laufen“, nicht ein neues Ziel „will einen Halbmarathon laufen“)
+  if (!/(einplan|statt |plan mir|plane mir|zusaetzlich|eine einheit|mal wieder|heute .*(gehen|machen)|lieber .*(gehen|machen))/.test(t + ' ') || /\b(nicht|kein|keine|nie)\b|marathon|triathlon|wettkampf|rennen|ziel|km/.test(t)) return null;
+  const sp = Object.keys(SPORT_ASK).find(k => SPORT_ASK[k][0].test(t) && !sportAllowed(ctx.profile, k));
+  if (!sp) return null;
+  const [, name, verb] = SPORT_ASK[sp];
+  return `${name} hast du nicht als Sportart gewählt, deshalb plane ich es nicht ein. Willst du ${verb === 'laufen' ? 'Laufen' : name} mit trainieren: Mehr → Profil und Ziele → Sportarten, dann plane ich es ein. Spontan ${verb} geht natürlich trotzdem – trag es danach als Extra-Einheit ein.`;
+}
 function step(ctx: EngineCtx, d: DialogState, raw: string, extra: Extra): Reply {
   const toks = norm(raw).split(' ').filter(Boolean);
   // Sicherheit zuerst (Notfall, Fieber, Medikamente)
-  const hits = checkMessage(raw);
+  const hits = checkMessage(raw, { minor: isMinor(ctx.profile, ctx.today) });
   if (hits.length) {
     const h = hits[0];
     if (h.flag === 'fever' && !C.illnessAt(ctx.state.illnessPeriods, ctx.today)) return propose('sick', h.text + ' Soll ich ab heute eine Krankheitsphase eintragen?', [{ op: 'illness-start', date: ctx.today }], YES_OPTS('Ja, Krankheit eintragen'));
     return { intent: 'safety', text: h.text };
   }
   if (!toks.length) return { intent: 'empty', text: 'Schreib mir einfach, was los ist, oder tipp auf einen der Knöpfe.', options: quickOptions(ctx, d) };
+  // Auftrag 15: Wunsch nach einer Sportart, die die Person nicht gewählt hat → nicht einplanen, sagen, wo man sie dazunimmt
+  const notMine = notChosenRequest(ctx, raw);
+  if (notMine) return { intent: 'sport-not-chosen', text: notMine };
   // 1) offene Rückfrage auflösen
   const p = d.pending;
   if (p && Date.now() - p.at < 60 * 60 * 1000) { const r = resolve(ctx, d, p, toks, raw); if (r) return r; }

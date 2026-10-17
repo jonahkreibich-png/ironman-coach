@@ -63,7 +63,8 @@ export interface RepairCtx {
   /** passende Qualität für eine (lange) Einheit dieser Phase, z. B. Tempo im langen Lauf */ quality?: (s: any, date: string, phase: string, from?: any) => any | null;
 }
 let KEEP: ((s: any) => boolean) | undefined;
-const movable = (s: any, date: string, from?: string | null) => !!s && !s.fixed && !s.race && !s.frozen && !s.locked && !s.test && !/test/i.test(s.title || '') && s.sport !== 'football' && (!from || date >= from) && !brick(s) && !(KEEP && KEEP(s));
+const isTest = (s: any) => !!s && (!!s.test || /test|Kraul-Check/i.test(s.title || ''));
+const movable = (s: any, date: string, from?: string | null, tests = false) => !!s && !s.fixed && !s.race && !s.frozen && !s.locked && (tests || !isTest(s)) && s.sport !== 'football' && (!from || date >= from) && !brick(s) && !(KEEP && KEEP(s));
 
 /* Nicht gewählte Sportarten entfernen (bewegliche Einheiten); liefert, was geändert wurde */
 export function repairSports(weeks: any[], p: Profile, o: { from?: string | null } = {}): string[] {
@@ -158,7 +159,7 @@ export function repairSpacing(weeks: any[], p: Profile, o: RepairCtx = {}): stri
         if (!other || excused(s) || excused(other)) continue;
         if ((other.fixed || other.frozen) && (s.fixed || s.frozen)) continue;
         // 1) verschieben: lieber die lockere Einheit, nie die lange, an einen Tag derselben Woche ohne Nachbarn derselben Sportart
-        const pick = [{ s, x: b }, { s: other, x: a }].filter(c => movable(c.s, c.x.d.date, o.from) && !longOf(c.s)).sort((u, v) => +hardOf(u.s) - +hardOf(v.s));
+        const pick = [{ s, x: b }, { s: other, x: a }].filter(c => movable(c.s, c.x.d.date, o.from, true) && !longOf(c.s)).sort((u, v) => +isTest(v.s) - +isTest(u.s) || +hardOf(u.s) - +hardOf(v.s));
         let done = false;
         for (const c of pick) {
           const idx = D.indexOf(c.x);
@@ -181,7 +182,8 @@ export function repairSpacing(weeks: any[], p: Profile, o: RepairCtx = {}): stri
         // 3) geht nicht anders: eine Einheit locker und kurz, mit Grund. Lange Einheiten bleiben lang; liegt eine harte Einheit daneben,
         //    wandert ihre Qualität in die lange Einheit (z. B. Tempo im langen Lauf), die harte wird locker und kurz.
         const both = [{ s, x: b }, { s: other, x: a }];
-        const cands = both.filter(c => !longOf(c.s) && (movable(c.s, c.x.d.date, o.from) || (c.s.stage && (!o.from || c.x.d.date >= o.from) && !c.s.frozen && !c.s.fixed && !(KEEP && KEEP(c.s)))));
+        // neben einem Test darf auch die lange Einheit locker und kurz werden (der Test lässt sich nicht kürzen)
+        const cands = both.filter(c => (!longOf(c.s) || both.some(y => y !== c && isTest(y.s))) && !isTest(c.s) && (movable(c.s, c.x.d.date, o.from) || (c.s.stage && (!o.from || c.x.d.date >= o.from) && !c.s.frozen && !c.s.fixed && !(KEEP && KEEP(c.s)))));
         if (!cands.length) continue;
         cands.sort((u, v) => (+hardOf(u.s) - +hardOf(v.s)) || (+longOf(u.s) - +longOf(v.s)) || (+isLightQuality(u.s) - +isLightQuality(v.s)) || ((u.s.plannedMinutes || 0) - (v.s.plannedMinutes || 0)));
         const c = cands[0];

@@ -34,10 +34,12 @@ describe('Formulierungen und Tippfehler', () => {
     ['wie lerne ich kraulen', 'swim-learn'], ['wann mache ich den test', 'test'], ['wann ist die nächste erholungswoche', 'recovery-week'],
     ['das ist mir zu viel', 'too-hard'], ['zu leicht, ich kann mehr', 'too-easy'], ['es ist so heiß', 'heat'], ['es regnet', 'rain'],
     ['ich bin im urlaub', 'travel'], ['keine motivation heute', 'motivation'], ['ich war zusätzlich laufen', 'extra'],
-    ['wie verbinde ich garmin', 'connect'], ['ich will abnehmen', 'safety'], ['wie ist das mit dem gewicht', 'weight'], ['neues ziel', 'goal-change'], ['hallo', 'greet'], ['danke', 'thanks'], ['hilfe', 'help'],
+    ['wie verbinde ich garmin', 'connect'], ['ich will abnehmen', 'weight'], ['wie ist das mit dem gewicht', 'weight'], ['neues ziel', 'goal-change'], ['hallo', 'greet'], ['danke', 'thanks'], ['hilfe', 'help'],
     ['ich bin total müde', 'tired'], ['heute fällt aus', 'skip-today'], ['längste einheit', 'longest'], ['morgen ist spiel', 'game']
   ];
   test.each(cases)('„%s“ → %s', (text, intent) => { expect(understand(ctx(), text).intent).toBe(intent); });
+  // Auftrag 15: „Ich will abnehmen“ ist bei Erwachsenen ein normales Thema, bei Jugendlichen ein Warnzeichen (kein Gewichtsziel unter 18)
+  test('„ich will abnehmen“: Jugendliche → Schutz-Antwort, Erwachsene → Gewicht', () => { expect(understand(ctx({ persona: 'jugend-langdistanz' }), 'ich will abnehmen').intent).toBe('safety'); expect(understand(ctx(), 'ich will abnehmen').text).not.toMatch(/Eltern/); });
 });
 
 describe('Antworten mit echten Daten und Aktionen', () => {

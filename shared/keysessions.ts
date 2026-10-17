@@ -38,8 +38,11 @@ export function bikeKey(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, to
   const lad = type === 'rp' ? BIKE_LADDER[short(goal) ? 'rpShort' : 'rpLong'] : BIKE_LADDER[type];
   const lvl0 = Math.floor(n / order.length) * 2 + order.slice(0, n % order.length).filter(x => x === type).length;
   // Tapering: kurze, scharfe Reize (niedrige Stufe)
-  const [reps, min] = phase === 'taper' ? lad[Math.max(0, Math.min(1, lvl0 - 2))] : ladderStep(lad, lvl0);
-  const rest = type === 'vo2' ? min : min >= 15 ? 5 : 4;
+  let [reps, min] = phase === 'taper' ? lad[Math.max(0, Math.min(1, lvl0 - 2))] : ladderStep(lad, lvl0);
+  // Auftrag 15: passt die Stufe nicht in die verfügbare Dauer (z. B. längste Fahrt bisher 30 min), weniger bzw. kürzere Stücke
+  const restOf = (m: number) => type === 'vo2' ? m : m >= 15 ? 5 : 4;
+  if (total) { while (reps > 1 && reps * min + (reps - 1) * restOf(min) + 25 > total) reps--; while (min > 5 && reps * min + (reps - 1) * restOf(min) + 25 > total) min -= type === 'vo2' ? 1 : 2; }
+  const rest = restOf(min);
   const zone = type === 'vo2' ? 5 : type === 'thr' || type === 'ou' || type === 'climb' ? 4 : type === 'rp' ? (short(goal) ? 4 : 3) : 3;
   const note = { ss: 'gleichmäßig im oberen Bereich von Zone 3 (Sweet Spot), Trittfrequenz 85-95', force: 'niedrige Trittfrequenz 60-70, im Sitzen, Oberkörper ruhig (Kraftausdauer)', thr: 'an der Schwelle, gleichmäßig, nicht zu schnell anfangen', ou: 'je 2 min knapp über und 2 min knapp unter der Schwelle im Wechsel', vo2: 'hart, aber jede Wiederholung gleich stark', rp: short(goal) ? 'Wettkampftempo für die kurze Distanz' : 'Wettkampftempo für die lange Distanz: gleichmäßig, mit Essen und Trinken', climb: 'am Anstieg (oder auf der Rolle mit Steigung) knapp unter der Schwelle, Trittfrequenz 70-80, im Sitzen; bergab locker zurück' }[type];
   const kind: W.Kind = ({ ss: 'sweetspot', force: 'force', thr: 'threshold', ou: 'overunder', vo2: 'vo2', rp: 'racepace', climb: 'climb' } as Record<string, W.Kind>)[type];

@@ -125,11 +125,11 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   const userMsg: CoachMsg = { id: `msg-user-${now}`, at: now, date: ctx.today, kind: 'user', from: 'user', text: String(text).slice(0, 2000) };
   const out: ChatResult = { messages: [userMsg], changes: [], status: await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today))) };
   // Sicherheit zuerst: Notfall, Medikamente und Diagnosen beantwortet die App selbst, ohne KI
-  const hits = checkMessage(text);
+  const hits = checkMessage(text, { minor: isMinor(ctx.profile, ctx.today) });
   const hard = hits.find(h => h.flag === 'emergency' || h.flag === 'medication');
   if (hard) { out.messages.push({ id: `msg-safe-${now}`, at: now + 1, date: ctx.today, kind: 'warning', from: 'coach', text: hard.text, important: hard.flag === 'emergency' }); out.blocked = hard.flag; return out; }
   if (!out.status.active) {
-    const why = !out.status.entitled ? 'Der KI-Coach ist für dein Konto noch nicht freigeschaltet.' : !out.status.keyPresent ? 'Der KI-Coach ist noch nicht eingerichtet (kein API-Schlüssel).' : !out.status.consent ? 'Für den KI-Coach fehlt deine Einwilligung.' : !out.status.enabled ? 'Der KI-Coach ist ausgeschaltet.' : out.status.monthUsd >= out.status.budgetUsd ? 'Das Monatsbudget für den KI-Coach ist aufgebraucht.' : 'Für heute sind alle KI-Nachrichten verbraucht.';
+    const why = !out.status.entitled ? 'Der KI-Coach ist für dein Konto noch nicht freigeschaltet.' : !out.status.keyPresent ? 'Der KI-Coach ist gerade nicht verfügbar.' : !out.status.consent ? 'Für den KI-Coach fehlt deine Einwilligung.' : !out.status.enabled ? 'Der KI-Coach ist ausgeschaltet.' : out.status.monthUsd >= out.status.budgetUsd ? 'Das Monatsbudget für den KI-Coach ist aufgebraucht.' : 'Für heute sind alle KI-Nachrichten verbraucht.';
     throw new HttpError(403, why + ' Die Schnellfragen und „Mit Claude besprechen“ funktionieren weiter.');
   }
   const create = creator(env);

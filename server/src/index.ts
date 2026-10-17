@@ -87,7 +87,7 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   }
   // Öffentlicher VAPID-Schlüssel (kein Geheimnis)
   if (p === '/api/push/key' && M === 'GET') {
-    if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind auf dem Server noch nicht eingerichtet.');
+    if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
     return { key: vapidPublicKey(env) };
   }
   if (p === '/api/setup' && M === 'POST') {
@@ -241,7 +241,7 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     return { configured: !!env.VAPID_PRIVATE_JWK, thisDevice: !!(me && me.n), devices: (all && all.n) || 0 };
   }
   if (p === '/api/push/test' && M === 'POST') {
-    if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind auf dem Server noch nicht eingerichtet.');
+    if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
     const n = await deliver(env, uid, { title: BRAND.name, body: 'Mitteilungen funktionieren. 💪', url: './?go=heute', tag: 'test' });
     return { delivered: n };
   }
@@ -314,7 +314,7 @@ export default {
       const status = e instanceof HttpError ? e.status : 500;
       // Keine Datensätze oder Schlüssel loggen, nur die Meldung
       if (status === 500) { console.error('Fehler:', e && e.message); await logError(env, 'server', e && e.message, req.method + ' ' + url.pathname); }
-      return json({ error: status === 500 ? 'Serverfehler' : e.message }, status, cors);
+      return json({ error: status === 500 ? 'Da ist etwas schiefgelaufen. Bitte gleich noch einmal versuchen.' : e.message }, status, cors);
     }
   },
   async scheduled(event: any, env: Env, ctx: any) {

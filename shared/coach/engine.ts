@@ -2,6 +2,7 @@
    Krankheits-Notiz, Essen) und zusätzlich täglich und wöchentlich. Wertet aus, passt den Plan nach festen Regeln an
    und schreibt jede Änderung mit Grund als Nachricht in den Coach-Chat. Funktioniert ohne KI und ohne Einwilligung. */
 import * as C from '../core';
+import { withTerms } from '../glossary';
 import type { Profile } from '../profile';
 import { sleepNeed, isMinor } from '../profile';
 import type { Goal } from '../goals';
@@ -172,7 +173,8 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
   const today = ctx.today;
   // Schlafbedarf aus dem Profil auch für die Ampel in den Regeln
   ctx = { ...ctx, state: { ...ctx.state, profile: ctx.profile, settings: { ...(ctx.state.settings || {}), readiness: fallback(ctx) } } };
-  const push = (m: CoachMsg) => { if (!has(ctx, m.id) && !out.messages.some(x => x.id === m.id)) out.messages.push(m); };
+  // Auftrag 15: Fachbegriffe in Nachrichten werden kurz erklärt
+  const push = (m: CoachMsg) => { if (!has(ctx, m.id) && !out.messages.some(x => x.id === m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m); };
 
   // Warnzeichen in den Daten (einmal pro Art und Woche)
   const flags: SafetyHit[] = checkData(ctx.state, today);

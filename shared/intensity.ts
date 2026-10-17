@@ -84,7 +84,7 @@ export interface IntensityStats { level: Level; easyShare: number; byPhase: Reco
 
 const days = (weeks: any[]) => weeks.flatMap((w: any) => (w.days || []).map((d: any) => ({ w, d, list: (d.sessions || []).filter((s: any) => s && s.sport !== 'rest' && !s.cancelled) })));
 const normalWeek = (w: any) => !w.isRecoveryWeek && !w.entry && !w.partial && !(w.races || []).length && w.phase !== 'race';
-const sig = (s: any) => `${s.sport}:${String(s.title || '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+\d+\s*min$/, '').trim()}`;
+const sig = (s: any) => `${s.sport}:${String(s.title || '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim()}`;
 
 /* Feste Termine der Person (Teamsport, Wettkampf, eigene feste Einheiten) plant die App nicht: sie zählen als harte Tage,
    aber nicht für den Anteil locker/hart des geplanten Trainings. */
@@ -159,7 +159,9 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o: Check
     if (seg.phase === 'taper') {
       const own = seg.weeks.flatMap((w: any) => (w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => ownSession(s) && ['run', 'bike', 'swim'].includes(s.sport))));
       const beginner = levelOf(p) === 'beginner';
-      if (own.some((s: any) => !s.stage) && !own.some((s: any) => isHardSession(s) || (beginner && isLightQuality(s) && s.sport !== 'swim'))) out.push({ rule: 'missing', phase: 'taper', msg: `Tapering ab ${seg.weeks[0].startDate}: kein kurzer, scharfer Reiz.` });
+      void beginner;
+      const game = seg.weeks.some((w: any) => (w.days || []).some((d: any) => (d.sessions || []).some((s: any) => isGameOrRace(s) && !s.race)));
+      if (!game && own.some((s: any) => !s.stage) && !own.some((s: any) => isHardSession(s) || (isLightQuality(s) && s.sport !== 'swim'))) out.push({ rule: 'missing', phase: 'taper', msg: `Tapering ab ${seg.weeks[0].startDate}: kein kurzer, scharfer Reiz.` });
       continue;
     }
     if (norm.length < 2) continue;
@@ -168,7 +170,10 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o: Check
       return per.reduce((a: number, l: any[]) => a + l.length, 0) / norm.length >= (sport === 'swim' ? 1.5 : 1.8);
     });
     const games = norm.reduce((a: number, w: any) => a + (w.days || []).filter((d: any) => (d.sessions || []).some((s: any) => fixedHard(s) && !/test/i.test(s.title || ''))).length, 0) / norm.length;
-    const budget = Math.max(0, maxHard(p, seg.phase, seg.weeks[0].startDate || today, seg.phase === 'base' ? 4 : 0) - games);
+    const free = norm.reduce((a: number, w: any) => { const ds = w.days || []; return a + ds.filter((d: any, k: number) => (d.sessions || []).some((s: any) => ownSession(s) && ['run', 'bike', 'swim'].includes(s.sport))
+      && ![ds[k - 1], d, ds[k + 1]].some((x: any) => x && (x.sessions || []).some((s: any) => fixedHard(s) && !/test/i.test(s.title || '')))).length; }, 0) / norm.length;
+    // Auftrag 15: mit Spielen und wenigen Tagen gibt es manchmal keinen Tag für Hartes (z. B. nur Sa/So, Spiel am Samstag): dann kein Bedarf
+    const budget = Math.min(Math.floor(free + 0.01), Math.max(0, maxHard(p, seg.phase, seg.weeks[0].startDate || today, seg.phase === 'base' ? 4 : 0) - games));
     for (const sport of sportsIn) {
       const per = norm.map((w: any) => (w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => s && s.sport === sport && !s.cancelled && !/^(Koppel|Wechsel)/.test(s.title || ''))));
       if (sport === 'run' && (o.runEasyOnly || per.flat().some((s: any) => s.stage && s.stage.ladder === 'runwalk'))) continue;
@@ -214,7 +219,9 @@ function variantOf(s: any, avoid: Set<string>): any | null {
   const r = q.reps || 1;
   // Schwimmen: nie längere Stücke als bisher (Können), sondern mehr kürzere Stücke oder andere Pausen
   const opts: Partial<W.Step>[] = sp.sport === 'swim' ? ((q.m || 0) >= 100 ? [{ m: 50, reps: r * 2 }] : [{ reps: r + 2, restSec: Math.max(15, (q.restSec || 30) - 10) }, { reps: Math.max(2, r - 1), restSec: (q.restSec || 30) + 10 }])
-    : [{ reps: r + 1, min: Math.max(1, Math.round((q.min || 0) * r / (r + 1))) }, { reps: Math.max(1, r - 1), min: Math.round((q.min || 0) * r / Math.max(1, r - 1)) }];
+    : [{ reps: r + 1, min: Math.max(1, Math.round((q.min || 0) * r / (r + 1))) }, { reps: Math.max(1, r - 1), min: Math.round((q.min || 0) * r / Math.max(1, r - 1)) },
+      // ein einzelner Block (z. B. 20 min Wettkampftempo): zwei Stücke mit kurzer Pause, gleiche Gesamtzeit (Auftrag 15)
+      { reps: r + 1, min: Math.max(1, Math.round(((q.min || 0) * r - r * (q.restMin || 2)) / (r + 1))) }];
   const base = { ...q };
   for (const o of opts) {
     Object.assign(q, base, o);
@@ -230,7 +237,7 @@ export function qualityFor(s: any, phase: IPhase, o: RepairOpts, p: Profile, n: 
   const noZ5 = !!(o.noZ5 && o.noZ5(date));
   let q: W.Spec | null = null;
   if (s.sport === 'run') {
-    if (phase === 'taper' && levelOf(p) === 'beginner') q = W.runEasy(ctx, min, { strides: 4 });
+    if (phase === 'taper' && (levelOf(p) === 'beginner' || min < 45)) q = W.runEasy(ctx, min, { strides: 4 });
     else if (phase === 'base') q = K.runBaseVariant(ctx, Math.max(30, Math.min(60, min)), n);
     else if (o.runAllowed !== false && !o.runEasyOnly) { const rq = K.runQualityStep(phase, o.goalType, n, !!o.minor, { noZ5, level: levelOf(p), baseWeek: 4 }); if (rq) q = s.long || /^Lang/.test(s.title || '') ? K.longRunWithQuality(ctx, min, rq) : K.runQuality(ctx, rq); }
   } else if (s.sport === 'bike') {
@@ -243,6 +250,8 @@ export function qualityFor(s: any, phase: IPhase, o: RepairOpts, p: Profile, n: 
   // Dauer wie geplant: zu lang → Hauptteil kürzen; passt es nicht, bleibt die Einheit locker
   for (let k = 0; k < 4 && W.totals(q).min > min + 2; k++) q = W.scaleSpec(q, Math.max(0.5, min / W.totals(q).min));
   if (W.totals(q).min > min + 2) return null;
+  // eine harte Einheit unter 30 min (oder mit weniger als 8 min Qualität) ist keine sinnvolle Schlüsseleinheit (Auftrag 15)
+  if (W.totals(q).min < 30 && q.kind !== 'hills' && q.kind !== 'fartlek' && q.kind !== 'easy') return null;
   return { ...s, ...W.build(q), id: s.id, checkFix: 'quality' };
 }
 
@@ -278,16 +287,19 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o: Repa
     }
     prevHard = new Set((w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && !isGameOrRace(s)).map((s: any) => s.sport)));
   }
-  // 3) gleiche Schlüsseleinheit wie in der Woche davor: andere Form
-  let prev: Set<string> | null = null;
-  for (const w of weeks) {
-    if (!normalWeek(w)) { if (w.isRecoveryWeek) prev = null; continue; }
-    for (const d of w.days || []) for (const s of [...(d.sessions || [])]) {
-      if (!prev || !isHardSession(s) || !flexible(s, o.from, d.date) || !prev.has(sig(s))) continue;
-      const v = variantOf(s, prev); if (v) { setS(d, s, v); fixes.push(`${d.date}: ${s.title} → ${v.title} (Abwechslung)`); }
+  // 3) gleiche Schlüsseleinheit wie in der Woche davor: andere Form (nach Schritt 4 noch einmal, Auftrag 15)
+  const vary = () => {
+    let prev: Set<string> | null = null;
+    for (const w of weeks) {
+      if (!normalWeek(w)) { if (w.isRecoveryWeek) prev = null; continue; }
+      for (const d of w.days || []) for (const s of [...(d.sessions || [])]) {
+        if (!prev || !isHardSession(s) || !flexible(s, o.from, d.date) || !prev.has(sig(s))) continue;
+        const v = variantOf(s, prev); if (v) { setS(d, s, v); fixes.push(`${d.date}: ${s.title} → ${v.title} (Abwechslung)`); }
+      }
+      prev = new Set((w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && !isGameOrRace(s)).map(sig)));
     }
-    prev = new Set((w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && !isGameOrRace(s)).map(sig)));
-  }
+  };
+  vary();
   // 4) fehlende Intensität je Phase und Sportart: eine lockere Einheit an einem freien Tag wird zur passenden Qualität
   for (let pass = 0; pass < 2; pass++) {
     const miss = checkIntensity(weeks, p, today, o).filter(i => i.rule === 'missing');
@@ -329,6 +341,7 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o: Repa
       }
     }
   }
+  vary();
   // 5) Anteil locker unter 75 %: die härtesten beweglichen Einheiten lockern
   for (let guard = 0; guard < 6 && intensityStats(weeks.filter(w => !o.from || !w.endDate || w.endDate >= o.from), p).easyShare < 0.75; guard++) {
     const c = days(weeks).flatMap(x => (x.d.sessions || []).filter((s: any) => isHardSession(s) && flexible(s, o.from, x.d.date)).map((s: any) => ({ x, s }))).sort((a, b) => hardMinutes(b.s) - hardMinutes(a.s))[0];

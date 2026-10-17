@@ -4,6 +4,7 @@
    Die Bauanleitung (spec) bleibt an der Einheit, damit Anpassungen (z. B. Umfang −10 %) Text und Zahlen gemeinsam ändern.
    Keine Abhängigkeit von core.ts (core importiert dieses Modul). */
 import { HR_ZONES, POWER_ZONES } from './sports';
+import { termsLine } from './glossary';
 import { speedRange, SPEED_HINT } from './bikespeed';
 
 export type WSport = 'run' | 'bike' | 'swim' | 'strength' | 'football';
@@ -288,6 +289,8 @@ export function describe(spec: Spec): string {
   }
   if (spec.why) L.push(`Warum: ${spec.why}`);
   if (spec.tip) L.push(`Achte auf: ${spec.tip}`);
+  // Auftrag 15: Fachbegriffe (Sweet Spot, Schwelle, CSS, VO2max …) mit kurzer Erklärung
+  const terms = termsLine(`${title(spec)}\n${L.join('\n')}`); if (terms) L.push(terms);
   return L.join('\n');
 }
 export function title(spec: Spec): string {
@@ -409,7 +412,16 @@ export function gearFit(spec: Spec): Spec {
 export function scaleSpec(spec: Spec, f: number): Spec {
   const out: Spec = JSON.parse(JSON.stringify(spec));
   if (out.sport === 'strength') { (out.exercises || []).forEach(e => { e.sets = Math.max(1, Math.round(e.sets * Math.min(1, f + 0.15))); }); out.steps.forEach(s => { if (s.part === 'main') s.min = Math.max(10, Math.round((s.min || 20) * f / 5) * 5); }); return out; }
-  if (out.stage) return out; // Lernstufen ändern sich nur mit der Stufe
+  if (out.stage) {
+    // Lernstufen ändern sich nur mit der Stufe. Schwimmen (Auftrag 15): kürzer geht trotzdem – der Kraul-Teil der Stufe bleibt,
+    // Ein-/Ausschwimmen, Brust und Übungen werden weniger (z. B. in der Erholungswoche)
+    if (out.sport !== 'swim' || f >= 1) return out;
+    out.steps.forEach(st => {
+      if (st.part !== 'main' && st.m) st.m = Math.max(st.part === 'warm' ? 100 : 50, Math.floor(st.m * f / 50) * 50);
+      else if (st.part === 'main' && ['breast', 'drill', 'kick', 'easy'].includes(st.mode || '')) { if ((st.reps || 1) > 1) st.reps = Math.max(1, Math.round((st.reps || 1) * f)); else if (st.m) st.m = Math.max(50, Math.floor(st.m * f / 50) * 50); }
+    });
+    return out;
+  }
   const before = totals(out).min;
   const target = before * f;
   const fixedMin = out.steps.filter(s => s.part !== 'main').reduce((a, s) => a + stepMinutes(out, s), 0);
@@ -427,6 +439,11 @@ export function scaleSpec(spec: Spec, f: number): Spec {
   }
   // Ein-/Ausrollen kürzen, wenn der Hauptteil schon minimal ist
   if (f < 1 && totals(out).min > target + 5) out.steps.forEach(s => { if (s.part !== 'main' && s.min && s.min > 5) s.min = Math.max(5, Math.round(s.min * f / 5) * 5); });
+  // Schwimmen (Auftrag 15): Ein-/Ausschwimmen in Metern und Technik-Serien mitkürzen
+  if (out.sport === 'swim' && f < 1 && totals(out).min > target + 3) {
+    out.steps.forEach(s => { if (s.part !== 'main' && s.m) s.m = Math.max(s.part === 'warm' ? 100 : 50, Math.floor(s.m * f / 50) * 50); });
+    out.steps.forEach(s => { if (s.part === 'main' && (s.mode === 'drill' || s.mode === 'kick') && (s.reps || 1) > 2 && totals(out).min > target + 3) s.reps = Math.max(2, Math.round((s.reps || 1) * f)); });
+  }
   return out;
 }
 export function rebuildScaled(session: any, f: number): any {
@@ -597,13 +614,15 @@ export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; 
   return spec;
 }
 /* Schwimmtest (Kraul-Check) zu Beginn der Einheit, danach Technik wie gewohnt. Ab 400 m Kraul am Stück: CSS-Test (swimTest). */
-export function swimCheck(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean } | null, fillMin?: number): Spec {
+export function swimCheck(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; n: number; breast?: boolean } | null, fillMin?: number, maxRep = 50): Spec {
+  // Auftrag 15: der Versuch „so weit wie möglich“ nie länger als das Können (wer 25 m schafft, versucht 25 m)
+  const tryM = Math.max(25, Math.min(50, maxRep || 50));
   const tech = stage ? swimLearn(ctx, { ...stage, breast: true }).steps.filter(x => x.part === 'main' && x.mode !== 'breast') : [S('main', { reps: 6, m: 25, zone: 1, mode: 'drill', restSec: 20 })];
   const spec: Spec = { sport: 'swim', kind: 'test', title: 'Schwimmtest: Kraul-Check', ctx,
     why: 'Zeigt, wie weit du am Stück kraulen kannst und wie effizient. Daraus kommen Schwimm-Score und Technik-Stufe.',
     tip: 'Werte direkt nach dem Test eintragen: längste Strecke Kraul am Stück, Ø Zeit und Züge pro Bahn, deine Brust-Zeit.',
     steps: [S('warm', { m: 200, zone: 1, mode: 'breast', note: 'einschwimmen' }),
-      S('main', { reps: 1, m: 50, zone: 2, mode: 'crawl', note: '(a) Kraul so weit wie möglich am Stück, ruhig atmen. Strecke merken' }),
+      S('main', { reps: 1, m: tryM, zone: 2, mode: 'crawl', note: '(a) Kraul so weit wie möglich am Stück, ruhig atmen. Strecke merken' }),
       S('main', { reps: 4, m: 25, zone: 3, mode: 'crawl', restSec: 30, note: '(b) locker-zügig, Zeit und Züge pro Bahn merken' }),
       S('main', { reps: 1, m: 200, zone: 3, mode: 'breast', note: '(c) auf Zeit, Zeit merken' }),
       ...tech.map(x => ({ ...x, note: x.note ? 'danach Technik: ' + x.note : 'danach Technik' })), S('cool', { m: 100, zone: 1, mode: 'breast' })] };
