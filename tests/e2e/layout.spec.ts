@@ -65,6 +65,11 @@ async function overflow(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const W = document.documentElement.clientWidth;
     const out: string[] = [];
+    // Auftrag 15: Safari auf dem iPhone zeichnet Datums-/Zeitfelder mit eigener Mindestbreite (etwa 250 px), WebKit auf dem PC nicht.
+    // Nachgestellt für alle Felder, die noch die System-Darstellung haben (nur appearance: none passt sich der Spalte an).
+    for (const el of Array.from(document.querySelectorAll('input[type="date"], input[type="time"], input[type="month"]')) as HTMLElement[]) {
+      const cs = getComputedStyle(el) as any; if ((cs.webkitAppearance || cs.appearance) !== 'none') el.style.minWidth = '250px';
+    }
     const desc = (el: Element) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''}${(el as HTMLElement).dataset && (el as HTMLElement).dataset.act ? `[${(el as HTMLElement).dataset.act}]` : ''} „${(el.textContent || '').trim().slice(0, 40)}“`;
     if (document.documentElement.scrollWidth > W + 1) out.push(`Seite scrollt seitlich (${document.documentElement.scrollWidth} > ${W})`);
     const scroller = (el: Element) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if (ox === 'auto' || ox === 'scroll') return p; } return null; };
