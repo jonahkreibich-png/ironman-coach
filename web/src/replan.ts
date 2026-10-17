@@ -108,14 +108,15 @@ export function calibrateIfDue(): boolean {
   return r.ok;
 }
 
-/* Auftrag 15 (für alle): Der Plan enthält nur gewählte Sportarten, und dieselbe Sportart liegt nicht an zwei Tagen hintereinander.
-   Beim Start prüft die App den Plan ab heute; bei Befund plant sie ab heute neu (Vergangenes und Erledigtes bleibt) und sagt es im Coach.
-   Einmal je Befund: bleibt nach dem Neuplanen etwas übrig (z. B. zwei feste Termine), fragt die App nicht bei jedem Start erneut. */
+/* Auftrag 15 (für alle): Der Plan enthält nur gewählte Sportarten. Beim Start prüft die App den Plan ab heute; steht eine nicht gewählte
+   Sportart darin (Mamas Fall), plant sie ab heute neu (Vergangenes und Erledigtes bleibt) und sagt es im Coach. Dabei gilt auch der Abstand
+   zwischen gleichen Sportarten. Den Abstand allein ändert die App nicht ungefragt (neue und geänderte Pläne bekommen ihn vom Generator).
+   Einmal je Befund: bleibt nach dem Neuplanen etwas übrig, fragt die App nicht bei jedem Start erneut. */
 export function planRulesOnStart(): boolean {
   const plan = readPlan(); if (!plan) return false;
   const p = profile(); const from = replanFrom();
   const eff = C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {});
-  const issues = checkPlanRules(eff, p, { from }).filter(i => !(i.rule !== 'sport' && i.date && i.date > addDays(from, 56)));
+  const issues = checkPlanRules(eff, p, { from }).filter(i => i.rule === 'sport');
   const sig = issues.map(i => i.msg).join('|');
   if (!issues.length || STATE.settings.planRules15 === sig) return false;
   const sportIss = issues.filter(i => i.rule === 'sport');
@@ -134,7 +135,7 @@ export function planRulesOnStart(): boolean {
     }));
     rebuildPlanIndex();
   }
-  const after = checkPlanRules(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), profile(), { from }).filter(i => !(i.rule !== 'sport' && i.date && i.date > addDays(from, 56)));
+  const after = checkPlanRules(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), profile(), { from }).filter(i => i.rule === 'sport');
   STATE.settings.planRules15 = after.map(i => i.msg).join('|') || sig;
   saveState();
   return true;

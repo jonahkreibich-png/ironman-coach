@@ -317,6 +317,17 @@ export async function setupWithInvite(invite: string, userName: string, keepLoca
   reloadSoon();
   return res;
 }
+/* Auftrag 15: eigenes Konto ohne Einladung, z. B. beim ersten „Verbinden“. Was auf diesem Gerät liegt, gehört der Person (sie hatte noch
+   kein Konto) und kommt mit. Kein Neuladen: danach geht es direkt weiter zur Anmeldung beim Dienst. */
+export async function setupSignup(userName = '') {
+  const res = await api('POST', '/api/setup', { signup: true, name: deviceName(), userName }, true);
+  prepareDevice(res.userId ?? null, true);
+  connected(res, true);
+  remember(res);
+  await syncNow(); rebaseline();
+  await loadMe();
+  return res;
+}
 /* Wiederherstellungscode einmal anzeigen (Auftrag 5 E4) */
 function remember(res: any) { if (res && res.recoveryCode) try { localStorage.setItem('ec_rc_show', res.recoveryCode); } catch (e) {} }
 /* Neues Gerät mit Wiederherstellungscode: das eigene Konto mit allen Daten zurück */

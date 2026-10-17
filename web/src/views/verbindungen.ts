@@ -6,7 +6,8 @@ import { STATE, saveState } from '../store';
 import { esc, fmtDate, ymd } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, openSheet, refreshSheet, closeSheet, armed, field, more, empty } from '../kit';
-import { apiCall, isSyncOn, syncNow, uploadFiles, ago, isAdmin } from '../sync';
+import { apiCall, publicCall, isSyncOn, syncNow, uploadFiles, ago, isAdmin, setupSignup } from '../sync';
+import { profile } from '../store';
 import { DEFAULT_PRIORITY, SOURCE_LABEL, priorityOf } from '../../../shared/activity/merge';
 import { API_BASE } from '../config';
 import { nav } from '../nav';
@@ -20,11 +21,15 @@ let NEW_KEY: { id: string; key: string } | null = null;
 let RETURN_TO: 'verbindungen' | 'onboarding' = 'verbindungen';
 
 export async function loadConnections(force = false) {
-  if (!isSyncOn() || LOADING || (CONN && !force)) return;
+  if (LOADING || (CONN && !force)) return;
   LOADING = true; ERR = '';
-  try { CONN = (await apiCall('GET', '/api/connections')).connections; } catch (e: any) { ERR = e.message; }
+  // Auftrag 15: ohne Konto die Liste der Dienste (ohne Anmeldung); „Verbinden“ legt dann das Konto an
+  try { CONN = isSyncOn() ? (await apiCall('GET', '/api/connections')).connections : (await publicCall('GET', '/api/connect/catalog')).connections; ACCOUNT = isSyncOn(); }
+  catch (e: any) { ERR = isSyncOn() ? e.message : t('conn.offline'); }
   LOADING = false; nav.rerender();
 }
+/* Stand der Liste: mit Konto (true) oder nur der Katalog (false) */
+let ACCOUNT = false;
 /* Für „Heute“: Verbindungen, die neu angemeldet werden müssen */
 export function reauthHints(): string[] {
   return (CONN || []).filter(c => c.status === 'reauth').map(c => t('conn.reauthHint', { name: c.label }));
@@ -44,28 +49,28 @@ function lastLine(c: any) {
   else if (c.stats && c.stats.folder) parts.push(t('conn.folder', { f: c.stats.folder }));
   return parts.join(' · ');
 }
+const unavailable = (c: any) => c.kind === 'oauth' && c.availability === 'ready' && (!c.configured || !!c.full) && c.status !== 'connected' && c.status !== 'error' && c.status !== 'reauth';
 function subLine(c: any): string {
   if (c.availability === 'partner') return c.status === 'via' ? t('conn.viaIcuShort') : t('conn.partnerShort');
   if (c.availability === 'prepared') return t('conn.prepared');
-  if (!c.configured) return t('conn.notConfiguredShort');
+  if (unavailable(c)) return t('conn.notConfiguredShort');
   return lastLine(c) || t('conn.desc.' + c.id);
 }
 function row(c: any): string {
   return `<button class="li" data-act="conn-open" data-id="${esc(c.id)}" data-state="${esc(c.status)}"><span class="ic" style="--c:${c.status === 'reauth' || c.status === 'error' ? 'var(--warn)' : c.status === 'connected' || c.status === 'via' ? 'var(--good)' : 'var(--ink-3)'}">${ic(c.status === 'connected' || c.status === 'via' ? 'check' : 'link')}</span>
-    <span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s">${esc(subLine(c))}</span></span>${pill(c.availability !== 'partner' && !c.configured && c.kind === 'oauth' ? t('conn.notReady') : stateText(c), stateKind(c))}<span class="chev">${ic('right')}</span></button>`;
+    <span class="grow"><span class="t">${esc(c.label)}</span><br><span class="s">${esc(subLine(c))}</span></span>${pill(unavailable(c) ? t('conn.notReady') : stateText(c), stateKind(c))}<span class="chev">${ic('right')}</span></button>`;
 }
 const ORDER = ['shortcut', 'intervals', 'garmin', 'coros', 'suunto', 'wahoo', 'dropbox', 'oura', 'whoop', 'polar', 'withings', 'trainingpeaks', 'fitbit'];
 const sorted = (list: any[]) => [...list].sort((a, b) => (ORDER.indexOf(a.id) + 99) % 99 - (ORDER.indexOf(b.id) + 99) % 99);
 
 export function renderVerbindungen(): string {
   RETURN_TO = 'verbindungen';
-  if (!isSyncOn()) return noSyncCard() + importSection();
-  if (!CONN) { loadConnections(); return `<div class="card">${empty(ERR || t('common.loading'))}</div>`; }
+  if (!CONN || ACCOUNT !== isSyncOn()) { if (CONN && ACCOUNT !== isSyncOn()) CONN = null; loadConnections(); return `<div class="card">${empty(ERR || t('common.loading'))}</div>`; }
   const main = sorted(CONN.filter(c => c.availability === 'ready' || c.availability === 'partner'));
   const later = CONN.filter(c => c.availability === 'prepared');
   const reauth = CONN.filter(c => c.status === 'reauth');
   let h = reauth.length ? `<div class="banner warn">${esc(reauthHints().join(' '))}</div>` : '';
-  h += `<div class="hint" style="margin:0 2px var(--s3)">${esc(t('conn.intro'))}</div>`;
+  h += `<div class="hint" style="margin:0 2px var(--s3)">${esc(t('conn.intro'))}${isSyncOn() ? '' : ' ' + esc(t('conn.introNoAccount'))}</div>`;
   h += sec(t('conn.sources'), `<div class="list">${main.map(row).join('')}</div>`);
   h += importSection();
   // erst mit einer Verbindung wichtig (Auftrag 11: neue Nutzer sahen eine lange Liste mit Fachbegriffen)
@@ -77,13 +82,9 @@ export function renderVerbindungen(): string {
 /* Kurzliste für den Fragebogen (A3): dieselben Abläufe, Rückkehr in den Fragebogen */
 export function connectList(ctx: 'onboarding' | 'verbindungen'): string {
   RETURN_TO = ctx;
-  if (!isSyncOn()) return `<div class="hint">${esc(t('conn.obNoSync'))}</div>${more(t('conn.partnerHow'), partnerGuide(), false)}`;
-  if (!CONN) { loadConnections(); return `<div class="hint">${esc(ERR || t('common.loading'))}</div>`; }
+  if (!CONN || ACCOUNT !== isSyncOn()) { if (CONN && ACCOUNT !== isSyncOn()) CONN = null; loadConnections(); return `<div class="hint">${esc(ERR || t('common.loading'))}</div>`; }
   const list = sorted(CONN.filter(c => ['shortcut', 'intervals', 'garmin', 'coros', 'suunto', 'wahoo', 'dropbox', 'oura', 'whoop', 'polar', 'withings'].includes(c.id)));
   return `<div class="list" data-connect-list>${list.map(row).join('')}</div><div class="hint">${esc(t('conn.obLater'))}</div>`;
-}
-function noSyncCard(): string {
-  return `<div class="card stack"><div class="hint">${esc(t('conn.needSync'))}</div><button class="btn" data-act="go-sub" data-sub="daten">${esc(t('conn.toSync'))}</button>${more(t('conn.partnerHow'), partnerGuide())}</div>`;
 }
 /* Server-Schlüssel (nur Betreiber): welche Secrets gesetzt sind */
 function serverKeysCard(): string {
@@ -146,10 +147,12 @@ function connSheet(): string {
   }
   if (c.availability === 'prepared') return h + `<div class="banner info">${esc(t('conn.preparedLong'))}</div>${ALT[c.id] ? `<div class="hint">${esc(t(ALT[c.id]))}</div>` : ''}</div>`;
   if (c.id === 'oura') h += `<div class="banner info">${esc(t('conn.ouraTerms'))}</div>`;
+  // Auftrag 15: ohne Konto erst ein Satz, dann „Verbinden“ (legt das private Konto an und öffnet die Anmeldung des Dienstes)
+  if (!isSyncOn() && !unavailable(c)) return h + `<div class="hint" data-account-note>${esc(t('conn.accountNote', { name: c.label }))}</div>${c.id === 'intervals' ? icuSteps() : ''}<button class="btn block" data-act="conn-signup">${esc(t('conn.connect'))}</button></div>`;
   if (c.id === 'shortcut') return h + shortcutBody(c) + '</div>';
   if (c.id === 'intervals') {
-    if (c.status !== 'connected') return h + `<div class="fgrid">${field('icu-id', t('conn.icuId'), '', { placeholder: 'i123456' })}${field('icu-key', t('conn.icuKey'), '', { type: 'password' })}</div><div class="hint">${esc(t('conn.icuHow'))}</div><button class="btn block" data-act="icu-connect">${esc(t('conn.connect'))}</button>${more(t('conn.partnerHow'), partnerGuide())}</div>`;
-  } else if (!c.configured) {
+    if (c.status !== 'connected') return h + `${icuSteps()}<div class="fgrid">${field('icu-id', t('conn.icuId'), '', { placeholder: 'i123456' })}${field('icu-key', t('conn.icuKey'), '', { type: 'password' })}</div><div class="hint">${esc(t('conn.icuHow'))}</div><button class="btn block" data-act="icu-connect">${esc(t('conn.connect'))}</button>${more(t('conn.partnerHow'), partnerGuide())}</div>`;
+  } else if (unavailable(c)) {
     return h + `<div class="banner warn" data-not-configured>${esc(t('conn.notConfiguredLong', { name: c.label }))}</div>${ALT[c.id] ? `<div class="hint"><b>${esc(t('conn.instead'))}</b> ${esc(t(ALT[c.id]))}</div>` : ''}
       ${isAdmin() ? `<div class="hint">${esc(t('conn.adminKeys', { keys: (c.secrets || []).map((s: any) => s.name).join(', ') }))}</div>` : ''}
       <button class="btn ghost block" data-act="conn-open" data-id="shortcut">${esc(t('conn.appleInstead'))}</button></div>`;
@@ -184,6 +187,10 @@ function connSheet(): string {
   } else h += `<div class="hint">${esc(t('conn.willOpen', { name: c.label }))}</div><button class="btn block" data-act="conn-start">${esc(t('conn.connect'))}</button>`;
   return h + '</div>';
 }
+/* intervals.icu braucht Athleten-ID und API-Schlüssel: Schritt für Schritt (Auftrag 15) */
+function icuSteps(): string {
+  return `<ol class="small stack" style="padding-left:18px;margin:0" data-icu-steps>${[1, 2, 3, 4, 5].map(i => `<li>${esc(t('conn.icuStep' + i))}</li>`).join('')}</ol>`;
+}
 function shortcutBody(c: any): string {
   const url = (API_BASE || location.origin) + '/api/ingest/shortcut';
   let h = '';
@@ -196,7 +203,6 @@ function shortcutBody(c: any): string {
   return h;
 }
 on('conn-open', el => {
-  if (!isSyncOn()) { toast(t('conn.needSync')); return; }
   CUR = el.dataset.id!; NEW_KEY = null; const c = cur();
   if (!c) { toast(t('common.loading')); loadConnections(true); return; }
   openSheet(c.label, connSheet);
@@ -205,6 +211,15 @@ async function busy(el: HTMLElement, fn: () => Promise<void>) {
   (el as HTMLButtonElement).disabled = true;
   try { await fn(); } catch (e: any) { toast(e.message); } finally { if (el.isConnected) (el as HTMLButtonElement).disabled = false; }
 }
+/* Auftrag 15: „Verbinden“ ohne Konto: privates Konto anlegen (Daten dieses Geräts kommen mit), dann wie gewohnt weiter */
+on('conn-signup', el => busy(el, async () => {
+  const id = CUR;
+  await setupSignup(String((profile() as any).name || ''));
+  await loadConnections(true);
+  CUR = id; const c = cur();
+  if (c && c.kind === 'oauth' && c.availability === 'ready' && !unavailable(c)) { const r = await apiCall('POST', `/api/connect/${id}/start`, { returnTo: RETURN_TO }); location.href = r.url; return; }
+  refreshSheet(); toast(t('conn.accountMade'));
+}));
 on('conn-start', el => busy(el, async () => {
   const r = await apiCall('POST', `/api/connect/${CUR}/start`, { returnTo: RETURN_TO });
   location.href = r.url;
@@ -255,7 +270,7 @@ on('key-revoke', el => {
 onChange('imp-file', async el => {
   const files = Array.from((el as HTMLInputElement).files || []);
   if (!files.length) return;
-  if (!isSyncOn()) { toast(t('conn.needSync')); return; }
+  if (!isSyncOn()) { try { await setupSignup(String((profile() as any).name || '')); } catch (e: any) { toast(e.message); return; } }
   toast(t('conn.importing'));
   try {
     const r = await uploadFiles(files);

@@ -26,6 +26,18 @@ export const OAUTH: Partial<Record<ProviderId, OAuthDef>> = {
   withings: { label: 'Withings', authUrl: 'https://account.withings.com/oauth2_user/authorize2', tokenUrl: 'https://wbsapi.withings.net/v2/oauth2', scope: 'user.metrics,user.activity', scopeSep: ',', idEnv: 'WITHINGS_CLIENT_ID', secretEnv: 'WITHINGS_CLIENT_SECRET', tokenAuth: 'body', status: 'ready' },
   fitbit: { label: 'Fitbit (Google Health)', authUrl: 'https://accounts.google.com/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.googleapis.com/token', scope: 'https://www.googleapis.com/auth/googlehealth.sleep.readonly', idEnv: 'GOOGLE_HEALTH_CLIENT_ID', secretEnv: 'GOOGLE_HEALTH_CLIENT_SECRET', tokenAuth: 'body', status: 'prepared' }
 };
+/* Auftrag 15: Anbieter erlauben im Entwicklermodus nur wenige Nutzer (Oura 10, WHOOP 10, Dropbox 500 – ab 50 muss die Freigabe beantragt werden).
+   Ist die Grenze erreicht, sagt die App neuen Nutzern „gerade nicht verfügbar“ statt eines Fehlers beim Anbieter. Änderbar per Variable <DIENST>_MAX_USERS
+   (z. B. nach der Freigabe). */
+export const DEV_LIMIT: Partial<Record<ProviderId, number>> = { oura: 10, whoop: 10, dropbox: 500, polar: 100, withings: 100 };
+export function userLimit(env: Env, p: ProviderId): number | null { const v = env[`${p.toUpperCase()}_MAX_USERS`]; return v != null && v !== '' ? +v : DEV_LIMIT[p] ?? null; }
+async function providerFull(env: Env, uid: number, p: ProviderId): Promise<boolean> {
+  const lim = userLimit(env, p); if (lim == null) return false;
+  const mine = await getConn(env, uid, p);
+  if (mine && mine.status !== 'disconnected') return false;
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM connections WHERE provider = ? AND status <> 'disconnected'").bind(p).first();
+  return !!n && n.n >= lim;
+}
 /* Basis-Adressen (in Tests auf einen Mock umleitbar) */
 const base = (env: Env, id: string, def: string) => (env[`${id.toUpperCase()}_API_BASE`] as string) || def;
 const redirectUri = (env: Env, p: string) => `${String(env.PUBLIC_URL || '').replace(/\/$/, '')}/api/connect/${p}/callback`;
@@ -60,7 +72,8 @@ export async function startOAuth(env: Env, a: Auth, p: ProviderId, returnTo?: st
   if (!def) throw new HttpError(404, 'Unbekannter Dienst.');
   if (def.status !== 'ready') throw new HttpError(409, `${def.label} braucht noch eine Freischaltung durch den Anbieter.`);
   const clientId = env[def.idEnv];
-  if (!clientId || !env[def.secretEnv]) throw new HttpError(503, `${def.label} ist auf dem Server noch nicht eingerichtet: Der Betreiber muss einmal den App-Schlüssel des Anbieters hinterlegen. Bis dahin klappt es über Apple Health (Kurzbefehl) oder intervals.icu.`);
+  if (!clientId || !env[def.secretEnv]) throw new HttpError(503, a.role === 'admin' ? `${def.label}: Der App-Schlüssel des Anbieters fehlt auf dem Server (${def.idEnv}, ${def.secretEnv}). Bis dahin klappt es über Apple Health (Kurzbefehl) oder intervals.icu.` : `${def.label} ist gerade nicht verfügbar. Bis dahin klappt es über Apple Health (Kurzbefehl) oder intervals.icu.`);
+  if (await providerFull(env, a.uid, p)) throw new HttpError(503, `${def.label} ist gerade nicht verfügbar (der Anbieter lässt noch nicht mehr Nutzer zu). Bis dahin klappt es über Apple Health (Kurzbefehl) oder intervals.icu.`);
   // Ohne TOKEN_KEY kann der Server die Anmeldung nicht speichern: gleich sagen statt nach dem Erlaubnis-Bildschirm scheitern
   if (!env.TOKEN_KEY || String(env.TOKEN_KEY).trim().length < 16) throw new HttpError(503, friendlyError(new Error('TOKEN_KEY fehlt')).text);
   const state = randomToken(24);
@@ -486,7 +499,10 @@ export async function connectionsStatus(env: Env, uid: number): Promise<any[]> {
   };
   // Grundlagen des Servers (nur ob gesetzt, nie Werte): TOKEN_KEY fehlte in der echten App (Auftrag 13)
   list.push({ id: 'server', label: 'Server', kind: 'server', availability: 'internal', configured: !!(env.TOKEN_KEY && String(env.TOKEN_KEY).trim().length >= 16), status: 'none', secrets: ['TOKEN_KEY', 'SETUP_CODE', 'VAPID_PRIVATE_JWK'].map(name => ({ name, set: !!env[name] })) });
-  for (const [p, d] of Object.entries(OAUTH) as [ProviderId, OAuthDef][]) pub(p, d.label, 'oauth', d.status, !!(env[d.idEnv] && env[d.secretEnv]), [{ name: d.idEnv, set: !!env[d.idEnv] }, { name: d.secretEnv, set: !!env[d.secretEnv] }]);
+  for (const [p, d] of Object.entries(OAUTH) as [ProviderId, OAuthDef][]) {
+    pub(p, d.label, 'oauth', d.status, !!(env[d.idEnv] && env[d.secretEnv]), [{ name: d.idEnv, set: !!env[d.idEnv] }, { name: d.secretEnv, set: !!env[d.secretEnv] }]);
+    if (d.status === 'ready' && list[list.length - 1].configured && await providerFull(env, uid, p)) list[list.length - 1].full = true;
+  }
   pub('intervals', 'intervals.icu', 'apikey', 'ready', true);
   list.push({ id: 'shortcut', label: 'Apple Health (Kurzbefehl)', kind: 'key', availability: 'ready', configured: true, status: (keys.results || []).length ? 'connected' : 'none', keys: (keys.results || []).map((k: any) => ({ id: k.id, label: k.label, createdAt: k.created_at, lastUsed: k.last_used })) });
   // Partner nötig: geführter Weg über intervals.icu (kostenlos, offizielle Verbindungen zu diesen Diensten)
@@ -652,3 +668,20 @@ export async function scheduledSync(env: Env, users: number[]): Promise<void> {
   }
 }
 void readJson;
+
+/* Auftrag 15: Normale Nutzer sehen nie Server, Schlüssel oder Secrets. Einstellungsfehler des Servers (TOKEN_KEY, Dropbox-App-Ordner,
+   fehlende Berechtigung) erscheinen als „gerade nicht verfügbar, du musst nichts tun“; der Betreiber sieht alles. */
+const OPERATOR_CODES = ['token_key', 'appfolder', 'scope'];
+export function connectionsFor(list: any[], role: string): any[] {
+  if (role === 'admin') return list;
+  return list.filter(c => c.kind !== 'server').map(c => {
+    const { secrets, ...rest } = c; void secrets;
+    const code = c.stats && c.stats.errorCode;
+    if (c.error && (OPERATOR_CODES.includes(code) || /TOKEN_KEY|Betreiber|Server|App folder|Secret/i.test(String(c.error)))) return { ...rest, error: `${c.label} ist gerade nicht verfügbar. Wir kümmern uns darum, du musst nichts tun.`, stats: { ...(c.stats || {}), errorCode: code === 'appfolder' ? 'appfolder' : 'operator' } };
+    return rest;
+  });
+}
+/* Für Geräte ohne Konto: nur Name, Art und ob es gerade geht */
+export function publicCatalog(list: any[]): any[] {
+  return list.filter(c => c.kind !== 'server').map(c => ({ id: c.id, label: c.label, kind: c.kind, availability: c.availability, configured: !!c.configured, full: !!c.full, status: 'none' }));
+}

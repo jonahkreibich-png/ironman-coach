@@ -182,7 +182,7 @@ test.describe('mit Server', () => {
     // Gerät mit Daten einer anderen Person (nie verbunden)
     await seed(page);
     await open(page, '/?go=daten');
-    await page.locator('summary', { hasText: 'Einladung' }).click();
+    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einladung' }).click();
     await expect(page.locator('#keep-inv')).not.toBeChecked();
     await page.fill('#inv-code', inv.code); await page.fill('#inv-name', 'Papa');
     await page.locator('[data-act="sync-invite"]').click();
@@ -221,7 +221,7 @@ test.describe('mit Server', () => {
     await request.post('/__reset');
     await seed(page, { noPlan: true });
     await open(page, '/?go=daten');
-    await page.locator('summary', { hasText: 'Server zum ersten Mal einrichten' }).click();
+    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einrichtungscode' }).click();
     await page.locator('[data-act="sync-setup"]').click();
     await expect(page.locator('[data-sync-status]').first()).toBeVisible();
     await page.locator('[data-act="back"]').click();
@@ -236,7 +236,7 @@ test.describe('mit Server', () => {
     await page.locator('#sheetPanel [data-act="sheet-close"]').click();
     // WHOOP ohne Server-Schlüssel: klare Erklärung und Alternative statt Knopf ohne Wirkung
     await page.locator('[data-act="conn-open"][data-id="whoop"]').click();
-    await expect(page.locator('[data-not-configured]')).toContainText('noch nicht freigeschaltet');
+    await expect(page.locator('[data-not-configured]')).toContainText('gerade nicht verfügbar');
     await expect(page.locator('#sheetPanel [data-act="conn-open"][data-id="shortcut"]')).toBeVisible();
     await page.locator('#sheetPanel [data-act="sheet-close"]').click();
     // Oura (Schlüssel im Test gesetzt): Start mit Rückkehr in den Fragebogen; der Anbieter wird simuliert

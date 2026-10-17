@@ -4,7 +4,8 @@ import { STATE, HAS_PLAN, hasLocalData } from '../store';
 import { esc, fmtDate, dowShort, ymd, daysBetween, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, armed, more, empty } from '../kit';
-import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify, deleteAccount } from '../sync';
+import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify, deleteAccount, setupSignup } from '../sync';
+import { profile } from '../store';
 import { recoveryBanner } from './intro';
 import { backupText, parseBackupText, isBackup, isPlan, applyBackup, markBackedUp, shareBackupFile } from '../backup';
 import { readErrors } from '../errlog';
@@ -47,7 +48,8 @@ export function connectPanel(): string {
 
 export function renderDaten(): string {
   let h = '';
-  if (!isSyncOn()) h += sec(t('data.sync'), `<div class="card stack"><div class="hint">${esc(t('data.syncIntro'))}</div>${connectPanel()}</div>`);
+  // Auftrag 15: ein Konto ohne Einladung, mit einem Tipp; Codes (Kopplung, Einladung, Wiederherstellung, Einrichtung) darunter
+  if (!isSyncOn()) h += sec(t('data.sync'), `<div class="card stack"><div class="hint">${esc(t('data.syncIntro'))}</div><div class="hint">${esc(t('data.signupHint'))}</div><button class="btn block" data-act="acc-signup">${esc(t('data.signup'))}</button>${more(t('data.haveCode'), connectPanel())}</div>`);
   else {
     if (DEVICES == null) loadLists();
     const S = syncInfo();
@@ -69,6 +71,8 @@ export function renderDaten(): string {
   h += sec(t('data.app'), appCard(), t('data.version', { v: APP_VERSION }));
   return h;
 }
+
+on('acc-signup', el => busy(el, async () => { await setupSignup(String((profile() as any).name || '')); resetDatenCache(); nav.rerender(); toast(t('data.signupDone')); }));
 
 function invitesCard(): string {
   return `<div class="card stack"><div class="hint">${esc(t('data.invitesHint'))}</div>

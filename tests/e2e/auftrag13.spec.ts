@@ -12,7 +12,7 @@ test.describe('mit Server', () => {
     await request.post('/__reset');
     await seed(page);
     await open(page, '/?go=daten');
-    await page.locator('summary', { hasText: 'Server zum ersten Mal einrichten' }).click();
+    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einrichtungscode' }).click();
     await page.locator('[data-act="sync-setup"]').click();
     await expect(page.locator('[data-sync-status]').first()).toBeVisible();
     let syncCalls = 0;

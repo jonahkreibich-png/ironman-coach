@@ -72,12 +72,14 @@ async function overflow(page: Page): Promise<string[]> {
     }
     const desc = (el: Element) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''}${(el as HTMLElement).dataset && (el as HTMLElement).dataset.act ? `[${(el as HTMLElement).dataset.act}]` : ''} „${(el.textContent || '').trim().slice(0, 40)}“`;
     if (document.documentElement.scrollWidth > W + 1) out.push(`Seite scrollt seitlich (${document.documentElement.scrollWidth} > ${W})`);
+    // in einem zugeklappten Abschnitt (auch verschachtelt, Auftrag 15) ist nichts sichtbar, außer der eigenen Überschrift
+    const hiddenIn = (el: Element) => { for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) { if (!(d as HTMLDetailsElement).open) { const sm = el.closest('summary'); if (!sm || sm.parentElement !== d) return true; } } return false; };
     const scroller = (el: Element) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if (ox === 'auto' || ox === 'scroll') return p; } return null; };
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || el.closest('[hidden]') || el.closest('[aria-hidden="true"]') && el.tagName !== 'svg') continue;
       // Inhalt zugeklappter Abschnitte ist nicht sichtbar (WebKit meldet trotzdem eine Position)
-      const det = el.closest('details'); if (det && !(det as HTMLDetailsElement).open && !el.closest('summary')) continue;
+      if (hiddenIn(el)) continue;
       const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
       if (cs.position === 'fixed' && (r.top > window.innerHeight || r.bottom < 0)) continue;
       if (scroller(el)) continue;
@@ -112,7 +114,7 @@ async function overflow(page: Page): Promise<string[]> {
     for (let n = tw.nextNode(); n; n = tw.nextNode()) {
       const par = n.parentElement; if (!par || !(n.textContent || '').trim()) continue;
       const pcs = getComputedStyle(par); if (pcs.display === 'none' || pcs.visibility === 'hidden' || par.closest('[hidden]')) continue;
-      const pd = par.closest('details'); if (pd && !(pd as HTMLDetailsElement).open && !par.closest('summary')) continue;
+      if (hiddenIn(par)) continue;
       // eigener Scroll-Kasten oder bewusst abgeschnitten (mit „…“ eigener Test oben)
       if (scroller(par) || pcs.overflowX !== 'visible') continue;
       const pr = par.getBoundingClientRect(); if (pr.width < 1) continue;

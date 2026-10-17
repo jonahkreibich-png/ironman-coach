@@ -35,7 +35,7 @@ export async function publicRoutes(req: Request, env: Env, url: URL, p: string, 
 /* Routen mit Geräte-Login */
 export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a: Auth, _ctx: any): Promise<any> {
   const M = req.method;
-  if (p === '/api/connections' && M === 'GET') return { connections: await X.connectionsStatus(env, a.uid), callbackBase: String(env.PUBLIC_URL || '') + '/api/connect/' };
+  if (p === '/api/connections' && M === 'GET') return { connections: X.connectionsFor(await X.connectionsStatus(env, a.uid), a.role), ...(a.role === 'admin' ? { callbackBase: String(env.PUBLIC_URL || '') + '/api/connect/' } : {}) };
   const m = PROVIDER.exec(p);
   if (m && M === 'POST') {
     const prov = m[1] as X.ProviderId;

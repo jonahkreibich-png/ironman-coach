@@ -86,7 +86,7 @@ test.describe('B: Meldungen mit Server', () => {
     // jetzt mit Einladung einrichten (Daten auf dem Gerät gehören nicht zum Konto)
     await page.locator('[data-act="back"]').click().catch(() => {});
     await open(page, '/?go=daten');
-    await page.locator('summary', { hasText: 'Einladung' }).click();
+    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einladung' }).click();
     await page.fill('#inv-code', inv.code); await page.fill('#inv-name', 'Papa');
     await page.locator('[data-act="sync-invite"]').click();
     await page.waitForLoadState('load');
@@ -205,7 +205,7 @@ test.describe('E: bereit für Tester', () => {
     // Safari-Daten gelöscht / neues Handy
     await page.evaluate(() => localStorage.clear());
     await page.goto('/?go=daten');
-    await page.locator('summary', { hasText: 'Wiederherstellungscode' }).click();
+    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Wiederherstellungscode' }).click();
     await page.fill('#rc-code', rc);
     await page.locator('[data-act="rc-recover"]').click();
     await page.waitForLoadState('load');

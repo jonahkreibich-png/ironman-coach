@@ -42,9 +42,34 @@ export async function guardAttempts(env: Env) {
 }
 export async function failedAttempt(env: Env) { await env.DB.prepare('INSERT INTO pair_attempts (ts) VALUES (?)').bind(Date.now()).run(); }
 
+/* Auftrag 15: Konto ohne Einladung, wenn jemand zum ersten Mal „Verbinden“ tippt (sonst konnten Nutzer ohne Einladung nichts verbinden).
+   Grenzen gegen Missbrauch (kostenloser Tarif): höchstens SIGNUP_MAX Nutzer (Standard 300), 20 neue Konten pro Stunde, 3 pro Tag und Adresse.
+   OPEN_SIGNUP = "0" schaltet es ab. Die Adresse wird nur gehasht gespeichert und nach 2 Tagen gelöscht. */
+export const SIGNUP_LIMITS = { perHour: 20, perIpDay: 3, maxUsers: 300 };
+async function signup(env: Env, body: any, ip: string) {
+  if (String(env.OPEN_SIGNUP || '1') === '0') throw new HttpError(403, 'Ein neues Konto ist gerade nicht möglich. Bitte später noch einmal versuchen.');
+  const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM devices').first();
+  if (!n || !n.n) throw new HttpError(409, 'Die App ist noch nicht eingerichtet.');
+  const now = Date.now();
+  const users = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first();
+  if (users && users.n >= (+env.SIGNUP_MAX || SIGNUP_LIMITS.maxUsers)) throw new HttpError(503, 'Gerade sind keine neuen Konten möglich. Bitte später noch einmal versuchen.');
+  const hour = await env.DB.prepare('SELECT COUNT(*) AS n FROM signups WHERE ts > ?').bind(now - 3600000).first();
+  if (hour && hour.n >= (+env.SIGNUP_PER_HOUR || SIGNUP_LIMITS.perHour)) throw new HttpError(429, 'Gerade legen sehr viele ein Konto an. Bitte in einer Stunde noch einmal versuchen.');
+  const ipHash = await sha256('ip:' + ip);
+  const mine = await env.DB.prepare('SELECT COUNT(*) AS n FROM signups WHERE ip_hash = ? AND ts > ?').bind(ipHash, now - 86400000).first();
+  if (mine && mine.n >= (+env.SIGNUP_PER_IP || SIGNUP_LIMITS.perIpDay)) throw new HttpError(429, 'Von hier wurden heute schon mehrere Konten angelegt. Bitte morgen noch einmal versuchen.');
+  await env.DB.prepare('INSERT INTO signups (ts, ip_hash) VALUES (?, ?)').bind(now, ipHash).run();
+  await env.DB.prepare('DELETE FROM signups WHERE ts < ?').bind(now - 2 * 86400000).run();
+  const res = await env.DB.prepare("INSERT INTO users (name, role, features, invited_by, created_at, test) VALUES (?, 'user', '{}', NULL, ?, 0)").bind(cleanName(body.userName), now).run();
+  const uid = res.meta.last_row_id;
+  const d = await createDevice(env, uid, body.name);
+  return { deviceId: d.id, token: d.token, userId: uid, time: now, newUser: true, signup: true };
+}
+
 /* Erstes Gerät: ohne Einladung nur, solange der Server noch kein einziges Gerät hat (wird Nutzer 1, Admin).
-   Mit Einladungscode: ein neuer Nutzer. Eine offene Registrierung gibt es nicht. */
-export async function setup(env: Env, body: any) {
+   Mit Einladungscode: ein neuer Nutzer. Ohne Code mit signup = true: eigenes Konto (Auftrag 15, siehe oben). */
+export async function setup(env: Env, body: any, ip = '') {
+  if (body && body.signup === true && !body.invite && !body.setupCode) return signup(env, body, ip);
   const inviteCode = normCode(body.invite);
   // Einrichtungscode (Secret SETUP_CODE): verbindet ein Gerät mit Nutzer 1, auch wenn schon Geräte da sind (Admin-Zugang).
   if (body.setupCode != null && String(body.setupCode).trim()) {

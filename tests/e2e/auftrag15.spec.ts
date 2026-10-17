@@ -68,3 +68,64 @@ test.describe('Fragebogen: Eingabefelder auf iPhone-Breite', () => {
     });
   }
 });
+
+/* Punkt 2: Jeder Nutzer verbindet selbst – „Verbinden“ → Anmelden beim Dienst → „Erlauben“. Kein Server, keine API, kein Secret, kein Schlüssel
+   (außer bei intervals.icu, mit Schritt-für-Schritt-Hilfe). Mama hatte kein Konto (Daten nur auf dem iPhone) und sah „Verbindungen laufen über deinen Server“. */
+const TECH = /Server|\bAPI\b|Secret|Token|TOKEN_KEY|Schlüssel|Betreiber|Sync einrichten|_CLIENT_|wrangler|FUER-JONAH/i;
+test.describe('Verbindungen für jeden Nutzer', () => {
+  test('neuer Nutzer ohne Konto: Oura verbinden legt ein privates Konto an, Daten des Geräts kommen mit, keine Fachbegriffe', async ({ page, request }) => {
+    test.setTimeout(60000);
+    await request.post('/__reset');
+    await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } }); // die App ist eingerichtet (Betreiber = Nutzer 1)
+    const { seed } = await import('./helpers');
+    await seed(page, { extra: d => { d.profile = { ...(d.profile || {}), name: 'Mama', sports: ['bike', 'swim', 'strength'] }; } });
+    await page.goto('/?go=verbindungen');
+    const oura = page.locator('[data-act="conn-open"][data-id="oura"]');
+    await expect(oura).toBeVisible();
+    expect(await page.locator('#app').innerText()).not.toMatch(TECH);
+    // nicht eingerichteter Dienst: „gerade nicht verfügbar“, nichts Technisches
+    await page.locator('[data-act="conn-open"][data-id="whoop"]').click();
+    await expect(page.locator('[data-not-configured]')).toContainText('gerade nicht verfügbar');
+    expect(await page.locator('#sheetPanel').innerText()).not.toMatch(TECH);
+    await page.locator('#sheetPanel [data-act="sheet-close"]').click();
+    // intervals.icu: Schritt-für-Schritt-Hilfe (hier sind Athleten-ID und API-Schlüssel nötig)
+    await page.locator('[data-act="conn-open"][data-id="intervals"]').click();
+    await expect(page.locator('#sheetPanel [data-icu-steps] li')).toHaveCount(5);
+    await page.locator('#sheetPanel [data-act="sheet-close"]').click();
+    // Oura: Satz zum Konto, dann „Verbinden“ → Anmeldeseite von Oura (simuliert) → zurück, verbunden
+    // Oura wird simuliert (WebKit erlaubt hier keine Weiterleitung per 302, deshalb eine Seite, die zurückspringt)
+    await page.route('https://cloud.ouraring.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<script>location.replace("http://localhost:4180/?go=mehr&open=verbindungen&verbunden=oura")</script>' }));
+    await oura.click();
+    await expect(page.locator('#sheetPanel [data-account-note]')).toContainText('privates Konto');
+    expect(await page.locator('#sheetPanel').innerText()).not.toMatch(TECH);
+    const start = page.waitForRequest(r => r.url().includes('/api/connect/oura/start'));
+    await page.locator('#sheetPanel [data-act="conn-signup"]').click();
+    await start;
+    await page.waitForURL(/verbunden=oura|go=/);
+    const auth = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_sync_auth') || 'null'));
+    expect(auth && auth.token).toBeTruthy();
+    const me = await (await request.get('/api/me', { headers: { Authorization: 'Bearer ' + auth.token } })).json();
+    expect(me.role).toBe('user'); expect(me.userId).toBeGreaterThan(1);
+    // der Plan von diesem Gerät liegt jetzt in ihrem Konto
+    await expect.poll(async () => { const r = await (await request.post('/api/sync', { headers: { Authorization: 'Bearer ' + auth.token }, data: { since: 0, changes: [] } })).json(); return (r.records || []).some((c: any) => c.kind === 'plan'); }).toBe(true);
+    // Verbindungen mit Konto: weiterhin keine Betreiber-Infos
+    await page.goto('/?go=verbindungen');
+    await expect(page.locator('[data-act="conn-open"][data-id="oura"]')).toBeVisible();
+    expect(await page.locator('#app').innerText()).not.toMatch(TECH);
+    expect(await page.locator('#app').innerText()).not.toMatch(/Server-Schlüssel/);
+    // Daten und Geräte: Konto statt Server
+    await page.goto('/?go=daten');
+    expect(await page.locator('#app').innerText()).not.toMatch(/Server|Secret|TOKEN/);
+  });
+  test('ohne Konto: „Konto anlegen“ unter Daten und Geräte, ohne Einladung', async ({ page, request }) => {
+    await request.post('/__reset');
+    await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } });
+    const { seed } = await import('./helpers');
+    await seed(page);
+    await page.goto('/?go=daten');
+    expect(await page.locator('#app').innerText()).not.toMatch(/Server|Secret|TOKEN|Betreiber/);
+    await page.locator('[data-act="acc-signup"]').click();
+    await expect(page.locator('[data-sync-status]').first()).toBeVisible();
+    expect(await page.evaluate(() => !!localStorage.getItem('ec_sync_auth'))).toBe(true);
+  });
+});

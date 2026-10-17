@@ -11,6 +11,7 @@ import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, chec
 import { vapidPublicKey } from './webpush';
 import { logError, recentErrors, scrub } from './errlog';
 import { extraRoutes, publicRoutes, scheduledExtras, onRecordsChanged } from './extensions';
+import { connectionsStatus, publicCatalog } from './connect';
 import { BRAND } from '../../shared/brand';
 import { feedbackRoutes } from './feedback';
 import { accountRoutes, makeRecovery, recover, purgeDeleted } from './account';
@@ -90,7 +91,7 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     return { key: vapidPublicKey(env) };
   }
   if (p === '/api/setup' && M === 'POST') {
-    const r: any = await setup(env, await readJson(req));
+    const r: any = await setup(env, await readJson(req), req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || 'local');
     // Neues Konto: Wiederherstellungscode gleich mitgeben (wird einmal angezeigt)
     if (r.newUser || !(await env.DB.prepare('SELECT 1 FROM recovery WHERE user_id = ?').bind(r.userId).first())) r.recoveryCode = await makeRecovery(env, r.userId);
     return r;
@@ -98,6 +99,8 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   if (p === '/api/recover' && M === 'POST') return await recover(env, await readJson(req));
   if (p === '/api/pair/redeem' && M === 'POST') return await redeemPairCode(env, await readJson(req));
 
+  // Auftrag 15: welche Dienste sich verbinden lassen (ohne Anmeldung, ohne technische Angaben) – für Geräte ohne Konto
+  if (p === '/api/connect/catalog' && M === 'GET') return { connections: publicCatalog(await connectionsStatus(env, 0)) };
   // Öffentliche Routen der Erweiterungen (OAuth-Rückkehr, Webhooks, Kurzbefehl mit eigenem Schlüssel)
   const pub = await publicRoutes(req, env, url, p, ctx);
   if (pub !== undefined) return pub;
