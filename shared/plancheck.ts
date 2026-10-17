@@ -12,14 +12,15 @@ import * as W from './workouts';
 import { abilityCap, dayCap, freqOf, teamActive } from './plangen';
 import { rulesOf, effectsOf, hardViolations, allowedHard, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
+import { checkPlanRules } from './planrules';
 
-export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint';
+export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup';
 export interface CheckIssue { rule: CheckRule; week?: number; date?: string; msg: string }
 
 const dowOf = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
 const pace = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
-export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: string, o: { from?: number } = {}): CheckIssue[] {
+export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: string, o: { from?: number; fromDate?: string | null } = {}): CheckIssue[] {
   const out: CheckIssue[] = [];
   const minor = isMinor(profile, today);
   const rules = rulesOf(profile, parseFor(today));
@@ -107,6 +108,8 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
   }
   // Harte Regeln der Person (Tage, Orte, Zeiträume, Tagesgrenzen)
   hardViolations(weeks, rules).forEach(v => out.push({ rule: 'constraint', date: v.date, msg: v.msg }));
+  // Auftrag 15: nur gewählte Sportarten, gleiche Sportart nicht an zwei Tagen hintereinander (auch So → Mo)
+  checkPlanRules(weeks, profile, { from: o.fromDate || null }).forEach(v => out.push({ rule: v.rule, week: v.week, date: v.date, msg: v.msg }));
   // Umfang und harte Tage
   validateWeeks(weeks, { minor, maxIncPct: progressionOf(profile, today).incPct }).forEach(v => out.push({ rule: v.rule as CheckRule, week: v.week, date: v.date, msg: v.msg }));
   return out;

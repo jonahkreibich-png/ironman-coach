@@ -3,6 +3,23 @@ import type { SportKey, Profile } from './profile';
 import type { Goal, GoalType } from './goals';
 import { GOALS, legsOf } from './goals';
 
+/* Auftrag 15 (feste Regel für alle): Der Plan enthält nur Sportarten, die die Person gewählt hat; Teamsport nur, wenn angegeben.
+   Gilt für Generator, Tests, Koppel, Ersatz-Einheiten, Coach-Vorschläge und den Plan-Check. */
+export function chosenSports(p: Profile): SportKey[] {
+  const out = (p.sports || []).filter(s => s === 'swim' || s === 'bike' || s === 'run' || s === 'strength');
+  const f = (p.freq || {}).strength;
+  if (!out.includes('strength') && f && f[0] > 0) out.push('strength');
+  return [...new Set(out)];
+}
+export function sportAllowed(p: Profile, sport: string): boolean {
+  if (!sport || sport === 'rest') return true;
+  // eigene feste Termine (z. B. „Lauftreff Di“) hat die Person selbst angegeben
+  if ((p.fixed || []).some(f => f && f.sport === sport)) return true;
+  if (sport === 'football') return !!p.teamSport;
+  const c = chosenSports(p);
+  return !c.length || c.includes(sport as SportKey);
+}
+
 export interface ZoneDef { zone: number; label: string; low: number; high: number }
 /* Prozent vom Schwellenpuls (LTHR). Für Pace und Speed gilt dieselbe Prozent-Tabelle relativ zur Schwelle. */
 export const HR_ZONES: ZoneDef[] = [
@@ -86,7 +103,8 @@ export function requirementFor(goal: Goal | null, profile: Profile): Requirement
   const L = LONG[type] || LONG.fitness;
   const req: Requirement = { ctl: L.ctl, ctlBySport: {}, basis: goal ? (goal.targetTimeSec ? 'deine Zielzeit' : 'Ankommen gut unter dem Zielschluss') : 'allgemeine Fitness' };
   const legs = goal ? legsOf(goal) : def.legs;
-  const has = (s: SportKey) => legs.some(l => l.sport === s) || type === 'fitness';
+  // Auftrag 15: nur gewählte Sportarten (Fitness ohne Laufen hat keine Lauf-Anforderung)
+  const has = (s: SportKey) => (legs.some(l => l.sport === s) || type === 'fitness') && sportAllowed(profile, s);
   // Mit Zielzeit: Tempo je Disziplin aus der Zielzeit aufteilen (grob nach typischen Anteilen)
   let runPace = F.run, bikeKmh = F.bike, swim100 = F.swim;
   if (goal && goal.targetTimeSec && legs.length) {

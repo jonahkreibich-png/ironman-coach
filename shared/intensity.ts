@@ -194,7 +194,7 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o: Check
 
 /* ---------- Korrektur ---------- */
 export interface RepairOpts extends CheckOpts { goalType: GoalType; minor?: boolean; noZ5?: (date: string) => boolean }
-const flexible = (s: any, from: string | null | undefined, date: string) => !!s && !!s.spec && !s.fixed && !s.race && !s.frozen && !s.stage && !/test/i.test(s.title || '') && !isGameOrRace(s) && (!from || date >= from) && ['run', 'bike', 'swim'].includes(s.sport);
+const flexible = (s: any, from: string | null | undefined, date: string) => !!s && !!s.spec && !s.adjacentOk && !s.fixed && !s.race && !s.frozen && !s.stage && !/test/i.test(s.title || '') && !isGameOrRace(s) && (!from || date >= from) && ['run', 'bike', 'swim'].includes(s.sport);
 const swimRep = (sp: W.Spec) => Math.max(25, ...sp.steps.filter(x => x.mode === 'crawl' || x.mode === 'pull').map(x => x.m || 0));
 /* Locker statt hart (gleiche Dauer, höchstens 60 min Lauf bzw. 90 min Rad) */
 function easyOf(s: any, phase: string): any {
@@ -225,7 +225,7 @@ function variantOf(s: any, avoid: Set<string>): any | null {
   return null;
 }
 /* Passende Qualität für eine lockere Einheit (Phase, Ziel, Niveau) */
-function qualityFor(s: any, phase: IPhase, o: RepairOpts, p: Profile, n: number, date: string): any | null {
+export function qualityFor(s: any, phase: IPhase, o: RepairOpts, p: Profile, n: number, date: string): any | null {
   const sp: W.Spec = s.spec; const ctx = sp.ctx; const min = s.plannedMinutes || 45;
   const noZ5 = !!(o.noZ5 && o.noZ5(date));
   let q: W.Spec | null = null;

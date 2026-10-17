@@ -122,7 +122,9 @@ describe('Titel passt zur Zone', () => {
 
 describe('Intensität als feste Regel', () => {
   // Bekannte Grenze: zufall-6 hat nur montags Platz für Hartes (Spiel Sa, Training Di); Rad und Lauf wechseln sich ab.
-  const KNOWN: Record<string, string[]> = { 'zufall-6': ['missing'] };
+  // Auftrag 15: triathlet-50m-freiwasser läuft 5×, radelt 4× und schwimmt 3× pro Woche; mit „gleiche Sportart nicht an zwei Tagen hintereinander“
+  // bleibt in einer Aufbauwoche kein freier Tag für einen harten Lauf (Rad und Schwimmen sind dort hart).
+  const KNOWN: Record<string, string[]> = { 'zufall-6': ['missing'], 'triathlet-50m-freiwasser': ['missing'] };
   test.each(PLANS.map(p => [p.id, p] as const))('%s: nie zwei harte Tage nebeneinander, Zahl harter Tage, 80 % locker, keine Wiederholung, Intensität je Phase', (id, p) => {
     const iss = checkIntensity(p.weeks, p.profile, p.today, p.opts || {}).filter(i => !(KNOWN[id] || []).includes(i.rule));
     expect(iss.map(i => i.msg)).toEqual([]);

@@ -317,7 +317,7 @@ export function title(spec: Spec): string {
     case 'racepace': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'} Wettkampftempo ${m0.reps && m0.reps > 1 ? `${m0.reps}×${m0.min}` : m0.min} min${where}`;
     case 'hills': return `Lockerer Lauf ${t.min} min mit Hügelsprints`;
     case 'fartlek': return `Fahrtspiel ${t.min} min`;
-    case 'longq': { const q = spec.steps.find(x => x.part === 'main' && (x.zone || 2) >= 3) || m0; return `${t.min >= 60 ? 'Langer Lauf' : 'Lauf'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${/^(Tempo|Schwelle|VO2max|\d+-km-Tempo|Halbmarathon-Tempo|Marathon-Tempo)$/.test(q.note || '') ? q.note : (q.zone || 3) >= 4 ? 'Schwelle' : 'Wettkampftempo'}`; }
+    case 'longq': { const q = spec.steps.find(x => x.part === 'main' && (x.zone || 2) >= 3) || m0; if (spec.sport === 'bike') return `${t.min >= 75 ? 'Lange Ausfahrt' : 'Ausfahrt'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${(q.zone || 3) >= 5 ? 'VO2max' : (q.zone || 3) >= 4 ? 'Schwelle' : 'Sweet Spot'}${where}`; return `${t.min >= 60 ? 'Langer Lauf' : 'Lauf'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${/^(Tempo|Schwelle|VO2max|\d+-km-Tempo|Halbmarathon-Tempo|Marathon-Tempo)$/.test(q.note || '') ? q.note : (q.zone || 3) >= 4 ? 'Schwelle' : 'Wettkampftempo'}`; }
     case 'brick': return `Koppeltraining Rad + Lauf ${t.min} min`;
     case 'recovery': return spec.sport === 'run' ? `Lockerer Lauf ${t.min} min` : `Lockere Runde ${t.min} min${where}`;
     case 'test': return spec.title || 'Test';
