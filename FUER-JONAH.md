@@ -2,7 +2,11 @@
 
 Nur das, was du selbst tun musst.
 
-## Neu am 18.10. (Auftrag 15)
+## Neu am 18.10. (Auftrag 16)
+
+**KI im Coach (kostenlos):** Im Coach erscheint einmal die Karte „KI-Antworten im Coach (kostenlos)“. Tipp auf „Einverstanden“, wenn du sie willst. Papa und Mama sehen die Karte auch, bei Mama legt die App dabei automatisch ein Konto an. Den Verbrauch siehst du unter Mehr → Daten und Geräte → „Kostenlose KI (Verbrauch)“. Heute ist das Gratis-Kontingent durch meine Tests fast leer, bis 2 Uhr nachts antwortet deshalb oft der Regel-Coach.
+
+## Auftrag 15 (18.10.)
 
 **Mama:** nichts zu tun. Sie öffnet die App einfach (bei „Neue Version“ einmal neu laden). Die Läufe verschwinden dann von selbst aus ihrem Plan, ab heute neu verteilt, Erledigtes bleibt. Verbinden geht jetzt direkt: Mehr → Verbindungen → z. B. Oura oder Dropbox → „Verbinden“ → anmelden → „Erlauben“. Die App legt dabei ein Konto für sie an.
 
@@ -26,9 +30,9 @@ Die App liest Dropbox richtig, aber dort liegt nur eine Datei (16.10.). So bekom
 
 Klappt Dropbox nicht: HealthFit → Einstellungen → **Intervals.icu** einschalten und in der App intervals.icu verbinden (Athleten-ID und API-Schlüssel unter intervals.icu → Settings → Developer Settings).
 
-## 1. KI-Coach einschalten (wenn du willst)
+## 1. Claude als Premium-KI (nur wenn du willst, kostet Geld)
 
-Ohne Schlüssel funktioniert alles weiter mit dem Regel-Coach (kostenlos). Mit Schlüssel formuliert Claude frei, die Regeln und Zahlen bleiben dieselben.
+Nicht nötig: Ohne Schlüssel antwortet die kostenlose KI (Workers AI), sonst der Regel-Coach. Mit Schlüssel antwortet stattdessen Claude, die Regeln und Zahlen bleiben dieselben.
 
 **Was es kostet** (Schätzung mit deinen echten Daten, Sonnet 5.5 für Gespräche, Haiku 5.5 für kurze Texte):
 

@@ -1,5 +1,48 @@
 # Ergebnis
 
+## Auftrag 16: Trainingsbewertung und kostenlose KI (18.10.)
+
+Live in der echten App (Version 3.3.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag16.sql`, `prod-vor-release16.sql`, `test-vor-auftrag16.sql`. In der echten App geändert: neue Tabelle für den KI-Verbrauch und deine zwei falschen Bewertungen (Lauf heute, Schwimmen gestern), neu geschrieben.
+
+**1 Lockerer langer Lauf als Intervall bewertet:** Ursache: Die Bewertung zählte jeden langen Lauf als harte Einheit und sprach deshalb von Intervallen („prüf die Runden“). Zusätzlich hätten bei anderen Läufen Puls-Anstieg oder ein schnellerer Schluss automatische Runden zu Intervallen gemacht. Jetzt:
+- Intervalle nur, wenn sich hart und locker deutlich abwechseln. Gleich lange Runden der Uhr (z. B. jeder Kilometer) sind ein Dauerlauf.
+- Sind nur automatische Runden da, schaut die App in den Verlauf. Dort erkennt sie echte Intervalle, Fahrtspiel und Hügel, auch Hügel ohne Wattmessung über den Puls.
+- Die Art kommt aus dem Plan, die Messung bestätigt oder widerspricht: „Gleichmäßig gelaufen …, genau richtig für einen lockeren langen Lauf“, „Du bist ab km 8 deutlich schneller geworden (5:5x statt 6:5x/km)“, „Geplant war ein lockerer langer Lauf. Deine Daten zeigen 7 Tempowechsel …“, „5 von 5 Intervallen, je etwa 4 min wie geplant“.
+
+Geprüft mit deinem Lauf von heute und echten FIT-Dateien (Garmin, Edge, COROS), dazu mit nachgebauten Läufen: automatische Runden, Intervalle mit Runden von Hand, nur automatischen Runden und ganz ohne Runden, Fahrtspiel, Hügel mit und ohne Watt, welliger Dauerlauf, Tempolauf und Rad.
+
+**2 Kostenlose KI (Cloudflare Workers AI):** Der Coach beantwortet Fragen jetzt mit einer KI, kostenlos und ohne Schlüssel. Er bekommt eine kurze Zusammenfassung (Profil, Ziel, Phase, heute, nächste 8 Tage, letzte 7 Tage, Ampel) und Werkzeuge (Training bewerten, Tag erklären, Analyse, Plan ändern). Die Regeln:
+- Zahlen und Regeln kommen aus der App. Planänderungen sind nur Vorschläge mit „Annehmen“, auch bei Claude.
+- Oura-Werte gehen nie an die KI.
+- Bei Schmerzen rät die KI zum Arzt, bei Medikamenten antwortet die App selbst. Unter 18 gelten Schutzregeln.
+- Ein Wächter prüft jede Antwort. Erfundene Puls-, Tempo- oder Wattwerte und behauptete Änderungen ohne Vorschlag führen zum Regel-Coach.
+- Reihenfolge: Claude (nur mit Schlüssel) → Workers AI → Regel-Coach. Der Regel-Coach antwortet auch, wenn das Kontingent leer ist oder ein Fehler kommt.
+- Fair verteilt: höchstens 30 Fragen pro Person und Tag. Den Verbrauch siehst du unter Mehr → Daten und Geräte.
+- Die Antwort erscheint Wort für Wort. Jeder sieht einmal die Karte „KI-Antworten im Coach (kostenlos)“ mit „Einverstanden / Nein, ohne KI“, unter 16 mit Eltern-Häkchen. Abschaltbar in den Einstellungen.
+
+Live geprüft mit einem neuen Nutzer in stamio-test (Chromium, WebKit) und in der echten App: Karte, Konto, echte KI-Antworten, Vorschlag „Teamtraining entfällt“. Danach wieder gelöscht.
+
+**Modellvergleich** (30 Fragen mit deinen echten Daten, gleicher Stand):
+
+| Modell | Neurons pro Frage | Zeit | Deutsch und Inhalt | Werkzeuge |
+|---|---|---|---|---|
+| Gemma 4 26B (gewählt) | 22 | 1,7 s | sehr gut, sachlich richtig | anfangs schwach, mit Server-Hilfe gut |
+| Qwen3 30B | 17 | 0,7 s | einfach, Fachfehler (Entkopplung, Kraul-Atmung) | 0 von 4 Änderungen, behauptete 6-mal Vorschläge ohne Werkzeug |
+| Mistral Small 3.1 | 117 | 1,9 s | gut, erfindet aber Einheiten, gibt teils rohen Code aus | 3 von 4 Änderungen |
+
+**Regel-Coach gegen KI** (60 Fragen: 30 mit deinen Daten, 30 mit Papas Daten; Training heute/gestern/Woche, Tagesplan, 9 Planänderungen, Wissen, Schmerzen, Krankheit, Medikamente, Unsinn):
+
+| | passend | teilweise | daneben | Neurons pro Frage |
+|---|---|---|---|---|
+| Regel-Coach | 23 | 8 | 29 | 0 |
+| KI (Gemma) | 55 | 4 | 0 | Ø 27 (15-73) |
+
+Einmal hat der Wächter auf den Regel-Coach umgeschaltet (Verschieben ohne Werkzeug), das ist so gewollt. Der Regel-Coach versteht vor allem Wissensfragen, „warum“-Fragen und Unsinn nicht. Seine zwei echten Fehler aus dem Vergleich sind behoben: „Gedicht über Pizza“ wurde als „krank“ erkannt, „10 min kürzer“ als „auf 10 min“.
+
+**Kostenlos möglich:** etwa 27 Neurons pro Frage, das sind rund 370 Fragen am Tag für das ganze Konto (10.000 Neurons, Neustart 2 Uhr nachts). Die echte App nimmt höchstens 9.500, die Test-Umgebung 1.500. Bei 30 Fragen pro Person reicht das für etwa 10 sehr aktive Nutzer am Tag. Heute ist das Kontingent durch den Modellvergleich schon zu etwa 90 % verbraucht. Bis 2 Uhr nachts antwortet deshalb öfter der Regel-Coach.
+
+Tests: 1544 Unit- und Server-Tests (neu: Erkennung, Bewertung, KI mit nachgebautem Modell), 251 Browser-Tests. Entscheidungen 187-197.
+
 ## Auftrag 15: Mamas Fehler und großer Test mit 60 Nutzern (18.10.)
 
 Live in der echten App (Version 3.2.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag15.sql`, `prod-vor-auftrag15b.sql`, `prod-vor-papa15.sql`, `test-vor-auftrag15.sql`. Geändert wurde in der echten App nur Papas Plan (ab heute neu, Erledigtes bleibt). Jonahs Plan erfüllt alle neuen Regeln und blieb unverändert.
