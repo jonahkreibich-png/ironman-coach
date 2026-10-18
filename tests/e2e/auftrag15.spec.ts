@@ -129,3 +129,20 @@ test.describe('Verbindungen für jeden Nutzer', () => {
     expect(await page.evaluate(() => !!localStorage.getItem('ec_sync_auth'))).toBe(true);
   });
 });
+
+test('neues Gerät ganz ohne Daten: Dropbox verbinden führt nach dem Konto direkt zur Anmeldung (kein Hängenbleiben)', async ({ page, request }) => {
+  await request.post('/__reset');
+  await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } });
+  await page.addInitScript(() => { if (sessionStorage.getItem('__n')) return; localStorage.clear(); localStorage.setItem('ec_ui', JSON.stringify({ seenRelease: '9.9.9' })); sessionStorage.setItem('__n', '1'); });
+  await page.route('https://www.dropbox.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<p>Dropbox</p>' }));
+  for (let k = 0; k < 3; k++) {
+    await page.goto('/?go=verbindungen');
+    if (k) await page.evaluate(() => { localStorage.removeItem('ec_sync_auth'); });
+    if (k) await page.goto('/?go=verbindungen');
+    await page.locator('[data-act="conn-open"][data-id="dropbox"]').click();
+    const nav = page.waitForURL(/dropbox\.com\/oauth2\/authorize/, { timeout: 15000 });
+    await page.locator('#sheetPanel [data-act="conn-signup"]').click();
+    await nav;
+    expect(new URL(page.url()).searchParams.get('redirect_uri')).toMatch(/\/api\/connect\/dropbox\/callback$/);
+  }
+});

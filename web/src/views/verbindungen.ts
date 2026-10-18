@@ -215,7 +215,8 @@ async function busy(el: HTMLElement, fn: () => Promise<void>) {
 on('conn-signup', el => busy(el, async () => {
   const id = CUR;
   await setupSignup(String((profile() as any).name || ''));
-  await loadConnections(true);
+  // Liste direkt mit Konto laden (nicht über loadConnections: ein gleichzeitiges Neuladen beim Rendern ließ den Schritt zur Anmeldung ausfallen)
+  CONN = (await apiCall('GET', '/api/connections')).connections; ACCOUNT = true;
   CUR = id; const c = cur();
   if (c && c.kind === 'oauth' && c.availability === 'ready' && !unavailable(c)) { const r = await apiCall('POST', `/api/connect/${id}/start`, { returnTo: RETURN_TO }); location.href = r.url; return; }
   refreshSheet(); toast(t('conn.accountMade'));

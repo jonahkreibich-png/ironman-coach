@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.2.0', items: [
+    'Dein Plan enthält nur noch die Sportarten, die du gewählt hast. Dieselbe Sportart liegt nicht mehr an zwei Tagen hintereinander; geht es nicht anders, ist eine Einheit locker und kurz und sagt, warum.',
+    'Verbinden geht jetzt für alle: Tipp bei Oura, Dropbox oder intervals.icu auf „Verbinden“, die App legt dabei ein privates Konto für dich an. Erholungswochen sind spürbar leichter.',
+    'Fachbegriffe wie Schwelle, Sweet Spot oder HFV werden direkt dabei kurz erklärt.'
+  ] },
   { version: '3.1.0', items: [
     'Die Ampel auf „Heute“ zeigt jetzt einen klaren Wert: Ring, Wort, Farbe und Satz passen immer zusammen. Unter „Warum?“ hat jeder Einzelwert seine eigene Farbe. Fehlen die Morgenwerte, steht dort „Ampel unsicher“. Neu: Gefühl und Muskelkater am Morgen eintragen.',
     'Schwimmen ehrlich gerechnet: Meter und Dauer passen zu deinem Tempo, mit Pausen. Jede Einheit als Liste (Einschwimmen, Technik, Hauptteil, Ausschwimmen) mit erklärten Übungen. Trag unter Berücksichtigungen deine Hilfsmittel ein (Kickbrett, Pull Buoy …).',

@@ -44,3 +44,5 @@ crons = ["*/5 * * * *"]
 ALLOWED_ORIGINS = "https://stamio-test.pages.dev"
 PUBLIC_URL = "https://stamio-test.pages.dev"
 ENVIRONMENT = "test"
+# Test-Umgebung: mehr neue Konten pro Tag und Adresse (Prüfungen), echte App: 3
+SIGNUP_PER_IP = "50"
