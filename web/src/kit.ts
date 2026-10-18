@@ -1,5 +1,6 @@
 /* UI-Bausteine nach DESIGN.md: Karten, Listen, Ring, Sparkline, Quellen-Symbol, Sheets, Aktionen. */
 import { esc, $ } from './util';
+import { termsLine } from '../../shared/glossary';
 import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
 import { t } from '../../shared/i18n';
 import { SOURCE_LABEL } from '../../shared/activity/merge';
@@ -87,12 +88,24 @@ export function toggle(id: string, label: string, on: boolean, data = ''): strin
 
 /* ---------- Sheet ---------- */
 let sheetRender: (() => string) | null = null;
+/* Auftrag 15: Fachbegriffe (HFV, CSS, FTP, Schwelle, Sweet Spot …) werden in jeder Karte kurz erklärt, wenn die Karte sie nicht selbst erklärt */
+export function explainTerms(root: HTMLElement | null): void {
+  if (!root) return;
+  // eigener Text einer Karte ohne die Texte darin liegender Karten (die bekommen ihre eigene Zeile)
+  const ownText = (c: Element): string => Array.from(c.childNodes).map(n => (n as Element).classList && (n as Element).classList.contains('card') ? '' : n.nodeType === 1 ? ownText(n as Element) : n.textContent || '').join(' ');
+  const cards = Array.from(root.querySelectorAll('.card')).filter(c => !c.querySelector(':scope > [data-terms]'));
+  for (const c of cards) { const line = termsLine(ownText(c)); if (line) c.insertAdjacentHTML('beforeend', `<div class="xs muted" data-terms>${esc(line)}</div>`); }
+  // was außerhalb von Karten steht (z. B. im Sheet), bekommt die Zeile am Ende
+  const rest = Array.from(root.childNodes).map(n => (n as HTMLElement).classList && (n as HTMLElement).classList.contains('card') ? '' : n.textContent || '').join(' ');
+  const line = termsLine(rest);
+  if (line && !root.querySelector(':scope > [data-terms]')) root.insertAdjacentHTML('beforeend', `<div class="xs muted" data-terms style="margin-top:var(--s2)">${esc(line)}</div>`);
+}
 export function openSheet(title: string, render: () => string): void {
   sheetRender = () => `<div class="sheet-grip"></div><div class="sheet-h"><h2>${esc(title)}</h2><button class="icon-btn" data-act="sheet-close" aria-label="${esc(t('common.close'))}">${ic('close')}</button></div>${render()}`;
-  $('#sheetPanel').innerHTML = sheetRender();
+  $('#sheetPanel').innerHTML = sheetRender(); explainTerms($('#sheetPanel'));
   $('#sheet').hidden = false; document.body.style.overflow = 'hidden';
 }
-export function refreshSheet(): void { if (sheetRender && !$('#sheet').hidden) { const p = $('#sheetPanel'); const y = p.scrollTop; p.innerHTML = sheetRender(); p.scrollTop = y; } }
+export function refreshSheet(): void { if (sheetRender && !$('#sheet').hidden) { const p = $('#sheetPanel'); const y = p.scrollTop; p.innerHTML = sheetRender(); explainTerms(p); p.scrollTop = y; } }
 export function closeSheet(): void { sheetRender = null; $('#sheet').hidden = true; $('#sheetPanel').innerHTML = ''; document.body.style.overflow = ''; }
 export function sheetOpen(): boolean { return !$('#sheet').hidden; }
 on('sheet-close', () => closeSheet());

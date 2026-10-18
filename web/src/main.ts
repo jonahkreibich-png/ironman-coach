@@ -5,7 +5,7 @@ import './design.css';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
-import { ACTIONS, CHANGE, on, ic, closeSheet, sheetOpen } from './kit';
+import { ACTIONS, CHANGE, on, ic, closeSheet, sheetOpen , explainTerms } from './kit';
 import { CHARTS, chartTap } from './charts';
 import { effStatus } from './domain';
 import { D, invalidate } from './data';
@@ -95,6 +95,7 @@ function render() {
   else if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) html = SUBS[UI.sub]();
   else html = TABS.find(x => x.id === UI.tab)!.render();
   byId('app').innerHTML = `<div class="view" data-view="${esc(UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab)}">${html}</div>`;
+  explainTerms(byId('app'));
   if (HAS_PLAN && UI.tab === 'coach') { if (!UI.coachVisit) { UI.coachSeenPrev = UI.coachSeenAt || 0; UI.coachVisit = true; } UI.coachSeenAt = Date.now(); saveUi(); } else if (UI.coachVisit) { UI.coachVisit = false; saveUi(); }
   // Letzte Bildschirme (für „Fehler melden“)
   const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');

@@ -14,7 +14,7 @@ export const JARGON: Term[] = [
   { term: 'HFV', re: /\bHFV\b/, text: 'HFV = Herzfrequenzvariabilität, zeigt, wie erholt du bist', ok: /Herzfrequenzvariabilität/ },
   { term: 'ACWR', re: /\bACWR\b/, text: 'ACWR = Belastung der letzten 7 Tage im Vergleich zu den letzten 4 Wochen', ok: /7 Tage|letzten 4 Wochen|28 Tage/ },
   { term: 'CTL', re: /\bCTL\b/, text: 'CTL = deine Fitness (Belastung der letzten 6 Wochen)', ok: /Fitness/ },
-  { term: 'ATL', re: /\bATL\b/, text: 'ATL = deine Müdigkeit (Belastung der letzten 7 Tage)', ok: /Müdigkeit/ },
+  { term: 'ATL', re: /\bATL\b/, text: 'ATL = deine Müdigkeit (Belastung der letzten 7 Tage)', ok: /Müdigkeit|Ermüdung/ },
   { term: 'TSB', re: /\bTSB\b/, text: 'TSB = deine Form (Fitness minus Müdigkeit)', ok: /Form/ },
   { term: 'RPE', re: /\bRPE\b/, text: 'RPE = wie anstrengend es sich angefühlt hat (1 = ganz leicht, 10 = maximal)', ok: /angefühlt|Anstrengung/ },
   { term: 'LTHR', re: /\bLTHR\b/, text: 'LTHR = dein Schwellenpuls', ok: /Schwellenpuls/ }
