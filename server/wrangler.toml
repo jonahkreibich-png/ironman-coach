@@ -53,3 +53,5 @@ PUBLIC_URL = "https://stamio-test.pages.dev"
 ENVIRONMENT = "test"
 # Test-Umgebung: mehr neue Konten pro Tag und Adresse (Prüfungen), echte App: 3
 SIGNUP_PER_IP = "50"
+# Auftrag 16: Test und echte App teilen sich das Gratis-Kontingent von Workers AI (10.000 Neurons/Tag) – die Test-Umgebung nimmt höchstens 1.500
+WAI_DAILY_NEURONS = "1500"
