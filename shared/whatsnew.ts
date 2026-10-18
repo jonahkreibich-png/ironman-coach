@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.3.0', items: [
+    'Neu: Der Coach kann deine Fragen mit einer KI beantworten, kostenlos. Einmal kurz zustimmen (unter 16 mit Eltern), abschaltbar unter Einstellungen. Zahlen und Planänderungen kommen weiter aus der App, Änderungen gelten erst nach deinem OK. Werte von Oura bekommt die KI nie.',
+    "Trainingsbewertung: Automatische Runden der Uhr (z. B. jeder Kilometer) zählen nicht mehr als Intervalle. Die App erkennt Dauerlauf, Intervalle, Fahrtspiel, Hügel und „ab km 8 schneller geworden“ und vergleicht mit dem Plan."
+  ] },
   { version: '3.2.0', items: [
     'Dein Plan enthält nur noch die Sportarten, die du gewählt hast. Dieselbe Sportart liegt nicht mehr an zwei Tagen hintereinander; geht es nicht anders, ist eine Einheit locker und kurz und sagt, warum.',
     'Verbinden geht jetzt für alle: Tipp bei Oura, Dropbox oder intervals.icu auf „Verbinden“, die App legt dabei ein privates Konto für dich an. Erholungswochen sind spürbar leichter.',

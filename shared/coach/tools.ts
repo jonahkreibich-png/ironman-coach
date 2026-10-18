@@ -13,12 +13,15 @@ import { explainDay } from './explain';
 import { analyze, doneSessions } from './analysis';
 import { zoneVerdict } from '../fields';
 import { sportAllowed } from '../sports';
+import { reviewItem, reviewWeek, doneItems } from './review';
 
 export const TOOL_DEFS = [
   { name: 'get_data', description: 'Liest Daten des Athleten. what: "day" (Plan und Status eines Tages), "week" (Woche um ein Datum), "values" (Morgenwerte der letzten Tage), "sessions" (erledigte Einheiten mit allen Feldern: Dauer, Distanz, Pace, Puls, max. Puls, Pulszone, Entkopplung, Effizienz, Kadenz, Watt, Schwimm-Technik, RPE, Gefühl, geplant vs. gemacht).',
     input_schema: { type: 'object', properties: { what: { type: 'string', enum: ['day', 'week', 'values', 'sessions'] }, date: { type: 'string', description: 'JJJJ-MM-TT, Standard heute' }, days: { type: 'integer', minimum: 1, maximum: 42 } }, required: ['what'], additionalProperties: false } },
   { name: 'explain_day', description: 'Erklärt die Einheit(en) eines Tages Schritt für Schritt wie die App (Ein-/Aufwärmen, Hauptteil mit Wiederholungen, Pausen, Zonen mit den Pulswerten des Athleten, Ausklang) und berücksichtigt Krankheit, Wiedereinstieg, Ampel und Zeitgrenze. Liefert ggf. einen Änderungsvorschlag (noch nicht übernommen).',
     input_schema: { type: 'object', properties: { date: { type: 'string', description: 'JJJJ-MM-TT, Standard heute' }, sport: { type: 'string', enum: ['swim', 'bike', 'run', 'strength', 'football'] }, minutes: { type: 'integer', minimum: 10, maximum: 240, description: 'nur so viel Zeit' } }, additionalProperties: false } },
+  { name: 'review_training', description: 'Bewertet erledigtes Training wie ein Trainer (Gut, Besser, Nächste Tage) mit den echten Werten: Plan gegen Messung, Puls und Zonen, Pace/Watt, Intervalle oder Dauerlauf, Entkopplung, Kadenz, Schwimm-Technik, Morgenwerte. Ohne Datum: die letzte erledigte Einheit. week true: die Woche.',
+    input_schema: { type: 'object', properties: { date: { type: 'string', description: 'JJJJ-MM-TT' }, sport: { type: 'string', enum: ['swim', 'bike', 'run', 'strength', 'football'] }, week: { type: 'boolean' }, last_week: { type: 'boolean' } }, additionalProperties: false } },
   { name: 'get_analysis', description: 'Ergebnis des Analyse-Coachs: Belastung (CTL/ATL/TSB, ACWR) und Erkenntnisse mit Begründung und Tipp (Trends wie aerobe Effizienz, zu hoher Puls, Ermüdung).',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'move_session', description: 'Verschiebt eine geplante Einheit auf einen anderen Tag.',
@@ -61,8 +64,17 @@ function ruleCheck(ctx: EngineCtx, weeks: any[], date: string): any[] {
 let seq = 0;
 function adjId(prefix: string, ctx: EngineCtx) { return `ai-${prefix}-${ctx.now}-${++seq}`; }
 
-export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
+/* opts.proposeOnly (Auftrag 16): Planänderungen der KI gelten nie sofort, sondern werden als Vorschlag zum Bestätigen gespeichert */
+export function runTool(ctx: EngineCtx, name: string, input: any, opts: { proposeOnly?: boolean } = {}): ToolOutcome {
   const today = ctx.today;
+  if (name === 'review_training') {
+    if (input.week || input.last_week) return { result: reviewWeek(ctx, false, input.last_week ? 1 : 0).text, isError: false, changes: [] };
+    const date = DATE.test(input.date || '') ? input.date : null;
+    const items = doneItems(ctx, date || C.addDays(today, -13), date || today).filter(d => !input.sport || d.sport === input.sport);
+    if (!items.length) return { result: `Keine erledigte Einheit${date ? ' am ' + date : ' in den letzten 14 Tagen'}${input.sport ? ' (' + input.sport + ')' : ''}. Nichts erfinden: sag dem Athleten, dass du keine findest und er sie abhaken oder die Uhr verbinden kann.`, isError: false, changes: [] };
+    const list = date ? items : [items[items.length - 1]];
+    return { result: list.map(d => reviewItem(ctx, d).text).join('\n\n'), isError: false, changes: [] };
+  }
   const weeks = effective(ctx);
   if (name === 'get_data') {
     const date = DATE.test(input.date || '') ? input.date : today;
@@ -85,6 +97,9 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
   if (name === 'explain_day') {
     const date = DATE.test(input.date || '') ? input.date : today;
     const ex = explainDay(ctx, date, input.sport || null, input.minutes || null);
+    // Auftrag 16: Änderung aus der Erklärung (wenig Zeit, krank, schlechte Werte) als Vorschlag zum Bestätigen
+    const adj = (ex.ops || []).flatMap((o: any) => o.op === 'adjust' ? o.adj || [] : []);
+    if (opts.proposeOnly && adj.length) return { result: ex.text + '\n[Als Vorschlag gespeichert: ' + adj.map((x: any) => x.what).join('; ') + '. Der Athlet bestätigt ihn selbst.]', isError: false, changes: [], proposal: { title: 'Vorschlag: ' + adj.map((x: any) => x.what).join('; '), text: String(adj[0].reason || ''), changes: adj.map((x: any) => ({ kind: 'adjust', key: x.id, data: { ...x, from_ai: true, createdAt: ctx.now, date: x.date || today } })) } };
     return { result: ex.text + (ex.ops && ex.ops.length ? '\n[Vorschlag, noch nicht übernommen: ' + ex.ops.flatMap((o: any) => o.op === 'adjust' ? o.adj.map((a: any) => a.what) : []).join('; ') + ']' : ''), isError: false, changes: [] };
   }
   if (name === 'get_analysis') {
@@ -111,6 +126,7 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
       if (input.sport) set.sport = input.sport;
       if (input.title) set.title = String(input.title).slice(0, 80);
       if (input.planned_minutes) set.plannedMinutes = input.planned_minutes;
+      if (input.planned_minutes && !input.title && /\b\d{1,3} min\b/.test(hit.s.title || '')) set.title = String(hit.s.title).replace(/\b\d{1,3} min\b/, input.planned_minutes + ' min');
       if (input.zone) set.zone = String(input.zone).slice(0, 30);
       if (input.description) set.description = String(input.description).slice(0, 400);
       if (!Object.keys(set).length) return err('Es wurde nichts geändert.');
@@ -137,7 +153,7 @@ export function runTool(ctx: EngineCtx, name: string, input: any): ToolOutcome {
     const grows = s2 && hit.s.plannedMinutes && s2.s.plannedMinutes && s2.s.plannedMinutes > hit.s.plannedMinutes * 1.3;
     const harder = s2 && !isIntense(hit.s) && isIntense(s2.s);
     const change = { kind: 'adjust', key: a.id, data: a };
-    if (grows || harder) return { result: 'Als Vorschlag gespeichert. Der Athlet entscheidet.', isError: false, changes: [], proposal: { title: 'Vorschlag: ' + a.what, text: reason, changes: [change] } };
+    if (grows || harder || opts.proposeOnly) return { result: 'Als Vorschlag gespeichert. Der Athlet sieht ihn im Chat und entscheidet selbst.', isError: false, changes: [], proposal: { title: 'Vorschlag: ' + a.what, text: reason, changes: [change] } };
     return { result: 'Erledigt: ' + a.what + '.', isError: false, changes: [change] };
   }
   if (name === 'rebuild_week') {

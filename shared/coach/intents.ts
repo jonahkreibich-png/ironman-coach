@@ -29,8 +29,11 @@ function lev(a: string, b: string): number {
   return d[a.length][b.length];
 }
 /* Wortanfang passt (Knie → knies, knieschmerzen) oder höchstens 1-2 Tippfehler */
+/* echte Wörter, die nur zufällig einem Stichwort ähneln (gedicht ≈ gewicht, ueber ≈ uebel) */
+const NEAR_REAL = new Set(['gedicht', 'gedichte', 'ueber', 'geduld', 'gericht', 'gerichte']);
 function wordHit(tok: string, key: string): boolean {
   if (tok === key) return true;
+  if (NEAR_REAL.has(tok)) return false;
   if (key.length >= 4 && tok.startsWith(key)) return true;
   if (key.length >= 5 && tok.length >= 5 && lev(tok.slice(0, key.length + 1), key) <= 1) return true;
   if (key.length >= 8 && lev(tok, key) <= 2) return true;

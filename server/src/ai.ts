@@ -163,7 +163,7 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
     const results: any[] = [];
     for (const tu of toolUses) {
       let o;
-      try { o = runTool(ctx, tu.name, tu.input || {}); } catch (e) { o = { result: 'Interner Fehler: ' + (e as Error).message, isError: true, changes: [] }; }
+      try { o = runTool(ctx, tu.name, tu.input || {}, { proposeOnly: true }); } catch (e) { o = { result: 'Interner Fehler: ' + (e as Error).message, isError: true, changes: [] }; }
       out.changes.push(...o.changes);
       // sofortige Änderungen auch für die nächsten Werkzeuge sichtbar machen
       o.changes.filter((c: ToolChange) => c.kind === 'adjust').forEach((c: ToolChange) => { ctx.state.adjustments = { ...(ctx.state.adjustments || {}), [c.key]: c.data }; });

@@ -46,13 +46,13 @@ export async function resetUser(env: Env, uid: number): Promise<number> {
   const t = Date.now();
   const changes: Change[] = (rows.results || []).map((r: any, i: number) => ({ kind: r.kind, key: r.key, deleted: true, updatedAt: t + i }));
   if (changes.length) await putRecords(env, uid, changes);
-  for (const tbl of ['connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'ai_usage', 'oauth_states']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
+  for (const tbl of ['connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'ai_usage', 'wai_usage', 'oauth_states']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare("DELETE FROM user_meta WHERE user_id = ? AND k <> 'reset_at'").bind(uid).run();
   await setMeta(env, uid, 'reset_at', t);
   return changes.length;
 }
 export async function deleteUser(env: Env, uid: number): Promise<void> {
-  for (const tbl of ['records', 'connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_subs', 'ai_usage', 'oauth_states', 'user_meta', 'devices', 'pair_codes', 'feedback']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
+  for (const tbl of ['records', 'connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_subs', 'ai_usage', 'wai_usage', 'oauth_states', 'user_meta', 'devices', 'pair_codes', 'feedback']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'admin'").bind(uid).run();
 }
 
@@ -83,7 +83,7 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
 
   if (p === '/api/health' && M === 'GET') {
     const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM devices').first();
-    return { ok: true, setup: (n && n.n) > 0, time: Date.now(), app: BRAND.name, env: env.ENVIRONMENT || 'production' };
+    return { ok: true, setup: (n && n.n) > 0, time: Date.now(), app: BRAND.name, env: env.ENVIRONMENT || 'production', freeAi: !!env.AI };
   }
   // Öffentlicher VAPID-Schlüssel (kein Geheimnis)
   if (p === '/api/push/key' && M === 'GET') {

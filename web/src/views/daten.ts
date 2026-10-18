@@ -20,17 +20,30 @@ import { toast } from '../toast';
 let PAIR: { code: string; expiresAt: number } | null = null;
 let DEVICES: any[] | null = null, BACKUPS: any[] | null = null, ME: any = null, INVITES: any[] | null = null, NEW_INVITE: string | null = null, SERVER_ERR: any[] | null = null;
 let USERS: any[] | null = null;
+let WAI: any = null;
 let loading = false;
 async function loadLists() {
   if (!isSyncOn() || loading) return; loading = true;
   try {
     const [d, b, m] = await Promise.all([apiCall('GET', '/api/devices'), apiCall('GET', '/api/backups'), apiCall('GET', '/api/me')]);
     DEVICES = d.devices; BACKUPS = b.backups; ME = m;
-    if (ME && ME.role === 'admin') { INVITES = (await apiCall('GET', '/api/invites')).invites; USERS = (await apiCall('GET', '/api/admin/users')).users; }
+    if (ME && ME.role === 'admin') { INVITES = (await apiCall('GET', '/api/invites')).invites; USERS = (await apiCall('GET', '/api/admin/users')).users; WAI = await apiCall('GET', '/api/admin/ai-usage').catch(() => null); }
   } catch (e) { DEVICES = DEVICES || []; BACKUPS = BACKUPS || []; }
   loading = false; nav.rerender();
 }
-export function resetDatenCache() { DEVICES = null; BACKUPS = null; ME = null; INVITES = null; USERS = null; }
+/* Auftrag 16: Verbrauch der kostenlosen KI (nur Betreiber): heute, je Person, 7 Tage */
+function waiCard(): string {
+  if (!WAI) return `<div class="card"><div class="hint">${esc(t('data.waiNone'))}</div></div>`;
+  const pct = WAI.freeLimit ? Math.round(WAI.neuronsToday / WAI.freeLimit * 100) : 0;
+  const perQ = WAI.perQuestion || 30;
+  return `<div class="card stack" data-wai>
+    <div class="kv"><span class="muted">${esc(t('data.waiToday'))}</span><b class="num">${WAI.neuronsToday} / ${WAI.freeLimit} (${pct} %)</b></div>
+    <div class="kv"><span class="muted">${esc(t('data.waiQuestions'))}</span><b class="num">${WAI.questionsToday}${WAI.perQuestion ? ' · Ø ' + String(WAI.perQuestion).replace('.', ',') + ' Neurons' : ''}</b></div>
+    <div class="hint">${esc(t('data.waiHint', { n: Math.floor(WAI.budget / perQ), per: WAI.perUser, model: WAI.model.split('/').pop() }))}</div>
+    ${(WAI.users || []).length ? `<div class="list">${WAI.users.map((u: any) => `<div class="li"><span class="grow">${esc(u.name || t('data.userN', { n: u.id }))}</span><span class="num small">${u.questions} · ${u.neurons} N${u.fallbacks ? ' · ' + u.fallbacks + '× Regel' : ''}</span></div>`).join('')}</div>` : ''}
+    ${(WAI.week || []).length > 1 ? `<div class="xs muted">${esc(t('data.waiWeek'))}: ${WAI.week.map((d: any) => `${d.day.slice(8)}.${d.day.slice(5, 7)}. ${d.questions}/${d.neurons}`).join(' · ')}</div>` : ''}</div>`;
+}
+export function resetDatenCache() { DEVICES = null; BACKUPS = null; ME = null; INVITES = null; USERS = null; WAI = null; }
 const time = (ts: number) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
 /* Verbinden: Einrichtungscode, Kopplungscode, Einladung. Auch auf dem Start-Bildschirm. */
@@ -61,7 +74,7 @@ export function renderDaten(): string {
       <button class="link" data-act="sync-off">${esc(t('data.syncOff'))}</button></div>`);
     h = recoveryBanner() + h;
     h += sec(t('data.recovery'), `<div class="card stack"><div class="hint">${esc(t('data.recoveryHint'))}</div>${NEW_RC ? `<div class="pair-code num" data-new-rc>${esc(NEW_RC)}</div><div class="hint">${esc(t('intro.rcHint'))}</div>` : ''}<button class="btn ghost" data-act="rc-new">${esc(t('data.recoveryNew'))}</button></div>`);
-    if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside'));
+    if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside')) + sec(t('data.wai'), waiCard(), t('data.usersAside'));
   }
   h += sec(t('data.backup'), backupCard(), STATE.lastBackupAt ? t('data.lastBackup', { d: fmtDate(STATE.lastBackupAt.slice(0, 10)) }) : '');
   if (isSyncOn() || hasLocalData()) h += sec(t('data.signOut'), `<div class="card stack"><div class="hint">${esc(t(isSyncOn() ? 'data.signOutHint' : 'data.wipeHint'))}</div><button class="btn danger" data-act="sign-out">${esc(t(isSyncOn() ? 'data.signOutBtn' : 'data.wipeBtn'))}</button></div>`);

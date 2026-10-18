@@ -355,7 +355,7 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
     if (!illNow) return { intent: 'healthy', text: 'Schön! Du bist nicht als krank eingetragen, der Plan läuft normal weiter.' };
     return propose('healthy', 'Schön! Soll ich die Krankheitsphase mit gestern beenden? Dann beginnt heute der Wiedereinstieg: die ersten Tage nur locker.', [{ op: 'illness-end', date: C.addDays(ctx.today, -1) }], YES_OPTS('Ja, Krankheit beenden'));
   }
-  if (has(toks, ['krank', 'erkaeltet', 'erkaeltung', 'grippe', 'halsschmerzen', 'schnupfen', 'husten', 'corona', 'covid', 'infekt', 'magen darm', 'uebel', 'kopfweh', 'kopfschmerzen', 'migraene', 'nicht gut', 'schlecht drauf', 'unwohl', 'angeschlagen']) && !has(toks, ['nicht mehr', 'wieder gesund'])) {
+  if (has(toks, ['krank', 'erkaeltet', 'erkaeltung', 'grippe', 'halsschmerzen', 'schnupfen', 'husten', 'corona', 'covid', 'infekt', 'magen darm', 'mir ist uebel', 'ist mir uebel', 'uebelkeit', 'kopfweh', 'kopfschmerzen', 'migraene', 'nicht gut', 'schlecht drauf', 'unwohl', 'angeschlagen']) && !has(toks, ['nicht mehr', 'wieder gesund'])) {
     if (illNow) return { intent: 'sick', text: 'Du bist schon als krank eingetragen. Schlafen, trinken, genug essen. Sag mir Bescheid, wenn du 24 Stunden ohne Symptome bist, dann starten wir in Stufen.', options: [{ label: 'Wieder gesund', say: 'Ich bin wieder gesund' }] };
     const mild = has(toks, ['nicht gut', 'unwohl', 'angeschlagen', 'schlecht drauf', 'kopfweh', 'kopfschmerzen']) && !has(toks, ['krank', 'fieber', 'grippe']);
     if (mild) {
@@ -451,7 +451,8 @@ function runVerb(ctx: EngineCtx, d: DialogState, verb: Verb, list: Sx[], data: a
     return propose('easier', `${joinDe(hard.map(label))} locker statt hart, höchstens 45 min?`, [easyOp(ctx, hard)]);
   }
   if (verb === 'shorter' || verb === 'longer') {
-    const target = mins ? +mins[1] : null;
+    const by = /\b(\d{1,3}) ?(min|minuten) (kuerzer|weniger|laenger|mehr)\b/.exec(raw);
+    const target = by && x.s.plannedMinutes ? Math.max(10, x.s.plannedMinutes + (/kuerzer|weniger/.test(by[3]) ? -1 : 1) * +by[1]) : mins ? +mins[1] : null;
     const f = verb === 'shorter' ? 0.75 : 1.2;
     if (verb === 'longer') {
       const want = target || Math.round((x.s.plannedMinutes || 45) * f / 5) * 5;

@@ -28,10 +28,34 @@ const env = {
   ...(process.env.WORKER_ENV ? JSON.parse(process.env.WORKER_ENV) : {})
 };
 
+/* Auftrag 16: nachgebautes Workers-AI-Modell für Browser-Tests (POST /__fake-ai {on, mode}); /__reset schaltet es ab.
+   Antwortet Wort für Wort wie Workers AI (SSE im OpenAI-Format). „streich“ → Werkzeug cancel_session für die erste Einheit der nächsten Tage. */
+function fakeAI(mode) {
+  return {
+    async run(model, input) {
+      if (mode === 'error') throw new Error('4006: daily free allocation used up');
+      const msgs = input.messages || []; const lastUser = [...msgs].reverse().find(m => m.role === 'user');
+      const toolDone = msgs.some(m => m.role === 'tool');
+      const ev = [];
+      if (/streich/i.test(lastUser && lastUser.content || '') && !toolDone && input.tools) {
+        const sys = msgs[0].content; const next = sys.split('NÄCHSTE TAGE:')[1] || ''; const m = /\[id ([\w.-]+)\]/.exec(next);
+        ev.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'call0', type: 'function', function: { name: 'cancel_session', arguments: JSON.stringify({ session_id: m ? m[1] : 'x', reason: 'keine Zeit' }) } }] } }] });
+      } else {
+        const text = toolDone ? 'Ich habe dir einen Vorschlag gemacht, du kannst ihn unten bestätigen.' : 'Schlaf ist die wichtigste Erholung. Bleib heute locker und hör auf deinen Körper.';
+        for (const w of text.split(/(?<= )/)) ev.push({ choices: [{ index: 0, delta: { content: w } }] });
+      }
+      ev.push({ response: '', usage: { prompt_tokens: 2400, completion_tokens: 60, neurons: 27 } });
+      const enc = new TextEncoder();
+      return new ReadableStream({ async start(c) { for (const e of ev) { c.enqueue(enc.encode('data: ' + JSON.stringify(e) + '\n\n')); await new Promise(r => setTimeout(r, 15)); } c.enqueue(enc.encode('data: [DONE]\n\n')); c.close(); } });
+    }
+  };
+}
+
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${port}`);
-  if (u.pathname === '/__reset' && req.method === 'POST') { env.DB = freshDb(); res.writeHead(204); return res.end(); }
+  if (u.pathname === '/__reset' && req.method === 'POST') { env.DB = freshDb(); delete env.AI; res.writeHead(204); return res.end(); }
+  if (u.pathname === '/__fake-ai' && req.method === 'POST') { const chunks = []; for await (const c of req) chunks.push(c); const b = JSON.parse(Buffer.concat(chunks).toString() || '{}'); if (b.on) env.AI = fakeAI(b.mode); else delete env.AI; res.writeHead(204); return res.end(); }
   if (u.pathname.startsWith('/api/')) {
     const chunks = []; for await (const c of req) chunks.push(c);
     const body = chunks.length ? Buffer.concat(chunks) : undefined;

@@ -164,13 +164,19 @@ describe('Werkzeuge und Regeln', () => {
     expect(res.is_error).toBe(true); expect(res.content).toMatch(/Umfang/);
     expect(r.data.messages.some((m: any) => m.kind === 'proposal')).toBe(false);
   });
-  test('Prüfungswoche → Einheiten kürzen gilt sofort (kleine Änderung, mit Rückgängig)', async () => {
+  // Auftrag 16: Planänderungen der KI gelten nie sofort, auch kleine nicht – immer als Vorschlag zum Bestätigen
+  test('Prüfungswoche → Einheiten kürzen nur als Vorschlag; Übernehmen wendet an', async () => {
     const sat = future(6);
     const id = (sat > add(mon, 6) ? 'w2' : 'w1') + '-sa';
-    mock([tool('modify_session', { session_id: id, planned_minutes: 50, reason: 'Prüfungswoche: weniger Umfang, Schlaf schützen' }), text('Ich habe den langen Lauf auf 50 min gekürzt.')]);
+    mock([tool('modify_session', { session_id: id, planned_minutes: 50, reason: 'Prüfungswoche: weniger Umfang, Schlaf schützen' }), text('Ich schlage vor, den langen Lauf auf 50 min zu kürzen.')]);
     const { env, T } = await user();
     const r = await chat(env, T, 'Nächste Woche habe ich Prüfungen.');
-    expect(r.data.applied).toBe(1);
+    expect(r.data.applied).toBe(0);
+    expect((await recs(env, T)).find((x: any) => x.kind === 'adjust' && x.data.from_ai)).toBeUndefined();
+    const prop = r.data.messages.find((m: any) => m.kind === 'proposal');
+    expect(prop).toBeTruthy();
+    const ok = await call(env, 'POST', '/api/coach/proposal/' + prop.id, { accept: true }, T);
+    expect(ok.data.applied).toBe(1);
     const adj = (await recs(env, T)).find((x: any) => x.kind === 'adjust' && x.data.from_ai);
     expect(adj.data).toMatchObject({ sessionId: id, from_ai: true }); expect(adj.data.set.plannedMinutes).toBe(50);
   });

@@ -357,9 +357,14 @@ export async function signOut() {
 }
 
 /* KI-Status (der KI-Coach ist im Testbetrieb abgeschaltet, solange kein Schlüssel hinterlegt ist) */
-let AI = { entitled: false, food: false, active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30 };
+let AI: any = { entitled: false, food: false, active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30, free: null, chatActive: false, tier: null };
 export function aiState() { return AI; }
 export async function loadAiState() { if (!AUTH) return AI; try { AI = await api('GET', '/api/coach/ai/status'); } catch (e) {} return AI; }
+/* Auftrag 16: gibt es kostenlose KI-Antworten? (auch ohne Konto, für das Angebot im Coach) */
+let FREE_PUBLIC: boolean | null = null;
+export function freePublic(): boolean { return !!FREE_PUBLIC; }
+export function freePublicKnown(): boolean { return FREE_PUBLIC != null; }
+export async function loadFreePublic(): Promise<boolean> { if (FREE_PUBLIC != null) return FREE_PUBLIC; try { const r = await api('GET', '/api/health', null, true); FREE_PUBLIC = !!(r && r.freeAi); } catch (e) { FREE_PUBLIC = false; } return FREE_PUBLIC; }
 
 /* Eigenes Konto: Rolle und Freischaltungen (Admin hat immer alles) */
 let ME = readJson('ec_me', null);

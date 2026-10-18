@@ -46,7 +46,7 @@ export async function exportAll(env: Env, uid: number) {
 }
 /* Konto löschen: sofort alles außer den nächtlichen Server-Backups; die werden nach 30 Tagen endgültig entfernt */
 export async function deleteAccount(env: Env, uid: number): Promise<{ purgeAfter: number }> {
-  for (const tbl of ['records', 'connections', 'ingest_keys', 'blobs', 'push_log', 'push_queue', 'push_subs', 'ai_usage', 'oauth_states', 'user_meta', 'devices', 'pair_codes', 'feedback', 'recovery']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
+  for (const tbl of ['records', 'connections', 'ingest_keys', 'blobs', 'push_log', 'push_queue', 'push_subs', 'ai_usage', 'wai_usage', 'oauth_states', 'user_meta', 'devices', 'pair_codes', 'feedback', 'recovery']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare('UPDATE error_log SET user_id = NULL WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'admin'").bind(uid).run();
   const purgeAfter = Date.now() + BACKUP_PURGE_DAYS * 86400000;

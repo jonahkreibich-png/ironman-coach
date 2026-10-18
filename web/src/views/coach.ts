@@ -13,7 +13,8 @@ import { applyOps, undoOps, type Op } from '../../../shared/coach/ops';
 import { arrangeFeed, searchMsgs, isOpen } from '../../../shared/coach/feed';
 import { nav } from '../nav';
 import { toast } from '../toast';
-import { aiState, apiCall, apiStream, syncNow } from '../sync';
+import { aiState, apiCall, apiStream, syncNow, isSyncOn, loadFreePublic, freePublicKnown, loadAiState } from '../sync';
+import { freeOffer, freeConsentHtml } from './freeai';
 import { propose } from './planedit';
 import { replanFuture } from '../replan';
 import { fixConflict } from './rules';
@@ -99,7 +100,8 @@ function msgHtml(m: any, latest: boolean): string {
   const undo = m.undo && !m.undone ? `<div class="row" style="margin-top:6px"><button class="btn ghost sm" data-act="chat-undo" data-id="${esc(m.id)}">${ic('back')} ${esc(t('chat.undo'))}</button></div>` : m.undone ? `<div class="xs muted" style="margin-top:6px">${esc(t('chat.undone'))}</div>` : '';
   const sugg = (m.suggestions || []).length && latest ? `<div class="suggest">${m.suggestions.map((s: string) => `<button class="chip" data-act="chat-say" data-text="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '';
   const pin = m.from !== 'user' ? `<button class="msg-pin ${m.pinned ? 'on' : ''}" data-act="chat-pin" data-id="${esc(m.id)}" aria-label="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}" title="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}">${ic('flag')}</button>` : '';
-  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(m.text)}</span>${prop}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
+  const by = m.from === 'ai' && !m.title && m.kind === 'answer' ? `<div class="xs muted" data-by-ai>${esc(t('coach.byAi'))}</div>` : '';
+  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(m.text)}</span>${by}${prop}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
 }
 
 /* Was der Coach gerade sieht (Auftrag 7): die 3 wichtigsten Erkenntnisse der Analyse mit Begründung und Tipp.
@@ -131,14 +133,17 @@ export function renderCoach(): string {
   const ai = aiState();
   const last = lastMsgId();
   const open = all.filter(m => isOpen(m)).sort((a, b) => b.at - a.at).slice(0, 3);
-  let h = nowCard(open) + seesCard();
-  h += `<div class="spread" style="margin:var(--s3) 0;flex-wrap:wrap;gap:6px"><span class="xs muted" style="flex:1 1 160px">${esc(ai.active ? t('coach.aiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
+  // einmal nachsehen, ob es kostenlose KI gibt (danach nicht erneut, sonst zeichnet sich der Coach endlos neu)
+  if (!isSyncOn() && !freePublicKnown()) loadFreePublic().then(v => { if (v && freeOffer()) nav.rerender(); });
+  let h = nowCard(open) + (freeOffer() ? freeConsentHtml('card') : '') + seesCard();
+  h += `<div class="spread" style="margin:var(--s3) 0;flex-wrap:wrap;gap:6px"><span class="xs muted" style="flex:1 1 160px">${esc(ai.tier === 'claude' ? t('coach.aiMode') : ai.tier === 'free' ? t('coach.freeAiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
   h += `<div class="feed">${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : STREAM ? '' : empty(t('coach.empty'))}${streamHtml()}</div>`;
   const dlg = STATE.chatDialog || {};
   const quick = quickOptions(D().engine, dlg).slice(0, 5);
   h += `<div class="chips quick" style="margin:var(--s3) 0 var(--s2)" data-quick>${quick.map(q => `<button class="chip" data-act="chat-say" data-text="${esc(q.say)}">${esc(q.label)}</button>`).join('')}</div>`;
   h += `<div class="composer"><textarea id="coach-in" rows="1" placeholder="${esc(t('coach.ask'))}" aria-label="${esc(t('coach.ask'))}"></textarea><button class="btn" data-act="coach-send" aria-label="${esc(t('coach.send'))}">${ic('right')}</button></div>`;
-  if (ai.active) h += `<div class="xs muted" style="text-align:center;margin-top:6px">${esc(t('coach.aiCost', { used: ai.monthUsd.toFixed(2), budget: ai.budgetUsd.toFixed(2) }))}</div>`;
+  if (ai.tier === 'claude') h += `<div class="xs muted" style="text-align:center;margin-top:6px">${esc(t('coach.aiCost', { used: ai.monthUsd.toFixed(2), budget: ai.budgetUsd.toFixed(2) }))}</div>`;
+  else if (ai.tier === 'free' && ai.free) h += `<div class="xs muted" style="text-align:center;margin-top:6px" data-free-count>${esc(t('coach.freeAiToday', { n: ai.free.todayQuestions || 0, max: ai.free.maxPerDay || 30 }))}</div>`;
   else h += `<div class="hint" style="text-align:center;margin-top:var(--s2)"><button class="link" data-act="go-sub" data-sub="einstellungen">${esc(t('coach.aiSettings'))}</button></div>`;
   return h;
 }
@@ -157,6 +162,7 @@ export function runOps(ops: Op[]): { undo: any; summary: string[] } {
 function addMsgs(list: any[]) { list.forEach(m => { STATE.coachMsgs[m.id] = m; }); saveState(); nav.rerender(); scrollCoachBottom(); }
 /* Frage beantworten: mit aktivem KI-Coach über den Server, sonst lokal mit der Gesprächsführung */
 let busy = false;
+let FELL_BACK = false;
 export async function ask(text: string, el?: HTMLButtonElement) {
   text = text.trim(); if (!text || busy) return;
   busy = true;
@@ -165,7 +171,7 @@ export async function ask(text: string, el?: HTMLButtonElement) {
     // alte Knöpfe sind beantwortet
     const last = lastMsgId(); if (last && STATE.coachMsgs[last] && STATE.coachMsgs[last].options) STATE.coachMsgs[last] = { ...STATE.coachMsgs[last], answered: true, pendingOpen: false };
     const userMsg = { id: `msg-u-${now}`, at: now, date: todayStr(), kind: 'user', from: 'user', text };
-    if (aiState().active && !(STATE.chatDialog && STATE.chatDialog.pending)) {
+    if (aiState().chatActive && !(STATE.chatDialog && STATE.chatDialog.pending)) {
       if (el) el.disabled = true;
       // Frage sofort zeigen, Antwort als Strom (Auftrag 12); ohne Strom die bisherige Anfrage
       STATE.coachMsgs[userMsg.id] = userMsg; STREAM = { text: '' }; nav.rerender(); toBottom();
@@ -179,9 +185,9 @@ export async function ask(text: string, el?: HTMLButtonElement) {
         const ms = (last.messages || []) as any[];
         // schon gestreamte KI-Antwort sofort ganz zeigen, alles andere (Hinweise, Vorschläge, Antwort ohne Strom) tippt sich auf
         ms.filter(m => m.from !== 'user').forEach(m => { if (!(streamed && /^msg-ai-/.test(m.id))) typeMsg(m.id, m.text); });
-        addMsgs(ms); if (last.applied) await syncNow(); return;
+        addMsgs(ms); if (last.applied) await syncNow(); loadAiState().then(() => nav.rerender()); return;
       }
-      catch (e) { STREAM = null; delete STATE.coachMsgs[userMsg.id]; /* ohne Verbindung oder ohne Budget: lokal antworten */ } finally { if (el) el.disabled = false; }
+      catch (e) { STREAM = null; delete STATE.coachMsgs[userMsg.id]; /* ohne Verbindung, Kontingent leer oder Fehler: der Regel-Coach antwortet */ if (!FELL_BACK) { FELL_BACK = true; toast(t('coach.freeFallback')); } loadAiState().then(() => nav.rerender()); } finally { if (el) el.disabled = false; }
     }
     const d = D();
     const { reply, dialog } = converse(d.engine, STATE.chatDialog || {}, text, { scores: d.scores, prognosis: d.prognosis });

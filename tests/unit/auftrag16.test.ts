@@ -145,3 +145,73 @@ describe('Bewertung: Art der Einheit kommt aus dem Plan', () => {
     expect(reviewAnswer(ctx, 'Wie war mein Lauf heute?')!.text).toMatch(/Erkannt: 8 harte Abschnitte bergauf/);
   });
 });
+
+/* ---------- Punkt 2: kostenlose KI – Hilfsfunktionen (ohne echte Aufrufe) ---------- */
+import { autoTool, isChangeRequest, claimsChange, inventedNumbers, cleanAnswer, cleanPartial, leaksInternals, compactContext, coachSkill } from '../../shared/coach/freeai';
+import { converse } from '../../shared/coach/dialog';
+
+describe('Kostenlose KI: Werkzeug vorher, Änderungswünsche, Wächter', () => {
+  const ctx = () => world('jugend-langdistanz', '2026-10-21').ctx();
+  test('Bewertungsfragen bekommen review_training, Tagesfragen explain_day (mit Datum, Sportart, Zeitgrenze)', () => {
+    expect(autoTool(ctx(), 'wie war mein training heute')).toEqual({ name: 'review_training', input: { date: '2026-10-21' } });
+    expect(autoTool(ctx(), 'Wie war meine Woche?')).toMatchObject({ name: 'review_training', input: { week: true } });
+    expect(autoTool(ctx(), 'was mache ich morgen genau')).toEqual({ name: 'explain_day', input: { date: '2026-10-22' } });
+    expect(autoTool(ctx(), 'was genau soll ich heute beim radfahren machen')).toEqual({ name: 'explain_day', input: { date: '2026-10-21', sport: 'bike' } });
+    expect(autoTool(ctx(), 'ich habe heute nur 20 minuten, was soll ich machen')).toMatchObject({ name: 'explain_day', input: { minutes: 20 } });
+    expect(autoTool(ctx(), 'kann ich morgen intervalle machen?')).toMatchObject({ name: 'explain_day', input: { date: '2026-10-22' } });
+    expect(autoTool(ctx(), 'wie wird meine form in den nächsten wochen')).toEqual({ name: 'get_analysis', input: {} });
+    expect(autoTool(ctx(), 'ist mein puls beim laufen zu hoch?')).toEqual({ name: 'review_training', input: { sport: 'run' } });
+    expect(autoTool(ctx(), 'was ist zone 2')).toBeNull();
+    expect(autoTool(ctx(), 'verschieb den lauf auf morgen')).toBeNull();
+  });
+  test('Änderungswünsche erkennen (dann muss ein Werkzeug her), Fragen nicht', () => {
+    for (const q of ['verschieb das schwimmen von dienstag auf mittwoch', 'ab jetzt mittwochs kein rad mehr', 'streich die kraft am freitag', 'mach den lauf am donnerstag 10 min kürzer', 'ich hab morgen keine zeit']) expect(isChangeRequest(q), q).toBe(true);
+    for (const q of ['kann ich statt schwimmen laufen gehen', 'was ist zone 2', 'wie war mein lauf', 'wie viel schlaf brauche ich']) expect(isChangeRequest(q), q).toBe(false);
+  });
+  test('Behauptete Änderung ohne Vorschlag wird erkannt, Verneinung nicht', () => {
+    expect(claimsChange('Ich habe dir einen Vorschlag gemacht, du kannst ihn unten bestätigen.')).toBe(true);
+    expect(claimsChange('Ich habe das Rad am Mittwoch gestrichen.')).toBe(true);
+    expect(claimsChange('Das Schwimmen habe ich nicht verschoben, weil deine Regel das verbietet.')).toBe(false);
+    expect(claimsChange('Zone 2 ist locker.')).toBe(false);
+  });
+  test('Zahlen-Wächter: Puls, Pace, Watt, km/h und Wiederholungen müssen belegt sein', () => {
+    const src = ['Zone 2: 6:30–7:07/km, Puls 138–151', 'Langer Lauf 55 min, 185 W'];
+    expect(inventedNumbers('Lauf in Zone 2 mit 6:30 bis 7:07/km und Puls 138-151.', src)).toEqual([]);
+    expect(inventedNumbers('Lauf mit Puls 163 und 4:12/km.', src)).toEqual(['Puls 163', '4:12/km']);
+    expect(inventedNumbers('Fahr 250 W.', src)).toEqual(['250 W']);
+    expect(inventedNumbers('Mach 5×4 min schnell.', src)).toEqual(['5×4 min']);
+    expect(inventedNumbers('Iss 2-3 Stunden vorher, schlaf 8 bis 10 Stunden.', src)).toEqual([]);
+  });
+  test('Denk-Teile werden entfernt (fertig und im Strom), Werkzeug-Namen erkannt', () => {
+    expect(cleanAnswer('<|channel>thought Überlegung <channel|>Schlaf ist wichtig.')).toBe('Schlaf ist wichtig.');
+    expect(cleanAnswer('<think>hmm</think>\n\nLocker bleiben.')).toBe('Locker bleiben.');
+    expect(cleanAnswer('**Wichtig:** locker')).toBe('Wichtig: locker');
+    expect(cleanPartial('<|channel>thought noch am Denken')).toBe('');
+    expect(cleanPartial('<|channel>thought x<channel|>Hallo <|')).toBe('Hallo ');
+    expect(leaksInternals('Nutze bitte get_analysis.')).toBe(true); expect(leaksInternals('[{"name": "x"}]')).toBe(true); expect(leaksInternals('Alles gut.')).toBe(false);
+  });
+  test('Anweisung und Zusammenfassung: Coach-Regeln, Profil, Ziel, Phase, heute, nächste Tage, letzte 7 Tage, Ampel', () => {
+    const c = ctx();
+    const sk = coachSkill(c, 'App');
+    expect(sk).toMatch(/Erfinde nichts/); expect(sk).toMatch(/„Das weiß ich nicht“/); expect(sk).toMatch(/Keine medizinischen Diagnosen/); expect(sk).toMatch(/Vorschlag/);
+    expect(sk).toMatch(/minderjährig/); // Persona ist 17
+    const cc = compactContext(c);
+    for (const k of ['PROFIL:', 'ZIEL:', 'PHASE:', 'HEUTE:', 'NÄCHSTE TAGE:', 'LETZTE 7 TAGE:', 'AMPEL HEUTE:']) expect(cc).toContain(k);
+    expect(cc).toMatch(/\[id [\w-]+\]/);
+    expect(cc.length).toBeLessThan(6000);
+  });
+});
+
+describe('Regel-Coach: Fehler aus dem Vergleich behoben', () => {
+  const W = () => world('jugend-langdistanz');
+  test('„Schreib mir ein Gedicht über Pizza“ ist weder Krankheit noch Gewicht', () => {
+    const r = converse(W().ctx(), {}, 'schreib mir ein gedicht über pizza').reply;
+    expect(r.intent).not.toMatch(/sick|weight/);
+  });
+  test('„mir ist übel“ bleibt Krankheit', () => { expect(converse(W().ctx(), {}, 'mir ist übel').reply.intent).toBe('sick'); });
+  test('„10 min kürzer“ heißt minus 10 (nicht auf 10)', () => {
+    const r = converse(W().ctx(), {}, 'mach den lauf am mittwoch 10 min kürzer').reply;
+    expect(r.intent).toBe('shorter'); expect(r.text).not.toMatch(/→ 1\d min/);
+    const m = /(\d+) → (\d+) min/.exec(r.text)!; expect(+m[1] - +m[2]).toBeGreaterThanOrEqual(8); expect(+m[1] - +m[2]).toBeLessThanOrEqual(13);
+  });
+});

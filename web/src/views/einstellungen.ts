@@ -8,6 +8,7 @@ import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports'
 import { bikeSpeedsOf, kindsOf, speedRange, mainKind, BIKE_KIND_LABEL, SPEED_HINT, type BikeKind } from '../../../shared/bikespeed';
 import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
 import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
+import { freeSettingsHtml } from './freeai';
 import { invalidate, D } from '../data';
 import { needsParentConsent } from '../../../shared/features';
 import { STORAGE, APP } from '../config';
@@ -147,7 +148,10 @@ on('push-test', async () => { try { const r = await apiCall('POST', '/api/push/t
 
 /* ---------- KI-Coach ---------- */
 function aiCard(): string {
-  const A = aiState(); const S = STATE.settings.ai || {};
+  const A: any = aiState(); const S = STATE.settings.ai || {};
+  // Auftrag 16: kostenlose KI-Antworten zuerst; Claude (Premium, kostet Geld) nur, wenn ein Schlüssel hinterlegt ist
+  const free = freeSettingsHtml();
+  if (!A.keyPresent) return `<div class="card stack">${free}</div>`;
   const minor = D().minor; const parent = needsParentConsent(D().age);
   let status: string;
   if (!isSyncOn()) status = t('ai.needSync');
@@ -156,7 +160,7 @@ function aiCard(): string {
   else if (!S.consentAt) status = t('ai.noConsent');
   else if (!S.enabled) status = t('ai.off');
   else status = A.active ? t('ai.on') : t('ai.limit');
-  return `<div class="card stack"><div class="spread"><span>${esc(status)}</span>${pill(A.active ? t('ai.activePill') : t('ai.freePill'), A.active ? 'good' : '')}</div>
+  return `<div class="card stack">${free}<div class="lbl" style="margin-top:var(--s3)">${esc(t('ai.premium'))}</div><div class="spread"><span>${esc(status)}</span>${pill(A.active ? t('ai.activePill') : t('ai.freePill'), A.active ? 'good' : '')}</div>
     <div class="hint">${esc(t('ai.freeExplain'))}</div>
     ${S.consentAt ? toggle('ai-on', t('ai.switch'), !!S.enabled, 'data-ch="ai-on"') : `<button class="btn ghost" data-act="ai-consent">${ic('lock')} ${esc(t('ai.consentOpen'))}</button>`}
     ${A.keyPresent ? `<div class="kv"><span class="muted">${esc(t('ai.costMonth'))}</span><b class="num">${num(A.monthUsd, 2)} $ / ${num(A.budgetUsd, 0)} $</b></div><div class="kv"><span class="muted">${esc(t('ai.today'))}</span><b class="num">${A.todayMessages} / ${A.maxPerDay}</b></div>

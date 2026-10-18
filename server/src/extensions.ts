@@ -6,6 +6,7 @@ import { HttpError, readJson } from './http';
 import * as X from './connect';
 import { runEngineFor, loadState, engineCtx, runAnalysis } from './coach';
 import { aiChat, aiStatus, aiFoodEstimate, decideProposal, aiRephrase, aiParseRules } from './ai';
+import { waiChat, freeStatus, waiUsageReport, FallbackError } from './wai';
 import { sanitizeRule } from '../../shared/constraints';
 import { parseRules } from '../../shared/ruleparse';
 import { putRecords } from './store';
@@ -68,7 +69,16 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
   if (p === '/api/coach/ai/status' && M === 'GET') {
     const s = await getRecord(env, a.uid, 'settings', 'main');
     const prof = await getRecord(env, a.uid, 'profile', 'main');
-    return aiStatus(env, a.uid, (s && s.data && s.data.settings) || {}, prof ? needsParentConsent(ageOf(prof.data, berlinParts().date)) : false);
+    const parent = prof ? needsParentConsent(ageOf(prof.data, berlinParts().date)) : false;
+    const set = (s && s.data && s.data.settings) || {};
+    const st = await aiStatus(env, a.uid, set, parent);
+    const free = await freeStatus(env, a.uid, set, parent);
+    // Auftrag 16: Chat über Claude (falls hinterlegt und eingeschaltet), sonst kostenlos über Workers AI
+    return { ...st, free, chatActive: st.active || free.active, tier: st.active ? 'claude' : free.active ? 'free' : null };
+  }
+  if (p === '/api/admin/ai-usage' && M === 'GET') {
+    if (a.role !== 'admin') throw new HttpError(403, 'Nur für den Betreiber.');
+    return waiUsageReport(env);
   }
   /* Freitext → Regeln: mit aktivem KI-Coach über die KI, sonst (und bei Fehlern) mit dem eingebauten Parser */
   if (p === '/api/rules/parse' && M === 'POST') {
@@ -91,7 +101,7 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     const body = await readJson(req);
     if (!String(body.text || '').trim()) throw new HttpError(400, 'Leere Nachricht.');
     const L = await loadState(env, a.uid);
-    const r = await aiChat(env, a.uid, engineCtx(L), String(body.text));
+    const r = await coachChat(env, a.uid, L, String(body.text));
     const t = Date.now();
     const changes: Change[] = [...r.changes.map((c, i) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })), ...r.messages.map((mm, i) => ({ kind: 'coachMsg', key: mm.id, data: mm, updatedAt: t + 100 + i }))];
     await putRecords(env, a.uid, changes);
@@ -106,12 +116,12 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     const send = (o: any) => w.write(enc.encode(JSON.stringify(o) + '\n')).catch(() => {});
     (async () => {
       try {
-        const r = await aiChat(env, a.uid, engineCtx(L), String(body.text), { delta: t => { send({ t: 'delta', text: t }); }, reset: () => { send({ t: 'reset' }); } });
+        const r = await coachChat(env, a.uid, L, String(body.text), { delta: t => { send({ t: 'delta', text: t }); }, reset: () => { send({ t: 'reset' }); } });
         const t = Date.now();
         const changes: Change[] = [...r.changes.map((c, i) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })), ...r.messages.map((mm, i) => ({ kind: 'coachMsg', key: mm.id, data: mm, updatedAt: t + 100 + i }))];
         await putRecords(env, a.uid, changes);
         await send({ t: 'done', messages: r.messages, applied: r.changes.length, status: r.status, blocked: r.blocked || null });
-      } catch (e: any) { await send({ t: 'error', status: e && e.status || 500, error: String(e && e.message || e) }); }
+      } catch (e: any) { await send({ t: 'error', status: e && e.status || 500, error: String(e && e.message || e), fallback: e instanceof FallbackError ? e.why : null }); }
       finally { try { await w.close(); } catch (e) { /* schon zu */ } }
     })();
     return new Response(ts.readable, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache' } });
@@ -131,6 +141,20 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
     return runEngineFor(env, a.uid, ev as any);
   }
   return undefined;
+}
+
+/* Auftrag 16: Chat-Reihenfolge. Claude nur, wenn Schlüssel, Freischaltung, Schalter und Einwilligung da sind (Premium);
+   sonst die kostenlose KI (Workers AI); sonst 403 → die App antwortet mit dem Regel-Coach. */
+async function coachChat(env: Env, uid: number, L: any, text: string, live?: any): Promise<any> {
+  const ctx = engineCtx(L);
+  const parent = needsParentConsent(ageOf(ctx.profile, ctx.today));
+  const st = await aiStatus(env, uid, L.state.settings, parent);
+  if (st.active) return aiChat(env, uid, ctx, text, live);
+  const free = await freeStatus(env, uid, L.state.settings, parent);
+  if (free.active) return waiChat(env, uid, ctx, text, live, { parentNeeded: parent });
+  // ohne kostenlose KI: wie bisher Claude fragen (wirft mit genauer Begründung, warum nicht)
+  if (!free.available) return aiChat(env, uid, ctx, text, live);
+  throw new HttpError(403, free.reason === 'consent' || free.reason === 'parent' ? 'Für KI-Antworten fehlt deine Einwilligung. Der Regel-Coach antwortet.' : 'Die KI ist gerade nicht verfügbar. Der Regel-Coach antwortet.');
 }
 
 /* Zusätzliche Zeitpläne (Abruf der Dienste) */

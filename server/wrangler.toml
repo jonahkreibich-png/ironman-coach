@@ -16,6 +16,10 @@ database_name = "coach-db-efc7"
 database_id = "42d4e471-2ad6-41da-8865-09bbb1d26a38"
 migrations_dir = "migrations"
 
+# Auftrag 16: kostenlose KI (Workers AI), kein Schlüssel nötig; Gratis-Kontingent 10.000 Neurons pro Tag
+[ai]
+binding = "AI"
+
 [triggers]
 # Zeiten in UTC. Der Code prüft selbst die Uhrzeit in Europe/Berlin.
 crons = ["*/5 * * * *"]
@@ -36,6 +40,9 @@ binding = "DB"
 database_name = "stamio-test"
 database_id = "f5a7a245-1fcf-49bd-b29d-4587c69a35cf"
 migrations_dir = "migrations"
+
+[env.test.ai]
+binding = "AI"
 
 [env.test.triggers]
 crons = ["*/5 * * * *"]
