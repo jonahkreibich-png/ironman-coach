@@ -2,6 +2,7 @@
    Schwimmbahnen mit Zügen. Ergebnis ist ein kompakter Datensatz (kind "activity"), die Rohverläufe werden verkleinert. */
 import type { RawActivity, ActSport } from './types';
 import { GENERIC_LTHR } from '../profile';
+import { isAutoLaps, lapKinds, streamStructure, paceTrend, statsOf, type Pattern } from './structure';
 
 export type Source = 'healthfit' | 'file' | 'shortcut' | 'intervals' | 'oura' | 'whoop' | 'polar' | 'withings' | 'fitbit' | 'suunto' | 'coros' | 'wahoo' | 'zepp' | 'healthkit' | 'manual';
 
@@ -45,6 +46,8 @@ export interface Activity {
   /** längstes Stück am Stück im lockeren Bereich (Minuten) */
   laps: LapOut[];
   intervals: IntervalOut | null;
+  /** Auftrag 16: Aufbau der Einheit (gleichmäßig, Intervalle, Fahrtspiel, Hügel, schneller werdend) */
+  pattern?: Pattern | null;
   swim: SwimOut | null;
   rpe?: number | null;
   /** Kadenz (Laufen: Schritte pro Minute, Rad: Umdrehungen), max. Leistung, Splits je km (Auftrag 7) */
@@ -124,8 +127,21 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   }
 
   // Runden
-  const laps = classifyLaps(raw);
-  const intervals = intervalStats(laps, sport, usePower);
+  const laps = classifyLaps(raw, usePower);
+  let intervals = intervalStats(laps, sport, usePower);
+  // Auftrag 16: Aufbau erkennen. Automatische Runden (oder keine) sagen nichts über Intervalle, dann zählt der Verlauf.
+  let pattern: Pattern | null = null;
+  if (sport === 'run' || sport === 'bike') {
+    const auto = isAutoLaps(raw.laps.filter(l => l.sec > 5).map(l => ({ sec: l.sec, m: l.dist, trigger: l.trigger })));
+    const watch = laps.some(l => l.kind === 'rest' || l.kind === 'warmup' || l.kind === 'cooldown') && raw.laps.some(l => l.intensity && l.intensity !== 'active');
+    if (intervals && intervals.count >= 2) pattern = { type: 'intervals', from: watch ? 'watch' : 'laps', reps: intervals.count, workSec: laps.filter(l => l.kind === 'work').map(l => Math.round(l.sec)), autoLaps: false };
+    else if (laps.filter(l => l.kind === 'work').length === 1 && !auto) pattern = { type: 'tempo', from: watch ? 'watch' : 'laps', reps: 1, workSec: laps.filter(l => l.kind === 'work').map(l => Math.round(l.sec)), autoLaps: false };
+    else {
+      const st = streamStructure(recs, sport);
+      if (st && st.intervals) { intervals = st.intervals; pattern = { ...st.pattern, autoLaps: auto }; }
+      else pattern = { type: 'steady', from: st ? 'stream' : laps.length >= 2 ? 'laps' : 'none', autoLaps: auto };
+    }
+  }
 
   // Schwimmen
   const swim = sport === 'swim' ? swimStats(raw) : null;
@@ -163,20 +179,23 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
     hrZones, decouplingPct, efficiency,
     avgCadence, maxCadence, maxPower, splits: splits.length ? splits : undefined,
     laps, intervals, swim,
+    pattern: withTrend(pattern, sport === 'run' ? paceTrend(splits) : null),
     hasStreams: recs.length > 0,
     createdAt: Date.now()
   };
 }
 
-/* Runden einordnen: Belastung, Pause, Ein- und Auslaufen. Nutzt die Angabe der Uhr, sonst Tempo und Puls. */
-export function classifyLaps(raw: RawActivity): LapOut[] {
+/* Runden einordnen: Belastung, Pause, Ein- und Auslaufen. Nutzt die Angabe der Uhr (Workout mit Belastung/Pause).
+   Sonst (Auftrag 16): nur bei deutlichem Wechsel schnell/langsam; automatische Runden der Uhr sind gleichmäßig. Schwimmen wie bisher. */
+export function classifyLaps(raw: RawActivity, usePower = false): LapOut[] {
   const L = raw.laps.filter(l => l.sec > 5);
   if (L.length < 2) return L.map((l, i) => lapOut(l, i, 'steady'));
   const fromWatch = L.some(l => l.intensity && l.intensity !== 'active');
   if (fromWatch) {
     return L.map((l, i) => lapOut(l, i, l.intensity === 'rest' || l.intensity === 'recovery' ? 'rest' : l.intensity === 'warmup' ? 'warmup' : l.intensity === 'cooldown' ? 'cooldown' : 'work'));
   }
-  // Ohne Angabe: deutlich schneller oder höherer Puls als der Median = Belastung, deutlich langsamer = Pause
+  if (raw.sport !== 'swim') return lapKinds(L.map((l, i) => lapOut(l, i, 'steady')), usePower);
+  // Schwimmen ohne Angabe: deutlich schneller oder höherer Puls als der Median = Belastung, deutlich langsamer = Pause
   const key = (l: typeof L[number]) => (l.avgPower ?? (l.avgSpeed != null ? l.avgSpeed * 100 : null));
   const vals = L.map(key).filter((x): x is number => x != null).sort((a, b) => a - b);
   const med = vals.length ? vals[Math.floor(vals.length / 2)] : null;
@@ -198,9 +217,12 @@ function lapOut(l: RawActivity['laps'][number], i: number, kind: LapOut['kind'])
   return { n: i + 1, sec: Math.round(l.sec), m: l.dist != null ? Math.round(l.dist) : null, avgHr: l.avgHr, maxHr: l.maxHr, speed: l.avgSpeed != null ? r2(l.avgSpeed) : null, power: l.avgPower, kind };
 }
 
+/* gleichmäßig + Splits deutlich schneller/langsamer ab km X → schneller werdend bzw. nachlassend */
+const withTrend = (p: Pattern | null, tr: Pattern | null): Pattern | null => p && p.type === 'steady' && tr ? { ...tr, autoLaps: p.autoLaps } : p;
 export function intervalStats(laps: LapOut[], sport: ActSport, usePower = false): IntervalOut | null {
   const work = laps.filter(l => l.kind === 'work');
   if (work.length < 2 || !(sport === 'run' || sport === 'bike' || sport === 'swim')) return null;
+  if (sport !== 'swim') return statsOf(laps, usePower);
   const first = work[0], last = work[work.length - 1];
   const out = (l: LapOut) => (usePower && l.power ? l.power : l.speed);
   const hrDriftPct = first.avgHr && last.avgHr ? r1((last.avgHr / first.avgHr - 1) * 100) : null;

@@ -2,6 +2,7 @@
    (was er bedeutet und ob es gut ist) und der Verlauf. Zeitraum 4 Wochen / 3 Monate / 1 Jahr. Trends ohne genug Daten
    zeigen „ab X … verfügbar“ statt einer wackligen Zahl. Extra-Einheiten zählen überall mit (sie stecken in activities). */
 import * as C from './core';
+import { intervalsOf } from './activity/structure';
 import type { Activity } from './activity/analyze';
 import { sleepNeed, type Profile } from './profile';
 
@@ -52,7 +53,7 @@ function firstLast(vals: number[]): { first: number; last: number } | null {
   const k = Math.max(2, Math.floor(vals.length / 3));
   return { first: avg(vals.slice(0, k))!, last: avg(vals.slice(-k))! };
 }
-const isHardAct = (a: Activity) => !!(a.intervals && a.intervals.count >= 2) || /intervall|schwelle|tempo|test|vo2|sweet|rennen|wettkampf/i.test(a.name || '');
+const isHardAct = (a: Activity) => !!((intervalsOf(a) || { count: 0 }).count >= 2) || /intervall|schwelle|tempo|test|vo2|sweet|rennen|wettkampf/i.test(a.name || '');
 const runs = (I: TrendInput, from: string) => I.activities.filter(a => a.sport === 'run' && a.date >= from && a.date <= I.today);
 const rides = (I: TrendInput, from: string) => I.activities.filter(a => a.sport === 'bike' && a.date >= from && a.date <= I.today);
 const swims = (I: TrendInput, from: string) => I.activities.filter(a => a.sport === 'swim' && a.date >= from && a.date <= I.today);

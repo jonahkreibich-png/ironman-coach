@@ -4,6 +4,7 @@
    das Tempo ist nur ein Anhalt: Wind und Steigung machen langsamer.
    Zonen: Tempo wächst etwa mit der dritten Wurzel der Leistung, daher Z2 (56-75 % FTP) ≈ 80-90 % der Schwellen-Geschwindigkeit. */
 import type { Profile } from './profile';
+import { intervalsOf } from './activity/structure';
 
 export type BikeKind = 'road' | 'gravel' | 'indoor';
 export const BIKE_KINDS: BikeKind[] = ['road', 'gravel', 'indoor'];
@@ -99,7 +100,7 @@ export function speedTrend(acts: any[], lthrBike: number, p: Pick<Profile, 'bike
   const by: Partial<Record<BikeKind, number[]>> = {};
   for (const a of acts) {
     if (!a || a.sport !== 'bike' || a.mergedInto || a.date > end || a.date <= from || !a.speedKmh || !a.avgHr || !a.min || a.min < 30) continue;
-    if (a.intervals && a.intervals.count >= 2) continue;
+    if ((intervalsOf(a) || { count: 0 }).count >= 2) continue;
     const f = a.avgHr / lthrBike; if (f > 0.9 || f < 0.62) continue;
     if (a.km && a.ascentM && a.ascentM / a.km > 8) continue; // hügelig: Tempo sagt wenig
     const k = kindOf({ indoor: a.indoor, bikeType: a.bikeType, name: a.name }, p);

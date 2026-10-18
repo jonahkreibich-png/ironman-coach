@@ -8,6 +8,7 @@
    gezählten Einheiten, wie sicher der Wert ist und was am meisten bringt.
    Bedingungen werden herausgerechnet: Hitze über 22 °C, Höhenmeter, Rollentrainer. Werte unter Krankheit zählen weniger. */
 import type { Activity } from './activity/analyze';
+import { intervalsOf } from './activity/structure';
 import type { Profile } from './profile';
 import { ageOf } from './profile';
 import type { Goal } from './goals';
@@ -145,7 +146,7 @@ function runRaw(c: Ctx): Raw {
   const { inp, end } = c;
   const lthr = inp.profile.thresholds.lthrRun || 170;
   const runs = inp.activities.filter(a => a.sport === 'run' && !a.mergedInto && inWindow(a, end, WINDOW) && a.min && a.min >= 10);
-  const easy = runs.filter(a => a.avgHr && a.avgHr <= 0.89 * lthr && !(a.intervals && a.intervals.count >= 2) && (a.speedKmh || a.efficiency));
+  const easy = runs.filter(a => a.avgHr && a.avgHr <= 0.89 * lthr && !((intervalsOf(a) || { count: 0 }).count >= 2) && (a.speedKmh || a.efficiency));
   const counted: Counted[] = [];
   // Schwelle: harte Einheiten, Intervall-Runden, Profil (Test oder Schätzung); lockere Läufe über den Puls-Anteil
   const thr: Est[] = [];
@@ -219,7 +220,7 @@ function bikeRaw(c: Ctx): Raw {
     const w = weightOf(a, inp, end);
     const sp = a.speedKmh! * flatSpeedFactor(a) * heatFactor(a);
     if (a.avgHr! >= 0.9 * lthr && a.min! >= 20) spThr.push({ v: roadEq(sp * Math.cbrt(lthr / a.avgHr!), k), w, date: a.date });
-    else if (a.avgHr! <= 0.88 * lthr && !(a.intervals && a.intervals.count >= 2)) imp.push({ v: roadEq(thrSpeedFromRide(sp, a.avgHr!, lthr), k), w, date: a.date });
+    else if (a.avgHr! <= 0.88 * lthr && !((intervalsOf(a) || { count: 0 }).count >= 2)) imp.push({ v: roadEq(thrSpeedFromRide(sp, a.avgHr!, lthr), k), w, date: a.date });
     if (!a.avgPower) counted.push({ date: a.date, title: titleOf(a), value: `${de(a.speedKmh!)} km/h ${BIKE_KIND_LABEL[k]} bei Puls ${a.avgHr}`, manual: isManual(a) });
   });
   const speedEst = (p.thresholds.estimated || []).includes('thresholdSpeedBikeKmh');

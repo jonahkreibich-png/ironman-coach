@@ -2,6 +2,7 @@
    Krankheits-Notiz, Essen) und zusätzlich täglich und wöchentlich. Wertet aus, passt den Plan nach festen Regeln an
    und schreibt jede Änderung mit Grund als Nachricht in den Coach-Chat. Funktioniert ohne KI und ohne Einwilligung. */
 import * as C from '../core';
+import { intervalsOf } from '../activity/structure';
 import { withTerms } from '../glossary';
 import type { Profile } from '../profile';
 import { sleepNeed, isMinor } from '../profile';
@@ -91,10 +92,11 @@ export function sessionComment(ctx: EngineCtx, act: any, s: any): string {
   const seed = act.id;
   const acts = Object.values(ctx.state.activities || {}).filter((x: any) => x && !x.mergedInto && x.id !== act.id && x.sport === act.sport && x.date < act.date && x.date > C.addDays(act.date, -56)) as any[];
   const lines: string[] = [];
-  const hard = s ? C.isIntervals(s) : !!(act.intervals && act.intervals.count >= 2);
+  const iv0 = intervalsOf(act);
+  const hard = s ? C.isIntervals(s) : !!(iv0 && iv0.count >= 2);
   // Gleiche Runde: Distanz ±10 %, Tempo ±4 %
   if ((act.sport === 'run' || act.sport === 'bike') && act.avgHr && act.km && act.speedKmh) {
-    const same = acts.filter(x => x.avgHr && x.km && x.speedKmh && Math.abs(x.km / act.km - 1) <= 0.1 && Math.abs(x.speedKmh / act.speedKmh - 1) <= 0.04 && !(x.intervals && x.intervals.count >= 2)).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const same = acts.filter(x => x.avgHr && x.km && x.speedKmh && Math.abs(x.km / act.km - 1) <= 0.1 && Math.abs(x.speedKmh / act.speedKmh - 1) <= 0.04 && !((intervalsOf(x) || { count: 0 }).count >= 2)).sort((a, b) => b.date.localeCompare(a.date))[0];
     if (same) {
       const d = Math.round(same.avgHr - act.avgHr);
       const weeks = Math.max(1, Math.round((+new Date(act.date) - +new Date(same.date)) / (7 * 86400000)));
@@ -102,8 +104,9 @@ export function sessionComment(ctx: EngineCtx, act: any, s: any): string {
       else if (d <= -4) lines.push(`Puls ${-d} Schläge höher als bei derselben Runde vor ${weeks === 1 ? 'einer Woche' : weeks + ' Wochen'}${act.tempC && act.tempC > 22 ? `, bei ${de(act.tempC, 0)} °C ist das normal` : '. Wenn das öfter vorkommt, brauchst du mehr Erholung'}.`);
     }
   }
-  if (act.intervals && act.intervals.count >= 2) {
-    const iv = act.intervals;
+  // Auftrag 16: Intervalle nur nennen, wenn sie geplant waren (oder ohne Plan erkannt); automatische Runden sind keine
+  if (iv0 && iv0.count >= 2 && (!s || C.isIntervals(s))) {
+    const iv = iv0;
     const drift = Math.max(iv.hrDriftPct || 0, iv.dropPct || 0);
     lines.push(drift < 5 ? `${iv.count} Intervalle, sehr gleichmäßig (Abfall nur ${de(drift)} %).` : `${iv.count} Intervalle, im letzten ${de(drift)} % schwächer als im ersten. Beim nächsten Mal etwas ruhiger anfangen.`);
     if (iv.recoveryHrDrop) lines.push(`In den Pausen fiel dein Puls um ${iv.recoveryHrDrop} Schläge.`);

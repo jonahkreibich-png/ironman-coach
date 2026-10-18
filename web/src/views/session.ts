@@ -1,6 +1,7 @@
 /* Einheit: Ansicht und Bearbeiten im Sheet, Abhaken. Werte von der Uhr tragen ihre Quelle,
    Korrekturen von Hand gelten ab dann, „Auf Original zurücksetzen“ holt die Werte der Uhr zurück. */
 import * as C from '../../../shared/core';
+import { intervalsOf } from '../../../shared/activity/structure';
 import { reviewSoon } from '../review';
 import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
@@ -117,8 +118,9 @@ export function activityDetails(a: any): string {
   if (a.paceSecKm) kv.push([t('m.pace'), pace(a.paceSecKm)]);
   if (a.speedKmh && a.sport === 'bike') kv.push([t('m.speed'), speed(a.speedKmh)]);
   if (kv.length) rows.push(kv.map(([k, v]) => `<div class="kv"><span class="muted">${esc(k)}</span><b class="num">${esc(v)}</b></div>`).join(''));
-  if (a.intervals) {
-    const iv = a.intervals;
+  const iv0 = intervalsOf(a);
+  if (iv0) {
+    const iv = iv0;
     rows.push(`<div class="lbl">${esc(t('act.intervals'))}</div><div class="hint">${esc(t('act.ivLine', { n: iv.count, drift: iv.hrDriftPct != null ? num(iv.hrDriftPct, 1) : '–', drop: iv.dropPct != null ? num(iv.dropPct, 1) : '–', rec: iv.recoveryHrDrop ?? '–' }))}</div>`);
   }
   if (a.laps && a.laps.length > 1) {

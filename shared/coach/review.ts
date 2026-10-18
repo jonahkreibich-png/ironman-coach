@@ -13,6 +13,7 @@ import { HR_ZONES } from '../sports';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
 import { de, mmss, dowName, joinDe } from './texts';
+import { patternOf, intervalsOf, type Pattern } from '../activity/structure';
 
 export interface ReviewOpt { label: string; say: string; go?: string }
 export interface Review { intent: 'review'; text: string; options: ReviewOpt[]; good: string[]; better: string[]; next: string[]; missing: string[]; items: number }
@@ -49,7 +50,7 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
 
 /* Werte einer Einheit: Uhr/Datei zuerst, sonst die Felder */
 export interface Vals { min: number | null; km: number | null; meters: number | null; hr: number | null; pace: number | null; speed: number | null; power: number | null; cadence: number | null; dec: number | null;
-  splits: { km: number; pace: string; hr: number | null }[]; hrZones: number[] | null; intervals: any; spl: number | null; dps: number | null; longest: number | null; pace100: number | null; crawlShare: number | null;
+  splits: { km: number; pace: string; hr: number | null }[]; hrZones: number[] | null; intervals: any; pattern: Pattern | null; spl: number | null; dps: number | null; longest: number | null; pace100: number | null; crawlShare: number | null;
   rpe: number | null; feel: number | null; deviation: string; notes: string; technique: string; tempC: number | null; ascent: number | null; indoor: boolean; bikeType: string | null; fromWatch: boolean }
 export function valsOf(d: Done): Vals {
   const f = fieldsOf(d.st || {}, d.sport); const a = d.act || {};
@@ -58,7 +59,7 @@ export function valsOf(d: Done): Vals {
   return {
     min: a.min ?? f.min ?? (d.custom && !d.act ? num(d.st.plannedMinutes) : null), km: d.sport === 'swim' ? null : (a.km ?? f.km), meters: d.sport === 'swim' ? (a.km ? Math.round(a.km * 1000) : f.meters) : null,
     hr: a.avgHr ?? f.hr, pace: d.sport === 'run' ? (a.paceSecKm ?? f.paceSec) : null, speed: sp ? Math.round(sp * 10) / 10 : null, power: a.avgPower ?? f.power, cadence: a.avgCadence ?? f.cadence, dec: a.decouplingPct ?? f.decoupling,
-    splits: (a.splits && a.splits.length ? a.splits : f.splits) || [], hrZones: a.hrZones || null, intervals: a.intervals || null,
+    splits: (a.splits && a.splits.length ? a.splits : f.splits) || [], hrZones: a.hrZones || null, intervals: d.act ? intervalsOf(a) : null, pattern: d.act ? patternOf(a) : null,
     spl: sw.strokesPerLength ?? f.spl, dps: sw.metersPerStroke ?? f.dps, longest: sw.longestContinuousM ?? f.longestCrawl, pace100: sw.pace100 ?? f.pace100, crawlShare: f.crawlShare,
     rpe: f.rpe ?? num(a.rpe), feel: f.feel, deviation: f.deviation, notes: f.notes, technique: f.technique, tempC: a.tempC ?? null, ascent: a.ascentM ?? null,
     indoor: !!(a.indoor || f.indoor || /rolle|trainer|indoor|zwift/i.test(d.title)), bikeType: f.bikeType || a.bikeType || null, fromWatch: !!d.act && d.act.source !== 'manual'
@@ -74,7 +75,9 @@ function plannedZone(s: any): number | null {
   return C.isHard(s) ? 4 : 2;
 }
 const EASY_T = /(keine|ohne) (intervall|harte)|ganz locker|\blocker(e|er|es)?\b|grundlage|regeneration/i;
-const isHardDone = (d: Done, v: Vals) => d.sport === 'football' && /spiel|match/i.test(d.title || '') ? true : d.planned ? C.isHard(d.planned) && !EASY_T.test(d.title || '') : !!(v.intervals && v.intervals.count >= 2) || /intervall|schwelle|tempo|sweet|hart|vo2|test|spiel/i.test(d.title);
+/* Auftrag 16: Die Art der Einheit kommt zuerst aus dem Plan. Ein langer lockerer Lauf ist eine Schlüsseleinheit, aber nicht hart. */
+export const plannedHard = (s: any) => !!s && (C.isIntervals(s) || C.isGame(s) || C.isTestOrRace(s)) && !EASY_T.test(s.title || '');
+const isHardDone = (d: Done, v: Vals) => d.sport === 'football' && /spiel|match/i.test(d.title || '') ? true : d.planned ? plannedHard(d.planned) : !!(v.intervals && v.intervals.count >= 2) || /intervall|schwelle|tempo|sweet|hart|vo2|test|spiel/i.test(d.title);
 
 /* Ähnliche frühere Einheit: gleiche Sportart, ähnlich lang (±30 %), gleich hart, mit Puls, in den 8 Wochen davor */
 function similarBefore(ctx: EngineCtx, d: Done, v: Vals): { d: Done; v: Vals } | null {
@@ -125,7 +128,8 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
       }
     } else {
       if (hz >= 3) good.push(`Harte Einheit wirklich hart: Puls Ø ${Math.round(v.hr)} (Zone ${hz}).`);
-      else better.push(`Puls Ø ${Math.round(v.hr)} nur Zone ${hz}. Bei Intervallen zählt der Puls in den Belastungen, der Schnitt mit Pausen ist niedriger; prüf die Runden.`);
+      else if (v.intervals && v.intervals.avgHrWork && hrZoneOf(v.intervals.avgHrWork, lthr) >= 3) good.push(`In den Belastungen Puls Ø ${v.intervals.avgHrWork} (Zone ${hrZoneOf(v.intervals.avgHrWork, lthr)}): hart genug. Der Schnitt mit Pausen (${Math.round(v.hr)}) ist natürlich niedriger.`);
+      else if (v.intervals || !s || !(s.spec && (s.spec.steps || []).some((x: any) => x.part === 'main' && (x.reps || 1) > 1))) better.push(`Puls Ø ${Math.round(v.hr)} nur Zone ${hz}. Für eine harte Einheit war das eher locker.`);
     }
     if (v.hrZones && !hard) {
       const tot = v.hrZones.reduce((a, x) => a + x, 0) || 1; const hi = (v.hrZones[2] + v.hrZones[3] + v.hrZones[4]) / tot;
@@ -147,13 +151,20 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     const k = kindOf({ indoor: v.indoor, bikeType: v.bikeType, title: d.title }, p); const thr = bikeSpeedsOf(p)[k];
     good.push(`${de(v.speed)} km/h im Schnitt (Zone ${z} flach etwa ${speedRange(thr, z)}; Wind und Hügel zählen mit).`);
   }
+  // Art der Einheit: Plan zuerst, die Messung bestätigt oder widerspricht (Auftrag 16)
+  const sn = structureNote(d, v, s, hard);
+  good.unshift(...sn.good); better.unshift(...sn.better); fatigue += sn.fatigue;
   // Wiederholungen und Intervall-Qualität
   const main = s && s.spec ? (s.spec.steps || []).find((x: any) => x.part === 'main' && (x.reps || 1) > 1) : null;
-  if (main && v.intervals) {
+  const repsAll = s && s.spec ? (s.spec.steps || []).filter((x: any) => x.part === 'main').reduce((a: number, x: any) => a + (x.reps || 1), 0) : 0;
+  // Schwimmen: alle Stücke des Hauptteils zählen (Technik, Kraul, Brust), die Uhr setzt pro Stück eine Runde
+  if (d.sport === 'swim' && main && v.intervals && repsAll) {
+    if (v.intervals.count >= repsAll * 0.8) good.push(`${v.intervals.count} Stücke mit Pause geschwommen (geplant ${repsAll}).`);
+  } else if (main && v.intervals && v.intervals.count <= main.reps * 1.5 && !sn.counted) {
     if (v.intervals.count >= main.reps) good.push(`${v.intervals.count} von ${main.reps} Intervallen geschafft.`);
     else better.push(`${v.intervals.count} von ${main.reps} Intervallen. Lieber alle etwas ruhiger als die letzten auslassen.`);
   }
-  if (v.intervals && v.intervals.count >= 2) {
+  if (v.intervals && v.intervals.count >= 2 && d.sport !== 'swim' && (hard || !s)) {
     const drift = Math.max(v.intervals.hrDriftPct || 0, v.intervals.dropPct || 0);
     if (drift < 5) good.push(`Intervalle sehr gleichmäßig (Abfall nur ${de(drift)} %).`);
     else if (drift > 8) better.push(`Das letzte Intervall war ${de(drift)} % schwächer als das erste: zu schnell angefangen. Die ersten zwei bewusst etwas ruhiger.`);
@@ -164,7 +175,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     if (v.dec <= 5) good.push(`Entkopplung ${de(v.dec)} %: der Puls blieb stabil, deine Grundlage trägt.`);
     else { better.push(`Entkopplung ${de(v.dec)} %: in der zweiten Hälfte stieg der Puls. Ruhiger anfangen, unterwegs trinken; mehr lange lockere Einheiten helfen.`); fatigue += 0.3; }
   }
-  if (v.splits.length >= 4) {
+  if (v.splits.length >= 4 && !(v.pattern && (v.pattern.type === 'progression' || v.pattern.type === 'fade'))) {
     const sec = (x: string) => { const m = /^(\d+):(\d{2})$/.exec(x || ''); return m ? +m[1] * 60 + +m[2] : null; };
     const ps = v.splits.map(x => sec(x.pace)).filter((x): x is number => x != null);
     if (ps.length >= 4) {
@@ -215,6 +226,50 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (mf.length) { better.push(`Morgenwerte: ${joinDe(mf)}. Das erklärt ${hard ? 'eine schwere Einheit' : 'einen höheren Puls'} oft schon.`); fatigue += 0.5 * mf.length; }
   else { const tr = (ctx.state.trend || []).find((x: any) => x && x.date === d.date); if (tr && tr.sleepHours != null && tr.sleepHours >= 7.5) good.push(`Gut geschlafen (${de(tr.sleepHours)} h).`); }
   return { good, better, next: [], missing, head, fatigue };
+}
+
+/* ---------- Plan gegen Messung (Auftrag 16) ----------
+   Gleichmäßige automatische Runden sind ein Dauerlauf, keine Intervalle. Intervalle erkennt die Auswertung nur bei deutlichem Wechsel
+   (structure.ts). Geplant locker, gemessen Wechsel → Hinweis; geplant Intervalle, gemessen gleichmäßig → sagen, warum nichts zu sehen ist. */
+const PAT: Record<string, string> = { intervals: 'Tempowechsel', fartlek: 'Tempowechsel wie bei einem Fahrtspiel', hills: 'harte Abschnitte bergauf' };
+function structureNote(d: Done, v: Vals, s: any, hard: boolean): { good: string[]; better: string[]; fatigue: number; counted: boolean } {
+  const out = { good: [] as string[], better: [] as string[], fatigue: 0, counted: false };
+  const p = v.pattern; if (!p || !(d.sport === 'run' || d.sport === 'bike')) return out;
+  const unit = d.sport === 'run' ? '/km' : '';
+  const long = s ? C.isLong(s) : false;
+  const what = d.sport === 'run' ? (long ? 'ein lockerer langer Lauf' : 'ein lockerer Lauf') : (long ? 'eine lange lockere Ausfahrt' : 'eine lockere Ausfahrt');
+  const whatAcc = d.sport === 'run' ? (long ? 'einen lockeren langen Lauf' : 'einen lockeren Lauf') : what;
+  const main = s && s.spec ? (s.spec.steps || []).find((x: any) => x.part === 'main' && (x.reps || 1) > 1) : null;
+  const changes = p.type === 'intervals' || p.type === 'fartlek' || p.type === 'hills';
+  if (s && !hard) {
+    if (changes) {
+      out.better.push(`Geplant war ${what}. Deine Daten zeigen ${p.reps || 'mehrere'} ${PAT[p.type]} im Wechsel mit ruhigen Abschnitten. War das Absicht, zählt der Tag als harter Tag; sonst gleichmäßig locker bleiben.`);
+      out.fatigue += 0.4;
+    } else if (p.type === 'progression' && p.fromKm && p.before && p.after) {
+      const late = (v.km || 0) - p.fromKm <= 2;
+      (late ? out.good : out.better).push(`Du bist ab km ${p.fromKm} deutlich schneller geworden (${mmss(p.after)} statt ${mmss(p.before)}${unit}).${late ? ' Ein kurzer Endspurt ist in Ordnung.' : ` Für ${whatAcc} lieber gleichmäßig bleiben, schneller wird es in den Tempo-Einheiten.`}`);
+    } else if (p.type === 'fade' && p.fromKm && p.before && p.after) {
+      out.better.push(`Ab km ${p.fromKm} deutlich langsamer (${mmss(p.after)} statt ${mmss(p.before)}${unit}): am Anfang etwas ruhiger loslaufen, unterwegs trinken.`);
+    } else if ((p.type === 'steady') && (v.min || 0) >= 20 && (p.autoLaps || p.from === 'stream')) {
+      out.good.push(`Gleichmäßig ${d.sport === 'run' ? 'gelaufen' : 'gefahren'}${p.autoLaps ? ', die automatischen Runden der Uhr sind alle ähnlich (Dauer' + (d.sport === 'run' ? 'lauf' : 'fahrt') + ', keine Intervalle)' : ''}: genau richtig für ${whatAcc}.`);
+    }
+  } else if (s && hard && main) {
+    if (changes && p.workSec && p.workSec.length && main.min) {
+      const med = [...p.workSec].sort((a, b) => a - b)[Math.floor(p.workSec.length / 2)];
+      const plan = main.min * 60;
+      const n = v.intervals ? v.intervals.count : p.reps || 0; const len = de(Math.round(med / 6) / 10);
+      const cnt = n >= main.reps ? `${n} von ${main.reps} Intervallen geschafft` : `${n} von ${main.reps} Intervallen`;
+      if (Math.abs(med / plan - 1) <= 0.25 && n >= main.reps) out.good.push(`${cnt}, je etwa ${len} min wie geplant.`);
+      else if (Math.abs(med / plan - 1) <= 0.25) out.better.push(`${cnt}, je etwa ${len} min. Lieber alle etwas ruhiger als die letzten auslassen.`);
+      else out.better.push(`${cnt}, im Schnitt ${len} min statt ${de(main.min)} min.`);
+      out.counted = true;
+    } else if (!changes && !v.intervals && v.fromWatch) {
+      out.better.push(`Geplant war ${s.title}. In deinen Daten sehe ich keine Tempowechsel${p.autoLaps ? ' (die Uhr hat nur automatisch Runden gesetzt, z. B. jeden Kilometer)' : ''}. Starte die Einheit beim nächsten Mal als Workout auf der Uhr oder drück bei jeder Belastung die Rundentaste, dann sehe ich die Intervalle.`);
+    }
+  } else if (!s && changes) {
+    out.good.push(`Erkannt: ${p.reps || 'mehrere'} ${PAT[p.type]}. Das zählt als harte Einheit.`);
+  }
+  return out;
 }
 
 /* ---------- Nächste Tage ---------- */
