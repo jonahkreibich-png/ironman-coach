@@ -2,6 +2,16 @@
 
 Nur das, was du selbst tun musst.
 
+## Neu am 18.10. (Auftrag 15)
+
+**Mama:** nichts zu tun. Sie öffnet die App einfach (bei „Neue Version“ einmal neu laden). Die Läufe verschwinden dann von selbst aus ihrem Plan, ab heute neu verteilt, Erledigtes bleibt. Verbinden geht jetzt direkt: Mehr → Verbindungen → z. B. Oura oder Dropbox → „Verbinden“ → anmelden → „Erlauben“. Die App legt dabei ein Konto für sie an.
+
+**Wenn mehr Leute Oura oder Dropbox verbinden** (erst dann nötig):
+- **Oura** lässt eine neue App nur von wenigen Nutzern verbinden (die App rechnet mit 10). Ab dann sehen neue Nutzer „Oura ist gerade nicht verfügbar“. Freigabe: auf cloud.ouraring.com anmelden → oben „API Applications“ (bzw. Developer) → deine App öffnen → Prüfung/Freigabe beantragen (Zweck: Trainings-App für Familie und Freunde, Daten nur für den Nutzer selbst). Nach der Freigabe sag Claude Bescheid, dann wird die Grenze aufgehoben.
+- **Dropbox:** Im Dropbox App Console (dropbox.com/developers/apps → deine App → Settings) steht „Development users“. Sobald dort 50 stehen, „Apply for production“ antippen (kostenlos, ein kurzes Formular). Bis 500 Nutzer geht es auch ohne.
+
+**Optional, nur für die Test-Umgebung:** Oura ist dort „gerade nicht verfügbar“, weil dort keine Oura-Schlüssel gesetzt sind. Wenn du Oura auch in der Test-App willst: in deiner Oura-App als zweite Redirect-Adresse `https://stamio-test.pages.dev/api/connect/oura/callback` eintragen, dann im Ordner `ironman-coach`: Client ID kopieren und `node scripts/set-secret.mjs OURA_CLIENT_ID` ausführen, danach Client Secret kopieren und `node scripts/set-secret.mjs OURA_CLIENT_SECRET`.
+
 ## A. Schwimm-Hilfsmittel eintragen (1 Minute, du und Papa, neu am 17.10.)
 
 Mehr → Berücksichtigungen → Können und Ausrüstung → **Schwimm-Hilfsmittel** antippen (Kickbrett, Pull Buoy, Flossen, Paddles, Frontschnorchel). Nur was ihr habt (oder im Bad leihen könnt), kommt in die Einheiten. Bis dahin plant die App ohne Hilfsmittel. Der Coach erinnert euch auch.

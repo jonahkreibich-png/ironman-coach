@@ -1,5 +1,41 @@
 # Ergebnis
 
+## Auftrag 15: Mamas Fehler und großer Test mit 60 Nutzern (18.10.)
+
+Live in der echten App (Version 3.2.0), vorher in stamio-test. Sicherungen: `data-export/prod-vor-auftrag15.sql`, `prod-vor-auftrag15b.sql`, `prod-vor-papa15.sql`, `test-vor-auftrag15.sql`. Geändert wurde in der echten App nur Papas Plan (ab heute neu, Erledigtes bleibt). Jonahs Plan erfüllt alle neuen Regeln und blieb unverändert.
+
+**1 Nur gewählte Sportarten:** Ursache war die Ziel-Vorlage „Allgemeine Fitness“: Sie fügte immer Laufen, Rad und Schwimmen hinzu, egal was gewählt war, und setzte nach 12 Wochen einen „Wettkampf“ als Lauf. Jetzt gilt fest: nur gewählte Sportarten, Teamsport nur, wenn angegeben – auch bei Tests, Koppel, Ersatz-Einheiten, Coach und KI. Fitness hat keinen Wettkampf mehr. Mama nutzt die App ohne Konto, ihre Daten liegen nur auf ihrem iPhone: Beim nächsten Öffnen erkennt die App die Läufe und plant ab heute neu, ohne Neuanfang. Der Plan-Check meldet und entfernt jede nicht gewählte Sportart.
+
+**2 Verbinden für alle:** Mama hatte kein Konto, deshalb „Verbindungen laufen über deinen Server“. Jetzt: „Verbinden“ → die App legt ein privates Konto an (Daten des Geräts kommen mit) → Anmeldung beim Dienst → „Erlauben“. Keine Einladung nötig, Schutz gegen Missbrauch (3 neue Konten pro Tag und Adresse, höchstens 300 Nutzer). Normale Nutzer sehen kein Server/API/Secret/Schlüssel mehr (außer intervals.icu, dort mit 5 Schritten). Server-Schlüssel nur für dich. Oura erlaubt im Entwicklermodus nur wenige Nutzer: ist die Grenze erreicht, steht „gerade nicht verfügbar“; die Freigabe steht in FUER-JONAH.md. Getestet mit einem neuen Nutzer in stamio-test und in der echten App (Konto → Dropbox-Anmeldung, danach gelöscht).
+
+**3 Datum im Fragebogen:** Safari auf dem iPhone gibt Datumsfeldern eine eigene Mindestbreite. Jetzt passen sie sich der Spalte an. Der Layout-Test stellt diese iPhone-Breite nach und prüft alle Eingabefelder auf allen Fragebogen-Seiten (320-430 px).
+
+**4 Gleiche Sportart nicht hintereinander:** Der Generator verteilt jede Sportart über die Woche, auch über So → Mo. Geht es nicht anders (Zeit, Schwimmbad, feste Termine), wird verschoben oder getauscht, sonst ist eine Einheit locker und kurz und sagt in „Warum“, weshalb. Kraft nicht zweimal hintereinander für dieselben Muskeln, nie zwei harte Tage hintereinander. Der Plan-Check prüft das bei jedem Plan.
+
+**5 Großer Test:** 60 erfundene Nutzer (14-75 Jahre, alle 15 Sportart-Kombinationen, Fitness, Abnehmen ohne Gewichtsziel für Jugendliche, 5 km bis Langdistanz, Rad, Schwimmen, Teamsport mit/ohne Spiele, wenig/viel Zeit, Kraul ja/etwas/nein, Hilfsmittel, 25/50-m-Becken, Verletzungen, Krankheit). Jeder komplett: Fragebogen → Plan → 3 Wochen (erledigt, ausgelassen, Extra) → Coach-Fragen → Profil ändern → Scores, Prognose, Ampel → alle Bildschirme im Browser. Gleicher Test vorher (alter Stand) und nachher:
+
+| Fehlerart | betroffene Test-Nutzer (von 60) | behoben |
+|---|---|---|
+| Nicht gewählte Sportart im Plan | 21 | ja |
+| Gleiche Sportart an Folgetagen ohne Begründung | 48 | ja |
+| Zwei harte Tage hintereinander | 0 | – (jetzt auch So → Mo geprüft) |
+| Erholungswoche kaum leichter als die Woche davor | 43 | ja |
+| Umfang springt zu stark (z. B. Lauf-Geh-Einheit mehr = +50 %) | 14 | ja |
+| Unrealistisch: Kraul-Check länger als das Können, 30-min-Lauftest für Einsteiger, Rad-Intervalle länger als die längste Fahrt | 7 | ja |
+| Intensität passt nicht zur Phase | 19 | 16 ja, 3 nein* |
+| Widersprüchliche Texte („locker“ + Zone 3) | 0 | – |
+| Fachbegriffe ohne Erklärung (Schwelle, Sweet Spot, HFV, CSS …) | 60 | ja |
+| Coach versteht „plan mir eine Einheit Laufen“ bei Nicht-Läufern nicht | 43 | ja |
+| Coach nennt nicht gewählte Sportart (z. B. „Laufzonen geschätzt“) | 21 | ja |
+| Coach: „Ich will abnehmen“ bei Erwachsenen mit Hinweis auf Eltern | 45 | ja |
+| Betreiber-/Server-Begriffe bei normalen Nutzern | 60 | ja |
+| Datumsfeld ragt heraus (iPhone) | alle auf dem iPhone | ja |
+| Ragt aus dem Bildschirm, Konsolenfehler, Ampel-Farbe ≠ Wert, Score/Prognose ungültig, Neuplanung verliert Erledigtes | 0 | – |
+
+*Bekannte Grenze: 3 Nutzer mit sehr wenigen freien Tagen plus Spielen (z. B. nur Mo/Fr/So frei, Spiel am Samstag) haben in einer Phase keinen Tag für eine harte Einheit; das Spiel ist dort der harte Reiz.
+
+Alle Fehlerarten sind als Regel im Plan-Check bzw. als dauerhafte Tests drin. Tests: 1484 Unit-/Server-Tests, 243 Browser-Tests (Chromium und WebKit). Entscheidungen 172-186.
+
 ## Fehlersuche (17.10. abends)
 
 Warum dein Training nicht ankommt: Die App holt alle FIT-Dateien ab, aber in deiner ganzen Dropbox liegt nur eine (Rad indoor, 16.10.). HealthFit exportiert deine Trainings nicht nach Dropbox. Was du tun musst, steht in FUER-JONAH.md, Abschnitt B. Die App sucht jetzt selbst in der ganzen Dropbox nach FIT-Dateien, wechselt bei Bedarf den Ordner und zeigt unter Verbindungen, was sie findet und wann die letzte Datei kam.
