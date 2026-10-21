@@ -1,3 +1,4 @@
+import { actualMetrics } from './results';
 /* Leistungs-Scores je Sportart (Auftrag 12): feste Leistungsskala 0-100 statt „Anteil am Ziel“.
    20 = Einsteiger, 50 = solider Hobbysportler, 70 = stark, 85 = Spitzenamateur, 100 = Elite; alters- und geschlechtsbereinigt, wenn bekannt.
    Kein Abschneiden bei 100 mehr: wer besser wird, steigt weiter.
@@ -15,6 +16,7 @@ import type { Goal } from './goals';
 import { requirementFor, type Requirement } from './sports';
 import { addDays, illnessAt, planDays, isIntervals } from './core';
 import { vdotFromThreshold } from './vdot';
+import { loadSeriesFromDaily } from './load';
 import { bikeSpeedsOf, kindOf, powerFracFromHr, thrSpeedFromRide, GRAVEL_F, BIKE_KIND_LABEL, type BikeKind } from './bikespeed';
 
 export type ScoreSport = 'run' | 'bike' | 'swim' | 'strength';
@@ -44,6 +46,7 @@ export interface ScoreInput {
   manualAdjust?: Record<string, number>;
   /** Tagesbelastung je Sport (für CTL je Sport) */
   loadsBySport?: Record<string, Record<string, number>>;
+  settings?: any;
   /** gespeicherte Etappenziele je Teil („run.thr“) */
   stages?: Record<string, StageGoal> | null;
 }
@@ -99,7 +102,7 @@ export function ageSexFactor(p: Pick<Profile, 'birthYear' | 'sex'>, today: strin
 function weightOf(a: Activity, inp: ScoreInput, end: string): number {
   const ill = illnessAt(inp.illness, a.date) || illnessAt(inp.illness, addDays(a.date, -2)) ? 0.5 : 1;
   const age = Math.max(0, (Date.parse(end) - Date.parse(a.date)) / 86400000);
-  return ill * (1 - 0.5 * Math.min(1, age / WINDOW));
+  return ill * Math.exp(-Math.LN2 * age / WINDOW);
 }
 /* Hitze herausrechnen: über 22 °C steigt der Puls bei gleichem Tempo um etwa 0,4 % pro Grad */
 function heatFactor(a: Activity): number { return a.tempC != null && a.tempC > 22 && !a.indoor ? 1 + 0.004 * (a.tempC - 22) : 1; }
@@ -115,8 +118,8 @@ const titleOf = (a: Activity) => a.name || ({ run: 'Lauf', bike: 'Radfahrt', swi
 
 interface Est { v: number; w: number; date: string }
 function wmedian(list: Est[]): number | null {
-  if (!list.length) return null;
-  const s = [...list].sort((a, b) => a.v - b.v);
+  const s = list.filter(x => Number.isFinite(x.v) && Number.isFinite(x.w) && x.w > 0).sort((a, b) => a.v - b.v);
+  if (!s.length) return null;
   const tot = s.reduce((a, x) => a + x.w, 0);
   let acc = 0;
   for (const x of s) { acc += x.w; if (acc >= tot / 2) return x.v; }
@@ -135,7 +138,19 @@ function markText(kind: ScoreMark['kind'], label: string, raw: number, cur: numb
 
 /* ---------- Teil-Bausteine ---------- */
 interface Ctx { inp: ScoreInput; end: string; req: Requirement; need: Requirement; wish: Requirement | null; f: number }
-interface Raw { parts: ScorePart[]; n: number; counted: Counted[]; latest: string | null; manualShare: number; levelSource: string; extra: any }
+interface Raw { parts: ScorePart[]; n: number; counted: Counted[]; latest: string | null; manualShare: number; levelSource: string; extra: any; evidence?: Est[] }
+
+// Letzte beobachtete Fähigkeit bleibt bei Pause bestehen. Nur die Sicherheit altert.
+// Leere Kurz-Einträge dürfen weder das Fenster noch das Vertrauen erneuern.
+function evidenceActivities(c: Ctx, sport: ScoreSport): { end: string; activities: Activity[] } {
+  const valid = c.inp.activities.filter(a => a.sport === sport && !a.mergedInto && a.date <= c.end && (a.min == null || (Number.isFinite(a.min) && a.min >= 0)) &&
+    (sport === 'run' ? !!(a.min && a.min >= 10 && ((a.avgHr && (a.speedKmh || a.efficiency)) || a.laps?.some(l => l.kind === 'work' && l.speed && l.avgHr) || a.min >= 30)) :
+      sport === 'bike' ? !!(a.min && a.min >= 15) : sport === 'swim' ? !!(a.km || a.min) : true));
+  const end = valid.map(a => a.date).sort().pop() || c.end;
+  const seen = new Set<string>();
+  const activities = valid.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return inWindow(a, end, WINDOW); });
+  return { end, activities };
+}
 
 function mk(key: string, label: string, weight: number, raw: number | null, sub: number | null, value: string, opts: { lowerBetter?: boolean; target?: string } = {}): ScorePart {
   return { key, label, weight, raw, sub: sub == null ? null : Math.round(sub * 10) / 10, value, target: opts.target || '', lowerBetter: opts.lowerBetter, marks: [] };
@@ -143,16 +158,22 @@ function mk(key: string, label: string, weight: number, raw: number | null, sub:
 
 /* ---------- Laufen ---------- */
 function runRaw(c: Ctx): Raw {
-  const { inp, end } = c;
+  const { inp } = c;
+  const { end, activities: runs } = evidenceActivities(c, 'run');
   const lthr = inp.profile.thresholds.lthrRun || 170;
-  const runs = inp.activities.filter(a => a.sport === 'run' && !a.mergedInto && inWindow(a, end, WINDOW) && a.min && a.min >= 10);
   const easy = runs.filter(a => a.avgHr && a.avgHr <= 0.89 * lthr && !((intervalsOf(a) || { count: 0 }).count >= 2) && (a.speedKmh || a.efficiency));
   const counted: Counted[] = [];
   // Schwelle: harte Einheiten, Intervall-Runden, Profil (Test oder Schätzung); lockere Läufe über den Puls-Anteil
   const thr: Est[] = [];
   runs.forEach(a => {
-    if (a.avgHr && a.speedKmh && a.min! >= 15 && a.min! <= 75 && a.avgHr >= 0.92 * lthr) { thr.push({ v: a.speedKmh / 3.6 * flatSpeedFactor(a) * heatFactor(a) * lthr / a.avgHr, w: weightOf(a, inp, end), date: a.date }); counted.push({ date: a.date, title: titleOf(a), value: `${mmss(3600 / a.speedKmh)}/km bei Puls ${a.avgHr} (hart)`, manual: isManual(a) }); }
-    (a.laps || []).filter(l => l.kind === 'work' && l.sec >= 180 && l.speed && l.avgHr && l.avgHr >= 0.9 * lthr).forEach(l => thr.push({ v: l.speed! * lthr / l.avgHr! * 0.98, w: 0.8 * weightOf(a, inp, end), date: a.date }));
+    const local: Est[] = [];
+    if (a.avgHr && a.speedKmh && a.min! >= 15 && a.min! <= 75 && a.avgHr >= 0.92 * lthr) { local.push({ v: a.speedKmh / 3.6 * flatSpeedFactor(a) * heatFactor(a) * lthr / a.avgHr, w: 1, date: a.date }); counted.push({ date: a.date, title: titleOf(a), value: `${mmss(3600 / a.speedKmh)}/km bei Puls ${a.avgHr} (hart)`, manual: isManual(a) }); }
+    (a.laps || []).filter(l => l.kind === 'work' && l.sec >= 180 && l.speed && l.avgHr && l.avgHr >= 0.9 * lthr).forEach(l => local.push({ v: l.speed! * lthr / l.avgHr! * 0.98, w: 0.8, date: a.date }));
+    const v = wmedian(local);
+    if (v != null) {
+      thr.push({ v, w: weightOf(a, inp, end), date: a.date });
+      if (!counted.some(x => x.date === a.date && x.title === titleOf(a))) counted.push({ date: a.date, title: titleOf(a), value: `${mmss(1000 / v)}/km aus Intervallrunden (Schätzung)`, manual: isManual(a) });
+    }
   });
   const imp: Est[] = [];
   easy.forEach(a => {
@@ -162,10 +183,9 @@ function runRaw(c: Ctx): Raw {
   });
   const t = inp.profile.thresholds;
   const est = (t.estimated || []).includes('thresholdPaceRunSec');
-  if (t.thresholdPaceRunSec > 0) thr.push({ v: 1000 / t.thresholdPaceRunSec, w: est ? 0.3 : 0.7, date: end });
   const impMed = wmedian(imp.filter(x => x.date > addDays(end, -RECENT)));
-  if (impMed) thr.push({ v: impMed, w: 0.5, date: end });
-  const thrSpeed = wmedian(thr);
+  const evidence = [...thr, ...imp.map(x => ({ ...x, w: x.w * 0.5 }))];
+  const thrSpeed = wmedian(evidence) ?? (t.thresholdPaceRunSec > 0 ? 1000 / t.thresholdPaceRunSec : null);
   const effSpeed = impMed && thrSpeed ? clamp(impMed, thrSpeed * 0.85, thrSpeed * 1.15) : null;
   const effs = easy.filter(a => inWindow(a, end, RECENT) && a.efficiency).map(a => ({ v: a.efficiency! * heatFactor(a) * flatSpeedFactor(a), w: weightOf(a, inp, end), date: a.date }));
   const eff = wmedian(effs);
@@ -177,21 +197,21 @@ function runRaw(c: Ctx): Raw {
   const f = c.f;
   const lvl = (sp: number) => scale(SCALES.runVdot, vdotFromThreshold(sp * f));
   const parts: ScorePart[] = [
-    mk('thr', 'Schwellen-Pace', 0.5, thrSpeed ? 1000 / thrSpeed : null, thrSpeed ? lvl(thrSpeed) : null, thrSpeed ? mmss(1000 / thrSpeed) + '/km' : '–', { lowerBetter: true }),
-    mk('eff', 'Effizienz locker', 0.15, effSpeed ? 1000 / effSpeed : null, effSpeed ? lvl(effSpeed) : null, eff ? `${de(eff, 2)} m pro Herzschlag${effSpeed ? ` (≈ ${mmss(1000 / effSpeed)}/km an der Schwelle)` : ''}` : '–', { lowerBetter: true }),
+    mk('thr', 'Schwellen-Pace', 0.65, thrSpeed ? 1000 / thrSpeed : null, thrSpeed ? lvl(thrSpeed) : null, thrSpeed ? mmss(1000 / thrSpeed) + '/km' : '–', { lowerBetter: true }),
+    mk('eff', 'Effizienz locker', 0, effSpeed ? 1000 / effSpeed : null, effSpeed ? lvl(effSpeed) : null, eff ? `${de(eff, 2)} m pro Herzschlag${effSpeed ? ` (≈ ${mmss(1000 / effSpeed)}/km an der Schwelle)` : ''}` : '–', { lowerBetter: true }),
     mk('long', easyMins.length ? 'Längster lockerer Lauf' : 'Laufen am Stück (Fragebogen)', 0.2, longest, longest ? scale(SCALES.longRun, longest) : null, longest ? longest + ' min' : '–'),
     mk('dec', 'Aerobe Entkopplung', 0.15, dec, dec != null ? scale(SCALES.dec, dec) : null, dec != null ? de(dec) + ' %' : '–', { lowerBetter: true, target: 'unter 5 %' })
   ];
   const latest = runs.map(a => a.date).sort().pop() || null;
-  return { parts, n: runs.length, counted, latest, manualShare: runs.length ? runs.filter(isManual).length / runs.length : 1, levelSource: thr.length > 1 || imp.length ? 'Einheiten' : est ? 'Schätzung aus dem Profil' : t.source || 'Profil', extra: { thrSpeed, eff, dec, longest, impMed } };
+  return { evidence, parts, n: runs.length, counted, latest, manualShare: runs.length ? runs.filter(isManual).length / runs.length : 1, levelSource: thr.length > 1 || imp.length ? 'Einheiten' : est ? 'Schätzung aus dem Profil' : t.source || 'Profil', extra: { thrSpeed, eff, dec, longest, impMed } };
 }
 
 /* ---------- Rad ---------- */
 function bikeRaw(c: Ctx): Raw {
-  const { inp, end } = c;
+  const { inp } = c;
+  const { end, activities: rides } = evidenceActivities(c, 'bike');
   const p = inp.profile;
   const lthr = p.thresholds.lthrBike || 165;
-  const rides = inp.activities.filter(a => a.sport === 'bike' && !a.mergedInto && inWindow(a, end, WINDOW) && a.min && a.min >= 15);
   const weight = p.weightKg || 70;
   const counted: Counted[] = [];
   // FTP: harte 20-75-min-Abschnitte, Runden ab 8 min, Sweet-Spot-/Schwellen-Einheiten mit Ø-Watt, Profil
@@ -199,16 +219,18 @@ function bikeRaw(c: Ctx): Raw {
   let strong = 0, titled = 0;
   rides.forEach(a => {
     const w = weightOf(a, inp, end);
-    if (a.avgPower && a.avgHr && a.min! >= 20 && a.min! <= 75 && a.avgHr >= 0.9 * lthr) { ftpEst.push({ v: a.avgPower * 0.95 * lthr / a.avgHr, w, date: a.date }); strong++; }
-    (a.laps || []).filter(l => l.kind === 'work' && l.sec >= 480 && l.power).forEach(l => { ftpEst.push({ v: l.power! * (l.sec >= 1200 ? 0.95 : 0.9), w: 0.8 * w, date: a.date }); strong++; });
+    const local: Est[] = [];
+    if (a.avgPower && a.avgHr && a.min! >= 20 && a.min! <= 75 && a.avgHr >= 0.9 * lthr) { local.push({ v: a.avgPower * 0.95 * lthr / a.avgHr, w, date: a.date }); strong++; }
+    (a.laps || []).filter(l => l.kind === 'work' && l.sec >= 480 && l.power).forEach(l => { local.push({ v: l.power! * (l.sec >= 1200 ? 0.95 : 0.9), w: 0.8 * w, date: a.date }); strong++; });
     const nm = `${a.name || ''}`;
-    if (a.avgPower && !(a.laps || []).some(l => l.kind === 'work') && /sweet ?spot/i.test(nm)) { ftpEst.push({ v: a.avgPower / 0.9, w: 0.5 * w, date: a.date }); titled++; }
-    else if (a.avgPower && !(a.laps || []).some(l => l.kind === 'work') && /schwelle|threshold|ftp/i.test(nm)) { ftpEst.push({ v: a.avgPower / 0.97, w: 0.5 * w, date: a.date }); titled++; }
+    if (a.avgPower && !(a.laps || []).some(l => l.kind === 'work') && /sweet ?spot/i.test(nm)) { local.push({ v: a.avgPower / 0.9, w: 0.5 * w, date: a.date }); titled++; }
+    else if (a.avgPower && !(a.laps || []).some(l => l.kind === 'work') && /schwelle|threshold|ftp/i.test(nm)) { local.push({ v: a.avgPower / 0.97, w: 0.5 * w, date: a.date }); titled++; }
+    const v = wmedian(local);
+    if (v != null) ftpEst.push({ v, w, date: a.date });
     if (a.avgPower) counted.push({ date: a.date, title: titleOf(a), value: `${Math.round(a.avgPower)} W${a.avgHr ? ` bei Puls ${a.avgHr}` : ''}`, manual: isManual(a) });
   });
   // FTP nur aus Test/Profil, harten Abschnitten oder Runden; Titel allein („Sweet Spot“ mit Ø-Watt) erst ab 2 Einheiten
-  if (p.thresholds.ftp && p.thresholds.ftp > 0) ftpEst.push({ v: p.thresholds.ftp, w: 0.7, date: end });
-  const ftp = (p.thresholds.ftp && p.thresholds.ftp > 0) || strong > 0 || titled >= 2 ? wmedian(ftpEst) : null;
+  const ftp = (strong > 0 || titled >= 2 ? wmedian(ftpEst) : null) ?? (p.thresholds.ftp && p.thresholds.ftp > 0 ? p.thresholds.ftp : null);
   // Ohne Watt: Schwellen-Geschwindigkeit (Rennrad-Wert; Gravel wird umgerechnet, drinnen zählt die virtuelle Geschwindigkeit wie Rennrad)
   const bs = bikeSpeedsOf(p);
   const roadEq = (kmh: number, k: BikeKind) => k === 'gravel' ? kmh / GRAVEL_F : kmh;
@@ -224,10 +246,9 @@ function bikeRaw(c: Ctx): Raw {
     if (!a.avgPower) counted.push({ date: a.date, title: titleOf(a), value: `${de(a.speedKmh!)} km/h ${BIKE_KIND_LABEL[k]} bei Puls ${a.avgHr}`, manual: isManual(a) });
   });
   const speedEst = (p.thresholds.estimated || []).includes('thresholdSpeedBikeKmh');
-  spThr.push({ v: roadEq(bs[bs.main], bs.main), w: speedEst ? 0.3 : 0.7, date: end });
   const impMed = wmedian(imp.filter(x => x.date > addDays(end, -RECENT)));
-  if (impMed) spThr.push({ v: impMed, w: 0.5, date: end });
-  const thrKmh = wmedian(spThr); // Rennrad-Äquivalent
+  const speedEvidence = [...spThr, ...imp.map(x => ({ ...x, w: x.w * 0.5 }))];
+  const thrKmh = wmedian(speedEvidence) ?? (p.thresholds.thresholdSpeedBikeKmh > 0 ? roadEq(bs[bs.main], bs.main) : null); // Rennrad-Äquivalent
   // Effizienz: mit Watt Leistung pro Herzschlag bei lockeren Fahrten (in FTP umgerechnet), sonst Tempo pro Herzschlag
   const effP: Est[] = rides.filter(a => a.avgPower && a.avgHr && a.avgHr <= 0.88 * lthr && inWindow(a, end, RECENT)).map(a => ({ v: a.avgPower! / powerFracFromHr(a.avgHr! / lthr), w: weightOf(a, inp, end), date: a.date }));
   const effFtp = wmedian(effP);
@@ -243,21 +264,21 @@ function bikeRaw(c: Ctx): Raw {
   const shownKmh = thrKmh ? (bs.main === 'gravel' ? thrKmh * GRAVEL_F : thrKmh) : null;
   const effVal = usePower ? (effFtp ? clamp(effFtp, ftp! * 0.85, ftp! * 1.15) : null) : (impMed && thrKmh ? clamp(impMed, thrKmh * 0.85, thrKmh * 1.15) : null);
   const parts: ScorePart[] = [
-    usePower ? mk('thr', 'FTP', 0.5, ftp! / weight, lvlW(ftp!), `${Math.round(ftp!)} W (${de(ftp! / weight, 1)} W/kg)`)
-      : mk('thr', 'Schwellen-Tempo', 0.5, shownKmh, thrKmh ? lvlS(thrKmh) : null, shownKmh ? `${de(shownKmh)} km/h (${mainLabel}, flach)` : '–'),
-    mk('eff', 'Effizienz locker', 0.15, effVal, effVal ? (usePower ? lvlW(effVal) : lvlS(effVal)) : null, effVal ? (usePower ? `≈ ${Math.round(effVal)} W an der Schwelle` : `≈ ${de(bs.main === 'gravel' ? effVal * GRAVEL_F : effVal)} km/h an der Schwelle`) + ' (aus lockeren Fahrten)' : '–'),
+    usePower ? mk('thr', 'FTP', 0.65, ftp! / weight, lvlW(ftp!), `${Math.round(ftp!)} W (${de(ftp! / weight, 1)} W/kg)`)
+      : mk('thr', 'Schwellen-Tempo', 0.65, shownKmh, thrKmh ? lvlS(thrKmh) : null, shownKmh ? `${de(shownKmh)} km/h (${mainLabel}, flach)` : '–'),
+    mk('eff', 'Effizienz locker', 0, effVal, effVal ? (usePower ? lvlW(effVal) : lvlS(effVal)) : null, effVal ? (usePower ? `≈ ${Math.round(effVal)} W an der Schwelle` : `≈ ${de(bs.main === 'gravel' ? effVal * GRAVEL_F : effVal)} km/h an der Schwelle`) + ' (aus lockeren Fahrten)' : '–'),
     mk('long', rides.length ? 'Längste Fahrt' : 'Längste Fahrt (Fragebogen)', 0.2, longest, longest ? scale(SCALES.longRide, longest) : null, longest ? longest + ' min' : '–'),
     mk('dec', 'Aerobe Entkopplung', 0.15, dec, dec != null ? scale(SCALES.dec, dec) : null, dec != null ? de(dec) + ' %' : '–', { lowerBetter: true, target: 'unter 5 %' })
   ];
   const latest = rides.map(a => a.date).sort().pop() || null;
-  return { parts, n: rides.length, counted, latest, manualShare: rides.length ? rides.filter(isManual).length / rides.length : 1, levelSource: rides.length ? 'Einheiten' : speedEst ? 'Schätzung aus dem Profil' : 'Profil', extra: { ftp, thrKmh, shownKmh, usePower, dec, longest, weight, mainKind: bs.main } };
+  return { evidence: usePower ? ftpEst : speedEvidence, parts, n: rides.length, counted, latest, manualShare: rides.length ? rides.filter(isManual).length / rides.length : 1, levelSource: rides.length ? 'Einheiten' : speedEst ? 'Schätzung aus dem Profil' : 'Profil', extra: { ftp, thrKmh, shownKmh, usePower, dec, longest, weight, mainKind: bs.main } };
 }
 
 /* ---------- Schwimmen ---------- */
 function swimRaw(c: Ctx): Raw {
-  const { inp, end } = c;
+  const { inp } = c;
+  const { end, activities: swims } = evidenceActivities(c, 'swim');
   const p = inp.profile; const sk = p.skills || {}; const th = p.thresholds;
-  const swims = inp.activities.filter(a => a.sport === 'swim' && !a.mergedInto && inWindow(a, end, WINDOW) && (a.km || a.min));
   const counted: Counted[] = [];
   const canCrawl = sk.swimCrawl === 'yes' || sk.swimCrawl === 'some' || (sk.swimCrawlM || 0) >= 25 || (!!th.cssSec && !(th.estimated || []).includes('cssSec')) || swims.some(a => a.swim && (a.swim.longestContinuousM || 0) >= 25) || (sk.swimCrawl == null && !!th.cssSec);
   // CSS: lange Serien (+3 s), Pace einer Einheit (−4 s, Pausen sind drin), Test im Profil, 25-m-Zeit, sonst Brust
@@ -270,14 +291,15 @@ function swimRaw(c: Ctx): Raw {
   });
   const cssEst = (th.estimated || []).includes('cssSec');
   let source = 'CSS';
-  if (th.cssSec) css.push({ v: th.cssSec, w: cssEst ? 0.3 : 0.8, date: end });
-  if (th.crawl25Sec) css.push({ v: th.crawl25Sec * 4 * 1.12, w: 0.6, date: end });
+  const evidence = [...css];
+  if (!css.length && th.cssSec) css.push({ v: th.cssSec, w: cssEst ? 0.3 : 0.8, date: end });
+  if (!css.length && th.crawl25Sec) css.push({ v: th.crawl25Sec * 4 * 1.12, w: 0.6, date: end });
   if (!css.length) { const br = th.breast100Sec || 170 + (p.sex === 'f' ? 5 : 0); css.push({ v: br + (canCrawl ? 0 : 5), w: 0.3, date: end }); source = canCrawl ? 'geschätzt' : 'Brust'; }
   const s = [...css].sort((a, b) => a.v - b.v);
   // nicht der einzelne Ausreißer: gewichteter Median
   const cssV = wmedian(s)!;
   const conts = swims.map(a => (a.swim && a.swim.longestContinuousM) || 0).filter(x => x > 0);
-  const cont = Math.max(0, ...conts, sk.swimCrawlM || 0);
+  const cont = conts.length ? Math.max(...conts) : (sk.swimCrawlM ?? null);
   const pool = (a: Activity) => (a.swim && a.swim.poolLengthM) || 25;
   const dpsVals = swims.filter(a => inWindow(a, end, RECENT) && a.swim && (a.swim.strokesPerLength || a.swim.metersPerStroke)).map(a => ({ v: a.swim!.strokesPerLength ? (pool(a) - 5) / a.swim!.strokesPerLength! : a.swim!.metersPerStroke!, w: 1, date: a.date }));
   const dps = wmedian(dpsVals);
@@ -285,17 +307,16 @@ function swimRaw(c: Ctx): Raw {
   const f = c.f;
   const parts: ScorePart[] = [
     mk('css', canCrawl ? 'CSS (Schwellen-Pace)' : 'Brust-Tempo', 0.45, cssV, scale(SCALES.swimCss, cssV / f), mmss(cssV) + '/100 m' + (source === 'Brust' ? ' Brust' : ''), { lowerBetter: true }),
-    mk('cont', 'Kraul am Stück', 0.3, cont, scale(SCALES.swimCont, cont), cont ? Math.round(cont) + ' m' : 'noch nicht'),
+    mk('cont', 'Kraul am Stück', 0.3, cont, cont != null ? scale(SCALES.swimCont, cont) : null, cont ? Math.round(cont) + ' m' : cont == null ? 'unbekannt' : 'noch nicht'),
     mk('tech', 'Meter pro Zug', 0.25, dps, dps ? scale(SCALES.swimDps, dps) : null, dps ? de(dps, 2) + ' m' + (spl ? ' (' + (Number.isInteger(spl) ? spl : de(spl)) + ' Züge/Bahn)' : '') : '–', { target: '1,6 m' })
   ];
   const latest = swims.map(a => a.date).sort().pop() || null;
-  return { parts, n: swims.length, counted, latest, manualShare: swims.length ? swims.filter(isManual).length / swims.length : 1, levelSource: source === 'CSS' ? (cssEst && !swims.length ? 'Schätzung aus dem Profil' : 'Einheiten und Test') : source === 'Brust' ? 'Brust-Tempo' : 'Schätzung', extra: { css: cssV, dps, spl, cont, canCrawl } };
+  return { evidence, parts, n: swims.length, counted, latest, manualShare: swims.length ? swims.filter(isManual).length / swims.length : 1, levelSource: source === 'CSS' ? (cssEst && !swims.length ? 'Schätzung aus dem Profil' : 'Einheiten und Test') : source === 'Brust' ? 'Brust-Tempo' : 'Schätzung', extra: { css: cssV, dps, spl, cont, canCrawl } };
 }
 
 /* ---------- Kraft: Regelmäßigkeit und Steigerung ---------- */
 function strengthRaw(c: Ctx): Raw {
-  const { inp, end } = c;
-  const list = inp.activities.filter(a => a.sport === 'strength' && !a.mergedInto && inWindow(a, end, WINDOW));
+  const { end, activities: list } = evidenceActivities(c, 'strength');
   const perWeek = list.length / 6;
   const weights = list.map(a => (a as any).liftKg).filter((x: any) => typeof x === 'number');
   const prog = weights.length >= 2 ? (weights[weights.length - 1] - weights[0]) / Math.max(1, weights[0]) : null;
@@ -314,10 +335,17 @@ function combine(parts: ScorePart[]): { score: number | null; coverage: number }
   return { score: have.reduce((a, p) => a + p.sub! * p.weight, 0) / wsum, coverage: wsum / parts.reduce((a, p) => a + p.weight, 0) };
 }
 function ctxFor(sport: ScoreSport, inp: ScoreInput, end: string): Ctx {
+  // Ein bekannter Aktualisierungszeitpunkt darf historische Kurven nicht vorwegnehmen.
+  // Undatierte Profilwerte sind nur ein unsicherer Startwert, keine neue Messung.
+  if (inp.profile.thresholds.trendAt && inp.profile.thresholds.trendAt > end) {
+    inp = { ...inp, profile: { ...inp.profile, thresholds: { ...inp.profile.thresholds,
+      lthrRun: 170, lthrBike: 165, thresholdPaceRunSec: 0, thresholdSpeedBikeKmh: 0,
+      ftp: null, cssSec: null, crawl25Sec: null, breast100Sec: null, bikeSpeeds: null } } };
+  }
   const req = requirementFor(inp.goal, inp.profile);
   const need = inp.goal ? requirementFor({ ...inp.goal, targetTimeSec: null, splits: null }, inp.profile) : req;
   const wish = inp.goal && (inp.goal.targetTimeSec || (inp.goal.splits && Object.keys(inp.goal.splits).length)) ? req : null;
-  return { inp, end, req, need, wish, f: ageSexFactor(inp.profile, inp.today, sport) };
+  return { inp, end, req, need, wish, f: ageSexFactor(inp.profile, end, sport) };
 }
 function scoreAt(sport: ScoreSport, inp: ScoreInput, end: string) {
   const c = ctxFor(sport, inp, end);
@@ -325,11 +353,19 @@ function scoreAt(sport: ScoreSport, inp: ScoreInput, end: string) {
   const cb = combine(r.parts);
   const measured = cb.score;
   // Vertrauen: Menge, Aktualität, Uhr statt Hand, Anteil gemessener Teile
-  const nF = Math.min(1, r.n / (sport === 'strength' ? 4 : 6));
-  const ageDays = r.latest ? (Date.parse(end) - Date.parse(r.latest)) / 86400000 : 99;
-  const recF = ageDays <= 7 ? 1 : ageDays <= 21 ? 0.75 : 0.5;
+  const evidenceLatest = r.evidence?.map(x => x.date).sort().pop() || r.latest;
+  const ageDays = evidenceLatest ? Math.max(0, (Date.parse(end) - Date.parse(evidenceLatest)) / 86400000) : 99;
+  const recF = Math.exp(-Math.LN2 * ageDays / WINDOW);
   const qF = 0.75 + 0.25 * (1 - r.manualShare);
-  const confidence = Math.round(Math.max(r.n ? 0 : 0.05, nF * recF * qF * cb.coverage) * 100) / 100;
+  // Eine Aktivität / ein Tag ist keine Reihe unabhängiger Tests.
+  const days = new Map<string, number>();
+  for (const x of r.evidence || []) days.set(x.date, Math.min(1, (days.get(x.date) || 0) + x.w));
+  const effectiveN = sport === 'strength' ? r.n : [...days.values()].reduce((a, v) => a + v, 0);
+  const nF = Math.min(1, effectiveN / (sport === 'strength' ? 4 : 6));
+  const med = wmedian(r.evidence || []);
+  const deviation = med && wmedian((r.evidence || []).map(x => ({ ...x, v: Math.abs(x.v - med) / Math.abs(med) })));
+  const agreement = deviation == null ? 1 : 1 / (1 + 4 * deviation);
+  const confidence = Math.round(Math.max(r.n ? 0 : 0.05, nF * recF * qF * cb.coverage * agreement) * 100) / 100;
   const score = Math.round(clamp((measured ?? 10) + ((inp.manualAdjust && inp.manualAdjust[sport]) || 0), 1, 120));
   return { score, measured: measured == null ? null : Math.round(measured), confidence, raw: r, parts: r.parts, c, ageDays };
 }
@@ -462,9 +498,10 @@ function confTextOf(sport: ScoreSport, s: ReturnType<typeof scoreAt>): string {
   const r = s.raw; const lvl = s.confidence >= 0.6 ? 'hoch' : s.confidence >= 0.3 ? 'mittel' : 'niedrig';
   const what = { run: 'Läufe', bike: 'Fahrten', swim: 'Schwimmeinheiten', strength: 'Krafteinheiten' }[sport];
   const watch = r.n ? Math.round((1 - r.manualShare) * r.n) : 0;
-  const bits = [r.n ? `${r.n} ${what} in 6 Wochen${sport !== 'strength' ? `, ${watch ? `davon ${watch} von der Uhr` : 'alle von Hand eingetragen'}` : ''}` : `noch keine ${what} in den letzten 6 Wochen`];
+  const bits = [r.n ? `${r.n} ${what} im letzten Messfenster (6 Wochen)${sport !== 'strength' ? `, ${watch ? `davon ${watch} von der Uhr` : 'alle von Hand eingetragen'}` : ''}` : `noch keine verwertbaren ${what}`];
   if (r.latest && s.ageDays > 10) bits.push(`letzte vor ${Math.round(s.ageDays)} Tagen`);
   if (/Schätzung/.test(r.levelSource)) bits.push('Hauptwert nur aus dem Profil geschätzt (ein Test macht ihn genau)');
+  else if (sport !== 'strength' && !r.evidence?.length) bits.push('Hauptwert aus dem Profil, keine neue Leistungsmessung');
   return `Sicherheit ${lvl}: ${bits.join('; ')}.`;
 }
 
@@ -485,9 +522,7 @@ export function sportScores(inp: ScoreInput, sports: ScoreSport[] = ['swim', 'bi
 export function formScore(inp: ScoreInput): FormScore {
   const req = requirementFor(inp.goal, inp.profile);
   const ctlOf = (loads: Record<string, number>) => {
-    const dates = Object.keys(loads).sort(); if (!dates.length) return 0;
-    let c = 0; for (let d = dates[0]; d <= inp.today; d = addDays(d, 1)) c += ((loads[d] || 0) - c) / 42;
-    return Math.round(c * 10) / 10;
+    return loadSeriesFromDaily(loads, [], inp.today, inp.settings).at(-1)?.ctl || 0;
   };
   const bySport: FormScore['bySport'] = {};
   const all: Record<string, number> = {};
@@ -496,7 +531,7 @@ export function formScore(inp: ScoreInput): FormScore {
     const target = (req.ctlBySport as any)[sp];
     if (target) bySport[sp as ScoreSport] = { ctl: ctlOf(loads), target };
   });
-  const total = ctlOf(all);
+  const total = loadSeriesFromDaily(all, inp.trend, inp.today, inp.settings).at(-1)?.ctl ?? 0;
   return { ctl: total || null, target: req.ctl, score: clamp(Math.round(total / req.ctl * 100)), bySport };
 }
 
@@ -517,20 +552,20 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
     const p100 = pace(m.pace100) || (p100raw && p100raw <= 200 ? p100raw : null);
     const spl = num(m.spl), dps = num(m.dps);
     const indoor = m.indoor === 'in' || (sport === 'bike' && /rolle|trainer|indoor|zwift|home ?trainer/i.test(title || ''));
-    const effMin = min ?? (km && paceSec ? Math.round(km * paceSec / 60) : km && speed ? Math.round(km / speed * 60) : plannedMin || (sport === 'strength' ? 30 : null));
+    const effMin = min ?? (km && paceSec ? Math.round(km * paceSec / 60) : km && speed ? Math.round(km / speed * 60) : null);
     out.push({
       id: 'sess-' + id, source: (s && s.source) || 'manual', sources: [(s && s.source) || 'manual'], sport: sport as any, date, startMs: Date.parse(date + 'T12:00:00Z'), name: title,
       indoor, bikeType: m.bikeType || null, min: effMin != null ? Math.round(effMin) : null, elapsedMin: null, km: sport === 'swim' ? (meters ? meters / 1000 : null) : km,
       avgHr: hr, maxHr: num(m.maxHr), avgPower: num(m.power), avgCadence: num(m.cadence), speedKmh: sp && sport !== 'swim' ? Math.round(sp * 36) / 10 : null, paceSecKm: sport === 'run' ? paceSec : null,
       ascentM: null, kcal: null, tempC: num(s && s.temp), hrZones: null, decouplingPct: num(m.decoupling),
       efficiency: sp && hr ? Math.round(sp * 60 / hr * 100) / 100 : null,
-      laps: [], intervals: isIntervals({ sport, title, zone: (s && s.zone) || '' }) ? { count: 2, workSec: 0, avgHrWork: null, hrDriftPct: null, dropPct: null, recoveryHrDrop: null, lapsHr: [] } : null,
+      laps: [], intervals: null,
       swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), strokeRate: num(m.rate) } : null,
       rpe: num(s && s.rpe)
     } as Activity);
   };
   planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, s.sport, st.metrics || {}, s.title, { ...st, zone: s.zone }, s.plannedMinutes); }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId) add(w.id, d, w.sport, w.metrics && Object.keys(w.metrics).length ? w.metrics : { min: w.plannedMinutes, km: w.plannedKm }, w.title, w, w.plannedMinutes); }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
   return out;
 }
 

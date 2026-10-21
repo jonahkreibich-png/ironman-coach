@@ -16,7 +16,8 @@ import { prognosis } from '../../shared/prognosis';
 import { mainGoal } from '../../shared/goals';
 import { chosenSports, sportAllowed } from '../../shared/sports';
 import { isMinor } from '../../shared/profile';
-import { JARGON, unexplained } from '../../shared/glossary';
+import { JARGON } from '../../shared/glossary';
+// Glossarzugang und Definitionen: glossary.test.ts / lexikon.spec.ts. Keine Wiederholungsblöcke erforderlich.
 import type { ManyUser } from '../../fixtures/manyusers';
 
 export type Kind = 'sport' | 'sameSport' | 'hardAdjacent' | 'volume' | 'realistic' | 'intensity' | 'contradiction' | 'jargon' | 'coachSport' | 'coach' | 'scores' | 'ampel' | 'replan' | 'questionnaire';
@@ -73,7 +74,6 @@ export function planFindings(user: string, weeks: any[], profile: any, goals: an
       if (s.sport === 'swim' && s.plannedKm) { const p100 = m * 60 / (s.plannedKm * 10); if (p100 < 75 || p100 > 330) add('realistic', `${d.date} ${s.title}: ${Math.round(p100)} s/100 m inkl. Pausen.`); if (s.plannedKm * 1000 < 150) add('realistic', `${d.date} ${s.title}: nur ${Math.round(s.plannedKm * 1000)} m.`); }
       if (s.sport === 'run' && s.plannedKm) { const sk = m * 60 / s.plannedKm; if (sk < 180 || sk > 660) add('realistic', `${d.date} ${s.title}: ${Math.floor(sk / 60)}:${String(Math.round(sk % 60)).padStart(2, '0')}/km.`); }
       if (s.sport === 'bike' && s.plannedKm) { const kmh = s.plannedKm / (m / 60); if (kmh < 12 || kmh > 40) add('realistic', `${d.date} ${s.title}: ${Math.round(kmh)} km/h.`); }
-      for (const j of unexplained(`${s.title}\n${s.description || ''}`)) add('jargon', `${s.title}: „${j}“ ohne Erklärung.`);
     }
   }
   return out;
@@ -181,14 +181,13 @@ export function simulate(u: ManyUser, T0: string): SimResult {
   return { findings: F, profile, goals, plan, state, today: T3 };
 }
 
-/* Coach-Text: schlägt er eine nicht gewählte Sportart vor? Erklärt er Fachbegriffe? */
+/* Coach-Text: schlägt er eine nicht gewählte Sportart vor? */
 function coachText(u: ManyUser, profile: any, text: string, where: string, add: (k: Kind, m: string) => void) {
   // die Erklärung „… hast du nicht als Sportart gewählt“ ist kein Vorschlag
-  if (/nicht als Sportart gewählt/.test(text)) { for (const j of unexplained(text)) add('jargon', where + ': „' + j + '“ ohne Erklärung.'); return; }
+  if (/nicht als Sportart gewählt/.test(text)) return;
   for (const sp of ['run', 'bike', 'swim'].filter(s => !sportAllowed(profile, s))) {
     const m = SPORT_WORDS[sp].exec(text);
     if (m) add('coachSport', `${where}: „${m[0]}“ in „${text.replace(/\s+/g, ' ').slice(Math.max(0, m.index - 50), m.index + 60)}“`);
   }
-  for (const j of unexplained(text)) add('jargon', `${where}: „${j}“ ohne Erklärung.`);
 }
 export { JARGON };

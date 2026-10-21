@@ -37,7 +37,7 @@ export function refreshFuture(weeks: any[], profile: any, today: string): { week
 export function trendThresholds(state: any, weeks: any[], profile: any, goal: any, today: string): { thresholds: Record<string, any>; settings: Record<string, any>; text: string } | null {
   const th = profile.thresholds || {};
   if (th.trendAt && th.trendAt > C.addDays(today, -21)) return null;
-  const acts = [...Object.values(state.activities || {}).filter((a: any) => a && !a.mergedInto), ...legacyActivities(state, weeks, profile)] as any[];
+  const acts = [...C.recordedActivities(state), ...legacyActivities(state, weeks, profile)] as any[];
   if (!acts.length) return null;
   let est: any;
   try { est = estimatesAt({ today, activities: acts, trend: state.trend || [], illness: state.illnessPeriods || [], profile, goal }, today); } catch (e) { return null; }

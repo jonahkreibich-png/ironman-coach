@@ -347,7 +347,7 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
   if (sw) {
     const u = swimSkillUpdate(ctx.profile, ctx.baseWeeks, ctx.state.adjustments || {}, ctx.today, sw, ctx.now, 'Coach-Chat');
     if (!u) return { intent: 'swim-skill', text: `Das ist schon eingetragen: ${(ctx.profile.skills || {}).swimCrawlM || 0} m Kraul am Stück${(ctx.profile.skills || {}).swimPullM ? `, ${(ctx.profile.skills || {}).swimPullM} m mit Pull Buoy` : ''}. Deine Schwimmeinheiten passen schon dazu.` };
-    return apply('swim-skill', [{ op: 'swim-skill', skills: u.skills }, ...(u.adjustments.length ? [{ op: 'adjust', adj: u.adjustments } as Op] : [])], 'Super! ' + u.text);
+    return propose('swim-skill', u.text + ' Soll ich diese Angabe und die gezeigten Änderungen übernehmen?', [{ op: 'swim-skill', skills: u.skills }, ...(u.adjustments.length ? [{ op: 'adjust', adj: u.adjustments } as Op] : [])], YES_OPTS('Angabe und Änderungen übernehmen'));
   }
   const illNow = C.illnessAt(ctx.state.illnessPeriods, ctx.today);
   // Gesund / krank

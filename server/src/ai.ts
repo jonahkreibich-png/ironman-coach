@@ -17,6 +17,8 @@ import { BRAND } from '../../shared/brand';
 import { rulesOf, describe as ruleText } from '../../shared/constraints';
 import { parseFor } from '../../shared/ruleparse';
 import { withoutSource, hasSource } from '../../shared/activity/merge';
+import { evidenceSignature } from '../../shared/results';
+import { loadState } from './coach';
 
 /* Oura-Daten dürfen laut Oura-API-Vertrag (gültig ab 08.06.2026, Abschnitt 4(d)) nicht an KI-Modelle gehen. Sie werden vor jedem KI-Aufruf entfernt. */
 export const NO_AI_SOURCES = ['oura'];
@@ -227,8 +229,16 @@ export async function decideProposal(env: Env, uid: number, msgId: string, accep
   const rec = await getRecord(env, uid, 'coachMsg', msgId);
   if (!rec || !rec.data || !rec.data.proposal) throw new HttpError(404, 'Vorschlag nicht gefunden.');
   if (rec.data.proposal.status !== 'open') throw new HttpError(409, 'Über diesen Vorschlag wurde schon entschieden.');
+  if (accept && rec.data.proposal.evidenceSignature) {
+    const current = await loadState(env, uid);
+    if (rec.data.proposal.evidenceSignature !== evidenceSignature(current.state, current.baseWeeks)) throw new HttpError(409, 'Die Trainingsdaten wurden geändert. Bitte den aktualisierten Vorschlag prüfen.');
+  }
   const t = Math.max(Date.now(), rec.updatedAt + 1);
   const changes = accept ? (rec.data.proposal.changes || []).map((c: any, i: number) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })) : [];
+  if (rec.data.proposal.skillsOnly) for (const c of changes) if (c.kind === 'profile') {
+    const current = (await getRecord(env, uid, 'profile', 'main'))?.data || {};
+    c.data = { ...current, skills: { ...(current.skills || {}), ...c.data.skills } };
+  }
   changes.push({ kind: 'coachMsg', key: msgId, data: { ...rec.data, proposal: { ...rec.data.proposal, status: accept ? 'accepted' : 'rejected' } }, updatedAt: t + 99 });
   await putRecords(env, uid, changes);
   return { applied: accept ? changes.length - 1 : 0 };

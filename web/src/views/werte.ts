@@ -1,12 +1,12 @@
+import { renderLoadValues } from './loadvalues';
 /* Werte & Erholung: Morgenwerte mit Quelle, Verläufe, Belastung. Eingabe nur noch unter „Bearbeiten“,
    weil die Werte im Alltag automatisch kommen. Von Hand korrigierte Werte gelten, bis man sie zurücksetzt. */
 import * as C from '../../../shared/core';
-import { STATE, PLAN, saveState } from '../store';
+import { STATE, saveState } from '../store';
 import { esc, fmtDate, dowShort, todayStr, parseNum } from '../util';
 import { t, num, temp } from '../../../shared/i18n';
 import { D } from '../data';
-import { on, onChange, sec, srcBadge, openSheet, refreshSheet, sparkline, ic, more } from '../kit';
-import { lineChart, illnessShades } from '../charts';
+import { on, onChange, sec, srcBadge, openSheet, refreshSheet, ic } from '../kit';
 import { setManual, resetToOriginal, hasOriginal, bestAuto, SOURCE_LABEL } from '../../../shared/activity/merge';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -28,33 +28,13 @@ function tile(field: string, label: string, unit: string, dec: number): string {
   const delta = v != null && prev != null ? v - prev : null;
   return `<button class="crit" data-act="checkin-open" data-date="${last ? last.date : todayStr()}"><div class="k">${esc(label)} ${last ? srcBadge((last._src || {})[field]) : ''}</div>
     <div class="v">${v != null ? (field === 'bodyTemp' ? (v > 0 ? '+' : '') + num(v, dec) : num(v, dec)) : '–'}<small class="xs"> ${unit}</small></div>
-    <div class="n">${last && last.date !== todayStr() ? fmtDate(last.date) + ' · ' : ''}${delta != null ? (delta > 0 ? '▲ ' : delta < 0 ? '▼ ' : '') + t('v.vs7') : ''}</div>${sparkline(series.map((p: any) => p[field]), 'var(--info)')}</button>`;
+    <div class="n">${last && last.date !== todayStr() ? fmtDate(last.date) + ' · ' : ''}${delta != null ? (delta > 0 ? '▲ ' : delta < 0 ? '▼ ' : '') + t('v.vs7') : ''}</div></button>`;
 }
 
 export function renderWerte(): string {
-  const d = D(); const R = STATE.settings.readiness;
   let h = `<div class="crit-grid">${tile('hrv', t('v.hrv'), 'ms', 0)}${tile('restingHR', t('v.rhr'), 'bpm', 0)}${tile('sleepHours', t('v.sleep'), 'h', 1)}${tile('bodyTemp', t('v.tempShort'), '°C', 1)}${tile('spo2', 'SpO2', '%', 1)}${tile('breathingRate', t('v.breathShort'), '/min', 1)}</div>
     <button class="btn ghost block" data-act="checkin-open" data-date="${todayStr()}" style="margin-top:var(--s3)">${ic('edit')} ${esc(t('v.edit'))}</button>`;
-  const bH = C.baselineOf(STATE.trend, STATE.illnessPeriods, C.addDays(d.today, 1), 'hrv', Math.log);
-  const bR = C.baselineOf(STATE.trend, STATE.illnessPeriods, C.addDays(d.today, 1), 'restingHR');
-  const tr = (STATE.trend || []).filter((p: any) => p.date >= C.addDays(d.today, -60));
-  const avg7 = (arr: any[], k: string, i: number) => { const sl = arr.slice(Math.max(0, i - 6), i + 1).filter(p => p[k] != null); return sl.length ? sl.reduce((a, p) => a + p[k], 0) / sl.length : null; };
-  const hp = tr.filter((p: any) => p.hrv != null).map((p: any, i: number, a: any[]) => ({ date: p.date, hrv: p.hrv, avg: avg7(a, 'hrv', i), note: p.illness || '' }));
-  h += sec(t('v.hrvTitle'), `<div class="card">${lineChart(hp, [{ key: 'hrv', name: t('v.hrv'), color: 'var(--info)', area: true }, { key: 'avg', name: t('v.avg7'), color: 'var(--ink-2)', dashed: true }], { legend: true, shade: illnessShades(), lines: bH && bH.n >= C.MIN_DAYS ? [{ v: Math.round(Math.exp(bH.mean)), label: t('v.normal', { v: Math.round(Math.exp(bH.mean)) }), color: 'var(--good)' }] : [{ v: R.hrvMin, label: '≥' + R.hrvMin, color: 'var(--good)' }], label: t('v.hrv') })}<div class="hint">${esc(t('v.hrvHint'))}</div></div>`);
-  const rp = tr.filter((p: any) => p.restingHR != null).map((p: any) => ({ date: p.date, rhr: p.restingHR, note: p.illness || '' }));
-  h += sec(t('v.rhrTitle'), `<div class="card">${lineChart(rp, [{ key: 'rhr', name: t('v.rhr'), color: 'var(--run)', area: true }], { shade: illnessShades(), lines: bR && bR.n >= C.MIN_DAYS ? [{ v: Math.round(bR.mean), label: t('v.normal', { v: Math.round(bR.mean) }), color: 'var(--good)' }] : [], label: t('v.rhr') })}</div>`);
-  const sp = tr.filter((p: any) => p.sleepHours != null).map((p: any) => ({ date: p.date, s: p.sleepHours }));
-  h += sec(t('v.sleepTitle'), `<div class="card">${lineChart(sp, [{ key: 's', name: t('v.sleep'), color: 'var(--strength)', area: true, fmt: (v: number) => num(v, 1) }], { h: 150, fmt: (v: number) => num(v, 1), lines: [{ v: d.fallback.sleepNeed[0], label: t('v.needLine', { h: num(d.fallback.sleepNeed[0], 1) }), color: 'var(--good)' }], label: t('v.sleep') })}</div>`);
-  const tp = tr.filter((p: any) => p.bodyTemp != null).map((p: any) => ({ date: p.date, temp: p.bodyTemp }));
-  if (tp.length > 1) h += sec(t('v.tempTitle'), `<div class="card">${lineChart(tp, [{ key: 'temp', name: t('v.tempShort'), color: 'var(--warn)', fmt: (v: number) => (v > 0 ? '+' : '') + num(v, 1) }], { h: 130, shade: illnessShades(), lines: [{ v: 0.3, label: '+0,3', color: 'var(--warn)' }, { v: 0.5, label: '+0,5', color: 'var(--bad)' }], label: t('v.tempShort') })}</div>`);
-  // Belastung
-  const own = C.ownLoadSeries(STATE, PLAN.weeks, d.today).filter(o => o.date >= C.addDays(d.today, -90));
-  const icu: Record<string, any> = {}; (STATE.trend || []).filter((p: any) => p.ctl != null && p.date >= C.addDays(d.today, -90)).forEach((p: any) => { icu[p.date] = p; });
-  const pts = own.map(o => ({ date: o.date, ctl: o.ctl, atl: o.atl, tsb: o.tsb, ictl: icu[o.date] ? icu[o.date].ctl : null }));
-  const last = own[own.length - 1];
-  h += sec(t('v.loadTitle'), `<div class="card">${last ? `<div class="row wrap" style="gap:var(--s4)"><div><div class="lbl">CTL</div><div class="big">${num(last.ctl, 0)}</div></div><div><div class="lbl">ATL</div><div class="big">${num(last.atl, 0)}</div></div><div><div class="lbl">TSB</div><div class="big" style="color:${last.tsb < -20 ? 'var(--bad)' : last.tsb < -10 ? 'var(--warn)' : 'var(--good)'}">${num(last.tsb, 0)}</div></div><div><div class="lbl">ATL/CTL</div><div class="big">${last.ctl ? num(last.atl / last.ctl, 2) : '–'}</div></div></div>` : ''}
-    ${lineChart(pts, [{ key: 'ctl', name: t('v.ctl'), color: 'var(--info)', area: true }, { key: 'atl', name: t('v.atl'), color: 'var(--run)' }, { key: 'tsb', name: t('v.tsb'), color: 'var(--good)' }, ...(Object.keys(icu).length ? [{ key: 'ictl', name: 'CTL intervals.icu', color: 'var(--info)', dashed: true }] : [])], { h: 190, legend: true, shade: illnessShades(), lines: [{ v: 0, label: '' }], label: t('v.loadTitle') })}
-    ${more(t('common.whatMeans'), `<div class="hint">${esc(t('v.loadHint'))}</div>`)}</div>`);
+  h += renderLoadValues();
   // Tabelle
   const rows = (STATE.trend || []).filter((p: any) => C.hasRecovery(p) || p.illness).slice(-10).reverse();
   if (rows.length) h += sec(t('v.nights'), `<div class="card tight scroll-x"><table class="tbl"><thead><tr><th>${esc(t('common.date'))}</th><th>${esc(t('v.sleep'))}</th><th>${esc(t('v.hrv'))}</th><th>${esc(t('v.rhr'))}</th><th>${esc(t('v.tempShort'))}</th><th></th></tr></thead><tbody>${rows.map((p: any) => `<tr><td><button class="link" data-act="checkin-open" data-date="${p.date}">${dowShort(p.date)} ${fmtDate(p.date)}</button></td><td>${num(p.sleepHours, 1)}</td><td>${p.hrv ?? '–'}</td><td>${p.restingHR ?? '–'}</td><td>${p.bodyTemp != null ? temp(p.bodyTemp, true) : '–'}</td><td>${[...new Set(Object.values(p._src || {}))].map((s: any) => srcBadge(s)).join(' ')}</td></tr>`).join('')}</tbody></table></div>`);

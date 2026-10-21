@@ -15,14 +15,14 @@ export function renderMehr(): string {
   const race = d.raceGoal || d.recentRace;
   let h = '';
   if (race) h += `<div class="list" style="margin-bottom:var(--s3)">${row('wettkampf', 'flag', 'var(--accent)', race.date && race.date >= d.today ? t('race.inDays', { name: race.name, n: daysUntil(d.today, race.date) }) : t('race.enterResult', { name: race.name }))}</div>`;
-  h += sec(t('mehr.daily'), `<div class="list">${row('werte', 'pulse', 'var(--info)')}${row('essen', 'food', 'var(--good)')}</div>`);
+  h += sec(t('mehr.daily'), `<div class="list">${row('werte', 'pulse', 'var(--info)')}${row('essen', 'food', 'var(--good)')}${li({ act: 'go-sub', data: { sub: 'strength' }, icon: ic('edit'), color: 'var(--strength)', title: 'Kraftvorlagen', sub: 'Übungen speichern und Training starten', html: false })}</div>`);
   const reauth = reauthHints().length;
   h += sec(t('mehr.setup'), `<div class="list">${row('profil', 'user', 'var(--accent)', d.goal ? t('mehr.profilGoal', { name: d.goal.name }) : '')}
     ${row('beruecksichtigungen', 'info', 'var(--warn)')}
     ${row('verbindungen', 'link', 'var(--run)', '', reauth ? pill(t('conn.reauth'), 'warn') : '')}
     ${row('einstellungen', 'sliders', 'var(--ink-2)')}
     ${row('daten', 'cloud', 'var(--swim)', isSyncOn() ? statusText() : '', backupDue() ? pill(t('mehr.backupDue'), 'warn') : '')}</div>`);
-  const extra = [(FEATURES.generator || entitled('generator')) ? row('generator', 'wand', 'var(--bike)') : '', row('onboarding', 'doc', 'var(--strength)')].join('');
+  const extra = [(FEATURES.generator || entitled('generator')) ? row('generator', 'wand', 'var(--bike)') : '', row('onboarding', 'doc', 'var(--strength)'), row('lexikon', 'info', 'var(--info)')].join('');
   h += sec(t('mehr.plan'), `<div class="list">${extra}</div>`);
   const m = me() as any; const fbBadge = m.feedbackNew ? pill(t('fb.newCount', { n: m.feedbackNew }), 'warn') : m.repliesUnseen ? pill(t('fb.newReply'), 'info') : '';
   h += `<div class="list" style="margin-top:var(--s3)">${row('feedback', 'chat', 'var(--info)', '', fbBadge)}</div>`;

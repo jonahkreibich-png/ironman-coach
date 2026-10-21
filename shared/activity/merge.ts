@@ -6,6 +6,7 @@
    - Automatisch übernommene Einheiten werden der geplanten Einheit zugeordnet und abgehakt. */
 import type { Activity, Source } from './analyze';
 import { splitsFromLaps } from '../fields';
+import { crawlOf } from '../results';
 
 export type MetricGroup = 'workouts' | 'sleep' | 'hrv' | 'restingHR' | 'temp' | 'spo2' | 'breath' | 'load' | 'weight';
 export const DEFAULT_PRIORITY: Record<MetricGroup, Source[]> = {
@@ -22,7 +23,7 @@ export const DEFAULT_PRIORITY: Record<MetricGroup, Source[]> = {
 export const FIELD_GROUP: Record<string, MetricGroup> = {
   sleepHours: 'sleep', sleepQuality: 'sleep', remSleep: 'sleep', deepSleep: 'sleep', sleepLatency: 'sleep',
   hrv: 'hrv', restingHR: 'restingHR', bodyTemp: 'temp', spo2: 'spo2', breathingRate: 'breath',
-  ctl: 'load', atl: 'load', tsb: 'load', vo2max: 'load', cardioRecovery: 'load', weight: 'weight'
+  ctl: 'load', atl: 'load', tsb: 'load', loadRatio: 'load', vo2max: 'load', cardioRecovery: 'load', weight: 'weight'
 };
 export const SOURCE_LABEL: Record<string, string> = {
   healthfit: 'HealthFit', file: 'Datei', shortcut: 'Kurzbefehl', intervals: 'intervals.icu', oura: 'Oura', whoop: 'WHOOP', polar: 'Polar',
@@ -136,7 +137,7 @@ export function metricsFromActivity(a: Activity): Record<string, any> {
   if (a.sport === 'bike') m.indoor = a.indoor ? 'in' : 'out';
   if (a.sport === 'run') { const sp = a.splits && a.splits.length ? a.splits : splitsFromLaps(a.laps || []); if (sp.length) m.splits = sp; }
   if (a.sport === 'swim' && a.swim) {
-    if (a.swim.longestContinuousM) m.longestCrawl = String(a.swim.longestContinuousM);
+    if (crawlOf(a)) m.longestCrawl = String(crawlOf(a));
     const bs = a.swim.byStroke || {}; const tot = Object.values(bs).reduce((x: number, y: any) => x + (y || 0), 0) as number;
     if (tot > 0 && bs.freestyle != null) m.crawlShare = String(Math.round(bs.freestyle / tot * 100));
   }

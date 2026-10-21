@@ -167,7 +167,9 @@ export async function onRecordsChanged(env: Env, uid: number, changes: Change[],
   const today = berlinParts().date;
   const kinds = new Set(changes.map(c => c.kind));
   const evs: any[] = [];
-  if (kinds.has('session') || kinds.has('custom') || kinds.has('activity')) evs.push({ type: 'activity' });
+  if (kinds.has('session') || kinds.has('custom') || kinds.has('activity')) evs.push({ type: 'activity',
+    activityIds: changes.filter(c => c.kind === 'activity').map(c => c.key),
+    sessionIds: changes.filter(c => c.kind === 'session' || c.kind === 'custom').map(c => c.key) });
   const trendDates = changes.filter(c => c.kind === 'trend' && c.key >= today).map(c => c.key);
   if (trendDates.length) evs.push({ type: 'trend', dates: trendDates });
   if (kinds.has('illness')) evs.push({ type: 'illness' });

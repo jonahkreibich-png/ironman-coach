@@ -210,7 +210,10 @@ describe('Regel-Coach: Fehler aus dem Vergleich behoben', () => {
   });
   test('„mir ist übel“ bleibt Krankheit', () => { expect(converse(W().ctx(), {}, 'mir ist übel').reply.intent).toBe('sick'); });
   test('„10 min kürzer“ heißt minus 10 (nicht auf 10)', () => {
-    const r = converse(W().ctx(), {}, 'mach den lauf am mittwoch 10 min kürzer').reply;
+    const ctx = W().ctx();
+    // Parser-Test unabhängig von einer wechselnden generierten Wochenbelegung.
+    ctx.baseWeeks = [{ days: [{ date: ctx.today, sessions: [{ id: 'short-run', sport: 'run', title: 'Lockerer Lauf', plannedMinutes: 40, zone: 'Zone 2' }] }] }];
+    const r = converse(ctx, {}, 'mach den lauf am mittwoch 10 min kürzer').reply;
     expect(r.intent).toBe('shorter'); expect(r.text).not.toMatch(/→ 1\d min/);
     const m = /(\d+) → (\d+) min/.exec(r.text)!; expect(+m[1] - +m[2]).toBeGreaterThanOrEqual(8); expect(+m[1] - +m[2]).toBeLessThanOrEqual(13);
   });

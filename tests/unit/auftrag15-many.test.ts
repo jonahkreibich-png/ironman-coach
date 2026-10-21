@@ -2,7 +2,7 @@
    Fragebogen → Plan → 3 Wochen (erledigt, ausgelassen, Extra-Einheiten, Morgenwerte, Krankheit) → Coach (Engine + Fragen) → Profil ändern und
    neu planen → Scores, Prognose, Ampel. Automatisch geprüft (tests/helpers/many-sim.ts): nur gewählte Sportarten, keine gleiche Sportart an
    Folgetagen ohne Begründung, nie zwei harte Tage hintereinander, Umfang passt zu Zeit und Niveau (auch Erholungswochen), realistische
-   Meter/Zeit, Intensität je Phase, keine widersprüchlichen Texte, Fachbegriffe erklärt, Coach schlägt keine fremde Sportart vor, Scores,
+   Meter/Zeit, Intensität je Phase, keine widersprüchlichen Texte, zentrales Lexikon separat geprüft, Coach schlägt keine fremde Sportart vor, Scores,
    Prognose und Ampel gültig, Neuplanen behält Erledigtes. Bildschirm, Konsole und Betreiber-Infos prüft tests/e2e/auftrag15-many.spec.ts. */
 import { test, expect, describe } from 'vitest';
 import fs from 'node:fs';

@@ -12,6 +12,7 @@ import { nav } from '../nav';
 const KEY = 'trendPeriod';
 let PERIOD: Period = (() => { try { const v = localStorage.getItem(KEY); return v === '3m' || v === '1y' ? v : '4w'; } catch (e) { return '4w'; } })();
 let CARDS: TrendCard[] = [];
+let GROUP: TrendGroup | 'all' = 'all';
 
 export function currentTrends(): TrendCard[] {
   const d = D();
@@ -21,20 +22,23 @@ export function currentTrends(): TrendCard[] {
 const TONE: Record<string, string> = { good: 'var(--good)', warn: 'var(--warn)', info: 'var(--info)' };
 function card(c: TrendCard): string {
   if (c.locked) return `<div class="tcard locked" data-trend="${esc(c.id)}"><div class="tc-main"><div class="tc-t">${esc(c.title)}</div><div class="tc-s">${esc(c.locked)}</div></div></div>`;
-  return `<button class="tcard" data-act="trend-open" data-id="${esc(c.id)}" data-trend="${esc(c.id)}" style="--c:${TONE[c.tone]}">
+  const preview = c.chart && c.chart.pts.length > 1 ? lineChart(c.chart.pts, c.chart.series, { h: 115, legend: c.chart.series.length > 1, endLabel: false, invert: c.chart.invert, fmt: c.chart.fmt && FMT[c.chart.fmt] ? FMT[c.chart.fmt] : undefined, label: c.title }) : '';
+  return `<div class="card tight trend-panel"><button class="tcard" data-act="trend-open" data-id="${esc(c.id)}" data-trend="${esc(c.id)}" style="--c:${TONE[c.tone]}">
     <div class="tc-main"><div class="tc-t"><i class="tc-dot"></i>${esc(c.title)}</div><div class="tc-s">${esc(c.text)}</div></div>
-    <div class="tc-val"><div class="tc-n num">${esc(c.value || '–')}${c.unit ? `<small> ${esc(c.unit)}</small>` : ''}</div>${c.delta ? `<div class="tc-d">${esc(c.delta)}</div>` : ''}${c.spark && c.spark.length > 1 ? sparkline(c.spark, 'var(--c)') : ''}</div></button>`;
+    <div class="tc-val"><div class="tc-n num">${esc(c.value || '-')}${c.unit ? `<small> ${esc(c.unit)}</small>` : ''}</div>${c.delta ? `<div class="tc-d">${esc(c.delta)}</div>` : ''}</div></button>${preview}</div>`;
 }
 export function renderTrends(): string {
   CARDS = currentTrends();
   const seg = `<div class="seg" role="tablist" data-trend-period>${(['4w', '3m', '1y'] as Period[]).map(p => `<button role="tab" aria-selected="${p === PERIOD}" class="${p === PERIOD ? 'on' : ''}" data-act="trend-period" data-p="${p}">${esc(t('trend.p.' + p))}</button>`).join('')}</div>`;
   const groups = GROUPS.map(g => {
+    if (GROUP !== 'all' && GROUP !== g) return '';
     const list = CARDS.filter(c => c.group === g);
     if (!list.length) return '';
     const open = list.filter(c => !c.locked), locked = list.filter(c => c.locked);
     return `<div class="tgroup" data-tgroup="${g}"><div class="lbl">${esc(t('trend.g.' + g))}</div><div class="tlist">${[...open, ...locked].map(card).join('')}</div></div>`;
   }).join('');
-  return sec(t('trend.title'), `<div class="stack">${seg}${groups}</div>`, esc(t('trend.aside')));
+  const filters = `<div class="chips trend-groups" role="group" aria-label="Trendgruppe">${(['all', ...GROUPS] as const).map(g => `<button class="chip ${GROUP === g ? 'on' : ''}" aria-pressed="${GROUP === g}" data-act="trend-group" data-group="${g}">${g === 'all' ? 'Alle' : esc(t('trend.g.' + g))}</button>`).join('')}</div>`;
+  return sec(t('trend.title'), `<div class="stack">${seg}${filters}${groups}</div>`, esc(t('trend.aside')));
 }
 
 const FMT: Record<string, (v: number) => string> = {
@@ -53,5 +57,6 @@ function sheet(id: string): string {
     <div class="hint">${esc(t('trend.period', { p: t('trend.p.' + PERIOD) }))}</div></div>`;
 }
 on('trend-period', el => { PERIOD = el.dataset.p as Period; try { localStorage.setItem(KEY, PERIOD); } catch (e) { /* privat */ } nav.rerender(); });
+on('trend-group', el => { const g = el.dataset.group as TrendGroup | 'all'; if (g === 'all' || GROUPS.includes(g)) { GROUP = g; nav.rerender(); } });
 on('trend-open', el => { const id = el.dataset.id!; const c = CARDS.find(x => x.id === id); openSheet(c ? c.title : '', () => sheet(id)); });
 export type { TrendGroup };

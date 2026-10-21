@@ -35,7 +35,7 @@ ok(C.sessionLoad({ sport: 'football', title: 'Spiel' }, {}) === 60, 'Spiel ohne 
 ok(C.sessionLoad({ sport: 'bike' }, { icuLoad: 88, metrics: { min: 60, hr: 140 } }) === 88, 'Trainingslast von intervals.icu hat Vorrang');
 ok(C.sessionLoad({ sport: 'swim', plannedMinutes: 45 }, { rpe: '6', metrics: { hr: 150 } }) === 33, 'Schwimmen über RPE, nicht über Puls');
 ok(C.sessionLoad({ sport: 'run' }, { rpe: 10, metrics: { min: 60 } }) === 110, 'IF höchstens 1,05');
-const st1 = { sessions: { 'w1-di': { completed: true, metrics: { min: 60, hr: 145 } }, 'w1-so': { completed: true, rpe: 5 } }, customWorkouts: {}, trend: [], profile: { thresholds: { lthrRun: 170, lthrBike: 162 } } };
+const st1 = { sessions: { 'w1-di': { completed: true, metrics: { min: 60, hr: 145 } }, 'w1-so': { completed: true, rpe: 5, metrics: { min: 150 } } }, customWorkouts: {}, trend: [], profile: { thresholds: { lthrRun: 170, lthrBike: 162 } } };
 const ser = C.ownLoadSeries(st1, plan(), '2026-10-11');
 ok(ser.length === 6 && ser[0].load === 80 && ser[5].ctl > 0 && ser[5].atl > ser[5].ctl, 'Eigene CTL/ATL: 42/7 Tage, ATL reagiert schneller');
 
@@ -95,12 +95,12 @@ adj = C.dailyAdjustments(Object.assign({}, s, { sessions: {} }), p3, '2026-10-14
 ok(!adj.some(a => a.type === 'move'), 'Nie zwei harte Tage hintereinander (Do ist hart) → Mi nicht möglich');
 
 console.log('Wöchentlich');
-const doneAll = { 'w1-di': { completed: true, rpe: '6', quality: 'good', metrics: { min: 60, hr: 150 } }, 'w1-mi': { completed: true }, 'w1-do': { completed: true }, 'w1-fr': { completed: true }, 'w1-sa': { completed: true }, 'w1-so': { completed: true } };
+const doneAll = { 'w1-di': { completed: true, rpe: '6', quality: 'good', metrics: { min: 60, hr: 150 } }, 'w1-mi': { completed: true, metrics: { min: 40 } }, 'w1-do': { completed: true, metrics: { min: 45 } }, 'w1-fr': { completed: true, metrics: { min: 45 } }, 'w1-sa': { completed: true, metrics: { min: 90 } }, 'w1-so': { completed: true, metrics: { min: 150 } } };
 s = { sessions: doneAll, customWorkouts: {}, illnessPeriods: [], adjustments: {}, settings: {}, trend: trend('2026-10-11', GREEN) };
 let W = C.weeklyAdjustments(s, plan(), '2026-10-11', { now: 1 });
 ok(W.summary.ratio >= 0.9 && W.summary.green >= 4, 'Gute Woche erkannt (' + Math.round(W.summary.ratio * 100) + ' %, ' + W.summary.green + ' grün)');
 const vol = W.adjustments.filter(a => a.id.includes('-vol-'));
-ok(vol.length === 5 && !vol.some(a => a.sessionId === 'w2-sa') && vol.find(a => a.sessionId === 'w2-so').set.plannedMinutes === 165, 'Umfang höchstens +10 % (150 → 165 min), Fußball/Kraft unverändert ' + JSON.stringify(vol.map(a => [a.sessionId, a.set.plannedMinutes])) + ' ' + JSON.stringify(W.adjustments.find(a => a.type === 'note').stats));
+ok(vol.length === 0 && W.adjustments.find(a => a.type === 'note').stats.pct === 0, 'Keine automatische Prozent-Steigerung ohne geprüften individuellen Vorschlag');
 const lad = W.adjustments.find(a => a.id.includes('ladder'));
 ok(lad && lad.set.title === 'Sweet-Spot 3×10', 'Intervall-Leiter: RPE 6 und „Gut“ → 3×8 wird 3×10');
 ok(W.adjustments.some(a => a.type === 'note' && a.id === 'week-2-summary'), 'Zusammenfassung der Woche wird gespeichert');
@@ -112,7 +112,7 @@ W = C.weeklyAdjustments(Object.assign({}, s, { sessions: Object.assign({}, doneA
 ok(!W.adjustments.some(a => a.id.includes('ladder')), 'RPE 9 → Stufe wiederholen (keine Änderung)');
 const groinW = Object.assign({}, s, { sessions: Object.assign({}, doneAll, { 'w1-fr': { completed: true, notes: 'Leiste 4/10' } }) });
 W = C.weeklyAdjustments(groinW, plan(), '2026-10-11', { now: 1 });
-ok(!W.adjustments.some(a => a.id.includes('-vol-')) && /Schmerz \(Leiste\)/.test(W.adjustments.find(a => a.type === 'note').reason), 'Leistenschmerz → eine Woche keine Steigerung');
+ok(!W.adjustments.some(a => a.id.includes('-vol-')) , 'Leistenschmerz → eine Woche keine Steigerung');
 W = C.weeklyAdjustments(Object.assign({}, s, { illnessPeriods: [{ start: '2026-10-07', end: '2026-10-08' }] }), plan(), '2026-10-11', { now: 1 });
 ok(W.adjustments.find(a => a.sessionId === 'w2-so' && a.id.includes('-vol-')).set.plannedMinutes === 120, 'Krankheit in der Woche → −20 %');
 W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note' } } }), plan(), '2026-10-11', { now: 1 });

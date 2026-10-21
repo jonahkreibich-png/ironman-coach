@@ -58,6 +58,8 @@ test.describe('Kostenlose KI im Coach', () => {
     await card.locator('[data-act="free-yes"]').click();
     await expect(page.locator('#toast')).toContainText('Elternteil');
     await expect(card).toBeVisible();
+    // mittig scrollen: oben läge das Häkchen unter der festen Kopfzeile
+    await card.locator('#free-parent').evaluate(el => el.scrollIntoView({ block: 'center' }));
     await card.locator('#free-parent').check({ force: true });
     await card.locator('[data-act="free-yes"]').click();
     await expect(card).toHaveCount(0, { timeout: 10000 });

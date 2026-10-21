@@ -13,12 +13,12 @@ export function reviewNow(key: string, date: string): boolean {
   const mode = reviewMode(); if (mode === 'off') return false;
   invalidate();
   const ctx = D().engine;
-  if (date < C.addDays(ctx.today, -2) || date > ctx.today) return false;
+  if (date > ctx.today) return false;
   const d = doneItems(ctx, date, date).find(x => x.key === key); if (!d) return false;
   const id = 'msg-review-' + key; const old = STATE.coachMsgs[id];
   const text = autoReview(ctx, d, mode);
-  if (old && old.text === text) return false;
-  STATE.coachMsgs[id] = { ...(old || {}), id, at: old ? old.at : Date.now(), date, kind: 'session', from: 'coach', title: 'Bewertung: ' + d.title, text, unread: true, refs: d.custom ? {} : { sessionId: key } };
+  if (old && (old.resultText ?? old.text) === text) return false;
+  STATE.coachMsgs[id] = { ...(old || {}), id, at: old ? old.at : Date.now(), date, kind: 'session', from: 'coach', title: (old ? 'Bewertung aktualisiert: ' : 'Bewertung: ') + d.title, resultText: text, text: old ? 'Nach geänderten Trainingsdaten neu bewertet.\n\n' + text : text, unread: true, refs: d.custom ? {} : { sessionId: key } };
   saveSoon();
   return true;
 }

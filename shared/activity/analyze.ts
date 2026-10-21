@@ -20,7 +20,7 @@ export interface IntervalOut {
 export interface SwimOut {
   poolLengthM: number | null; lengths: number; activeLengths: number;
   strokesPerLength: number | null; metersPerStroke: number | null; pace100: number | null;
-  byStroke: Record<string, number>; longestContinuousM: number | null; strokeRate: number | null;
+  byStroke: Record<string, number>; longestContinuousM: number | null; longestCrawlM?: number | null; strokeRate: number | null;
 }
 export interface Activity {
   id: string;
@@ -247,15 +247,18 @@ export function swimStats(raw: RawActivity): SwimOut {
   const strokes = act.map(l => l.strokes).filter((x): x is number => x != null && x > 0);
   const spl = strokes.length ? r1(avg(strokes)!) : null;
   const byStroke: Record<string, number> = {};
-  act.forEach(l => { const k = l.stroke || 'freestyle'; byStroke[k] = (byStroke[k] || 0) + (pool || 0); });
+    act.forEach(l => { const k = l.stroke || 'unknown'; byStroke[k] = (byStroke[k] || 0) + (pool || 0); });
   // längste Strecke am Stück: Bahnen ohne Pause (Abstand < 10 s)
-  let best = 0, cur = 0, prevEnd: number | null = null;
+  let best = 0, cur = 0, crawlBest = 0, crawl = 0, prevEnd: number | null = null;
   for (const l of raw.lengths) {
-    if (!l.active) { best = Math.max(best, cur); cur = 0; prevEnd = null; continue; }
-    if (prevEnd != null && l.start - prevEnd > 10) { best = Math.max(best, cur); cur = 0; }
+    if (!l.active) { best = Math.max(best, cur); crawlBest = Math.max(crawlBest, crawl); cur = 0; crawl = 0; prevEnd = null; continue; }
+    if (prevEnd != null && l.start - prevEnd > 10) { best = Math.max(best, cur); crawlBest = Math.max(crawlBest, crawl); cur = 0; crawl = 0; }
+    if (/^(freestyle|crawl|front_crawl)$/i.test(l.stroke || '')) crawl += pool || 0;
+    else { crawlBest = Math.max(crawlBest, crawl); crawl = 0; }
     cur += pool || 0; prevEnd = l.start + l.sec;
   }
   best = Math.max(best, cur);
+  crawlBest = Math.max(crawlBest, crawl);
   const swimSec = act.reduce((a, l) => a + l.sec, 0);
   const meters = act.length * (pool || 0);
   const cad = act.map(l => l.cadence).filter((x): x is number => x != null && x > 0);
@@ -264,7 +267,7 @@ export function swimStats(raw: RawActivity): SwimOut {
     strokesPerLength: spl,
     metersPerStroke: spl && pool ? r2(pool / spl) : null,
     pace100: meters && swimSec ? Math.round(swimSec / (meters / 100)) : (raw.totals.distanceM && raw.totals.movingSec ? Math.round(raw.totals.movingSec / (raw.totals.distanceM / 100)) : null),
-    byStroke, longestContinuousM: best || null,
+    byStroke, longestContinuousM: best || null, longestCrawlM: crawlBest || null,
     strokeRate: cad.length ? Math.round(avg(cad)!) : null
   };
 }

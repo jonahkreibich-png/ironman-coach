@@ -9,6 +9,7 @@ import * as W from '../workouts';
 import type { EngineCtx } from './engine';
 import { readinessFacts } from './engine';
 import { fieldsOf } from '../fields';
+import { actualMetrics, effectiveActivity, crawlOf } from '../results';
 import { HR_ZONES } from '../sports';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
@@ -37,11 +38,11 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
     out.push({ key: s.id, date: d.date, sport: s.sport, title: s.title, planned: s, st, act, custom: false });
   }));
   Object.entries(ctx.state.customWorkouts || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => {
-    if (d < from || d > to) return;
+    if (d < from || d > to || w.completed === false) return;
     const act = w.activityId ? acts[w.activityId] || null : null; if (act) usedActs.add(act.id);
     out.push({ key: w.id, date: d, sport: w.sport, title: w.title || SPORT[w.sport] || 'Einheit', planned: null, st: w, act, custom: true });
   }));
-  Object.values(acts).forEach((a: any) => {
+  C.recordedActivities(ctx.state).forEach((a: any) => {
     if (!a || a.mergedInto || usedActs.has(a.id) || a.date < from || a.date > to || a.sessionId) return;
     out.push({ key: a.id, date: a.date, sport: a.sport, title: a.name || SPORT[a.sport] || 'Einheit', planned: null, st: {}, act: a, custom: true });
   });
@@ -49,18 +50,19 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
 }
 
 /* Werte einer Einheit: Uhr/Datei zuerst, sonst die Felder */
-export interface Vals { min: number | null; km: number | null; meters: number | null; hr: number | null; pace: number | null; speed: number | null; power: number | null; cadence: number | null; dec: number | null;
+export interface Vals { conflicts: string[]; min: number | null; km: number | null; meters: number | null; hr: number | null; pace: number | null; speed: number | null; power: number | null; cadence: number | null; dec: number | null;
   splits: { km: number; pace: string; hr: number | null }[]; hrZones: number[] | null; intervals: any; pattern: Pattern | null; spl: number | null; dps: number | null; longest: number | null; pace100: number | null; crawlShare: number | null;
   rpe: number | null; feel: number | null; deviation: string; notes: string; technique: string; tempC: number | null; ascent: number | null; indoor: boolean; bikeType: string | null; fromWatch: boolean }
 export function valsOf(d: Done): Vals {
-  const f = fieldsOf(d.st || {}, d.sport); const a = d.act || {};
+  const f = fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport); const a = d.act ? effectiveActivity(d.act, d.st) : {};
   const sw = a.swim || {};
   const sp = d.sport === 'bike' ? (a.speedKmh ?? f.speed ?? (f.km && f.min ? f.km / (f.min / 60) : null)) : null;
   return {
-    min: a.min ?? f.min ?? (d.custom && !d.act ? num(d.st.plannedMinutes) : null), km: d.sport === 'swim' ? null : (a.km ?? f.km), meters: d.sport === 'swim' ? (a.km ? Math.round(a.km * 1000) : f.meters) : null,
+    conflicts: actualMetrics(d.st, d.act)._issues || [],
+    min: a.min ?? f.min, km: d.sport === 'swim' ? null : (a.km ?? f.km), meters: d.sport === 'swim' ? (a.km ? Math.round(a.km * 1000) : f.meters) : null,
     hr: a.avgHr ?? f.hr, pace: d.sport === 'run' ? (a.paceSecKm ?? f.paceSec) : null, speed: sp ? Math.round(sp * 10) / 10 : null, power: a.avgPower ?? f.power, cadence: a.avgCadence ?? f.cadence, dec: a.decouplingPct ?? f.decoupling,
     splits: (a.splits && a.splits.length ? a.splits : f.splits) || [], hrZones: a.hrZones || null, intervals: d.act ? intervalsOf(a) : null, pattern: d.act ? patternOf(a) : null,
-    spl: sw.strokesPerLength ?? f.spl, dps: sw.metersPerStroke ?? f.dps, longest: sw.longestContinuousM ?? f.longestCrawl, pace100: sw.pace100 ?? f.pace100, crawlShare: f.crawlShare,
+    spl: sw.strokesPerLength ?? f.spl, dps: sw.metersPerStroke ?? f.dps, longest: d.act ? crawlOf(a) : f.longestCrawl, pace100: sw.pace100 ?? f.pace100, crawlShare: f.crawlShare,
     rpe: f.rpe ?? num(a.rpe), feel: f.feel, deviation: f.deviation, notes: f.notes, technique: f.technique, tempC: a.tempC ?? null, ascent: a.ascentM ?? null,
     indoor: !!(a.indoor || f.indoor || /rolle|trainer|indoor|zwift/i.test(d.title)), bikeType: f.bikeType || a.bikeType || null, fromWatch: !!d.act && d.act.source !== 'manual'
   };
@@ -91,7 +93,7 @@ function similarBefore(ctx: EngineCtx, d: Done, v: Vals): { d: Done; v: Vals } |
 /* ---------- Eine Einheit bewerten ---------- */
 export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: string[]; next: string[]; missing: string[]; head: string; fatigue: number } {
   const v = valsOf(d); const p = ctx.profile; const th = p.thresholds;
-  const good: string[] = [], better: string[] = [], missing: string[] = [];
+  const good: string[] = [], better: string[] = [...v.conflicts], missing: string[] = [];
   let fatigue = 0;
   const s = d.planned;
   const hard = isHardDone(d, v);
@@ -110,7 +112,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     const r = v.min / s.plannedMinutes;
     if (r >= 0.9 && r <= 1.15) good.push(`Dauer passt: ${Math.round(v.min)} von ${s.plannedMinutes} min.`);
     else if (r < 0.8) better.push(`Nur ${Math.round(v.min)} von ${s.plannedMinutes} min${v.deviation ? ` (${v.deviation})` : ''}. Wenn die Zeit fehlte, ist das okay; fehlt sie öfter, plane ich kürzer.`);
-    else if (r > 1.25 && !hard) better.push(`${Math.round(v.min - s.plannedMinutes)} min länger als geplant. Locker ist das in Ordnung, aber steiger den Umfang nicht schneller als etwa 10 % pro Woche.`);
+    else if (r > 1.25 && !hard) better.push(`${Math.round(v.min - s.plannedMinutes)} min länger als geplant. Locker ist das in Ordnung, aber prüfe zusätzliche Dauer anhand deines bisherigen Trainings, der verfügbaren Zeit und deiner Erholung.`);
   }
   // Puls und Zone
   if (v.hr && lthr && (d.sport === 'run' || d.sport === 'bike')) {
@@ -189,6 +191,9 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (d.sport === 'bike' && v.cadence) { if (v.cadence < 75) better.push(`Trittfrequenz ${Math.round(v.cadence)}: eher zu niedrig, ein leichterer Gang (85-95) schont die Beine.`); else if (v.cadence <= 100) good.push(`Trittfrequenz ${Math.round(v.cadence)}: rund.`); }
   // Schwimmen
   if (d.sport === 'swim') {
+    const target = Math.max(0, ...(s?.spec?.steps || []).filter((x: any) => x.mode === 'crawl').map((x: any) => Number(x.m) || 0));
+    if (target && v.longest != null && v.longest < target) better.push(`SOLL: ${target} m Kraul am Stück. IST: ${v.longest} m; das Streckenziel ist noch nicht nachgewiesen. Wiederholen oder kürzer schwimmen, bis es technisch kontrolliert gelingt.`);
+    if (target && v.longest == null) missing.push(`tatsächliche Kraulstrecke (SOLL ${target} m ist kein Ergebnis)`);
     if (v.spl) good.push(`${de(v.spl)} Züge pro Bahn${v.dps ? ` (${de(v.dps, 2)} m pro Zug)` : ''}.`);
     if (v.longest) { const best = (p.skills || {}).swimCrawlM || 0; if (v.longest >= best && v.longest >= 25) good.push(`${v.longest} m Kraul am Stück${v.longest > best ? ', neue Bestmarke' : ''}.`); }
     if (v.crawlShare != null && v.crawlShare < 70) better.push(`Kraul-Anteil ${Math.round(v.crawlShare)} %: Stück für Stück mehr Kraul, Brust nur zum Erholen.`);

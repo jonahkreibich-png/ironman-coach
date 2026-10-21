@@ -7,11 +7,12 @@ import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../.
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
 import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/fields';
-import { swimBests, swimSkillUpdate } from '../../shared/swimskill';
+import { swimBests, swimSkillUpdate, legacySwimReview } from '../../shared/swimskill';
 import { refreshFuture, trendThresholds } from '../../shared/refresh';
 import { mainGoal } from '../../shared/goals';
 import { analyze, type Trigger } from '../../shared/coach/analysis';
 import { extendPlan } from '../../shared/replan';
+import { evidenceSignature } from '../../shared/results';
 
 export async function loadState(env: Env, uid: number): Promise<any> {
   const [planRec, settingsRec, profileRec, sessions, customs, trend, illness, weekNotes, adjustments, nutrition, activities, coachMsgs, coachNotes, goals] = await Promise.all([
@@ -139,12 +140,21 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
   // Schwimmen: neue Bestwerte → Können eintragen und alle kommenden Schwimmeinheiten neu stufen
   {
     const day = opts.date || berlinParts().date;
-    const su = swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, swimBests(L.state, L.baseWeeks, day), t);
-    if (su) {
-      L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...su.skills } }; L.state.profile = L.profile;
-      changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 3 }, updatedAt: t + 3 });
-      su.adjustments.forEach((a, i) => { const x = { ...a, createdAt: t + i, date: day }; L.state.adjustments[a.id] = x; changes.push({ kind: 'adjust', key: a.id, data: x, updatedAt: t + 4 + i }); });
-      changes.push({ kind: 'coachMsg', key: 'msg-swim-' + t, data: { id: 'msg-swim-' + t, at: t, date: day, kind: 'adjust', from: 'coach', title: 'Schwimm-Stufe aktualisiert', text: su.text, important: true }, updatedAt: t + 5 });
+    const best = swimBests(L.state, L.baseWeeks, day);
+    const su = legacySwimReview(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t) || swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t);
+    const swimMsgId = su?.reviewOnly ? 'msg-swim-legacy-' + evidenceSignature(L.state, L.baseWeeks) : 'msg-swim-' + t;
+    if (su && !(su.reviewOnly && L.state.coachMsgs[swimMsgId])) {
+      if (!su.reviewOnly) { L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...su.skills } }; L.state.profile = L.profile;
+      changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 3 }, updatedAt: t + 3 }); }
+      if (su.reviewOnly) {
+        // alte Profilangabe ohne Herkunft: nur ein Vorschlag
+        changes.push({ kind: 'coachMsg', key: swimMsgId, data: { id: swimMsgId, at: t, date: day, kind: 'proposal', from: 'coach', title: 'Schwimmen: bitte prüfen', text: su.text + (su.adjustments.length ? '\n\n' + su.adjustments.map(a => a.what).join('\n') : ''), important: true,
+          proposal: { status: 'open', skillsOnly: true, evidenceSignature: evidenceSignature(L.state, L.baseWeeks), changes: [{ kind: 'profile', key: 'main', data: { skills: su.skills } }, ...su.adjustments.map((a, i) => ({ kind: 'adjust', key: a.id, data: { ...a, createdAt: t + i, date: day } }))] } }, updatedAt: t + 5 });
+      } else {
+        // Auftrag 17: Korrekturen und bestätigte Fortschritte gelten sofort für die kommenden Schwimmeinheiten (rückgängig machbar)
+        su.adjustments.forEach((a, i) => { const x = { ...a, createdAt: t + i, date: day }; L.state.adjustments[a.id] = x; changes.push({ kind: 'adjust', key: a.id, data: x, updatedAt: t + 6 + i }); });
+        changes.push({ kind: 'coachMsg', key: swimMsgId, data: { id: swimMsgId, at: t, date: day, kind: 'adjust', from: 'coach', title: /^Korrigiert/.test(su.text) ? 'Schwimmen korrigiert' : 'Schwimm-Stufe', text: su.text, important: true }, updatedAt: t + 5 });
+      }
     }
   }
   const ctx = engineCtx(L, opts.date);

@@ -7,16 +7,20 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const procs: ChildProcess[] = [];
+const startupLogs: string[] = [];
 let vapid = '';
 
 function start(file: string, args: string[] = [], env: Record<string, string> = {}): ChildProcess {
   const p = spawn(process.execPath, [file, ...args], { cwd: ROOT, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   procs.push(p);
+  p.stdout?.on('data', d => startupLogs.push(String(d)));
+  p.stderr?.on('data', d => startupLogs.push(String(d)));
+  p.on('error', e => startupLogs.push(e.message));
   return p;
 }
 async function waitFor(url: string) {
   for (let i = 0; i < 100; i++) { try { const r = await fetch(url); if (r.status < 500) return; } catch (e) {} await new Promise(r => setTimeout(r, 100)); }
-  throw new Error('Server startet nicht: ' + url);
+  throw new Error('Server startet nicht: ' + url + '\n' + startupLogs.join(''));
 }
 function run(file: string, env: Record<string, string>): Promise<{ code: number; out: string }> {
   return new Promise(resolve => {

@@ -2,6 +2,14 @@
 
 Nur das, was du selbst tun musst.
 
+## Stand 20.10.2026
+
+**Abschluss 17:35:** Die Änderungen sind jetzt unter https://coach-app-efc7.pages.dev veröffentlicht. App und Backend sind bei Cloudflare bestätigt; die Datenbanksicherung liegt lokal vor. Bei noch alter Anzeige die App neu öffnen beziehungsweise neu laden. Die folgenden Hinweise sind ältere Zwischenstände.
+
+**Aktualisierung 17:10:** Die Anmeldung funktioniert, die vier korrigierten Browsertests sind bestanden und das Testdeployment ist bei Cloudflare als erfolgreich bestätigt. Testversion: https://stamio-test.pages.dev. Die echte App ist noch unverändert; ihre Veröffentlichung erfordert „Freigeben“ gemäß `scripts/release.md`. Die folgenden früheren Hinweise zu den lokalen Zugriffssperren beschreiben den ursprünglichen Zwischenstand.
+
+Die neuen Funktionen liegen lokal auf `entwicklung`. Deine veröffentlichte App ist noch unverändert. Hier sind lokale Browserzugriffe und die Cloudflare-Prüfung gesperrt; die ausstehenden Prüfungen und das Testdeployment müssen in einer entsprechend freigeschalteten Entwicklungsumgebung erfolgen. Erst danach gilt die bestehende Produktionsfreigabe aus `scripts/release.md`. Keine neuen Schlüssel oder kostenpflichtigen Dienste erforderlich.
+
 ## Neu am 18.10. (Auftrag 16)
 
 **KI im Coach (kostenlos):** Im Coach erscheint einmal die Karte „KI-Antworten im Coach (kostenlos)“. Tipp auf „Einverstanden“, wenn du sie willst. Papa und Mama sehen die Karte auch, bei Mama legt die App dabei automatisch ein Konto an. Den Verbrauch siehst du unter Mehr → Daten und Geräte → „Kostenlose KI (Verbrauch)“. Heute ist das Gratis-Kontingent durch meine Tests fast leer, bis 2 Uhr nachts antwortet deshalb oft der Regel-Coach.

@@ -1,5 +1,7 @@
 /* Einfache SVG-Liniendiagramme mit Antippen für Einzelwerte. */
 import { STATE } from './store';
+import { chartSegments } from '../../shared/chartdata';
+import { validDate } from '../../shared/load';
 import { $, esc, de, daysBetween, addDays, fmtDate, dowShort, todayStr } from './util';
 
 export const CHARTS = {};
@@ -12,8 +14,9 @@ export function niceStep(range, target) {
 export function fmtTick(v, step) { const dec = step < 1 ? (step < 0.1 ? 2 : 1) : 0; return de(v, dec); }
 export function lineChart(pts, series, o) {
   o = o || {};
+  pts = (pts || []).filter(p => p && validDate(p.date)).slice().sort((a, b) => a.date.localeCompare(b.date));
   const vals = [];
-  series.forEach(s => pts.forEach(p => { if (p[s.key] != null) vals.push(p[s.key]); }));
+  series.forEach(s => pts.forEach(p => { if (typeof p[s.key] === 'number' && Number.isFinite(p[s.key])) vals.push(p[s.key]); }));
   if (pts.length < 2 || !vals.length) return `<div class="empty">${o.empty || 'Noch nicht genug Datenpunkte für einen Verlauf.'}</div>`;
   (o.lines || []).forEach(l => vals.push(l.v));
   const id = 'c' + (++chartSeq);
@@ -50,14 +53,19 @@ export function lineChart(pts, series, o) {
     s += `<text x="${W - R - 2}" y="${y(l.v) - 5}" text-anchor="end" style="fill:${l.color || 'var(--ink-2)'}">${esc(l.label)}</text>`;
   });
   series.forEach((ser, si) => {
-    const c = pts.map((p, i) => p[ser.key] != null ? [x(i), y(p[ser.key]), p[ser.key]] : null).filter(Boolean);
+    const segments = chartSegments(pts, ser.key, o.maxGapDays ?? 7).map(indices => indices.map(i => [x(i), y(pts[i][ser.key]), pts[i][ser.key]]));
+    const c = segments.flat();
     if (!c.length) return;
+    segments.forEach(segment => {
+    const c = segment;
+    if (c.length === 1) s += `<circle cx="${c[0][0].toFixed(1)}" cy="${c[0][1].toFixed(1)}" r="2.6" style="fill:${ser.color}"/>`;
     const poly = c.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ');
     if (ser.area && c.length > 1) {
       const base = o.invert ? T : H - B;
       s += `<polygon points="${c[0][0].toFixed(1)},${base} ${poly} ${c[c.length - 1][0].toFixed(1)},${base}" style="fill:${ser.color};opacity:.12"/>`;
     }
     if (c.length > 1) s += `<polyline points="${poly}" style="fill:none;stroke:${ser.color};stroke-width:${ser.dashed ? 1.6 : 2.4};stroke-linejoin:round;stroke-linecap:round${ser.dashed ? ';stroke-dasharray:5 4' : ''}"/>`;
+    });
     if (!ser.dashed) {
       if (n <= 45) c.slice(0, -1).forEach(q => { s += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="2.6" style="fill:${ser.color}"/>`; });
       const e = c[c.length - 1];

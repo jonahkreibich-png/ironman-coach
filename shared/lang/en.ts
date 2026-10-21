@@ -1,5 +1,19 @@
 /* Englische Texte (vorbereitet). Fehlende Schlüssel fallen auf Deutsch zurück. Vollständig übersetzen: siehe SPAETER.md. */
 export const en: Record<string, string> = {
+  "sub.lexikon": "Terms / Glossary",
+  "mehr.lexikon": "Look up training terminology",
+  "lexicon.intro": "Terms in alphabetical order. Search for a term or choose a topic. Model values are estimates and do not replace how you feel or a medical assessment. Definitions are currently available in German.",
+  "lexicon.search": "Search terms",
+  "lexicon.placeholder": "For example CTL, FTP or taper",
+  "lexicon.topic": "Topic",
+  "lexicon.all": "All topics",
+  "lexicon.load": "Load and recovery",
+  "lexicon.intensity": "Intensity and zones",
+  "lexicon.planning": "Training planning",
+  "lexicon.technique": "Technique and transitions",
+  "lexicon.count": "{n} terms",
+  "lexicon.empty": "No matching term. Try another spelling or all topics.",
+  "lexicon.sources": "Sources and further reading",
   'tab.heute': 'Today', 'tab.plan': 'Plan', 'tab.coach': 'Coach', 'tab.fortschritt': 'Progress', 'tab.mehr': 'More',
   'common.back': 'Back', 'common.close': 'Close', 'common.save': 'Save', 'common.saved': 'Saved', 'common.delete': 'Delete',
   'common.next': 'Next', 'common.yes': 'Yes', 'common.no': 'No', 'common.loading': 'Loading …', 'common.today': 'today',
@@ -16,6 +30,6 @@ export const en: Record<string, string> = {
   'conn.dbxStale': 'Last file from HealthFit: {d}. Nothing new? In HealthFit: Settings → Automatic export → Dropbox on, format FIT, and open HealthFit once after training.', 'conn.dbxFit': 'FIT files in your Dropbox:', 'conn.newest': 'newest', 'conn.dbxSwitched': 'switched to {f}',
   'v.feel': 'Feeling', 'v.load': 'Load', 'v.ill': 'Illness', 'heute.restDay': 'Rest day',
   'heute.goalIn': '{name} in {n} days', 'heute.week': 'This week', 'heute.values': 'Metrics',
-  'sub.werte': 'Metrics', 'sub.essen': 'Nutrition', 'sub.profil': 'Profile and goals', 'sub.verbindungen': 'Connections',
+  'sub.strength': 'Strength templates', 'sub.werte': 'Metrics', 'sub.essen': 'Nutrition', 'sub.profil': 'Profile and goals', 'sub.verbindungen': 'Connections',
   'sub.einstellungen': 'Settings', 'sub.daten': 'Data and devices', 'sub.wettkampf': 'Race', 'sub.onboarding': 'Questionnaire'
 };

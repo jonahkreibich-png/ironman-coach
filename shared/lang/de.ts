@@ -1,6 +1,20 @@
 /* Deutsche Texte (vollständig). Schlüssel nach Bereich. {name} wird ersetzt.
    Prüfung: tests/unit/i18n.test.ts meldet jeden benutzten Schlüssel, der hier fehlt. */
 export const de: Record<string, string> = {
+  "sub.lexikon": "Begriffe / Lexikon",
+  "mehr.lexikon": "Trainingsbegriffe nachschlagen",
+  "lexicon.intro": "Alle Begriffe alphabetisch. Suche nach einem Begriff oder wähle ein Thema. Modellwerte sind Schätzungen und ersetzen weder dein Befinden noch eine medizinische Beurteilung.",
+  "lexicon.search": "Begriff suchen",
+  "lexicon.placeholder": "Zum Beispiel CTL, FTP oder Taper",
+  "lexicon.topic": "Thema",
+  "lexicon.all": "Alle Themen",
+  "lexicon.load": "Belastung und Erholung",
+  "lexicon.intensity": "Intensität und Zonen",
+  "lexicon.planning": "Trainingsplanung",
+  "lexicon.technique": "Technik und Wechsel",
+  "lexicon.count": "{n} Begriffe",
+  "lexicon.empty": "Kein Begriff gefunden. Versuche eine andere Schreibweise oder alle Themen.",
+  "lexicon.sources": "Quellen und Vertiefung",
   /* ---------- Allgemein ---------- */
   'common.back': 'Zurück', 'common.close': 'Schließen', 'common.save': 'Speichern', 'common.saved': 'Gespeichert',
   'common.delete': 'Löschen', 'common.remove': 'Entfernen', 'common.copy': 'Kopieren', 'common.copied': 'Kopiert',
@@ -15,7 +29,7 @@ export const de: Record<string, string> = {
   /* ---------- Navigation ---------- */
   'tab.heute': 'Heute', 'tab.plan': 'Plan', 'tab.coach': 'Coach', 'tab.fortschritt': 'Fortschritt', 'tab.mehr': 'Mehr',
   'tab.unread': '{n} neue Nachrichten',
-  'sub.werte': 'Werte', 'sub.essen': 'Essen', 'sub.profil': 'Profil und Ziele', 'sub.verbindungen': 'Verbindungen',
+  'sub.strength': 'Kraftvorlagen', 'sub.werte': 'Werte', 'sub.essen': 'Essen', 'sub.profil': 'Profil und Ziele', 'sub.verbindungen': 'Verbindungen',
   'sub.einstellungen': 'Einstellungen', 'sub.daten': 'Daten und Geräte', 'sub.wettkampf': 'Wettkampf', 'sub.onboarding': 'Fragebogen',
   'sub.generator': 'Plan-Generator', 'sub.beruecksichtigungen': 'Berücksichtigungen', 'mehr.beruecksichtigungen': 'Können, Beschwerden, Vorlieben, Ausrüstung',
   'mehr.werte': 'Morgenwerte, Verläufe, Belastung', 'mehr.essen': 'Ziele für heute, Foto, Gewicht', 'mehr.profil': 'Angaben, Ziele, Sprache',

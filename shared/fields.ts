@@ -96,10 +96,8 @@ export function zoneVerdict(s: any, st: any, thr: any): { zone: number; planned:
 }
 /* Fitness, Müdigkeit, Form an einem Tag: intervals.icu, sonst aus den eigenen Einheiten */
 export function loadOn(state: any, weeks: any[], date: string): { ctl: number; atl: number; tsb: number; source: string } | null {
-  const p = (state.trend || []).find((x: any) => x && x.date === date && num(x.ctl) != null && x.ctl > 0);
-  if (p) return { ctl: Math.round(p.ctl), atl: Math.round(num(p.atl) || 0), tsb: Math.round(num(p.tsb) ?? (p.ctl - (num(p.atl) || 0))), source: 'intervals.icu' };
   const own = C.ownLoadSeries(state, weeks || [], date).find((x: any) => x.date === date);
-  return own && own.ctl > 0 ? { ctl: Math.round(own.ctl), atl: Math.round(own.atl), tsb: Math.round(own.tsb), source: 'eigene Einheiten' } : null;
+  return own ? { ctl: Math.round(own.ctl), atl: Math.round(own.atl), tsb: Math.round(own.tsb), source: own.source } : null;
 }
 
 /* ---------- Werte aus Aufzeichnungen (Uhr, HealthFit, intervals.icu) ---------- */

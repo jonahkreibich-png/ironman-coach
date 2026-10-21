@@ -21,6 +21,7 @@ import { fixConflict } from './rules';
 import * as C from '../../../shared/core';
 import { analyze } from '../../../shared/coach/analysis';
 import { openSession } from './session';
+import { evidenceSignature } from '../../../shared/results';
 
 const time = (ms: number) => { const d = new Date(ms); return `${dowShort(d.toISOString().slice(0, 10))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 export const keepDays = () => [3, 7, 14].includes(+((STATE.settings || {}).coachKeepDays)) ? +STATE.settings.coachKeepDays : 7;
@@ -244,6 +245,14 @@ on('chat-action', el => {
   if (a.kind === 'rule-fix') { const msg = fixConflict('now', a.payload || {}); done(msg || t('chat.nothing')); return; }
 });
 on('prop', async el => {
+  if (!isSyncOn()) {
+    const m = STATE.coachMsgs[el.dataset.id!]; const p = m?.proposal; if (!p || p.status !== 'open') return;
+    const accept = el.dataset.ok === '1';
+    if (accept && p.evidenceSignature && p.evidenceSignature !== evidenceSignature(STATE, D().engine.baseWeeks)) { toast('Trainingsdaten geändert. Bitte den aktuellen Vorschlag prüfen.'); return; }
+    if (accept) for (const c of p.changes || []) if (c.kind === 'adjust') STATE.adjustments[c.key] = c.data;
+    else if (p.skillsOnly && c.kind === 'profile') saveProfile({ ...profile(), skills: { ...profile().skills, ...c.data.skills } });
+    p.status = accept ? 'accepted' : 'rejected'; rebuildPlanIndex(); saveState(); invalidate(); nav.rerender(); return;
+  }
   try { await apiCall('POST', '/api/coach/proposal/' + el.dataset.id, { accept: el.dataset.ok === '1' }); await syncNow(); toast(el.dataset.ok === '1' ? t('coach.accepted') : t('coach.rejected')); }
   catch (e) { toast((e as Error).message); }
 });

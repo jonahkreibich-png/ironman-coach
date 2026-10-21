@@ -1,12 +1,12 @@
 /* Auftrag 15, Punkt 5: alle 60 Test-Nutzer nach 3 simulierten Wochen in der App (normale Nutzer, kein Betreiber).
    Je Nutzer: Heute, Plan (mit geöffneter Einheit), Coach, Fortschritt, Mehr, Profil, Werte, Verbindungen, Daten, Einstellungen,
    Berücksichtigungen. Geprüft: nichts ragt aus dem Bildschirm, keine Fehler in der Konsole, keine Betreiber-Infos oder Fachbegriffe wie
-   Server/API/Secret, Fachbegriffe in Karten erklärt, Ampel-Farbe passt zum Wert, keine nicht gewählte Sportart im Plan der nächsten Tage.
+   Server/API/Secret, zentrales Lexikon separat geprüft, Ampel-Farbe passt zum Wert, keine nicht gewählte Sportart im Plan der nächsten Tage.
    Chromium für alle 60, WebKit (iPhone) für jeden vierten. */
 import { test, expect, type Page } from '@playwright/test';
 import { manyUsers, MANY_TODAY } from '../../fixtures/manyusers';
 import { simulate } from '../helpers/many-sim';
-import { unexplained } from '../../shared/glossary';
+// Zentrales Lexikon statt Erklärblöcken je Karte: siehe lexikon.spec.ts.
 import * as C from '../../shared/core';
 
 const USERS = manyUsers();
@@ -54,7 +54,6 @@ for (const [i, u] of USERS.entries()) {
       (await problems(page)).forEach(p => found.push(`${sc}: ${p}`));
       const text = await page.locator('#app').innerText();
       const tech = TECH.exec(text); if (tech) found.push(`${sc}: „${tech[0]}“ sichtbar: …${text.slice(Math.max(0, tech.index - 40), tech.index + 40).replace(/\s+/g, ' ')}…`);
-      for (const card of await page.locator('#app .card').all()) { const t = await card.innerText().catch(() => ''); for (const j of unexplained(t)) found.push(`${sc}: „${j}“ ohne Erklärung in „${t.replace(/\s+/g, ' ').slice(0, 60)}“`); }
       if (sc === 'heute') {
         // Ampel: Farbe passt zum Wert (ab 70 grün, 45-69 gelb, darunter rot, ohne Wert grau)
         const card = page.locator('.answer').first();
@@ -66,7 +65,7 @@ for (const [i, u] of USERS.entries()) {
       }
       if (sc === 'plan') {
         const b = page.locator('[data-act="sess-open"]').first();
-        if (await b.count()) { await b.click(); await page.waitForTimeout(60); (await problems(page)).forEach(p => found.push(`Einheit: ${p}`)); const t = await page.locator('#sheetPanel').innerText().catch(() => ''); const tech2 = TECH.exec(t); if (tech2) found.push(`Einheit: „${tech2[0]}“`); for (const j of unexplained(t)) found.push(`Einheit: „${j}“ ohne Erklärung`); await page.keyboard.press('Escape'); }
+        if (await b.count()) { await b.click(); await page.waitForTimeout(60); (await problems(page)).forEach(p => found.push(`Einheit: ${p}`)); const t = await page.locator('#sheetPanel').innerText().catch(() => ''); const tech2 = TECH.exec(t); if (tech2) found.push(`Einheit: „${tech2[0]}“`); await page.keyboard.press('Escape'); }
       }
     }
     // keine nicht gewählte Sportart in den nächsten 14 Tagen

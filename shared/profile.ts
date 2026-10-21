@@ -68,6 +68,12 @@ export interface Skills {
   swimCrawlM?: number | null;
   /** so viele Meter Kraul mit Pull Buoy am Stück */
   swimPullM?: number | null;
+  /** Automatisch aus Ergebnissen abgeleitete Werte; eigene Angaben bleiben getrennt erhalten. */
+  swimEvidence?: {
+    crawl?: { value: number | null; baseline: number | null; manual?: boolean };
+    pull?: { value: number | null; baseline: number | null; manual?: boolean };
+    mode?: { value: 'some' | 'yes' | 'no' | null; baseline: 'some' | 'yes' | 'no' | null; manual?: boolean };
+  } | null;
   swimBreast?: boolean;
   /** so lange am Stück locker laufen (min) */
   runContinuousMin?: number | null;

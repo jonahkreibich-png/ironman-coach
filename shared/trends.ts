@@ -106,26 +106,27 @@ function readinessCard(I: TrendInput, from: string, n: number): TrendCard {
 
 /* ---------- Fitness ---------- */
 /* Tagesbelastung aus allen erledigten Einheiten (Plan, Extra, Uhr) – gleiche Formel wie im Coach (sessionLoad) */
-export function loadsFromActivities(I: TrendInput): Record<string, number> {
-  const out: Record<string, number> = {};
-  const thr = I.profile.thresholds || {};
-  for (const a of I.activities) {
-    if (!a || a.date > I.today || !a.min) continue;
-    const l = C.sessionLoad({ sport: a.sport === 'walk' ? 'run' : a.sport, title: a.name || '', plannedMinutes: a.min }, { metrics: { min: a.min, hr: a.avgHr }, rpe: a.rpe }, thr);
-    if (l > 0) out[a.date] = (out[a.date] || 0) + l;
-  }
-  return out;
+function loadState(I: TrendInput): any {
+  const activities = { ...(I.state.activities || {}) };
+  I.activities.filter(a => a && !a.id.startsWith("sess-")).forEach(a => { activities[a.id] = a; });
+  return { ...I.state, trend: I.trend, profile: I.profile, activities };
 }
-function loadSeries(I: TrendInput): { date: string; ctl: number; atl: number; tsb: number; src: string }[] {
-  const icu = sorted((I.trend || []).filter(p => p && num(p.ctl) != null && num(p.atl) != null && p.date <= I.today && p.ctl > 0));
-  // intervals.icu, wenn aktuell; sonst eigene Rechnung aus allen Einheiten (auch Extra-Einheiten)
-  if (icu.length && icu[icu.length - 1].date >= C.addDays(I.today, -7)) return icu.map(p => ({ date: p.date, ctl: p.ctl, atl: p.atl, tsb: Math.round((p.ctl - p.atl) * 10) / 10, src: 'intervals.icu' }));
-  const loads = loadsFromActivities(I);
-  const days = Object.keys(loads).sort();
-  if (!days.length) return [];
-  let ctl = 0, atl = 0; const out: any[] = [];
-  for (let d = days[0]; d <= I.today; d = C.addDays(d, 1)) { const l = loads[d] || 0; ctl += (l - ctl) / 42; atl += (l - atl) / 7; out.push({ date: d, ctl: Math.round(ctl * 10) / 10, atl: Math.round(atl * 10) / 10, tsb: Math.round((ctl - atl) * 10) / 10, src: 'eigene Einheiten' }); }
-  return out;
+export function loadsFromActivities(I: TrendInput): Record<string, number> { return C.dailyLoads(loadState(I), I.weeks); }
+function loadSeries(I: TrendInput) { return C.ownLoadSeries(loadState(I), I.weeks, I.today); }
+function temperatureCard(I: TrendInput, from: string): TrendCard {
+  const pts = sorted((I.trend || []).filter(p => p && p.date >= from && p.date <= I.today && num(p.bodyTemp) != null)).map(p => ({ date: p.date, v: num(p.bodyTemp) }));
+  if (pts.length < 2) return lock('bodytemp', 'recovery', 'Temperaturabweichung', 2, pts.length, 'Tagen mit Messwerten');
+  return { id: 'bodytemp', group: 'recovery', title: 'Temperaturabweichung', value: de(pts.at(-1)!.v!, 1), unit: '°C', tone: 'info',
+    text: 'Abweichung von deiner persönlichen Basis laut Messquelle. Einzelne Messungen erlauben keine Diagnose.',
+    chart: { pts, series: [{ key: 'v', name: 'Temperaturabweichung (°C)', color: 'var(--warn)' }], lines: [{ v: 0, label: 'Basis' }] } };
+}
+function loadRatioCard(I: TrendInput, from: string): TrendCard {
+  const pts = loadSeries(I).filter(p => p.date >= from);
+  const last = pts.at(-1);
+  if (!last || last.loadRatio == null) return lock('loadratio', 'fitness', 'ATL/CTL', 1, 0, 'Tagen mit CTL über null');
+  return { id: 'loadratio', group: 'fitness', title: 'ATL/CTL', value: de(last.loadRatio, 2), tone: last.inconsistent ? 'warn' : 'info',
+    text: last.inconsistent ? 'Separater Handwert widerspricht CTL und ATL. Korrektur unter Mehr → Werte prüfen.' : 'Akute im Verhältnis zur längerfristigen erfassten Belastung. Kein direkter Leistungs- oder Verletzungsnachweis.',
+    chart: { pts: pts.map(p => ({ date: p.date, v: p.loadRatio })), series: [{ key: 'v', name: 'ATL/CTL', color: 'var(--info)' }], fmt: 'num' } };
 }
 function loadCard(I: TrendInput, from: string): TrendCard {
   const s = loadSeries(I);
@@ -384,8 +385,10 @@ export function trendCards(I: TrendInput): TrendCard[] {
     ...safe(() => rollingVsBase(I, 'hrv', 'hrv', 'HFV', 'ms', true, 0, from)),
     ...safe(() => rollingVsBase(I, 'restingHR', 'rhr', 'Ruhepuls', 'bpm', false, 0, from)),
     ...safe(() => sleepCard(I, from)),
+      ...safe(() => temperatureCard(I, from)),
     ...safe(() => readinessCard(I, from, PERIOD_DAYS[I.period])),
     ...safe(() => loadCard(I, from)),
+      ...safe(() => loadRatioCard(I, from)),
     ...safe(() => volumeCard(I, from)),
     ...safe(() => acwrCard(I, from)),
     ...(sports.includes('run') || runs(I, from).length ? safe(() => runPaceCard(I, from)) : []),

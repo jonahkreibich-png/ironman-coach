@@ -11,6 +11,8 @@ import { fieldsOf, hrZone, plannedZone } from '../fields';
 import { sleepNeed } from '../profile';
 import { rulesOf } from '../constraints';
 import { parseFor } from '../ruleparse';
+import { doneItems } from './review';
+import { actualMetrics } from '../results';
 
 export type Trigger = 'morning' | 'activity' | 'weekly' | 'view';
 export interface Insight { id: string; kind: 'load' | 'recovery' | 'trend' | 'technique' | 'consistency' | 'illness'; tone: 'good' | 'info' | 'warn' | 'bad'; score: number; title: string; why: string; tip: string }
@@ -32,11 +34,7 @@ const fmtD = (d: string) => `${DOW[new Date(d + 'T12:00:00Z').getUTCDay()]} ${d.
 /* Alle erledigten Einheiten mit ihren Feldern (geplante, Extra-Einheiten, Aufzeichnungen ohne Zuordnung) */
 export interface Done { id: string; date: string; sport: string; title: string; planned: any | null; f: ReturnType<typeof fieldsOf> }
 export function doneSessions(ctx: EngineCtx, from: string, to: string): Done[] {
-  const out: Done[] = [];
-  const weeks = C.applyAdjustments(ctx.baseWeeks, ctx.state.adjustments || {});
-  C.planDays(weeks).forEach((d: any) => { if (d.date < from || d.date > to) return; d.sessions.forEach((s: any) => { const st = (ctx.state.sessions || {})[s.id]; if (st && st.completed && s.sport !== 'rest') out.push({ id: s.id, date: d.date, sport: s.sport, title: s.title, planned: s, f: fieldsOf(st, s.sport) }); }); });
-  Object.entries(ctx.state.customWorkouts || {}).forEach(([d, l]: any) => { if (d < from || d > to) return; (l || []).forEach((w: any) => out.push({ id: w.id, date: d, sport: w.sport, title: w.title, planned: null, f: fieldsOf({ ...w, metrics: { min: w.plannedMinutes, km: w.plannedKm, ...(w.metrics || {}) } }, w.sport) })); });
-  return out.sort((a, b) => a.date.localeCompare(b.date));
+  return doneItems(ctx, from, to).map(d => ({ id: d.key, date: d.date, sport: d.sport, title: d.title, planned: d.planned, f: fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport) }));
 }
 /* Laufökonomie: Meter pro Herzschlag bei lockeren Läufen (je höher, desto effizienter) */
 const runEff = (x: Done) => x.f.paceSec && x.f.hr ? (60000 / x.f.paceSec) / x.f.hr : null;
@@ -73,11 +71,11 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const recentIll = (st.illnessPeriods || []).find((p: any) => p && p.end && p.end >= C.addDays(today, -21) && p.end < today);
   // Auftrag 14: erst ab etwas Trainingsverlauf (Fitness ab 15), sonst ergibt eine einzige Einheit Werte wie „483 % über deiner Fitness“
   if (acwr != null && !ill && (ctl || 0) >= 15) {
-    if (acwr > 1.5) add({ id: 'acwr-high', kind: 'load', tone: 'bad', score: 90, title: 'Belastung steigt zu schnell', why: `Müdigkeit (ATL ${Math.round(atl!)}) liegt ${Math.round((acwr - 1) * 100)} % über deiner Fitness (CTL ${Math.round(ctl!)}), ACWR ${de(acwr, 2)}. Über 1,5 steigt das Verletzungsrisiko deutlich.`, tip: 'Die nächsten 2-3 Tage locker, keine Intervalle.' });
-    else if (acwr > 1.3) add({ id: 'acwr-up', kind: 'load', tone: 'warn', score: 60, title: 'Belastung ist gerade hoch', why: `ACWR ${de(acwr, 2)} (ATL ${Math.round(atl!)}, CTL ${Math.round(ctl!)}). Gut ist 0,8 bis 1,3.`, tip: 'Achte auf Schlaf und plane nach der nächsten harten Einheit einen lockeren Tag.' });
-    else if (acwr < 0.8 && recentIll) add({ id: 'acwr-low-ill', kind: 'load', tone: 'info', score: 55, title: 'Fitness nach der Krankheit gesunken', why: `CTL ${ctl28 != null ? `von ${Math.round(ctl28)} auf ` : ''}${Math.round(ctl!)}, ATL nur ${Math.round(atl!)} (ACWR ${de(acwr, 2)}). Das ist nach einer Pause normal und kommt schnell zurück.`, tip: 'Langsam steigern: der Plan startet mit 15 % weniger und steigert höchstens 10 % pro Woche.' });
+    if (acwr > 1.5) add({ id: 'acwr-high', kind: 'load', tone: 'bad', score: 90, title: 'Belastung steigt zu schnell', why: `Müdigkeit (ATL ${Math.round(atl!)}) liegt ${Math.round((acwr - 1) * 100)} % über deiner Fitness (CTL ${Math.round(ctl!)}), ACWR ${de(acwr, 2)}. Das Verhältnis zeigt einen Belastungsunterschied, sagt allein aber weder Erschöpfung noch Verletzungsrisiko voraus.`, tip: 'Die nächsten 2-3 Tage locker, keine Intervalle.' });
+    else if (acwr > 1.3) add({ id: 'acwr-up', kind: 'load', tone: 'warn', score: 60, title: 'Belastung ist gerade hoch', why: `ACWR ${de(acwr, 2)} (ATL ${Math.round(atl!)}, CTL ${Math.round(ctl!)}). Das ist ein Modellhinweis; tatsächliche Erholung, Verlauf und Beschwerden entscheiden mit.`, tip: 'Achte auf Schlaf und plane nach der nächsten harten Einheit einen lockeren Tag.' });
+    else if (acwr < 0.8 && recentIll) add({ id: 'acwr-low-ill', kind: 'load', tone: 'info', score: 55, title: 'Fitness nach der Krankheit gesunken', why: `CTL ${ctl28 != null ? `von ${Math.round(ctl28)} auf ` : ''}${Math.round(ctl!)}, ATL nur ${Math.round(atl!)} (ACWR ${de(acwr, 2)}). Das ist nach einer Pause normal und kommt schnell zurück.`, tip: 'Nach tatsächlicher Verträglichkeit wieder einsteigen; ausgefallene Einheiten nicht nachholen und Steigerungen erst nach Prüfung übernehmen.' });
     else if (acwr < 0.8) add({ id: 'acwr-low', kind: 'load', tone: 'info', score: 35, title: 'Weniger Belastung als deine Fitness', why: `ACWR ${de(acwr, 2)}: in den letzten Tagen weniger trainiert als in den Wochen davor.`, tip: 'Ist das gewollt (Erholungswoche), passt es. Sonst die geplanten Einheiten wieder regelmäßig machen.' });
-    if (tsb != null && tsb < -25) add({ id: 'tsb-low', kind: 'load', tone: 'warn', score: 65, title: 'Du bist ziemlich müde', why: `Form (TSB) ${Math.round(tsb)}: die Belastung der letzten Tage ist deutlich höher als deine Fitness.`, tip: 'Morgen locker oder frei, gut essen und schlafen.' });
+    if (tsb != null && tsb < -25) add({ id: 'tsb-low', kind: 'load', tone: 'warn', score: 65, title: 'Kurzfristige Modellbelastung ist hoch', why: `Form (TSB) ${Math.round(tsb)}: die Belastung der letzten Tage ist deutlich höher als deine Fitness.`, tip: 'Morgen locker oder frei, gut essen und schlafen.' });
   }
   if (ctl != null && ctl28 != null && !recentIll && !ill && Math.abs(ctl - ctl28) >= 3) add({ id: ctl > ctl28 ? 'ctl-up' : 'ctl-down', kind: 'trend', tone: ctl > ctl28 ? 'good' : 'info', score: ctl > ctl28 ? 40 : 45, title: ctl > ctl28 ? 'Deine Fitness steigt' : 'Deine Fitness sinkt', why: `CTL in 4 Wochen von ${Math.round(ctl28)} auf ${Math.round(ctl)} (${src}).`, tip: ctl > ctl28 ? 'Weiter so: regelmäßig und überwiegend locker.' : 'Mehr Regelmäßigkeit bringt die Fitness zurück, nicht einzelne harte Einheiten.' });
 

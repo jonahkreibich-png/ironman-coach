@@ -19,9 +19,11 @@ export interface CoachMsg {
   kind: 'adjust' | 'briefing' | 'session' | 'week' | 'warning' | 'answer' | 'info' | 'proposal' | 'user';
   from: 'coach' | 'ai' | 'user';
   title?: string; text: string;
+  /** Unverzierter Bewertungstext, damit Datenkorrekturen einmalig erkennbar werden. */
+  resultText?: string;
   important?: boolean;
   refs?: { sessionId?: string; activityId?: string; adjustmentIds?: string[] };
-  proposal?: { changes: any[]; status: 'open' | 'accepted' | 'rejected' } | null;
+  proposal?: { changes: any[]; status: 'open' | 'accepted' | 'rejected'; evidenceSignature?: string; skillsOnly?: boolean } | null;
   readiness?: { level: number; score: number | null };
 }
 export interface EngineCtx {
@@ -177,7 +179,14 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
   // Schlafbedarf aus dem Profil auch für die Ampel in den Regeln
   ctx = { ...ctx, state: { ...ctx.state, profile: ctx.profile, settings: { ...(ctx.state.settings || {}), readiness: fallback(ctx) } } };
   // Auftrag 15: Fachbegriffe in Nachrichten werden kurz erklärt
-  const push = (m: CoachMsg) => { if (!has(ctx, m.id) && !out.messages.some(x => x.id === m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m); };
+  const push = (m: CoachMsg) => {
+    if (out.messages.some(x => x.id === m.id)) return;
+    const old = ctx.state.coachMsgs?.[m.id];
+    if (old && m.id.startsWith('msg-review-')) {
+      if ((old.resultText ?? old.text) === m.text) return;
+      out.messages.push({ ...m, at: old.at || m.at, title: 'Bewertung aktualisiert: ' + (m.title || '').replace(/^Bewertung: /, ''), resultText: m.text, text: 'Nach geänderten Trainingsdaten neu bewertet.\n\n' + m.text });
+    } else if (!has(ctx, m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m);
+  };
 
   // Warnzeichen in den Daten (einmal pro Art und Woche)
   const flags: SafetyHit[] = checkData(ctx.state, today);
@@ -187,7 +196,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     const weeks = effWeeks(ctx);
     const byId: Record<string, any> = {};
     C.planDays(weeks).forEach((d: any) => d.sessions.forEach((s: any) => { byId[s.id] = { ...s, date: d.date }; }));
-    const acts = Object.values(ctx.state.activities || {}).filter((a: any) => a && !a.mergedInto && (!ev.activityIds || ev.activityIds.includes(a.id)) && a.date >= C.addDays(today, -2)) as any[];
+    const acts = C.recordedActivities(ctx.state).filter((a: any) => (!ev.activityIds || ev.activityIds.includes(a.id)) && (ev.activityIds || a.date >= C.addDays(today, -2))) as any[];
     // Auftrag 12: Bewertung in 3 Teilen (Einstellung „Bewertung nach jeder Einheit“: ausführlich, kurz oder aus)
     const mode = ((ctx.state.settings || {}).coachReview || 'full') as 'full' | 'short' | 'off';
     const seen = new Set<string>();
@@ -200,10 +209,20 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
       push(msg(ctx, { id: 'msg-review-' + key, date: a.date, kind: 'session', title: 'Bewertung: ' + (s ? s.title : (a.name || 'Einheit')), text, refs: { activityId: a.id, sessionId: a.sessionId || undefined } }));
     }
     // von Hand abgehakte Einheiten ohne Aufzeichnung (heute und gestern)
-    if (mode !== 'off') for (const d of doneItems(ctx, C.addDays(today, -1), today)) {
+    if (mode !== 'off') for (const d of doneItems(ctx, ev.sessionIds?.length ? '1900-01-01' : C.addDays(today, -1), today)) {
+      if (ev.sessionIds?.length && !ev.sessionIds.includes(d.key)) continue;
       if (d.act || seen.has(d.key)) continue;
       let text: string; try { text = autoReview(ctx, d, mode); } catch (e) { continue; }
       push(msg(ctx, { id: 'msg-review-' + d.key, date: d.date, kind: 'session', title: 'Bewertung: ' + d.title, text, refs: { sessionId: d.custom ? undefined : d.key } }));
+    }
+    const touched = new Set([...(ev.sessionIds || []), ...(ev.activityIds || [])]);
+    const current = doneItems(ctx, '1900-01-01', today);
+    for (const old of Object.values(ctx.state.coachMsgs || {}) as CoachMsg[]) {
+      if (!old?.id?.startsWith('msg-review-')) continue;
+      const key = old.id.slice('msg-review-'.length);
+      if (!touched.has(key) && !touched.has(old.refs?.activityId || '')) continue;
+      if (current.some(d => d.key === key || d.act?.id === old.refs?.activityId)) continue;
+      push(msg(ctx, { ...old, kind: 'info', title: 'Bewertung veraltet', text: 'Die zugehörige Einheit wurde gelöscht oder ist nicht mehr abgeschlossen. Die frühere Bewertung ist kein aktueller Leistungsnachweis.' }));
     }
     // Auftrag 13: Extra-Einheiten zählen für den Plan (harte Extra-Einheit → nächster harter Tag, volle Woche → Entlastung)
     try { for (const m of extraChecks(ctx)) push(m); } catch (e) { /* Prüfung darf die Bewertung nicht verhindern */ }
@@ -248,6 +267,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
 
   if (ev.type === 'weekly') {
     const W = C.weeklyAdjustments(ctx.state, ctx.baseWeeks, today, { planMeta: ctx.planMeta, now: ctx.now });
+    // Auftrag 17: Schwimm-Stufen kommen nur noch aus Nachweisen (2 Einheiten), deshalb wirken sie wie die übrigen Wochen-Anpassungen sofort
     out.adjustments.push(...W.adjustments);
     push(weeklyReview(ctx, today, W.adjustments, W.summary));
   }

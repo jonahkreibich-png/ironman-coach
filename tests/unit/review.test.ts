@@ -91,7 +91,9 @@ describe('Test-Personen mit gespielten Einheiten', () => {
     const W = played('erfahren-md-marathon', { rpe: '8', feel: '5' });
     const r = W.say('Wie war mein letztes Training?');
     expect(r.text).toMatch(/Gefühl 8\/10 für eine lockere Einheit ist hoch|sehr müde/);
-    if (/Müdigkeit/.test(r.text)) expect((r.options || []).some(o => /lockerer/.test(o.label))).toBe(true);
+    const hardSoon = W.sessions(W.today, C.addDays(W.today, 3)).some((s: any) => C.isHard(s) && !W.state.sessions[s.id]?.completed);
+    if (hardSoon && /Müdigkeit/.test(r.text)) expect((r.options || []).some(o => /lockerer/.test(o.label))).toBe(true);
+    else expect(r.text).toMatch(/locker|Erholung/);
   });
   test('Werte fehlen → sagen, was fehlt, und Eintragen anbieten', () => {
     const W = played('marathon-anfaenger', { noValues: true });

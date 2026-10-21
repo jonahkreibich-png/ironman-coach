@@ -36,9 +36,13 @@ describe('Schwimm-Stufen', () => {
   test('jede Lern-Einheit fragt am Ende nach der längsten Strecke', () => {
     expect(weeks[0].days[0].sessions[0].description).toMatch(/Am Ende trägst du die längste Strecke Kraul am Stück ein/);
   });
-  test('Feld „längste Strecke Kraul am Stück“ 100 m → Können eintragen, ALLE kommenden Schwimmeinheiten auf die 100-m-Stufe', () => {
-    const state = { sessions: { a: { completed: true, metrics: { longestCrawl: '100', longestPull: '100' } } }, customWorkouts: {}, activities: {} };
-    expect(swimBests(state, weeks, today)).toEqual({ crawl: 100, pull: 100 });
+  test('Feld „längste Strecke Kraul am Stück“ 100 m in 2 Einheiten → Können eintragen, ALLE kommenden Schwimmeinheiten auf die 100-m-Stufe', () => {
+    // Auftrag 17: einmal 100 m ist ein Bestwert, aber noch keine neue Stufe
+    const once = { sessions: { a: { completed: true, metrics: { longestCrawl: '100', longestPull: '100' } } }, customWorkouts: {}, activities: {} };
+    expect(swimBests(once, weeks, today)).toMatchObject({ crawl: 0, pull: 0, best: 100, bestPull: 100 });
+    expect(swimSkillUpdate(profile, weeks, {}, today, swimBests(once, weeks, today), 1000)).toBe(null);
+    const state = { sessions: { a: { completed: true, metrics: { longestCrawl: '100', longestPull: '100' } } }, customWorkouts: { '2026-11-01': [{ id: 'x1', sport: 'swim', metrics: { longestCrawl: '100', longestPull: '100' } }] }, activities: {} };
+    expect(swimBests(state, weeks, today)).toMatchObject({ crawl: 100, pull: 100, authoritative: true });
     const u = swimSkillUpdate(profile, weeks, {}, today, swimBests(state, weeks, today), 1000)!;
     expect(u.skills).toMatchObject({ swimCrawlM: 100, swimPullM: 100 });
     expect(u.adjustments.map(a => a.sessionId)).toEqual(['b', 'c']);
@@ -70,7 +74,9 @@ describe('Coach versteht Schwimm-Fortschritte', () => {
     expect(reply.text).toMatch(/100 m Kraul am Stück/);
     let saved: any = null;
     const store: any = { state, profile, goals: {}, saveProfile: (p: any) => { saved = p; } };
-    applyOps(store, reply.apply!, 6000, today);
+    expect(reply.apply).toBeUndefined(); // Bestätigung vor Änderung des gespeicherten Plans.
+    const confirmed = converse(ectx, { pending: reply.pending } as any, 'ja').reply;
+    applyOps(store, confirmed.apply!, 6000, today);
     expect(saved.skills.swimCrawlM).toBe(100);
     expect(Object.values(state.adjustments).filter((a: any) => a.type === 'modify').length).toBe(2);
   });

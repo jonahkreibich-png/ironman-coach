@@ -32,9 +32,11 @@ test('Lauf-Geh-Wechsel: zu hart (RPE 9) oder ohne Daten → Stufe bleibt', () =>
     expect(r.adjustments.find((a: any) => a.type === 'note').reason).toMatch(/Stufe bleibt/);
   }
 });
-test('Kraul lernen: Uhr misst 50 m am Stück → nächste Stufe mit 50-m-Stücken', () => {
+test('Kraul lernen: Uhr misst in 2 Einheiten 50 m am Stück → nächste Stufe mit 50-m-Stücken (einmal reicht nicht)', () => {
   const w = weeksWith('swim');
-  const r = C.weeklyAdjustments({ ...state({ 'w1-b': { completed: true, activityId: 'a1' } }), activities: { a1: { swim: { longestContinuousM: 50 } } } }, w, '2026-10-18', {});
+  const once = C.weeklyAdjustments({ ...state({ 'w1-b': { completed: true, activityId: 'a1' } }), activities: { a1: { swim: { longestContinuousM: 50, longestCrawlM: 50 } } } }, w, '2026-10-18', {});
+  expect(once.adjustments.find((a: any) => /stage/.test(a.id))).toBeUndefined();
+  const r = C.weeklyAdjustments({ ...state({ 'w1-a': { completed: true, activityId: 'a0' }, 'w1-b': { completed: true, activityId: 'a1' } }), activities: { a0: { swim: { longestContinuousM: 50, longestCrawlM: 50 } }, a1: { swim: { longestContinuousM: 50, longestCrawlM: 50 } } } }, w, '2026-10-18', {});
   const up = r.adjustments.find((a: any) => /stage/.test(a.id));
   expect(up.set.stage.n).toBe(3);
   expect(up.set.description).toMatch(/\d×50 m Kraul/);

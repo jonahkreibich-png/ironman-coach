@@ -107,14 +107,17 @@ describe('Wochen-Engine beim festen Wochenaufbau', () => {
     expect(a.set.title).toBe('Schwimmtest 400/200 m');
     expect(a.reason).toMatch(/400 m Kraul am Stück/);
   });
-  test('Lernstufe aus dem Kraul-Check: längste Strecke am Stück bestimmt die Stufe, die aufgefüllte Dauer bleibt', () => {
+  test('Lernstufe aus dem Kraul-Check: längste Strecke am Stück in 2 Einheiten bestimmt die Stufe, die aufgefüllte Dauer bleibt', () => {
     const w = [{ ...weeks[0], days: weeks[0].days.map((d: any) => d.date === '2026-11-24' ? { ...d, sessions: [{ id: 'ckx', ...check }, d.sessions[0]] } : d) }, weeks[1]];
-    const state = { sessions: { ckx: { completed: true, metrics: { longestCrawl: '100' } }, sw1: { completed: true, metrics: { min: '30', rpe: 8 } } }, trend, illnessPeriods: [], adjustments: {}, customWorkouts: {}, activities: {}, profile: prof };
+    // Auftrag 17: nur einmal 100 m → Stufe bleibt
+    const one = { sessions: { ckx: { completed: true, metrics: { longestCrawl: '100' } }, sw1: { completed: true, metrics: { min: '30', rpe: 8 } } }, trend, illnessPeriods: [], adjustments: {}, customWorkouts: {}, activities: {}, profile: prof };
+    expect(C.weeklyAdjustments(one, w, '2026-11-29', { planMeta: { pattern: true } }).adjustments.some((x: any) => x.sessionId === 'sw2' && /stage/.test(x.id))).toBe(false);
+    const state = { sessions: { ckx: { completed: true, metrics: { longestCrawl: '100' } }, sw1: { completed: true, metrics: { min: '30', rpe: 8, longestCrawl: '100' } } }, trend, illnessPeriods: [], adjustments: {}, customWorkouts: {}, activities: {}, profile: prof };
     const r = C.weeklyAdjustments(state, w, '2026-11-29', { planMeta: { pattern: true } });
     const a = r.adjustments.find((x: any) => x.sessionId === 'sw2');
     expect(a.set.stage.n).toBe(4);
     expect(a.set.plannedMinutes).toBeGreaterThanOrEqual(45);
-    expect(a.reason).toMatch(/Kraul-Check: 100 m am Stück/);
+    expect(a.reason).toMatch(/100 m Kraul am Stück in 2 Einheiten/);
   });
 });
 

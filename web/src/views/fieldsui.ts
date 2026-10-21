@@ -12,6 +12,8 @@ import { toast } from '../toast';
 import { checkTestResult, checkSwimSkill } from '../testupdate';
 import { reviewSoon } from '../review';
 import * as C from '../../../shared/core';
+import { strengthNumber } from '../../../shared/strength';
+import { editStrengthTemplate } from './strength';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
 /* Datensatz der Einheit (Zustand einer geplanten Einheit oder die Extra-Einheit selbst) */
@@ -46,16 +48,15 @@ function splitsHtml(tg: Target, list: any[]): string {
     <button class="btn ghost sm" data-act="fd-split-add" ${attrs(tg)}>+ ${esc(t('fd.splitAdd'))}</button></div>`;
 }
 function exercisesHtml(tg: Target, list: any, st: any): string {
-  // ohne Einträge: Übungen aus dem Plan vorschlagen (Name und Sätze × Wiederholungen)
-  const planned = (tg.planned && tg.planned.spec && tg.planned.spec.exercises) || [];
-  const rows: any[] = Array.isArray(list) && list.length ? list : planned.map((e: any) => ({ name: e.name, sets: e.sets, reps: e.reps, kg: null, planned: true }));
-  void st;
-  return `<div class="fld wide" data-exercises><span class="lab">${esc(t('fd.exercises'))}</span>${rows.map((e: any, i: number) => `<div class="ex-row">
-    <input class="inp sm ex-name" aria-label="${esc(t('fd.exName'))}" data-ch="fd-ex" data-i="${i}" data-f="name" ${attrs(tg)} value="${esc(e.name || '')}" placeholder="${esc(t('fd.exName'))}">
-    <input class="inp sm" inputmode="numeric" aria-label="${esc(t('fd.exSets'))}" data-ch="fd-ex" data-i="${i}" data-f="sets" ${attrs(tg)} value="${esc(e.sets ?? '')}" placeholder="${esc(t('fd.exSets'))}">
-    <span class="xs muted">×</span><input class="inp sm" aria-label="${esc(t('fd.exReps'))}" data-ch="fd-ex" data-i="${i}" data-f="reps" ${attrs(tg)} value="${esc(e.reps ?? '')}" placeholder="${esc(t('fd.exReps'))}">
-    <span class="xs muted">×</span><input class="inp sm" inputmode="decimal" aria-label="${esc(t('fd.exKg'))}" data-ch="fd-ex" data-i="${i}" data-f="kg" ${attrs(tg)} value="${esc(e.kg ?? '')}" placeholder="kg"></div>`).join('')}
-    <button class="btn ghost sm" data-act="fd-ex-add" ${attrs(tg)}>+ ${esc(t('fd.exAdd'))}</button>${!(Array.isArray(list) && list.length) && planned.length ? `<div class="xs muted">${esc(t('fd.exFromPlan'))}</div>` : ''}</div>`;
+  const planned = tg.planned?.spec?.exercises || [];
+  const rows: any[] = Array.isArray(list) ? list : planned.map((e: any) => ({ ...e, kg: null }));
+  const templates = Object.values(STATE.strengthTemplates || {}) as any[];
+  return `<div class="fld wide stack" data-exercises><span class="lab">${esc(t('fd.exercises'))}</span>
+    ${rows.map((e, i) => `<div class="card flat stack"><b class="xs">Übung ${i + 1}</b><div class="fgrid">${(['name', 'sets', 'reps', 'kg', 'restSec'] as const).map((f, j) => `<label class="fld ${f === 'name' ? 'wide' : ''}"><span class="lab">${['Übung', 'Sätze', 'Wiederholungen / Dauer', 'Gewicht (kg)', 'Pause (Sekunden)'][j]}</span><input class="inp" aria-label="${['Übung', 'Sätze', 'Wiederholungen / Dauer', 'Gewicht (kg)', 'Pause (Sekunden)'][j]}" data-ch="fd-ex" data-i="${i}" data-f="${f}" ${attrs(tg)} inputmode="${f === 'kg' ? 'decimal' : ['sets', 'restSec'].includes(f) ? 'numeric' : 'text'}" value="${esc(e[f] ?? '')}"></label>`).join('')}</div><div class="row" style="flex-wrap:wrap"><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="-1" ${attrs(tg)} ${i === 0 ? 'disabled' : ''} aria-label="Übung ${i + 1} nach oben">↑</button><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="1" ${attrs(tg)} ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Übung ${i + 1} nach unten">↓</button><button class="btn ghost sm danger" data-act="fd-ex-del" data-i="${i}" ${attrs(tg)}>Übung entfernen</button></div></div>`).join('')}
+    <button class="btn ghost sm" data-act="fd-ex-add" ${attrs(tg)}>+ ${esc(t('fd.exAdd'))}</button>
+    <button class="btn ghost sm" data-act="fd-template-save" ${attrs(tg)}>Als Kraftvorlage speichern</button>
+    ${templates.length ? `<label class="fld"><span class="lab">Kraftvorlage</span><select class="inp" data-template-select aria-label="Kraftvorlage"><option value="">Vorlage auswählen</option>${templates.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label><button class="btn ghost sm" data-act="fd-template-apply" ${attrs(tg)}>Übungen durch Vorlage ersetzen</button>` : '<p class="xs muted">Eigene Kraftvorlagen findest du unter Mehr → Kraftvorlagen.</p>'}
+    ${!Array.isArray(list) && planned.length ? `<div class="xs muted">${esc(t('fd.exFromPlan'))}</div>` : ''}</div>`;
 }
 
 /* Der ganze Block: Werte je Sportart, berechnete Angaben, RPE, Gefühl, Abweichung, Notiz */
@@ -85,7 +86,7 @@ export function fieldsBlock(tg: Target): string {
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
 /* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
-const rev = (tg: Target) => { const st = rec(tg); if (st && (tg.kind === 'custom' || st.completed)) reviewSoon(tg.id, tg.date); };
+const rev = (tg: Target) => { const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
 onChange('fd', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const k = el.dataset.k!;
   let v: any = (el as HTMLInputElement).value.trim();
@@ -114,14 +115,24 @@ onChange('fd-split', el => {
 /* Übungen */
 on('fd-ex-add', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); l.push({ name: '', sets: null, reps: '', kg: null }); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
 function exList(tg: Target, st: any): any[] {
-  const own = listOf(st, 'exercises'); if (own.length) return own;
+  const own = listOf(st, 'exercises'); if (Array.isArray(st.metrics?.exercises)) return own;
   const day = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((d: any) => d.date === tg.date);
   const s = day && day.sessions.find((x: any) => x.id === tg.id);
-  return ((s && s.spec && s.spec.exercises) || []).map((e: any) => ({ name: e.name, sets: e.sets, reps: e.reps, kg: null }));
+  return ((s && s.spec && s.spec.exercises) || []).map((e: any) => ({ ...e, kg: null }));
 }
 onChange('fd-ex', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); const i = +el.dataset.i!; if (!l[i]) return;
   const v = (el as HTMLInputElement).value.trim(); const f = el.dataset.f!;
-  l[i][f] = f === 'sets' ? (v ? parseInt(v, 10) || null : null) : f === 'kg' ? (v ? +v.replace(',', '.') || null : null) : v;
-  put(tg, setSessionMetricManual(st, 'exercises', l.filter((e: any) => e.name || e.sets || e.reps || e.kg))); saveSoon();
+  try { l[i][f] = ['sets', 'kg', 'restSec'].includes(f) ? strengthNumber(v, f === 'sets' ? 'Sätze' : f === 'kg' ? 'Gewicht' : 'Pause', f !== 'kg', f === 'sets') : v; }
+  catch (error) { toast((error as Error).message); (el as HTMLInputElement).value = String(l[i][f] ?? ''); return; }
+  put(tg, setSessionMetricManual(st, 'exercises', l)); saveSoon();
+});
+on('fd-ex-del', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st); l.splice(+el.dataset.i!, 1); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
+on('fd-ex-move', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st), i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
+on('fd-template-save', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; editStrengthTemplate(st.title || tg.planned?.title || 'Mein Kraftplan', exList(tg, st)); });
+on('fd-template-apply', el => {
+  const tg = tgOf(el), st = rec(tg); if (!st) return;
+  const select = el.closest('[data-exercises]')?.querySelector('[data-template-select]') as HTMLSelectElement;
+  const template = STATE.strengthTemplates?.[select?.value]; if (!template) { toast('Bitte eine Vorlage auswählen.'); return; }
+  put(tg, setSessionMetricManual(st, 'exercises', template.exercises.map((e: any) => ({ ...e })))); redraw(); toast('Vorlage übernommen.');
 });

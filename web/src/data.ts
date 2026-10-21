@@ -78,14 +78,12 @@ function compute(): Derived {
   const history = C.readinessHistory(STATE.trend, STATE.illnessPeriods, today, 14, fallback);
   const ill = C.illnessAt(STATE.illnessPeriods, today);
   const ret = returnPhase(today);
-  const acts: Activity[] = [...(Object.values(STATE.activities || {}) as Activity[]).filter(a => a && !a.mergedInto), ...legacyActivities(STATE, BASE_WEEKS.length ? PLAN.weeks : [], prof)];
+  const acts: Activity[] = [...C.recordedActivities(STATE), ...legacyActivities(STATE, BASE_WEEKS.length ? PLAN.weeks : [], prof)];
   // Belastung je Sport (für die Gesamt-Form)
   const loadsBySport: Record<string, Record<string, number>> = {};
-  const thr = prof.thresholds;
-  SESS.forEach(s => { const st = STATE.sessions[s.id]; if (st && st.completed && s.sport !== 'rest') { const m = (loadsBySport[s.sport] = loadsBySport[s.sport] || {}); m[s.date] = (m[s.date] || 0) + C.sessionLoad(s, st, thr); } });
-  Object.entries(STATE.customWorkouts || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => { const m = (loadsBySport[w.sport] = loadsBySport[w.sport] || {}); m[d] = (m[d] || 0) + C.sessionLoad({ sport: w.sport, title: w.title, plannedMinutes: w.plannedMinutes }, w, thr); }));
+  C.dailyLoadEntries({ ...STATE, profile: prof }, PLAN.weeks).forEach(e => { const m = (loadsBySport[e.sport] = loadsBySport[e.sport] || {}); m[e.date] = (m[e.date] || 0) + e.load; });
   const cal = PLAN.meta && PLAN.meta.scoreCalibration;
-  const inp = { today, activities: acts, trend: STATE.trend, illness: STATE.illnessPeriods, profile: prof, goal, calibration: cal || null, manualAdjust: STATE.scoreAdjust, loadsBySport, stages: (STATE.settings || {}).stageGoals || null };
+  const inp = { today, activities: acts, trend: STATE.trend, illness: STATE.illnessPeriods, profile: prof, goal, calibration: cal || null, manualAdjust: STATE.scoreAdjust, loadsBySport, settings: STATE.settings, stages: (STATE.settings || {}).stageGoals || null };
   const scoreSports = (['swim', 'bike', 'run', 'strength'] as SportSport[]).filter(s => prof.sports.includes(s as any) || (goal && JSON.stringify(goal).includes(s)));
   lastInp = inp;
   const scores = sportScores(inp, scoreSports.length ? scoreSports : ['run']);

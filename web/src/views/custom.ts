@@ -2,11 +2,12 @@
 import { STATE, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, parseNum } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, openSheet, closeSheet, field, select, armed, srcBadge } from '../kit';
+import { on, onChange, openSheet, closeSheet, refreshSheet, field, select, armed, srcBadge } from '../kit';
 import { activityDetails } from './session';
 import { nav } from '../nav';
 import { fieldsBlock } from './fieldsui';
 import { toast } from '../toast';
+import { reviewSoon } from '../review';
 
 let CUR: { id: string | null; date: string } = { id: null, date: '' };
 const find = () => ((STATE.customWorkouts || {})[CUR.date] || []).find((w: any) => w.id === CUR.id);
@@ -26,10 +27,14 @@ function viewSheet(): string {
   return `<div class="stack"><div class="hint">${esc(t('sport.' + w.sport))} · ${dowShort(CUR.date)} ${fmtDate(CUR.date)} ${srcBadge(w.source)}</div>
     ${fieldsBlock({ kind: 'custom', id: w.id, date: CUR.date, sport: w.sport })}
     ${act ? activityDetails(act) : ''}
+    ${w.completed === false ? '<p class="hint">Entwurf: zählt erst nach dem Abschluss als Training.</p><button class="btn block" data-act="custom-complete">Training abschließen</button>' : w.strengthTemplateId ? '<span class="pill good">Abgeschlossen</span><button class="btn ghost" data-act="custom-reopen">Wieder als Entwurf öffnen</button>' : ''}
     <button class="btn danger" data-act="custom-remove">${esc(t('plan.removeExtra'))}</button></div>`;
 }
 on('custom-add', el => { CUR = { id: null, date: el.dataset.date! }; openSheet(t('plan.addExtra'), addSheet); });
 on('custom-open', el => { CUR = { id: el.dataset.cid!, date: el.dataset.date! }; const w = find(); openSheet(w ? w.title : '', viewSheet); });
+export function openCustomWorkout(id: string, date: string) { CUR = { id, date }; const w = find(); if (w) openSheet(w.title, viewSheet); }
+on('custom-complete', () => { const w = find(); if (!w) return; w.completed = true; saveState(); refreshSheet(); nav.rerender(); reviewSoon(w.id, CUR.date); toast('Training abgeschlossen.'); });
+on('custom-reopen', () => { const w = find(); if (!w) return; w.completed = false; saveState(); refreshSheet(); nav.rerender(); });
 on('custom-save', () => {
   const v = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
   const entry = { id: 'custom-' + CUR.date + '-' + Date.now(), sport: v('ca-sport'), title: v('ca-title').trim() || t('plan.extraDefault'), description: '', plannedMinutes: parseNum(v('ca-min')), plannedKm: parseNum(v('ca-km')), metrics: { ...(v('ca-min') ? { min: v('ca-min') } : {}), ...(v('ca-km') ? { km: v('ca-km') } : {}) } };

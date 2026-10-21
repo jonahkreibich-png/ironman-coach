@@ -15,7 +15,9 @@ import { renderPlan, scrollToPlanDay } from './views/plan';
 import { renderCoach, scrollCoachBottom } from './views/coach';
 import { renderFortschritt } from './views/fortschritt';
 import { renderMehr } from './views/mehr';
+import { renderLexikon } from './views/lexikon';
 import { renderWerte, openCheckin } from './views/werte';
+import { renderStrength } from './views/strength';
 import { renderEssen } from './views/essen';
 import { renderProfil } from './views/profil';
 import { renderVerbindungen, handleOAuthReturn, loadConnections } from './views/verbindungen';
@@ -38,6 +40,7 @@ import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
 import { isSyncOn, loadAiState, loadMe, entitled, onSynced } from './sync';
+import { checkSwimSkill } from './testupdate';
 export const canGenerate = () => FEATURES.generator || entitled('generator');
 
 initErrorLog();
@@ -51,11 +54,11 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
   { id: 'mehr', icon: 'grid', render: renderMehr }
 ];
 const SUBS: Record<string, () => string> = {
-  werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
+  lexikon: renderLexikon, strength: renderStrength, werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
   daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback, generator: () => canGenerate() ? renderGenerator() : renderMehr()
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
-const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen', 'feedback']);
+const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen', 'feedback', 'lexikon']);
 
 /* Alter UI-Zustand: view = heute|plan|werte|fortschritt|essen */
 if (!UI.tab) {
@@ -87,6 +90,7 @@ function renderTabs() {
 }
 
 function render() {
+  if (HAS_PLAN && checkSwimSkill()) saveState();
   invalidate();
   for (const k in CHARTS) delete (CHARTS as any)[k];
   document.body.classList.toggle('no-plan', !HAS_PLAN);

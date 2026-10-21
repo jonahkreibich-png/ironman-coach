@@ -291,11 +291,10 @@ export function generatePlan(inp: GenInput): GenResult {
   // Lernstufen
   const fromSkill = W.swimLadderStart(profile.skills || {});
   const fromPlan = inp.stages && inp.stages.swim !== undefined ? inp.stages.swim : fromSkill;
-  // Stufe: die weiter fortgeschrittene aus Plan und Können (z. B. nach „ich schaffe jetzt 100 m Kraul am Stück“)
-  // „kann kraulen“ (auch ohne Meterangabe) oder 200 m am Stück: normales Training, auch wenn der alte Plan noch eine Lernstufe hatte
+  // Auftrag 17: Die Stufe kommt aus dem belegten Können (Profil, aus eingetragenen oder gemessenen Strecken). Eine geplante Stufe im alten
+  // Plan ist kein Nachweis. Nur ohne Angabe im Profil gilt die Stufe des bisherigen Plans weiter.
   const skS = profile.skills || {};
-  const swimStage0 = fromPlan === null || fromSkill === null ? (fromSkill === null && (skS.swimCrawlM || skS.swimCrawl === 'yes') ? null : fromPlan ?? fromSkill)
-    : fromPlan.ladder === fromSkill.ladder ? (fromPlan.n >= fromSkill.n ? fromPlan : fromSkill) : fromSkill.ladder === 'swim' ? fromSkill : fromPlan;
+  const swimStage0 = skS.swimCrawl || skS.swimCrawlM ? fromSkill : fromPlan;
   // Kraul lernen und Brust können: Brust zum Einschwimmen und für die Ausdauer dazu
   const swimStage = swimStage0 && swimStage0.ladder === 'swim' ? { ...swimStage0, ...((profile.skills || {}).swimBreast ? { breast: true } : {}), ...((profile.skills || {}).swimPullM ? { pull: (profile.skills || {}).swimPullM } : {}) } : swimStage0;
   const runStage = inp.stages && inp.stages.runwalk !== undefined ? inp.stages.runwalk : W.runLadderStart((profile.skills || {}).runContinuousMin);
@@ -782,6 +781,8 @@ export function generatePlan(inp: GenInput): GenResult {
       return { date: sl.date, dow: DOW[sl.dow], sessions: list.length ? list : [{ id: `${idp}${wi + 1}-${DOW[sl.dow].toLowerCase()}-rest`, sport: 'rest', title: sl.closed && !inp.frozen ? 'Vor dem Planstart' : 'Ruhetag' }] };
     });
     prevSundayHard = isHardDay(6); prevSundayStrength = slots[6].items.some(legsStrength); prevSunday = slots[6].items.map(x => x.s);
+    // Lauf-Geh-Stufen: es zählt, wie viele wirklich in die Woche gepasst haben (sonst kommt später eine dazu, +50 % Laufumfang)
+    if (runStage != null && runStageN != null && !ph.recovery && !part) { const placed = slots.flatMap(sl => sl.items).filter(x => x.s.stage && x.s.stage.ladder === 'runwalk').length; if (placed > 0) runStageN = Math.min(runStageN, placed); }
     if (!ph.recovery && ph.phase !== 'taper' && ph.phase !== 'race') { const lr = Math.max(0, ...slots.flatMap(sl => sl.items).filter(x => x.s.sport === 'run' && (x.long || x.s.long || /Langer Lauf/.test(x.s.title || ''))).map(x => x.s.plannedMinutes || 0)); if (lr) lastLR = lr; }
     const races = slots.filter(sl => sl.race).map(sl => ({ goalId: sl.race!.id, name: sl.race!.name, date: sl.date, priority: sl.race!.priority }));
     const otherRaces = races.filter(r => r.goalId !== A.id);

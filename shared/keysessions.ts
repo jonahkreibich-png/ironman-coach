@@ -105,7 +105,7 @@ export function longRunWithQuality(ctx: W.PaceCtx, min: number, q: NonNullable<R
 export function runBaseVariant(ctx: W.PaceCtx, min: number, k: number): W.Spec {
   const v = k % 3;
   if (v === 0) return { sport: 'run', kind: 'hills', ctx, why: 'Hügelsprints machen kräftig und ökonomisch, ohne müde zu machen.', steps: [S('main', { min: r5(min - 8), zone: 2 }), S('main', { reps: 8, min: 0.25, zone: 3, restMin: 0.75, note: '10-15 s zügig bergauf, langsam zurückgehen' })] };
-  if (v === 1) return { sport: 'run', kind: 'fartlek', ctx, why: 'Fahrtspiel: spielerische Tempowechsel nach Gefühl, locker bleiben.', steps: [S('warm', { min: 10, zone: 1 }), S('main', { reps: 6, min: 1, zone: 3, restMin: 2, note: 'locker-zügig, nicht hart' }), S('cool', { min: Math.max(5, r5(min - 10 - 6 - 10)), zone: 2 })] };
+  if (v === 1) return { sport: 'run', kind: 'fartlek', ctx, why: 'Kurze, kontrollierte Intervalle: locker-zügig laufen, dazwischen vollständig erholen.', steps: [S('warm', { min: 10, zone: 1 }), S('main', { reps: 6, min: 1, zone: 3, restMin: 2, note: 'locker-zügig, nicht hart' }), S('cool', { min: Math.max(5, r5(min - 10 - 6 - 10)), zone: 2 })] };
   return W.runEasy(ctx, min, { strides: 6 });
 }
 /* Variante der langen Ausfahrt je Woche (Grundlage und Aufbau) */

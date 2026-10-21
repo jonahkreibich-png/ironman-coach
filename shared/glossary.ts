@@ -1,36 +1,40 @@
-/* Fachbegriffe mit kurzer Erklärung (Auftrag 15: keine Fachbegriffe ohne Erklärung).
-   Taucht ein Begriff in einer Einheit oder Nachricht auf, steht die Erklärung dabei („Begriffe: …“), sofern der Text ihn nicht schon erklärt. */
-export interface Term { term: string; re: RegExp; text: string; /** erkennt eine schon vorhandene Erklärung im Text */ ok?: RegExp }
+/** Zentrales Lexikon; keine automatischen Erklärblöcke in normalen Ansichten. */
+export type GlossaryTopic = 'load' | 'intensity' | 'planning' | 'technique';
+export interface Term { term: string; topic: GlossaryTopic; aliases: string; text: string; re: RegExp; ok?: RegExp }
+const entry = (term: string, topic: GlossaryTopic, aliases: string, text: string): Term => ({ term, topic, aliases, text, re: new RegExp(term, 'i') });
 export const JARGON: Term[] = [
-  { term: 'CSS', re: /\bCSS\b/, text: 'CSS = dein Schwellentempo im Wasser, etwa so schnell, wie du 30 min am Stück kraulen kannst', ok: /Schwellentempo im Wasser|Critical Swim Speed/ },
-  { term: 'FTP', re: /\bFTP\b/, text: 'FTP = die Leistung in Watt, die du etwa eine Stunde halten kannst', ok: /eine Stunde halten/ },
-  { term: 'VO2max', re: /VO2max|VO2-max/i, text: 'VO2max = kurze, sehr harte Stücke nahe am Maximum, trainieren die Sauerstoffaufnahme', ok: /Sauerstoffaufnahme/ },
-  { term: 'Sweet Spot', re: /Sweet Spot/i, text: 'Sweet Spot = zügig, aber lange gut durchzuhalten, etwas unter dem Tempo, das du eine Stunde halten kannst', ok: /etwas unter dem Tempo|lange gut durchzuhalten/ },
-  { term: 'Over-Unders', re: /Over-Under/i, text: 'Over-Unders = im Wechsel etwas unter und etwas über dem Tempo, das du eine Stunde halten kannst', ok: /etwas unter und etwas über/ },
-  { term: 'Schwelle', re: /Schwelle(?!ntempo im Wasser)/, text: 'Schwelle = das Tempo, das du etwa eine Stunde lang halten kannst (Zone 4)', ok: /eine Stunde (lang )?halten|Tempo, das du lange halten kannst/ },
-  { term: 'Kadenz', re: /Kadenz/, text: 'Kadenz = Umdrehungen bzw. Schritte pro Minute', ok: /Umdrehungen|Schritte pro Minute|Trittfrequenz/ },
-  { term: 'Tapering', re: /Tapering/, text: 'Tapering = weniger Umfang vor dem Wettkampf, damit du frisch an den Start gehst', ok: /frisch/ },
-  { term: 'Koppellauf', re: /Koppel(lauf|training)/, text: 'Koppellauf = direkt nach dem Rad laufen, gewöhnt die Beine an den Wechsel', ok: /Wechsel vom Rad|direkt nach dem Rad/ },
-  { term: 'HFV', re: /\bHFV\b/, text: 'HFV = Herzfrequenzvariabilität, zeigt, wie erholt du bist', ok: /Herzfrequenzvariabilität/ },
-  { term: 'ACWR', re: /\bACWR\b/, text: 'ACWR = Belastung der letzten 7 Tage im Vergleich zu den letzten 4 Wochen', ok: /7 Tage|letzten 4 Wochen|28 Tage/ },
-  { term: 'CTL', re: /\bCTL\b/, text: 'CTL = deine Fitness (Belastung der letzten 6 Wochen)', ok: /Fitness/ },
-  { term: 'ATL', re: /\bATL\b/, text: 'ATL = deine Müdigkeit (Belastung der letzten 7 Tage)', ok: /Müdigkeit|Ermüdung/ },
-  { term: 'TSB', re: /\bTSB\b/, text: 'TSB = deine Form (Fitness minus Müdigkeit)', ok: /Form/ },
-  { term: 'RPE', re: /\bRPE\b/, text: 'RPE = wie anstrengend es sich angefühlt hat (1 = ganz leicht, 10 = maximal)', ok: /angefühlt|Anstrengung/ },
-  { term: 'LTHR', re: /\bLTHR\b/, text: 'LTHR = dein Schwellenpuls', ok: /Schwellenpuls/ }
+  entry('ACWR', 'load', 'Acute Chronic Workload Ratio Belastungsverhältnis', 'Verhältnis kurzfristiger zu längerfristiger Belastung. Zeitfenster und Berechnung unterscheiden sich je nach Verfahren. Die App verwendet ATL/CTL, nicht pauschal einen 7-/28-Tage-Quotienten. Kein persönlicher Verletzungsprädiktor und keine sichere Trainingsgrenze.'),
+  entry('ATL', 'load', 'Acute Training Load Ermüdung Müdigkeit', 'Kurzfristig geglättete tägliche Trainingsbelastung, hier standardmäßig mit 7 Tagen Zeitkonstante. Neuere Tage zählen stärker; ältere verschwinden nicht schlagartig. Modell für jüngste Belastung, keine Messung deiner tatsächlichen Müdigkeit.'),
+  entry('ATL/CTL', 'load', 'Belastungsverhältnis Load Ratio', 'ATL geteilt durch CTL am selben Tagesende. Über 1 liegt die kurzfristige über der längerfristigen modellierten Belastung. Bei CTL = 0 ist das Verhältnis nicht definiert. Es beschreibt den Verlauf, sagt aber keine Verletzung voraus und gibt keine individuelle sichere Grenze an.'),
+  entry('Belastung', 'load', 'Load Trainingslast TSS Training Stress Score', 'Trainingsreiz aus Dauer und Intensität. Je nach Sportart, Datenquelle und Berechnung unterscheiden sich die Punkte. Die App nutzt importierte Werte oder Schätzungen aus Einheiten. Gleiche Punkte bedeuten nicht bei jedem Menschen dieselbe Beanspruchung; fehlende Daten verfälschen den Verlauf.'),
+  entry('CSS', 'intensity', 'Critical Swim Speed Schwellentempo Schwimmen', 'Geschätztes Schwellentempo im Wasser, meist in Minuten pro 100 m. Häufig aus einem 400-m- und einem 200-m-Zeitschwimmen berechnet. Hilft bei der Tempowahl; Technik, Testqualität und Tagesform beeinflussen den Wert. Keine garantierte Dauerleistung.'),
+  entry('CTL', 'load', 'Chronic Training Load Fitness', 'Längerfristig geglättete tägliche Trainingsbelastung, hier standardmäßig mit 42 Tagen Zeitkonstante. Neuere Tage zählen stärker. Häufig Fitness genannt, misst aber weder Leistungsfähigkeit noch Gesundheit direkt. Ohne ausreichende Vorgeschichte ist der Startwert unsicher.'),
+  entry('Entkopplung', 'load', 'Decoupling Herzfrequenzdrift', 'Veränderung des Verhältnisses von Tempo oder Leistung zum Puls zwischen Abschnitten einer möglichst gleichmäßigen Einheit. Hitze, Flüssigkeitsverlust, Gelände und Messfehler beeinflussen sie; kein isolierter Fitnesstest.'),
+  entry('FTP', 'intensity', 'Functional Threshold Power Watt Rad', 'Geschätzte funktionelle Schwellenleistung auf dem Rad in Watt. Oft vereinfacht als Stundenleistung beschrieben; tatsächliche Haltedauer und Testverfahren unterscheiden sich. Dient als Referenz zur Einteilung von Leistungszonen.'),
+  entry('Grundlage', 'planning', 'Base Grundlagenausdauer GA1 GA2', 'Überwiegend ruhiges Ausdauertraining zum Aufbau einer belastbaren Basis. Der Umfang wächst passend zu Erfahrung, Erholung und verfügbarer Zeit. Locker bedeutet ein gut kontrollierbares Tempo, bei dem Sprechen meist möglich bleibt.'),
+  entry('HFV', 'load', 'HRV Herzfrequenzvariabilität Erholung', 'Schwankung der Zeitabstände zwischen Herzschlägen. Persönliche Verläufe unter vergleichbaren Messbedingungen können Hinweise auf Belastung geben. Auch Schlaf, Stress, Krankheit und Messverfahren wirken darauf; ein Einzelwert misst Erholung nicht zuverlässig.'),
+  entry('Kadenz', 'technique', 'Trittfrequenz Schrittfrequenz rpm spm', 'Beim Radfahren Kurbelumdrehungen pro Minute, beim Laufen meist Schritte pro Minute. Die Angabe hängt von Sportart und Gerät ab; es gibt keinen für alle passenden Idealwert.'),
+  entry('Koppellauf', 'technique', 'Koppeltraining Brick', 'Laufen direkt nach dem Radfahren. Übt den Wechsel und das Laufen mit vorbelasteten Beinen; Länge und Intensität richten sich nach Erfahrung und Trainingsziel.'),
+  entry('LTHR', 'intensity', 'Lactate Threshold Heart Rate Schwellenpuls', 'Geschätzte Herzfrequenz nahe der individuellen Ausdauerschwelle. Referenz für Pulszonen, kein fester Grenzwert für jeden Tag. Sportart, Hitze, Ermüdung und Testverfahren beeinflussen sie.'),
+  entry('Over-Unders', 'intensity', 'Over Under Over-Under', 'Intervalle mit Abschnitten knapp unter und knapp über der angesetzten Schwelle. Die Einheit legt Dauer, Zielbereich und Pausen fest; kein durchgehend maximales Training.'),
+  entry('Pace', 'intensity', 'Tempo min/km min/100m', 'Zeit pro Strecke, etwa Minuten pro Kilometer beim Laufen oder pro 100 Meter beim Schwimmen. Eine kleinere Zeit bedeutet höheres Tempo. Gelände und Bedingungen gehören zur Einordnung dazu.'),
+  entry('Periodisierung', 'planning', 'Trainingsphasen Aufbau wettkampfspezifisch Erholungswoche', 'Geplante Abfolge von Trainingsschwerpunkten und Erholung, etwa Grundlage, Aufbau, wettkampfspezifische Vorbereitung und Tapering. Der Plan wird an Reaktion, Alltag und Gesundheit angepasst; keine Garantie für einen bestimmten Leistungszuwachs.'),
+  entry('RPE', 'intensity', 'Rate of Perceived Exertion Anstrengung', 'Subjektiv empfundene Anstrengung. Die App nutzt 1 bis 10: 1 sehr leicht, 10 maximal. Die Zahl beschreibt dein Empfinden und ergänzt Puls, Tempo und Leistung; andere RPE-Skalen sind nicht direkt vergleichbar.'),
+  entry('Schwelle', 'intensity', 'Laktatschwelle anaerob threshold', 'Praktische Referenz für die Grenze zwischen länger stabiler und nur begrenzt haltbarer hoher Ausdauerintensität. Je nach Test sind unterschiedliche Schwellen gemeint; FTP, CSS und Schwellenpuls sind sportartspezifische Näherungen, keine identischen physiologischen Messungen.'),
+  entry('Sweet Spot', 'intensity', 'SST', 'Radtraining etwas unter der FTP, häufig etwa 88–94 % davon. Verbindet einen deutlichen Trainingsreiz mit länger haltbaren Abschnitten. Zielbereiche sind Konventionen; die konkrete Einheit und dein Empfinden bestimmen die Belastung.'),
+  entry('Tapering', 'planning', 'Taper Wettkampfwoche Frische', 'Geplante Reduktion der Trainingsbelastung vor einem Wettkampf, vor allem des Umfangs. Einzelne kurze intensive Reize können erhalten bleiben. Ziel ist, Ermüdung abzubauen und Leistungsfähigkeit zu erhalten; Dauer und Umfang sind individuell.'),
+  entry('TSB', 'load', 'Training Stress Balance Form Frische', 'CTL minus ATL. Die App zeigt die Differenz am selben Tagesende; andere Dienste verwenden teils den Vortag. Negative Werte bedeuten höhere kurzfristige Belastung, positive Werte geringere. Modellierte Balance, keine Messung der Wettkampfform und keine Startfreigabe.'),
+  entry('VO2max', 'intensity', 'VO₂max VO2-max maximale Sauerstoffaufnahme', 'Maximale Sauerstoffmenge, die der Körper bei hoher Belastung pro Minute aufnehmen und nutzen kann, oft bezogen auf das Körpergewicht. Laborwerte und Uhren-Schätzungen unterscheiden sich. VO2max-Intervalle sind harte Trainingsabschnitte mit diesem Trainingsziel, nicht die Messgröße selbst.'),
+  entry('Zonen', 'intensity', 'Zone 1 Zone 2 Zone 3 Zone 4 Zone 5 Z1 Z2 Z3 Z4 Z5 Trainingsbereiche', 'Intensitätsbereiche für Puls, Leistung oder Tempo. Im üblichen Fünfzonenmodell: sehr locker (Z1), ruhige Ausdauer (Z2), zügig (Z3), Schwelle (Z4), sehr hart (Z5). Grenzen hängen vom System und deinen Referenzwerten ab; Puls reagiert verzögert. Die Zielwerte stehen in der jeweiligen Einheit.')
 ];
-/* Begriffe im Text, die nicht erklärt sind */
-export function unexplained(text: string): string[] {
-  const t = String(text || '');
-  return JARGON.filter(j => j.re.test(t) && !(j.ok && j.ok.test(t))).map(j => j.term);
+const normalize = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss');
+export function searchGlossary(query = '', topic: GlossaryTopic | '' = ''): Term[] {
+  const words = normalize(query).trim().split(/\s+/).filter(Boolean);
+  return JARGON.filter(j => (!topic || j.topic === topic) && words.every(w => normalize(`${j.term} ${j.aliases} ${j.text}`).includes(w))).sort((a, b) => a.term.localeCompare(b.term, 'de'));
 }
-/* Erklär-Zeile für die Begriffe eines Textes (leer, wenn nichts zu erklären ist) */
-export function termsLine(text: string): string {
-  const miss = JARGON.filter(j => j.re.test(text) && !(j.ok && j.ok.test(text)));
-  return miss.length ? 'Begriffe: ' + miss.map(j => j.text).join('; ') + '.' : '';
-}
-/* Text mit Erklär-Zeile am Ende (für Coach-Nachrichten und Antworten) */
-export function withTerms(text: string): string {
-  const t = String(text || ''); const line = termsLine(t);
-  return line && !t.includes('Begriffe: ') ? `${t}\n\n${line}` : t;
-}
+/** Nur für gezielte Textprüfungen; keine zusätzliche Anweisung. */
+export function unexplained(text: string): string[] { return JARGON.filter(j => j.re.test(String(text || '')) && !(j.ok && j.ok.test(text))).map(j => j.term); }
+/** Alte Aufrufer bleiben kompatibel; Erklärungen stehen unter Mehr → Begriffe / Lexikon. */
+export function termsLine(_text: string): string { return ''; }
+/** Ausdrücklich geschriebene Erklärungen und Sicherheitshinweise bleiben erhalten. */
+export function withTerms(text: string): string { return String(text || ''); }
