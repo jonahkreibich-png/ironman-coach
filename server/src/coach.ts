@@ -7,7 +7,7 @@ import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../.
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
 import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/fields';
-import { swimBests, swimSkillUpdate, legacySwimReview } from '../../shared/swimskill';
+import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate } from '../../shared/swimskill';
 import { refreshFuture, trendThresholds } from '../../shared/refresh';
 import { mainGoal } from '../../shared/goals';
 import { analyze, type Trigger } from '../../shared/coach/analysis';
@@ -140,6 +140,15 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
   // Schwimmen: neue Bestwerte → Können eintragen und alle kommenden Schwimmeinheiten neu stufen
   {
     const day = opts.date || berlinParts().date;
+    // Auftrag 17: eigene Schwimm-Pace (mit Pausen) → kommende Schwimmeinheiten mit realistischen Metern
+    const rate = swimRateUpdate(L.profile, L.state, L.baseWeeks, day);
+    if (rate !== undefined) {
+      L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), swimMPerMin: rate } }; L.state.profile = L.profile;
+      changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 2 }, updatedAt: t + 2 });
+      const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day) : { weeks: [], changed: 0, example: null };
+      if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 });
+        if (!L.state.coachMsgs['msg-swimrate-' + day]) changes.push({ kind: 'coachMsg', key: 'msg-swimrate-' + day, data: { id: 'msg-swimrate-' + day, at: t, date: day, kind: 'adjust', from: 'coach', title: 'Schwimmen an dein Tempo angepasst', text: `Du schwimmst im Schnitt etwa ${String(rate).replace('.', ',')} m pro Minute (mit Pausen). Die kommenden Schwimmeinheiten haben deshalb so viele Meter, wie in die Zeit passen, mit genug Pause.` }, updatedAt: t + 7 }); }
+    }
     const best = swimBests(L.state, L.baseWeeks, day);
     const su = legacySwimReview(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t) || swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t);
     const swimMsgId = su?.reviewOnly ? 'msg-swim-legacy-' + evidenceSignature(L.state, L.baseWeeks) : 'msg-swim-' + t;

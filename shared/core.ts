@@ -3,6 +3,7 @@
 import { GENERIC_LTHR } from './profile';
 import { loadSeriesFromDaily, validDate } from './load';
 import * as W from './workouts';
+import * as K from './keysessions';
 import { rulesOf, evaluate, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
 import { actualMetrics, effectiveActivity } from './results';
@@ -571,6 +572,9 @@ function stageSession(s, n, ctxPatch?) {
       if (s.stage.ladder === 'swimBreast') spec = W.swimLearn(ctx, { ladder: 'swim', n: 2, breast: true }, why);
       else spec = W.swimNormal(ctx, 'technique', s.plannedMinutes || 45, 'base', 200);
     } else spec = W.swimLearn(ctx, { ...s.stage, n }, why, s.spec && s.spec.fillMin);
+    // Auftrag 17: Schwerpunkt der Einheit (Technik, Beinschlag, Pull Buoy …) bleibt, Hilfsmittel nach der aktuellen Ausrüstung
+    spec = K.swimVariant(spec, K.swimFocusIndex(s.spec && s.spec.variant, ctx.gear, spec.stage), 1, 'base');
+    if (s.spec && s.spec.fillMin) spec = K.fitSwim(spec, s.spec.fillMin);
   }
   if (tip && !spec.tip) spec.tip = tip;
   const b = W.build(spec);
@@ -598,6 +602,18 @@ function swimProofs(state, weeks, date, days = 42) {
     out.push({ date: a.date, key: a.id, crawl: c != null && c > 0 ? c : null, pull: null, target: null, stage: null, manual: false });
   });
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+/* Auftrag 17: Meter pro Minute (mit Pausen) aus erledigten Schwimmeinheiten der letzten 6 Wochen mit eingetragener oder gemessener
+   Strecke und Dauer. Mindestens 2 Einheiten, sonst null (dann rechnet die App mit dem Modell). */
+function swimRate(state, weeks, date) {
+  let m = 0, min = 0, n = 0; const from = addDays(date, -42);
+  const look = (st, act) => { const x = actualMetrics(st, act); const meters = toNum(x.meters) ?? (toNum(x.km) != null ? toNum(x.km) * 1000 : null), mi = toNum(x.min);
+    if (meters && mi && meters >= 200 && mi >= 15 && meters / mi < 80) { m += meters; min += mi; n++; } };
+  planDays(weeks).filter(d => d.date <= date && d.date > from).forEach(d => d.sessions.filter(s => s.sport === 'swim').forEach(s => {
+    const st = (state.sessions || {})[s.id]; if (st && st.completed) look(st, st.activityId ? (state.activities || {})[st.activityId] : null);
+  }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
+  return n >= 2 ? Math.round(m / min * 10) / 10 : null;
 }
 /* Bestätigt = in mindestens 2 verschiedenen Einheiten geschafft (der zweitbeste Wert). Ein einzelner Wert ist ein Bestwert, keine neue Stufe. */
 function confirmedOf(values) { const v = (values || []).filter(x => x != null && x > 0).sort((a, b) => b - a); return v.length >= 2 ? v[1] : 0; }
@@ -901,5 +917,5 @@ export {
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
-  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict
+  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate
 };

@@ -121,19 +121,40 @@ export function bikeLongVariant(spec: W.Spec, k: number, phase: Ph): W.Spec {
 }
 /* Schwimmen: Schwerpunkt je Woche und kürzere Pausen im Block (mehr Meter in gleicher Zeit) */
 export const SWIM_VARIANTS = ['Technik', 'Pull Buoy', 'zügige Bahnen'];
+/* Auftrag 17: Schwerpunkte je Einheit nach vorhandener Ausrüstung (nie Ausrüstung voraussetzen, die fehlt, und nicht alles in jeder
+   Einheit): Technik (Übungen; Flossen für Lernende, Schnorchel für Kraulende), Beinschlag (Kickbrett), Zug und Wasserlage (Pull Buoy),
+   zügige Bahnen (erst, wenn Kraul-Stücke geschwommen werden). */
+export function swimFocusList(gear: string[] | null | undefined, stage?: { ladder: string; n: number } | null): string[] {
+  const g = gear || [];
+  const crawling = !stage || (stage.ladder === 'swim' && stage.n >= 2);
+  return ['Technik', ...(g.includes('board') ? ['Beinschlag'] : []), ...(g.includes('buoy') && crawling ? ['Pull Buoy'] : []), ...(crawling ? ['zügige Bahnen'] : [])];
+}
+/* Schwerpunkt einer neu gebauten Einheit wie bisher behalten (z. B. nach einer Stufenänderung) */
+export function swimFocusIndex(oldVariant: string | null | undefined, gear: string[] | null | undefined, stage?: { ladder: string; n: number } | null): number {
+  const list = swimFocusList(gear, stage); const i = list.indexOf(String(oldVariant || '').split(',')[0].trim());
+  return i >= 0 ? i : 0;
+}
 export function swimVariant(spec: W.Spec, k: number, weekInBlock: number, phase: Ph): W.Spec {
   const out: W.Spec = JSON.parse(JSON.stringify(spec));
-  let v = SWIM_VARIANTS[k % SWIM_VARIANTS.length];
-  // Auftrag 14: Pull Buoy nur, wenn die Person einen hat
-  if (v === 'Pull Buoy' && !((out.ctx && out.ctx.gear) || []).includes('buoy')) v = 'Technik';
+  const gear = (out.ctx && out.ctx.gear) || [];
+  const list = swimFocusList(gear, out.stage as any);
+  let v = list[((k % list.length) + list.length) % list.length];
   const rest = Math.max(15, 30 - 5 * weekInBlock);
   out.steps.forEach(s => { if (s.part === 'main' && (s.reps || 1) > 1 && s.restSec && s.restSec >= 20 && s.mode !== 'drill') s.restSec = rest; });
-  // „Pull Buoy“ nur, wenn die Einheit auch Pull-Buoy-Stücke hat (Auftrag 11: vorher stand es manchmal nur im Titel).
-  // Wer schon krault, schwimmt die Hälfte der lockeren Kraul-Stücke mit Pull Buoy; Lernende ohne Pull-Buoy-Strecke bekommen Technik.
+  const learnLen = out.stage && out.stage.ladder === 'swim' ? (W.SWIM_STAGE_M[out.stage.n] || 25) : 0;
+  const crawlMain = () => out.steps.find(s => s.part === 'main' && s.mode === 'crawl' && (s.zone || 2) <= 2 && (s.reps || 1) >= 2);
+  // Pull Buoy: Zug und Wasserlage. Kraulende: die Hälfte der lockeren Kraul-Stücke mit Pull Buoy. Lernende: Stücke so lang wie die Stufe.
   if (v === 'Pull Buoy' && !out.steps.some(s => s.mode === 'pull')) {
-    const c = out.stage ? null : out.steps.find(s => s.part === 'main' && s.mode === 'crawl' && (s.zone || 2) <= 2 && (s.reps || 1) >= 2);
-    if (c) { const half = Math.floor((c.reps || 1) / 2); c.reps = (c.reps || 1) - half; out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: half, m: c.m, zone: 2, mode: 'pull', restSec: c.restSec, note: 'Beine ruhig, lange Züge' })); }
+    const c = crawlMain();
+    if (c && !out.stage) { const half = Math.floor((c.reps || 1) / 2); c.reps = (c.reps || 1) - half; out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: half, m: c.m, zone: 2, mode: 'pull', restSec: c.restSec, note: 'Beine ruhig, lange Züge' })); }
+    else if (c && learnLen) out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: 4, m: Math.min(learnLen, c.m || learnLen), zone: 2, mode: 'pull', restSec: 30, note: 'Beine ruhig, lange Züge, gleichmäßig ausatmen', focus: 'Zug und Wasserlage, Beine locker lassen' }));
     else v = 'Technik';
+  }
+  // Beinschlag mit Kickbrett: eigener Block nach dem Einschwimmen (vorhandener Beinschlag wird länger)
+  if (v === 'Beinschlag') {
+    const kk = out.steps.find(s => s.mode === 'kick');
+    if (kk) kk.reps = (kk.reps || 1) + 2;
+    else { const i = out.steps.findIndex(s => s.part !== 'warm'); out.steps.splice(Math.max(1, i), 0, S('main', { reps: 6, m: out.stage ? 25 : 50, zone: 1, mode: 'kick', restSec: 30, focus: 'Beine aus der Hüfte, Knie locker, Wasserlage ruhig halten' })); }
   }
   if (v === 'Technik') { const d = out.steps.find(s => s.mode === 'drill'); if (d) d.reps = (d.reps || 1) + 2; }
   if (v === 'Pull Buoy') { const p = out.steps.find(s => s.mode === 'pull'); if (p) p.reps = (p.reps || 1) + 2; }

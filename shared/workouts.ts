@@ -38,6 +38,9 @@ export interface PaceCtx {
   indoor?: boolean; bikeName?: string | null;
   /** Tempo-Zonen Rad anzeigen (Auftrag 12, Standard ja) */
   speedZones?: boolean;
+  /** Auftrag 17: tatsächliche Meter pro Minute (mit Pausen) aus den eigenen Schwimmeinheiten; braucht jemand mehr Pause als das Modell,
+      wird die Pause länger gerechnet und es werden weniger Meter in derselben Zeit */
+  swimMPerMin?: number | null;
   /** Beckenlänge (Auftrag 11): 25 m (auch „beides“) oder 50 m. Stücke gehen immer auf, man endet am Startrand */
   pool?: 25 | 50 | null;
   /** Schwimm-Hilfsmittel, die die Person hat (Auftrag 14): board, buoy, fins, paddles, snorkel. Nur diese werden eingeplant. */
@@ -170,6 +173,9 @@ export function swimSums(spec: Spec): { meters: number; swimMin: number; restMin
     rest += Math.max(0, reps - 1) * (s.restSec || 0) / 60;
   }
   rest += Math.max(0, spec.steps.filter(s => s.m).length - 1) * SWIM_SET_CHANGE_SEC / 60;
+  // eigene Pace mit Pausen (Auftrag 17): nie schneller planen, als die Person bisher wirklich geschwommen ist (höchstens 2,5-mal so viel Pause wie im Modell)
+  const real = spec.ctx && spec.ctx.swimMPerMin && spec.ctx.swimMPerMin > 0 ? m / spec.ctx.swimMPerMin : 0;
+  if (real > swim + rest) rest = Math.min(real - swim, rest * 2.5 + 2);
   return { meters: m, swimMin: swim, restMin: rest, min: swim + rest };
 }
 export function totals(spec: Spec): { min: number; km: number | null } {
@@ -539,11 +545,8 @@ export function swimRepMax(sk: { swimCrawl?: string | null; swimCrawlM?: number 
 export function swimNormal(ctx: PaceCtx, kind: 'technique' | 'endurance' | 'css', minutes: number, phase: string, repMax: number, n = 0): Spec {
   const drillM = repMax >= 100 ? 50 : 25;
   const d1 = DRILL_ROT[(n * 2) % DRILL_ROT.length], d2 = DRILL_ROT[(n * 2 + 1) % DRILL_ROT.length];
-  const board = (ctx.gear || []).includes('board');
-  // Material bekommt einen eigenen Technikzweck; die Strecken bleiben innerhalb des bestaetigten Koennens.
-  const kick: Step[] = board ? [{ part: 'main', reps: 4, m: drillM, zone: 1, mode: 'kick', restSec: 30 }] : [];
-  const pull: Step[] = (ctx.gear || []).includes('buoy') ? [{ part: 'main', reps: 2, m: Math.min(50, repMax), zone: 2, mode: 'pull', restSec: 30, focus: 'Wasserlage und ruhige Atmung, Beine locker lassen' }] : [];
-  const tech = (reps: number): Step[] => [{ part: 'main', reps, m: drillM, zone: 1, mode: 'drill', restSec: 20, drill: d1 }, ...kick];
+  // Auftrag 17: Hilfsmittel nicht in jeder Einheit; Kickbrett und Pull Buoy kommen gezielt über den Schwerpunkt (keysessions.swimVariant)
+  const tech = (reps: number): Step[] => [{ part: 'main', reps, m: drillM, zone: 1, mode: 'drill', restSec: 20, drill: d1 }];
   const mk = (k: number): Spec => {
     if (kind === 'css') {
       if (repMax >= 400 && ctx.css) {
@@ -558,11 +561,11 @@ export function swimNormal(ctx: PaceCtx, kind: 'technique' | 'endurance' | 'css'
       const alt = repMax < 100 && n % 2 === 1;
       return swimSession(ctx, 'css', [...tech(4), { part: 'main', reps: alt ? k + 2 : k, m, zone: alt ? 3 : 4, mode: 'crawl', restSec: m >= 100 ? 20 : alt ? 20 : 30 }], 300, 200);
     }
-    if (kind === 'technique') return swimSession(ctx, 'technique', [...tech(4), ...(board ? [] : [{ part: 'main' as const, reps: 4, m: drillM, zone: 1, mode: 'drill' as const, restSec: 20, drill: d2 }]), ...pull, { part: 'main', reps: k, m: Math.min(100, repMax), zone: 2, mode: 'crawl', restSec: 20 }]);
+    if (kind === 'technique') return swimSession(ctx, 'technique', [...tech(4), { part: 'main', reps: 4, m: drillM, zone: 1, mode: 'drill', restSec: 20, drill: d2 }, { part: 'main', reps: k, m: Math.min(100, repMax), zone: 2, mode: 'crawl', restSec: 20 }]);
     const len = repMax >= 400 && phase === 'specific' ? 400 : Math.min(200, repMax);
     // unter 100 m am Stück: Kraul-Stücke im Wechsel mit Brust (Ausdauer ohne Stücke über dem Können)
     const breast: Step[] = repMax < 100 ? [{ part: 'main', reps: Math.max(1, Math.round(k / 4)), m: 100, zone: 2, mode: 'breast', restSec: 20 }] : [];
-    return swimSession(ctx, 'endurance', [...tech(4), ...pull, { part: 'main', reps: k, m: len, zone: 2, mode: 'crawl', restSec: len >= 200 || len <= 50 ? 30 : 20 }, ...breast], repMax < 100 ? 100 : 200, 100, repMax < 100 ? 'breast' : 'easy');
+    return swimSession(ctx, 'endurance', [...tech(4), { part: 'main', reps: k, m: len, zone: 2, mode: 'crawl', restSec: len >= 200 || len <= 50 ? 30 : 20 }, ...breast], repMax < 100 ? 100 : 200, 100, repMax < 100 ? 'breast' : 'easy');
   };
   let k = kind === 'css' && repMax >= 400 && ctx.css ? 4 : 2;
   while (k < 40 && totals(mk(k + 1)).min <= minutes) k++;
@@ -595,14 +598,13 @@ export function swimLearn(ctx: PaceCtx, stage: { ladder: 'swim' | 'swimBreast'; 
   const br = !!(stage.ladder === 'swim' && stage.breast && stage.n <= 5) || (!!fillMin && stage.ladder === 'swimBreast');
   const endu = S('main', { reps: 2, m: 100, zone: 2, mode: 'breast', restSec: 30, note: 'ruhig, für die Ausdauer im Wasser' });
   const crawlStep = st.main.find((x: Step) => x.mode === 'crawl');
-  // Ohne eigene Pull-Angabe kurze Technikstuecke innerhalb der Kraul-Stufe. Laenger nur mit bestaetigter Pull-Distanz.
+  // Pull Buoy über die Stufe nur mit bestätigter längerer Pull-Strecke (höchstens doppelt so lang wie die Stufe); sonst gezielt über den
+  // Schwerpunkt der Einheit (keysessions.swimVariant). Nie ohne Pull Buoy in der Ausrüstung.
   const stageLen = SWIM_STAGE_M[n] || 25;
   const haveBuoy = (ctx.gear || []).includes('buoy');
-  const pullM = haveBuoy && stage.ladder === 'swim' && n >= 2 && n <= 5
-    ? stage.pull && stage.pull > 0 ? Math.min(Math.floor(stage.pull / 25) * 25, stageLen * 2) : Math.min(50, stageLen) : 0;
+  const pullM = haveBuoy && stage.ladder === 'swim' && stage.pull && stage.pull > stageLen && n >= 2 && n <= 5 ? Math.min(Math.floor(stage.pull / 25) * 25, stageLen * 2) : 0;
   const pull = pullM ? S('main', { reps: 4, m: pullM, zone: 2, mode: 'pull', restSec: 30, note: 'Beine ruhig, lange Züge, gleichmäßig ausatmen' }) : null;
-  const kick = (ctx.gear || []).includes('board') && !st.main.some((x: Step) => x.mode === 'kick')
-    ? [S('main', { reps: 4, m: 25, zone: 1, mode: 'kick', restSec: 30, focus: 'Beine aus der Hüfte, Wasserlage ruhig halten' })] : [];
+  const kick: Step[] = [];
   const spec: Spec = { sport: 'swim', kind: 'swimlearn', ctx, stage: { ...stage }, why,
     tip: st.tip + ` Am Ende trägst du die längste Strecke Kraul am Stück ein${haveBuoy ? ' (und getrennt mit Pull Buoy)' : ''}: Danach stuft die App dich passend ein.`,
     steps: [S('warm', { m: br ? 200 : st.warm || 100, zone: 1, mode: stage.ladder === 'swimBreast' || br ? 'breast' : 'easy' }), ...kick, ...st.main.map((x: Step) => ({ ...x })), ...(pull ? [pull] : []), ...(br ? [endu] : []), S('cool', { m: 100, zone: 1, mode: br ? 'breast' : 'easy' })] };

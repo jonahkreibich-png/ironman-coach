@@ -75,6 +75,8 @@ export interface Skills {
     mode?: { value: 'some' | 'yes' | 'no' | null; baseline: 'some' | 'yes' | 'no' | null; manual?: boolean };
   } | null;
   swimBreast?: boolean;
+  /** Auftrag 17: tatsächliche Meter pro Minute mit Pausen aus den eigenen Schwimmeinheiten (automatisch, für realistische Meter) */
+  swimMPerMin?: number | null;
   /** so lange am Stück locker laufen (min) */
   runContinuousMin?: number | null;
   /** längste Radfahrt in letzter Zeit (min) */

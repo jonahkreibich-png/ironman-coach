@@ -5,6 +5,7 @@
    werden neu ausgewertet; eigene Profil- und Coachangaben bleiben erhalten. */
 import * as C from './core';
 import * as W from './workouts';
+import * as K from './keysessions';
 import { actualMetrics } from './results';
 import type { Skills } from './profile';
 
@@ -17,6 +18,15 @@ export function swimBests(state: any, weeks: any[], today: string): { crawl: num
   const pr = C.swimProofs(state, weeks, today, 42);
   const crawls = pr.map((p: any) => p.crawl), pulls = pr.map((p: any) => p.pull);
   return { crawl: C.confirmedOf(crawls), pull: C.confirmedOf(pulls), best: Math.max(0, ...crawls.filter(Boolean)), bestPull: Math.max(0, ...pulls.filter(Boolean)), n: crawls.filter(Boolean).length, authoritative: true };
+}
+
+/* Auftrag 17: eigene Schwimm-Pace mit Pausen ins Profil, wenn sie sich deutlich (mehr als 10 %) ändert. Rückgabe: neuer Wert oder undefined. */
+export function swimRateUpdate(profile: any, state: any, weeks: any[], today: string): number | null | undefined {
+  const cur = num((profile.skills || {}).swimMPerMin);
+  const rate = C.swimRate(state, weeks, today);
+  if (rate == null) return undefined;
+  if (cur && Math.abs(rate / cur - 1) <= 0.1) return undefined;
+  return rate;
 }
 
 /* Stufe aus den Strecken (Kraul-Weg; null = normales Schwimmen: ab 200 m am Stück, bei „kann kraulen“ ab 50 m) */
@@ -94,6 +104,9 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
         spec = stage ? W.swimLearn(ctx, { ladder: stage.ladder, n: !best.authoritative && sameOrHigher ? cur.n : stage.n, breast: !!sk.swimBreast, pull }, s.spec && s.spec.why, fill)
           : W.swimNormal(ctx, 'technique', fill, 'base', repNew);
       }
+      // Auftrag 17: Schwerpunkt der Einheit bleibt, Hilfsmittel nach der aktuellen Ausrüstung (Kickbrett, Pull Buoy …)
+      spec = K.swimVariant(spec, K.swimFocusIndex(s.spec && s.spec.variant, ctx.gear, spec.stage), 1, 'base');
+      spec = K.fitSwim(spec, fill);
       const b = W.build(spec);
       adj.push({ id: `${g}-${s.id}`, group: g, type: 'modify', sessionId: s.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, stage: b.stage || null, zone: b.zone },
         what: `${s.title} → ${b.title}`, reason: `${best.authoritative ? 'Aktualisierte Schwimmnachweise' : 'Neue Bestwerte'} (${source}): ${crawl} m Kraul am Stück${pull ? `, ${pull} m mit Pull Buoy` : ''}` });

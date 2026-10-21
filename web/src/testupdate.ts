@@ -2,7 +2,7 @@
    Derselbe Schritt läuft auf dem Server (Werte von der Uhr ohne App). */
 import { STATE, PLAN, BASE_WEEKS, profile, saveProfile, rebuildPlanIndex, replacePlanInPlace } from './store';
 import { refreshFuture } from '../../shared/refresh';
-import { swimBests, swimSkillUpdate, legacySwimReview } from '../../shared/swimskill';
+import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate } from '../../shared/swimskill';
 import { todayStr } from './util';
 import { runTestUpdate, applyTestUpdate } from '../../shared/fields';
 import { invalidate } from './data';
@@ -16,6 +16,17 @@ export function checkSwimSkill(): boolean {
   const signature = () => today + evidenceSignature(STATE, BASE_WEEKS) + JSON.stringify(profile().skills) + JSON.stringify(BASE_WEEKS.map(w => w.days?.map((d: any) => [d.date, d.sessions?.map((s: any) => [s.id, s.sport])])));
   const current = signature(); if (current === lastSwimInputs) return false;
   lastSwimInputs = current;
+  // Auftrag 17: eigene Schwimm-Pace (mit Pausen) → kommende Schwimmeinheiten mit realistischen Metern
+  const rate = swimRateUpdate(profile(), STATE, BASE_WEEKS, today);
+  if (rate !== undefined) {
+    const p0 = profile(); saveProfile({ ...p0, skills: { ...(p0.skills || {}), swimMPerMin: rate } });
+    const rf = refreshFuture(BASE_WEEKS, profile(), today);
+    if (rf.changed) {
+      replacePlanInPlace({ ...PLAN, weeks: rf.weeks });
+      const mid = 'msg-swimrate-' + today;
+      if (!STATE.coachMsgs[mid]) STATE.coachMsgs[mid] = { id: mid, at: Date.now(), date: today, kind: 'adjust', from: 'coach', title: 'Schwimmen an dein Tempo angepasst', text: `Du schwimmst im Schnitt etwa ${String(rate).replace('.', ',')} m pro Minute (mit Pausen). Die kommenden Schwimmeinheiten haben deshalb so viele Meter, wie in die Zeit passen, mit genug Pause.`, unread: true };
+    }
+  }
   const best = swimBests(STATE, BASE_WEEKS, today);
   const u = legacySwimReview(profile(), BASE_WEEKS, STATE.adjustments || {}, today, best) || swimSkillUpdate(profile(), BASE_WEEKS, STATE.adjustments || {}, today, best);
   if (!u) return false;

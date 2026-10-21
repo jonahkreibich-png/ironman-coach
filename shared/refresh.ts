@@ -3,6 +3,7 @@
    Der Coach zeigt an einem Beispiel vorher und nachher. */
 import * as C from './core';
 import * as W from './workouts';
+import * as K from './keysessions';
 import { paceCtx } from './plangen';
 import { estimatesAt, legacyActivities } from './scores';
 import { speedTrend, bikeSpeedsOf, mainKind, BIKE_KIND_LABEL, type BikeKind } from './bikespeed';
@@ -18,7 +19,9 @@ export function refreshFuture(weeks: any[], profile: any, today: string): { week
       const old = s.spec.ctx || {};
       const ctx = { ...paceCtx(profile, !!old.indoor, old.bikeName ?? null, today), indoor: old.indoor, bikeName: old.bikeName };
       if (JSON.stringify({ ...old, indoor: undefined, bikeName: undefined }) === JSON.stringify({ ...ctx, indoor: undefined, bikeName: undefined })) return s;
-      const spec = { ...s.spec, ctx };
+      let spec = { ...s.spec, ctx };
+      // Schwimmen (Auftrag 17): mit der eigenen Pace neu auf die geplante Dauer bringen (weniger Meter statt längerer Einheit)
+      if (s.sport === 'swim' && s.plannedMinutes && W.totals(spec).min > s.plannedMinutes + 3) spec = K.fitSwim(JSON.parse(JSON.stringify(spec)), s.plannedMinutes);
       const b = W.build(spec);
       changed++;
       if (!example && (s.hard || /Schwelle|Sweet|Intervall|Tempo/i.test(s.title || ''))) {
@@ -26,7 +29,7 @@ export function refreshFuture(weeks: any[], profile: any, today: string): { week
         const before = W.intensity(s.spec, z), after = W.intensity(spec, z);
         if (before !== after) example = `${b.title} (${d.date.slice(8)}.${d.date.slice(5, 7)}.): vorher ${before.replace(/^Z\d: /, '')}, jetzt ${after.replace(/^Z\d: /, '')}`;
       }
-      return { ...s, title: s.title === W.title(s.spec) ? b.title : s.title, description: b.description, plannedKm: b.plannedKm ?? s.plannedKm, spec: b.spec };
+      return { ...s, title: s.title === W.title(s.spec) ? b.title : s.title, description: b.description, plannedKm: b.plannedKm ?? s.plannedKm, ...(s.sport === 'swim' ? { plannedMinutes: b.plannedMinutes } : {}), spec: b.spec };
     }) };
   }) }));
   return { weeks: out, changed, example };
