@@ -85,7 +85,8 @@ describe('Plan geht weiter (kein Neustart)', () => {
     const healthy = { ...st, illnessPeriods: [{ id: 'ill-x', start: '2026-09-01', end: '2026-09-03' }] };
     expect(continuationOf(oldPlan(), today, healthy)).toMatchObject({ lastNormalTracked: true, lastNormalDoneMin: 80 });
     const r3 = replanPlan(oldPlan(), profile, goals, today, { state: healthy, adjustments: {}, from: '2026-10-19' })!;
-    expect(r3.plan.meta.explain.join(' ')).toMatch(/wie in deiner letzten Aufbauwoche erledigt \(2,3 h von 3,8 h\)/);
+    // Auftrag 17: Start höchstens +10 % auf das wirklich erledigte eigene Training der letzten Wochen (hier 80 min)
+    expect(r3.plan.meta.explain.join(' ')).toMatch(/aus deinem echten Training der letzten Wochen \(zuletzt 1,3 h eigenes Training\), höchstens \+10 %/);
     void ctlToWeekMin;
   });
   test('CTL zählt nicht, wenn Einheiten in den Daten fehlen (CTL viel niedriger als das Training)', () => {

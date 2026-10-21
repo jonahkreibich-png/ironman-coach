@@ -674,6 +674,35 @@ function lastCrawlCheck(state, weeks, date) {
   return m ? { m, date: done.date } : null;
 }
 
+/* Auftrag 17: tatsächlich erledigtes eigenes Training (ohne Teamsport) in Minuten je Kalenderwoche. Erledigt ohne Dauer zählt mit der
+   geplanten Dauer (Schätzung: die Einheit wurde gemacht). Aufzeichnungen ohne Zuordnung zählen dazu, nichts doppelt. */
+function ownDoneMinutes(state, weeks, mon, sun) {
+  let min = 0, n = 0; const used = new Set();
+  planDays(applyAdjustments(weeks, state.adjustments || {})).filter(d => d.date >= mon && d.date <= sun).forEach(d => d.sessions.forEach(x => {
+    const st = (state.sessions || {})[x.id]; if (!st || !st.completed || x.sport === 'football' || x.sport === 'rest' || x.race) return;
+    const act = st.activityId ? (state.activities || {})[st.activityId] : null; if (act) used.add(act.id);
+    min += toNum(actualMetrics(st, act).min) ?? x.plannedMinutes ?? 0; n++;
+  }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= mon && d <= sun) (l || []).forEach(c => {
+    if (!c || c.sport === 'football' || c.completed === false) return;
+    const act = c.activityId ? (state.activities || {})[c.activityId] : null; if (act) used.add(act.id);
+    const m = toNum(actualMetrics(c, act).min); if (m) { min += m; n++; }
+  }); });
+  recordedActivities(state).filter(a => a.date >= mon && a.date <= sun && !a.sessionId && !used.has(a.id) && a.sport !== 'football' && toNum(a.min)).forEach(a => { min += toNum(a.min); n++; });
+  return { min: Math.round(min), n };
+}
+/* Bezug für die Steigerung: das meiste eigene Training einer der letzten 3 abgeschlossenen Wochen (ohne Krankheitswochen). null ohne Daten. */
+function recentOwnMinutes(state, weeks, date) {
+  const mon = addDays(date, -((new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7));
+  const vals = [];
+  for (let k = 1; k <= 3; k++) {
+    const m = addDays(mon, -7 * k), s = addDays(m, 6);
+    if ((state.illnessPeriods || []).some(p => p && p.start && p.start <= s && (!p.end || p.end >= m))) continue;
+    const r = ownDoneMinutes(state, weeks, m, s); if (r.n >= 2) vals.push(r.min);
+  }
+  return vals.length ? Math.max(...vals) : null;
+}
+
 /* ---------- Wöchentlich (Sonntag 18 Uhr) für die nächste Woche ---------- */
 function weekRange(date) { const dow = new Date(date + 'T12:00:00Z').getUTCDay(); const mon = addDays(date, -((dow + 6) % 7)); return [mon, addDays(mon, 6)]; }
 function weekSummary(state, baseWeeks, date) {
@@ -740,6 +769,17 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   if (next.isRecoveryWeek) { pct = 0; why = 'Erholungswoche aus dem Plan bleibt bestehen'; }
   if (next.entry && pct < 0 && S.sick) { pct = 0; why = 'Nach der Krankheit ist die nächste Woche schon als Wiedereinstieg geplant (weniger Umfang, nichts Hartes)'; }
   if (meta.pattern && !S.sick && pct !== 0) { pct = 0; why = 'Fester Wochenplan: der Umfang bleibt. Die Ampel kürzt einzelne Tage, der Coach schlägt bei Bedarf eine leichtere Woche vor'; }
+  // Auftrag 17: Steigerung gedeckelt durch das echte Training: die nächste Woche höchstens +10 % auf das, was diese Woche erledigt wurde
+  // (gilt auch beim festen Wochenplan; nur wenn die Woche eingetragen wurde, sonst fehlen nur Daten)
+  {
+    const [m0, s0] = weekRange(date); const od = ownDoneMinutes(state, baseWeeks, m0, s0 > date ? date : s0);
+    const own = planDays([next]).flatMap(d => d.sessions).filter(s => !['football', 'rest'].includes(s.sport) && !s.cancelled && !s.race && !s.fixed).reduce((a, s) => a + (s.plannedMinutes || 0), 0);
+    const tracked = S.nPlanned > 0 && S.nDone >= S.nPlanned * 0.6;
+    if (!S.sick && !next.isRecoveryWeek && tracked && od.min > 0 && own > od.min * 1.1 + 15) {
+      const capPct = Math.round((od.min * 1.1 / own - 1) * 100);
+      if (capPct < pct) { pct = capPct; why = `Diese Woche ${Math.round(od.min / 6) / 10} h eigenes Training erledigt: nächste Woche höchstens etwa 10 % mehr`.replace('.', ','); }
+    }
+  }
   pct = Math.max(-20, Math.min(10, pct));
 
   const nextSessions = planDays([next]).flatMap(d => d.sessions.map(s => Object.assign({}, s, { date: d.date })));
@@ -917,5 +957,5 @@ export {
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
-  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate
+  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, ownDoneMinutes, recentOwnMinutes
 };

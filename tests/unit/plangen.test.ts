@@ -48,7 +48,7 @@ describe('Plan erzeugen', () => {
     }
     expect(validateWeeks(r.plan.weeks, { minor: true })).toEqual([]);
     // Jugendliche: nie sehr harte Intervalle (Zone 5); Lauf-Einheiten höchstens Zone 4 (Auftrag 17: Intervalle heißen jetzt „Intervalle“)
-    expect(r.plan.weeks.some((w: any) => w.days.some((d: any) => d.sessions.some((s: any) => /sehr hart|VO2/.test(s.title))))).toBe(false);
+    expect(r.plan.weeks.some((w: any) => w.days.some((d: any) => +d.date.slice(0, 4) - 2009 < 18 && d.sessions.some((s: any) => /sehr hart|VO2/.test(s.title))))).toBe(false);
     expect(r.plan.weeks.every((w: any) => w.days.every((d: any) => d.sessions.every((s: any) => s.sport !== 'run' || !/5/.test(s.zone || ''))))).toBe(true);
   });
   test('Fehlende Schwellen: Einstiegstests in den ersten zwei Wochen', () => {

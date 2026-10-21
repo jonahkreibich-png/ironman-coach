@@ -130,7 +130,8 @@ export function timelineOf(start: string, phases: WeekPhase[], anchors: Anchor[]
 }
 
 /* ---------- Obergrenzen der langen Einheiten ---------- */
-const RUN_CAP: Record<GoalType, number> = { run_5k: 75, run_10k: 90, run_half: 120, run_marathon: 180, tri_supersprint: 60, tri_sprint: 90, tri_olympic: 100, tri_middle: 120, tri_long: 165, duathlon: 90, aquathlon: 75, bike_event: 75, swim_goal: 60, fitness: 80 };
+// Auftrag 17: langer Lauf passend zum nächsten Ziel (Halbmarathon höchstens etwa 105 min, Marathon und Langdistanz etwa 2:30 h)
+const RUN_CAP: Record<GoalType, number> = { run_5k: 75, run_10k: 90, run_half: 105, run_marathon: 165, tri_supersprint: 60, tri_sprint: 90, tri_olympic: 100, tri_middle: 105, tri_long: 150, duathlon: 90, aquathlon: 75, bike_event: 75, swim_goal: 60, fitness: 80 };
 const BIKE_CAP: Record<GoalType, number> = { run_5k: 90, run_10k: 90, run_half: 120, run_marathon: 120, tri_supersprint: 90, tri_sprint: 150, tri_olympic: 180, tri_middle: 240, tri_long: 300, duathlon: 150, aquathlon: 60, bike_event: 300, swim_goal: 90, fitness: 150 };
 const SWIM_CAP: Partial<Record<GoalType, number>> = { tri_olympic: 65, tri_middle: 75, tri_long: 90, swim_goal: 75, aquathlon: 60 };
 export interface Caps { run: number; bike: number; swim: number; why: string[] }

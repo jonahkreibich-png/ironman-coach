@@ -92,14 +92,16 @@ describe('Platzhalter für Ziele ohne Datum', () => {
 });
 
 describe('Obergrenzen', () => {
-  test('langer Lauf: Sprint/Olympisch ~100 min, Halb-Ironman 2 h, Ironman 2:45 h, unter 18 höchstens 2 h, nie Marathondistanz', () => {
+  // Auftrag 17: langer Lauf passend zum nächsten Ziel (Halbmarathon-Strecke höchstens etwa 105 min, Marathon/Langdistanz etwa 2:30-2:45 h)
+  test('langer Lauf: Sprint/Olympisch ~100 min, Halb-Ironman 105 min, Ironman 2:30 h, unter 18 höchstens 2 h, nie Marathondistanz', () => {
     expect(capsFor('tri_sprint', '2027-05-01', { aGoal: 'tri_long' }).run).toBe(100);
     expect(capsFor('tri_olympic', '2027-05-01', { aGoal: 'tri_long' }).run).toBe(100);
-    expect(capsFor('tri_middle', '2028-05-01', { aGoal: 'tri_long' }).run).toBe(120);
-    expect(capsFor('tri_long', '2029-07-01').run).toBe(165);
+    expect(capsFor('tri_middle', '2028-05-01', { aGoal: 'tri_long' }).run).toBe(105);
+    expect(capsFor('tri_long', '2029-07-01').run).toBe(150);
+    expect(capsFor('run_half', '2027-03-01', { aGoal: 'tri_long' }).run).toBe(105);
     expect(capsFor('tri_long', '2029-07-01', { age: 17 }).run).toBe(120);
-    expect(capsFor('run_marathon', '2027-08-01', { runEasySecKm: 390 }).run).toBe(180);
-    expect(capsFor('run_marathon', '2027-08-01', { runEasySecKm: 330 }).run).toBe(175);
+    expect(capsFor('run_marathon', '2027-08-01', { runEasySecKm: 390 }).run).toBe(165);
+    expect(capsFor('run_marathon', '2027-08-01', { runEasySecKm: 300 }).run).toBe(160);
     expect(capsFor('tri_sprint', '2027-05-01').run).toBe(90);
   });
   test('langes Rad: Winter draußen 2:30 h, drinnen 2 h; Olympisch 3 h, Halb 4 h, Ironman 5 h', () => {

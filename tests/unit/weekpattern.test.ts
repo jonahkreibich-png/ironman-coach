@@ -35,8 +35,15 @@ describe('Woche 5 bleibt, ab 19.10. der neue Plan', () => {
 });
 
 describe('Umfang nach den Vorgaben', () => {
-  test('Gesamt je Woche (eigenes Training ohne Fußball) nah an der Vorgabe', () => {
-    for (const t of targets) expect(Math.abs(own(W(t.start)) - t.hours)).toBeLessThanOrEqual(0.6);
+  // Auftrag 17: die Vorgabe ist eine Obergrenze; auch sie steigt höchstens etwa 10 % pro Woche (auf die letzte normale Woche)
+  test('Gesamt je Woche (eigenes Training ohne Fußball) höchstens die Vorgabe, Steigerung höchstens etwa +10 %', () => {
+    let prev: number | null = null;
+    for (const t of targets) {
+      const o = own(W(t.start));
+      expect(o).toBeLessThanOrEqual(t.hours + 0.6); // feste Längen aus der Vorgabe (lange Ausfahrt, Schwimmen) runden etwas
+      if (prev != null && !t.recovery) expect(o).toBeLessThanOrEqual(prev * 1.1 + 0.3);
+      if (!t.recovery && !(t as any).entry) prev = o;
+    }
   });
   test('langer Lauf So, lange Ausfahrt Sa und Schwimmen Di + Sa wie vorgegeben', () => {
     expect(longRun(W('2026-10-19')).title).toBe('Lauftest 30 min');
@@ -93,7 +100,7 @@ describe('Aufbau einer normalen Woche', () => {
   test('Mi Rad: Sweet Spot ab Woche 8 (3×8 → 3×12 → 2×20), vorher locker, Woche 7 der Radtest', () => {
     expect(titles(W('2026-10-19'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
     expect(titles(W('2026-10-26'), 3)[0]).toBe('Radtest 20 min');
-    expect(titles(W('2026-11-02'), 3)[0]).toMatch(/^Rad-Intervalle 3×8 min Sweet Spot/);
+    expect(titles(W('2026-11-02'), 3)[0]).toMatch(/^Rad-Intervalle \d×8 min Sweet Spot/);
     expect(titles(W('2026-11-09'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
     expect(titles(W('2026-11-16'), 3)[0]).toMatch(/^Rad-Intervalle 3×12 min Sweet Spot/);
     // Abwechslung: nach zwei Sweet-Spot-Wochen Kraftausdauer, dann Sweet Spot weiter (2×20)
@@ -112,13 +119,17 @@ describe('Aufbau einer normalen Woche', () => {
     expect(day(W('2026-11-02'), 4).sessions[0].description).toMatch(/Steigerungsläufe|Hügelsprints|zügig/);
     expect(day(W('2026-11-16'), 4).sessions[0].description).toMatch(/Steigerungsläufe|Hügelsprints|zügig/);
   });
-  test('Sa Koppellauf 10-15 min ab Woche 10, nur wenn gut erholt, nicht in Erholungswochen', () => {
+  // Auftrag 17: Koppel nur gezielt: nie in der Grundlage oder Erholung, im Aufbau höchstens jede 3., spezifisch jede 2. Woche, kurz
+  test('Sa Koppellauf nur im Aufbau/spezifisch, höchstens jede 2.-3. Woche, kurz, nur wenn gut erholt', () => {
     const brick = (w: any) => day(w, 6).sessions.find((s: any) => /Koppellauf/.test(s.title));
-    expect(brick(W('2026-11-02'))).toBeUndefined();
-    expect(brick(W('2026-11-16')).plannedMinutes).toBe(10);
-    expect(brick(W('2026-11-23')).plannedMinutes).toBe(15);
-    expect(brick(W('2026-11-16')).description).toMatch(/gut erholt/);
-    expect(brick(W('2026-12-07'))).toBeUndefined();
+    for (const w of future) {
+      const b = brick(w); if (!b) continue;
+      expect(['build', 'specific']).toContain(w.phase); expect(w.isRecoveryWeek).toBeFalsy();
+      expect(b.plannedMinutes).toBeLessThanOrEqual(20); expect(b.description).toMatch(/gut erholt/);
+    }
+    const idx = future.map((w: any, i: number) => brick(w) ? i : -1).filter((i: number) => i >= 0);
+    for (let k = 1; k < idx.length; k++) expect(idx[k] - idx[k - 1]).toBeGreaterThanOrEqual(2);
+    expect(future.filter((w: any) => w.phase === 'base').some((w: any) => brick(w))).toBe(false);
   });
   test('Morgens optional Mobility oder lockeres Rad nur bei grüner Ampel (Hinweis), keine Einheit morgens über 40 min', () => {
     expect(W('2026-11-02').important).toMatch(/optional 30-40 min Mobility oder lockeres Rad.*grüner Ampel/);

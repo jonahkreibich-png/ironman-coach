@@ -21,7 +21,7 @@ import { parseFor } from './ruleparse';
 import * as WP from './weekpattern';
 import * as K from './keysessions';
 import { placeholders, macroPhases, timelineOf, capsFor, easyAfterDays, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
-import { levelOf, maxHard, repairIntensity, qualityFor } from './intensity';
+import { levelOf, maxHard, ownHardBudget, repairIntensity, qualityFor } from './intensity';
 import { repairSports, repairSpacing } from './planrules';
 
 export type Phase = 'base' | 'build' | 'specific' | 'taper' | 'race';
@@ -60,6 +60,8 @@ export interface GenInput {
   measuredStartMin?: number | null;
   /** „Stunden bisher: weiß ich nicht“: vorsichtig starten, nach 2 Wochen an die echten Daten anpassen */
   hoursUnknown?: boolean;
+  /** Auftrag 17: wirklich erledigtes eigenes Training (Minuten, meiste der letzten 3 Wochen ohne Krankheit): Start höchstens +Steigerung darauf */
+  recentOwnMin?: number | null;
 }
 /* CTL ist etwa die tägliche Belastung (TSS) der letzten 6 Wochen. Lockeres Ausdauertraining bringt etwa 50 TSS pro Stunde. */
 export const TSS_PER_HOUR = 50;
@@ -140,11 +142,20 @@ export function abilityCap(p: Profile, sport: 'run' | 'bike', weekIdx: number): 
   return Math.round(start * Math.pow(1.1, weekIdx));
 }
 const LONG_CAP: Partial<Record<GoalType, { run: number; bike: number }>> = {
-  run_5k: { run: 60, bike: 90 }, run_10k: { run: 80, bike: 90 }, run_half: { run: 120, bike: 90 }, run_marathon: { run: 165, bike: 90 },
-  tri_supersprint: { run: 45, bike: 75 }, tri_sprint: { run: 60, bike: 100 }, tri_olympic: { run: 85, bike: 150 }, tri_middle: { run: 120, bike: 240 }, tri_long: { run: 165, bike: 330 },
+  run_5k: { run: 60, bike: 90 }, run_10k: { run: 80, bike: 90 }, run_half: { run: 105, bike: 90 }, run_marathon: { run: 165, bike: 90 },
+  tri_supersprint: { run: 45, bike: 75 }, tri_sprint: { run: 60, bike: 100 }, tri_olympic: { run: 85, bike: 150 }, tri_middle: { run: 105, bike: 240 }, tri_long: { run: 150, bike: 330 },
   duathlon: { run: 70, bike: 120 }, aquathlon: { run: 60, bike: 60 }, bike_event: { run: 60, bike: 330 }, swim_goal: { run: 50, bike: 90 }, fitness: { run: 70, bike: 120 }
 };
 
+/* Auftrag 17: Tempo-Teil im langen Lauf nur in den letzten 8 Wochen vor einem Ziel mit Laufen (nicht in der Wettkampfwoche),
+   nur jede 2. Woche (2, 4, 6, 8 Wochen vorher). Sonst ist der lange Lauf locker. */
+export function longRunTempoOk(goals: Goal[], weekStart: string): boolean {
+  // nur das nächste Ziel mit Laufen zählt (sonst könnten zwei Ziele zwei Wochen hintereinander erlauben)
+  const g = (goals || []).filter(x => x && x.date && x.date > weekStart && x.type !== 'fitness' && x.priority !== 'C' && GOALS[x.type] && legsOf(x).some(l => l.sport === 'run')).sort((a, b) => a.date!.localeCompare(b.date!))[0];
+  if (!g) return false;
+  const k = Math.floor(daysBetween(weekStart, g.date!) / 7);
+  return k >= 1 && k <= 8 && k % 2 === 0;
+}
 /* Teamsport aktiv an diesem Tag? (Saison von … bis, sonst ganzjährig) */
 export function teamActive(ts: TeamSport | null | undefined, date: string): boolean {
   if (!ts) return false;
@@ -307,13 +318,19 @@ export function generatePlan(inp: GenInput): GenResult {
   // weniger war). Die CTL ist nur dann eine Obergrenze, wenn sie zum tatsächlichen Training passt (sonst fehlen Einheiten in den Daten).
   // Nach einer Krankheit: Wiedereinstieg in Stufen (etwa 72 %, 90 %, dann wieder 100 %). Danach jede Aufbauwoche +incPct bis zum Wochenlimit.
   const budget = Math.max(1.5, profile.weeklyHours || 5);
-  const peakCapH = Math.max(...allGoals.map(g => ({ tri_supersprint: 6, tri_sprint: 8, tri_olympic: 11, tri_middle: 14, tri_long: 18, run_5k: 6, run_10k: 7, run_half: 8, run_marathon: 10, duathlon: 9, aquathlon: 6, bike_event: 12, swim_goal: 5, fitness: 7 } as Record<string, number>)[g.type] || 10));
+  const PEAK_H: Record<string, number> = { tri_supersprint: 6, tri_sprint: 8, tri_olympic: 11, tri_middle: 14, tri_long: 18, run_5k: 6, run_10k: 7, run_half: 8, run_marathon: 10, duathlon: 9, aquathlon: 6, bike_event: 12, swim_goal: 5, fitness: 7 };
+  const peakCapH = Math.max(...allGoals.map(g => PEAK_H[g.type] || 10));
+  // Auftrag 17: Spitze passend zum nächsten Ziel (Ziel des Zyklus); ein größeres Hauptziel hebt sie höchstens auf olympisch bzw. Halbmarathon
+  const LIFT_H: Record<string, string> = { tri: 'tri_olympic', run: 'run_half' };
+  const peakForWeek = (wi: number) => { const sgT = segGoal(wi).goalType; const base = PEAK_H[sgT] || 10; const aG = GOALS[A.type]; const lift = aG ? LIFT_H[aG.group] : null;
+    return Math.max(base, A.type !== sgT && lift ? Math.min(PEAK_H[A.type] || 10, PEAK_H[lift] || 10) : base); };
   const tsP = profile.teamSport || null;
   const teamWeekMin = tsP && teamActive(tsP, addDays(start, 3)) ? (tsP.trainingDays || []).length * (tsP.trainingMinutes || 90) + (tsP.gameDays || []).length * (tsP.gameMinutes || 90) : 0;
   // Wochenlimit (auf Wunsch inklusive Teamsport); kein Abschlag mehr für weit entfernte Ziele, solange das Limit nicht erreicht ist
   const ownBudget = Math.max(90, budget * 60 - (profile.budgetInclTeam ? teamWeekMin : 0));
-  // ohne „inklusive Teamsport“: wie bisher zählt der Teamsport zur Hälfte gegen das Limit
-  const peakOwn = Math.min(ownBudget - (profile.budgetInclTeam ? 0 : teamWeekMin * 0.5), peakCapH * 60);
+  // Auftrag 17: Teamsport zählt voll in die Belastung: eigenes Training höchstens Spitze des Ziels minus Teamsport (Zeitbudget ohne Teamsport bleibt Zeitbudget)
+  const peakOwn = Math.max(90, Math.min(ownBudget, peakCapH * 60 - teamWeekMin));
+  const peakOwnW = (wi: number) => Math.max(90, Math.min(ownBudget, peakForWeek(wi) * 60 - teamWeekMin));
   const L = inp.load || null;
   const usePre = afterIllness && !!(L && L.preIllnessCtl && L.preIllnessCtl > (L.ctl || 0));
   const ctlBase = L ? (usePre ? L.preIllnessCtl! : L.ctl) : null;
@@ -326,13 +343,16 @@ export function generatePlan(inp: GenInput): GenResult {
     ownStart = inp.measuredStartMin; startWhy = `aus deinem Training der ersten 2 Wochen (${hh0(ownStart)} h pro Woche)`;
   } else if (lastPlanned) {
     const done = cont!.lastNormalTracked && cont!.lastNormalDoneMin != null ? cont!.lastNormalDoneMin : null;
-    ownStart = done != null && done < lastPlanned * 0.9 ? Math.max(done, lastPlanned * 0.6) : lastPlanned;
+    ownStart = done != null && done < lastPlanned * 0.9 ? Math.max(done * (1 + prog.incPct / 100), lastPlanned * 0.5) : lastPlanned;
     startWhy = done != null && done < lastPlanned * 0.9 ? `wie in deiner letzten Aufbauwoche erledigt (${hh0(ownStart)} h von ${hh0(lastPlanned)} h)` : `auf Höhe deiner letzten Aufbauwoche (${hh0(lastPlanned)} h)`;
     const ctlComplete = ctlMin != null && ctlMin >= ownStart * 0.8;
     if (ctlComplete && ctlMin! * (1 + prog.incPct / 100) < ownStart) { ownStart = ctlMin! * (1 + prog.incPct / 100); startWhy += `, begrenzt durch deine Belastung (CTL ${Math.round(ctlBase!)})`; }
     else if (ctlMin != null && !ctlComplete) startWhy += `; die CTL (${Math.round(ctlBase!)}) ist niedriger, weil nicht alle Einheiten in den Daten sind, deshalb zählt sie hier nicht`;
   } else if (ctlMin != null) { ownStart = ctlMin; startWhy = `aus deiner Belastung (CTL ${Math.round(ctlBase!)}${usePre ? ' vor der Krankheit' : ''}${L && L.source ? ', ' + L.source : ''})`; }
   if (ownStart != null && L && L.atl != null && L.ctl && L.atl > L.ctl * 1.3 && !afterIllness) { ownStart *= 0.9; startWhy += ', 10 % weniger, weil die Müdigkeit (ATL) gerade hoch ist'; }
+  // Auftrag 17: nie mehr als +Steigerung auf das, was zuletzt wirklich erledigt wurde
+  const doneCap = inp.recentOwnMin && inp.recentOwnMin > 0 ? Math.round(Math.max(60, inp.recentOwnMin) * (1 + prog.incPct / 100)) : null;
+  if (doneCap != null && (ownStart == null || ownStart > doneCap)) { ownStart = doneCap; startWhy = `aus deinem echten Training der letzten Wochen (zuletzt ${hh0(inp.recentOwnMin!)} h eigenes Training), höchstens +${prog.incPct} %`; }
   if (ownStart != null && afterIllness) startWhy += ', nach der Krankheit in Stufen: erst etwa 72 %, dann 90 %, dann wieder 100 %';
   const baseOwn = ownStart != null ? Math.min(peakOwn, Math.max(90, ownStart)) : Math.min(peakOwn, Math.max(90, (inp.currentWeeklyHours ?? budget * 0.7) * 60 * (cautious ? 0.85 : 1) - teamWeekMin * 0.5));
   const pat = profile.weekPattern && (profile.weekPattern.slots || []).length ? profile.weekPattern : null;
@@ -345,8 +365,11 @@ export function generatePlan(inp: GenInput): GenResult {
     const tg = pat ? WP.targetFor(pat, mon) : null;
     if (tg) {
       if (tg.recovery != null) p.recovery = tg.recovery;
-      ownVols.push(Math.round(tg.hours * 60)); entryWeek.push(!!tg.entry);
-      if (!tg.recovery && !tg.entry) lastNormal = tg.hours * 60;
+      // Auftrag 17: auch eine Vorgabe steigt höchstens +Steigerung pro Woche (auf die letzte normale Woche, am Anfang auf das Erledigte)
+      const capT = i === 0 ? (doneCap ?? Infinity) : lastNormal * inc;
+      const v = Math.round(Math.min(tg.hours * 60, capT));
+      ownVols.push(v); entryWeek.push(!!tg.entry);
+      if (!tg.recovery && !tg.entry) lastNormal = v; else if (i === 0) lastNormal = Math.min(lastNormal, v / (tg.recovery ? 0.65 : 0.9));
       afterEntry = !!tg.entry; return;
     }
     entryWeek.push(false);
@@ -355,7 +378,7 @@ export function generatePlan(inp: GenInput): GenResult {
     if (p.recovery) { ownVols.push(Math.round(lastNormal * 0.65)); afterEntry = false; return; }
     if (afterIllness && i < ENTRY_F.length) { ownVols.push(Math.round(baseOwn * ENTRY_F[i])); entryWeek[i] = true; afterEntry = true; return; }
     // erste Woche (oder erste nach dem Wiedereinstieg): auf Höhe der letzten Aufbauwoche, danach +incPct
-    const cur = i === 0 || afterEntry ? Math.min(peakOwn, lastNormal) : Math.min(peakOwn, lastNormal * inc);
+    const cur = i === 0 || afterEntry ? Math.min(peakOwnW(i), lastNormal) : Math.min(peakOwnW(i), lastNormal * inc);
     ownVols.push(Math.round(cur)); lastNormal = cur; afterEntry = false;
   });
   // Bisherige Form (eigenes Training + halber Teamsport) für die freie Verteilung
@@ -372,7 +395,7 @@ export function generatePlan(inp: GenInput): GenResult {
   /* Lauf-Geh-Stufen: so viele Einheiten wie in der ersten Woche (nicht kürzbar, eine mehr wären +33-50 % Laufumfang) */
   let runStageN: number | null = null;
   let lastLR: number | null = cont && cont.lastLongRun ? cont.lastLongRun : null;
-  const gq: { bikeN: Record<string, number>; runQN: Record<string, number>; swimN: Record<string, number> } = { bikeN: {}, runQN: {}, swimN: {} };
+  const gq: { bikeN: Record<string, number>; runQN: Record<string, number>; swimN: Record<string, number>; brickN: Record<string, number> } = { bikeN: {}, runQN: {}, swimN: {}, brickN: {} };
   const blockWeekOf = (wi: number) => { let k = 0; for (let i = wi - 1; i >= 0 && !phases[i].recovery; i--) k++; return k; };
   // Woche innerhalb der Grundlage (für Tempo in der späten Grundlage), bei Fortsetzung mit den Wochen davor
   const baseWeekOf = (wi: number) => { let k = 0; for (let i = wi - 1; i >= 0 && phases[i].phase === 'base'; i--) k++; return k + (wi - k === 0 && cont && cont.weekNo ? Math.min(8, cont.weekNo) : 0); };
@@ -471,7 +494,7 @@ export function generatePlan(inp: GenInput): GenResult {
           bikeOut: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor: cOut0.indoor }).bike, swim: capsFor(sgP.goalType, mon, { swimLearning: !!swimStage, phase: ph.phase as any }).swim },
         run: pc(false, null), bikeOut: pc(cOut.indoor, cOut.name), bikeIn: pc(cIn.indoor, cIn.name), swim: pc(false, null), swimStage: swimStage as any, inc: 1 + prog.incPct / 100,
         crawl400, repMax, strength: { knee: eff.strengthKnee, back: eff.strengthBack, shoulder: eff.strengthShoulder }, goalName: A.name,
-        level: levelOf(profile), baseWeek: baseWeekOf(wi), maxHard: maxHard(profile, ph.phase, mon, baseWeekOf(wi)), noZ5: (() => { const a = ageOf(profile, mon); return a != null && (a < 18 || a >= 60); })() }, pst);
+        level: levelOf(profile), baseWeek: baseWeekOf(wi), maxHard: maxHard(profile, ph.phase, mon, baseWeekOf(wi), slots.filter(x => x.game || x.race).length), longQOk: longRunTempoOk(allGoals, mon), noZ5: (() => { const a = ageOf(profile, mon); return a != null && (a < 18 || a >= 60); })() }, pst);
       for (const it of items) {
         // laufende Woche: nichts vor „from“, und nicht dieselbe Sportart neben einer schon erledigten Einheit
         if (part && (it.dow !== undefined) && (() => { const sl0 = slots.find(x => x.dow === it.dow)!; return sl0.closed || sl0.items.some(x => x.frozen && x.s.sport === it.s.sport); })()) continue;
@@ -498,14 +521,15 @@ export function generatePlan(inp: GenInput): GenResult {
     const hardOk = !ph.recovery && ph.phase !== 'race';
     // harte Einheiten pro Woche: Grundlage 1 (Rad), Aufbau/spezifisch 3 (Rad, Lauf, Schwimmen; unter 18: 2), Tapering 1
     // Auftrag 14: Zahl der harten Tage nach Niveau, Alter und Phase (Einsteiger 1, Fortgeschrittene 2, Erfahrene 3; unter 18 und ab 60 höchstens 2)
-    let hardLeft = ph.recovery || ph.phase === 'race' ? 0 : maxHard(profile, ph.phase, mon, baseWeekOf(wi));
+    // Auftrag 17: eigene harte Einheiten (höchstens 2 plus Spiel/Wettkampf, siehe intensity.ownHardMax); Spiele und C-Rennen kommen dazu
+    const fixedHardN = slots.filter(sl => sl.game || (sl.race && sl.race.priority === 'C')).length;
+    let hardLeft = ph.recovery || ph.phase === 'race' ? 0 : ownHardBudget(profile, ph.phase, mon, baseWeekOf(wi), fixedHardN);
     // erste Woche nach einer Krankheit: nichts Hartes (ein Test am Ende der Woche ist die Ausnahme)
     if (wi === 0 && afterIllness) hardLeft = 0;
     // laufende Woche: schon erledigte harte Einheiten zählen mit (keine doppelte harte Einheit)
     if (part) hardLeft = Math.max(0, hardLeft - doneHard);
     // Spiel und C-Rennen zählen in Grundlage und Tapering als harte Einheit; im Aufbau/spezifisch ist das Kontingent für Intervall-Einheiten (Abstand gilt trotzdem)
     // Spiele und C-Rennen zählen als harte Tage (Auftrag 14: in allen Phasen)
-    hardLeft = Math.max(0, hardLeft - slots.filter(sl => sl.game || (sl.race && sl.race.priority === 'C')).length);
     const lv = levelOf(profile); const ageW = ageOf(profile, mon); const noZ5 = ageW != null && (ageW < 18 || ageW >= 60);
     const target = A;
     const whyBase = (sport: string, kind: string) => {
@@ -634,17 +658,23 @@ export function generatePlan(inp: GenInput): GenResult {
         const sl = slots.find(x => x.dow === dow);
         if (!sl || sl.race) continue;
         if (area === 'lower' && (sl.game || (slots[sl.i + 1] && (slots[sl.i + 1].game || slots[sl.i + 1].race)))) { dropped.push(`Woche ${wi + 1}: Kraft Unterkörper nicht am Spieltag oder am Tag davor`); continue; }
-        cands.push({ s: W.build({ ...W.strengthArea(area, { light, back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, why: area === 'lower' ? 'kräftige Beine und Hüfte schützen Knie, Leiste und Achillessehne und machen dich beim Laufen ökonomischer.' : area === 'upper' ? 'Schultern und Rücken stark machen, das hilft beim Kraulen und schützt die Schulter.' : 'ein stabiler Rumpf hält die Haltung beim Laufen, auf dem Rad und im Wasser.' }), tip: tipFor('strength', rules) || undefined }), strength: true, prio: 0.5, onDays: [dow] });
+        cands.push({ s: W.build({ ...W.strengthArea(area, { light, ...(ph.phase === 'build' || ph.phase === 'specific' ? { minutes: 30 } : {}), back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, why: area === 'lower' ? 'kräftige Beine und Hüfte schützen Knie, Leiste und Achillessehne und machen dich beim Laufen ökonomischer.' : area === 'upper' ? 'Schultern und Rücken stark machen, das hilft beim Kraulen und schützt die Schulter.' : 'ein stabiler Rumpf hält die Haltung beim Laufen, auf dem Rad und im Wasser.' }), tip: tipFor('strength', rules) || undefined }), strength: true, prio: 0.5, onDays: [dow] });
       }
     } else if (sports.includes('strength')) {
       const [smin, smax] = freqOf(profile, 'strength');
       const n = limitByRules('strength', ph.phase === 'race' ? Math.min(1, smax) : Math.max(smin, Math.min(smax, smin || 1)), smin);
-      for (let k = 0; k < n; k++) cands.push({ s: W.build({ ...W.strengthSession([...profile.sports, ...sports], { light: ph.recovery || ph.phase === 'taper' || ph.phase === 'race', back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, variant: k, why: 'stabile Muskeln und Sehnen schützen vor Verletzungen und machen dich ökonomischer.' }), tip: tipFor('strength', rules) || undefined }), strength: true, prio: 4 });
+      // Auftrag 17: im Aufbau und in der spezifischen Phase Kraft als Erhaltung (höchstens 2 × 25-30 min)
+      const keep = ph.phase === 'build' || ph.phase === 'specific';
+      for (let k = 0; k < (keep ? Math.min(2, n) : n); k++) cands.push({ s: W.build({ ...W.strengthSession([...profile.sports, ...sports], { light: ph.recovery || ph.phase === 'taper' || ph.phase === 'race', ...(keep ? { minutes: 30 } : {}), back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, variant: k, why: keep ? 'Kraft als Erhaltung: hält Muskeln und Sehnen stabil, ohne müde zu machen.' : 'stabile Muskeln und Sehnen schützen vor Verletzungen und machen dich ökonomischer.' }), tip: tipFor('strength', rules) || undefined }), strength: true, prio: 4 });
     }
     // Koppellauf in der spezifischen Phase (Triathlon): direkt nach der langen Ausfahrt
     // Koppeleinheiten ab der Aufbauphase regelmäßig
-    if ((GOALS[sg.goalType].group === 'tri' || GOALS[target.type].group === 'tri') && (ph.phase === 'build' || ph.phase === 'specific') && !ph.recovery && sports.includes('run') && sports.includes('bike') && runStage == null) {
-      const spec = W.runEasy(pc(false, null), 15); spec.title = 'Wechsel-Lauf 15 min (direkt nach dem Rad)'; spec.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.';
+    // Auftrag 17: Koppel nur gezielt: im Aufbau jede 3., in der spezifischen Phase jede 2. Woche, kurz (10-15 min, spezifisch bis 20 min)
+    const brickWeek = ph.phase === 'specific' ? (gq.brickN.specific || 0) % 2 === 0 : (gq.brickN.build || 0) % 3 === 0;
+    if (!ph.recovery && (ph.phase === 'build' || ph.phase === 'specific')) gq.brickN[ph.phase] = (gq.brickN[ph.phase] || 0) + 1;
+    if ((GOALS[sg.goalType].group === 'tri' || GOALS[target.type].group === 'tri') && (ph.phase === 'build' || ph.phase === 'specific') && !ph.recovery && brickWeek && sports.includes('run') && sports.includes('bike') && runStage == null) {
+      const bm = ph.phase === 'specific' ? 20 : 15;
+      const spec = W.runEasy(pc(false, null), bm); spec.title = `Koppellauf ${bm} min (direkt nach dem Rad)`; spec.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.';
       cands.push({ s: W.build(spec), pairDay: 'bikeLong', prio: 1.5 });
     }
 
@@ -749,6 +779,14 @@ export function generatePlan(inp: GenInput): GenResult {
       if (softHit.length) { const note = softNote(softHit[0], probe, slots, idx); placed = { ...placed, ruleNote: note, description: `${placed.description || ''}\nAusnahme: ${note}`.trim() }; }
       put(idx, { ...c, s: placed, slot: morningDay(slots[idx]) ? (amFree(idx, placed) ? 'am' : 'pm') : undefined });
     }
+    // Auftrag 17: Hügelsprints und kurze Intervalle nicht direkt neben einem harten Tag (dann lockerer Lauf mit Steigerungen)
+    slots.forEach((sl, i) => sl.items.forEach(x => {
+      const k = x.s.spec && x.s.spec.kind;
+      if (x.s.sport !== 'run' || x.fixed || x.frozen || !(k === 'fartlek' || k === 'hills')) return;
+      if (!(prevHard(i) || isHardDay(i + 1))) return;
+      const e = W.runEasy(x.s.spec.ctx, x.s.plannedMinutes, { strides: 6 }); e.why = 'Locker mit kurzen Steigerungen: der Tag davor oder danach ist hart.';
+      x.s = W.build(e);
+    }));
     // Erste Woche nach einer Krankheit: Ausdauer-Einheiten auf den Wochenumfang kürzen (Test und Lernstufen bleiben)
     if (wi === 0 && afterIllness) {
       const endu = slots.flatMap(sl => sl.items).filter(x => ['swim', 'bike', 'run'].includes(x.s.sport) && !x.test && !x.fixed && !x.s.stage && x.s.spec && (x.s.plannedMinutes || 0) > 30);
@@ -813,7 +851,7 @@ export function generatePlan(inp: GenInput): GenResult {
       quality: (s: any, date: string, phase: string, from?: any) => {
         // die Qualität der gekürzten Einheit wandert in die lange Einheit daneben (Lauf: Tempo im langen Lauf, gleiche Dauer)
         const a = ageOf(profile, date); const noZ5q = a != null && (a < 18 || a >= 60);
-        if (s.sport === 'run' && s.spec && !eff.runEasyOnly && runAllowed) {
+        if (s.sport === 'run' && s.spec && !eff.runEasyOnly && runAllowed && longRunTempoOk(allGoals, mondayOf(date))) {
           // genau der Qualitätsteil der gekürzten Einheit (Leiter läuft weiter), sonst der erste Schritt der Phase
           const st = from && from.spec && from.spec.steps ? from.spec.steps.find((x: any) => x.part === 'main' && (x.zone || 0) >= 3) : null;
           // passt der Block nicht in die lange Einheit, werden es weniger Wiederholungen
@@ -847,12 +885,15 @@ export function generatePlan(inp: GenInput): GenResult {
   enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null);
   // Auftrag 15: Erholungswochen spürbar leichter als die letzte normale Woche (vorher oft gleich viel, weil das Ziel über dem lag, was die Einheiten hergeben)
   enforceRecovery(weeks, prevRef[0] || null);
+  // Auftrag 17: Kürzungen oben können einen langen Lauf verkürzt haben; danach wieder höchstens +10 min pro Woche und der Umfang
+  // wieder höchstens +10 % (beides kürzt nur, deshalb endet es)
+  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, cont && cont.lastLongRun ? cont.lastLongRun : null); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null); }
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
     const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };
     weeks[0].days.forEach((d: any) => { const f = (inp.frozen || []).find(x => x.date === d.date); d.sessions = d.date < from! && f && f.sessions.length ? f.sessions.map(strip) : d.sessions.map((s: any) => orig[s.id] || s); }); }
   // Auftrag 14: Plan-Check Intensität mit Korrektur, bevor die Person den Plan sieht
-  const intensityFixes = repairIntensity(weeks, profile, today, { goalType: A.type, runEasyOnly: !!eff.runEasyOnly, runAllowed, from: from || start, minor,
+  const intensityFixes = repairIntensity(weeks, profile, today, { goalType: A.type, runEasyOnly: !!eff.runEasyOnly, runAllowed, from: from || start, minor, longQ: (d: string) => longRunTempoOk(allGoals, mondayOf(d)),
     baseOffset: phases[0] && phases[0].phase === 'base' && cont && cont.weekNo ? Math.min(8, cont.weekNo) : 0, noZ5: (d: string) => { const a = ageOf(profile, d); return a != null && (a < 18 || a >= 60); } });
   const violations = validateWeeks(weeks, { minor, maxIncPct: prog.incPct }, prevRef);
   const age2 = goalAllowed(A.type, ageAtRace);
@@ -884,7 +925,7 @@ export function generatePlan(inp: GenInput): GenResult {
   if (way.length > 1 || placed.length) explain.push(`Dein Weg: ${way.map(g => `${g.name} ${fmtD(g.date!)}${String(g.date).slice(2, 4)}${(g as any).placeholder ? ' (Platzhalter)' : ''}`).join(' → ')}.${placed.length ? ' Platzhalter richten sich nach Reihenfolge, Saison und deiner Form. Trag das echte Datum beim Ziel ein, dann plant die App neu.' : ''}`);
   explain.splice(1, 0, `Zyklen: ${cycleText(macro, start)}`);
   const plan = {
-    meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, ...(inp.hoursUnknown ? { calibrateAt: addDays(from || start, 14) } : {}), goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? true, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}), ...(intensityFixes.length ? { intensityFixes: intensityFixes.slice(0, 40) } : {}), ...(ruleFixes.length ? { ruleFixes: ruleFixes.slice(0, 40) } : {}), intensityOpts: { runEasyOnly: !!eff.runEasyOnly, runAllowed } },
+    meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, ...(inp.hoursUnknown ? { calibrateAt: addDays(from || start, 14) } : {}), goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? true, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}), ...(intensityFixes.length ? { intensityFixes: intensityFixes.slice(0, 40) } : {}), ...(ruleFixes.length ? { ruleFixes: ruleFixes.slice(0, 40) } : {}), intensityOpts: { runEasyOnly: !!eff.runEasyOnly, runAllowed, longQWeeks: weeks.map(w => w.startDate).filter(m => longRunTempoOk(allGoals, m)) } },
     weeks: shown, keyDates,
     zonePercents: HR_ZONES.map(z => ({ zone: z.zone, label: z.label, low: z.low, high: z.high }))
   };
@@ -1005,7 +1046,8 @@ function enforceLongRun(weeks: any[], start: number | null) {
   for (const w of weeks) {
     const runs = w.days.flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.race && !s.stage && (s.long || /^Langer Lauf/.test(s.title || ''))));
     for (const s of runs) {
-      if (last != null && s.plannedMinutes > last + 10 && s.spec) { const rb = W.rebuildScaled(s, (last + 10) / s.plannedMinutes); if (rb && rb.plannedMinutes <= last + 10) Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); }
+      // Rundung auf 5 min kann knapp darüber landen: in kleinen Schritten nachkürzen (Auftrag 17)
+      for (let k = 0; k < 4 && last != null && s.plannedMinutes > last + 10 && s.spec; k++) { const rb = W.rebuildScaled(s, (last + 10) / s.plannedMinutes * (1 - 0.03 * k)); if (rb && rb.plannedMinutes < s.plannedMinutes) Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); else break; }
     }
     const lr = Math.max(0, ...runs.map((s: any) => s.plannedMinutes || 0));
     if (lr && !w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') last = lr;

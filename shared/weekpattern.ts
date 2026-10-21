@@ -20,7 +20,8 @@ export interface PatternState { longRun: number; longBike: number; swim: number;
   /** tatsächlich geplanter Umfang der letzten Aufbauwoche (Minuten): Erholung und Tapering richten sich danach */ buildOwn?: number | null;
   /** Schwellen-Leiter in der wettkampfspezifischen Phase */ thrWeeks?: number;
   /** Schlüsseleinheiten Rad und Qualitätsläufe je Phase, Wochenzähler (Abwechslung) und Woche im Block (seit der letzten Erholung) */
-  keyN?: Record<string, number>; runQN?: Record<string, number>; weekN?: number; blockWeek?: number }
+  keyN?: Record<string, number>; runQN?: Record<string, number>; weekN?: number; blockWeek?: number;
+  /** Auftrag 17: Wochen seit dem letzten Koppellauf (Koppel nur jede 2.-3. Woche) */ sinceBrick?: number }
 export interface PatternWeekIn {
   mon: string; dates: string[]; recovery: boolean; entry: boolean;
   /** eigenes Training dieser Woche (Minuten, ohne Teamsport) */
@@ -40,6 +41,7 @@ export interface PatternWeekIn {
   /** Auftrag 14: Niveau, Woche in der Grundlage, keine Zone 5 (unter 18, ab 60) */
   level?: 'beginner' | 'advanced' | 'experienced'; baseWeek?: number; noZ5?: boolean;
   /** höchstens so viele harte Tage (Spiele und Wettkämpfe zählen mit) */ maxHard?: number;
+  /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt (letzte 8 Wochen vor einem Laufziel, jede 2. Woche) */ longQOk?: boolean;
 }
 export interface PatternItem { dow: number; s: any; long?: boolean; test?: boolean; hard?: boolean; strength?: boolean }
 
@@ -84,15 +86,23 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
   // Auftrag 14: harte Tage nach Niveau und Alter; reicht es nur für eine Qualität neben den Spielen, wechseln sich Rad und Lauf ab
   // (Grundlage: das Rad, Tempolauf entfällt)
   const budget = (inp.maxHard ?? 3) - (inp.hardDows || []).length;
+  const runSlots = slots.filter(x => x.sport === 'run' && x.role !== 'brick');
+  const longRunSlot = runSlots.find(x => x.role === 'long');
+  const keySlot0 = slots.find(x => x.sport === 'bike' && x.role === 'key' && (!x.keyFrom || dateOf(x) >= x.keyFrom));
+  // Auftrag 17: Platz für den Qualitätslauf: ein Lauftag ohne harten Nachbartag, sonst der lange Lauf – dort aber nur in den letzten
+  // 8 Wochen vor einem Laufziel und nur jede 2. Woche (inp.longQOk). Gibt es keinen Platz, entfällt er (und nimmt dem Rad nichts weg).
+  const qDayFor = (withKey: boolean) => {
+    const hd = new Set<number>([...(inp.hardDows || []), ...(withKey && keySlot0 && !rec && !inp.entry ? [keySlot0.dow] : []), ...(bikeTestDow0 >= 0 ? [bikeTestDow0] : [])]);
+    const free = runSlots.find(x => x.role !== 'long' && !hd.has((x.dow + 6) % 7) && !hd.has((x.dow + 1) % 7) && !hd.has(x.dow));
+    return free ? free.dow : longRunSlot && inp.longQOk && !hd.has((longRunSlot.dow + 6) % 7) && !hd.has((longRunSlot.dow + 1) % 7) ? longRunSlot.dow : -1;
+  };
   let keyOk = budget > 0;
   if (budget <= 0) runQ = null;
-  else if (budget === 1 && runQ) { if (ph === 'base' || ((st.runQN || {})[ph] || 0) >= ((st.keyN || {})[ph] || 0)) runQ = null; else keyOk = false; }
-  const keySlot = keyOk ? slots.find(x => x.sport === 'bike' && x.role === 'key' && (!x.keyFrom || dateOf(x) >= x.keyFrom)) : undefined;
+  else if (budget === 1 && runQ) { if (ph === 'base' || ((st.runQN || {})[ph] || 0) >= ((st.keyN || {})[ph] || 0) || qDayFor(false) < 0) runQ = null; else keyOk = false; }
+  if (runQ && qDayFor(keyOk) < 0) runQ = null;
+  const keySlot = keyOk ? keySlot0 : undefined;
   const hardDays = new Set<number>([...(inp.hardDows || []), ...(keySlot && !rec && !inp.entry ? [keySlot.dow] : []), ...(bikeTestDow0 >= 0 ? [bikeTestDow0] : [])]);
-  const runSlots = slots.filter(x => x.sport === 'run' && x.role !== 'brick');
-  const freeRun = runSlots.find(x => x.role !== 'long' && !hardDays.has((x.dow + 6) % 7) && !hardDays.has((x.dow + 1) % 7) && !hardDays.has(x.dow));
-  const longRunSlot = runSlots.find(x => x.role === 'long');
-  const qDay = runQ ? (freeRun ? freeRun.dow : longRunSlot && !hardDays.has((longRunSlot.dow + 6) % 7) ? longRunSlot.dow : -1) : -1;
+  const qDay = runQ ? qDayFor(keyOk) : -1;
   const why = (k: string) => k;
   for (const sl of slots) {
     const date = dateOf(sl);
@@ -112,7 +122,8 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       const area = sl.role;
       // Tag vor dem Radtest: Unterkörper nur leicht (2 Sätze, nichts Explosives)
       const easy = area === 'lower' && bikeTestDow >= 0 && ((sl.dow + 1) % 7) === bikeTestDow;
-      const min = easy ? 25 : rec ? 30 : r5(mid(sl.min || [30, 35]));
+      // Auftrag 17: im Aufbau und in der spezifischen Phase Kraft als Erhaltung (25-30 min)
+      const min = easy ? 25 : rec ? 30 : ph === 'build' || ph === 'specific' ? Math.min(30, r5(mid(sl.min || [30, 35]))) : r5(mid(sl.min || [30, 35]));
       const spec = W.strengthArea(area, { ...inp.strength, light: rec && !easy, easy, minutes: min,
         why: area === 'lower' ? 'kräftige Beine und Hüfte schützen Knie, Leiste und Achillessehne und machen dich beim Laufen ökonomischer.' : 'Schultern und Rücken stark machen, das hilft beim Kraulen und schützt die Schulter.' });
       if (easy) spec.tip = 'Morgen ist der Radtest: nur 2 Sätze, nichts Explosives.';
@@ -134,7 +145,9 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       const lq = runQ && qDay === sl.dow && !easyDay(date);
       out.push({ dow: sl.dow, slot: sl, s: null, long: true, hard: lq || undefined, make: (min) => lq ? K.longRunWithQuality(inp.run, min, runQ!) : W.runLong(inp.run, min), min: easyDay(date) ? r5(longRun * 0.6) : longRun });
     } else if (sl.sport === 'run' && sl.role === 'brick') {
-      if (rec || ph === 'taper' || ph === 'race' || easyDay(date)) continue;
+      // Auftrag 17: Koppel nur gezielt: im Aufbau jede 3., in der spezifischen Phase jede 2. Woche, kurz; nie in Grundlage, Erholung, Tapering
+      if (rec || inp.entry || ph === 'taper' || ph === 'race' || ph === 'base' || easyDay(date)) continue;
+      if (st.sinceBrick != null && st.sinceBrick < (ph === 'specific' ? 1 : 2)) continue;
       const min = ph === 'specific' ? 20 : st.brickWeeks > 0 ? 15 : 10;
       out.push({ dow: sl.dow, slot: sl, s: null, make: () => { const sp = W.runEasy(inp.run, min); if (ph === 'specific') sp.steps[0].note = 'die mittleren 10 min im Wettkampftempo'; sp.title = `Koppellauf ${min} min (direkt nach dem Rad)`; sp.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.'; sp.tip = 'Nur wenn du gut erholt bist (Ampel grün). Sonst weglassen, das ist kein Problem.'; return sp; } });
     } else if (sl.sport === 'run') {
@@ -142,7 +155,8 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       const strides = !rec && !!sl.stridesFrom && date >= sl.stridesFrom ? (st.strideWeeks > 0 ? 6 : 4) : 0;
       const q = runQ && qDay === sl.dow && !easyDay(date);
       // Grundlage: im Wechsel Hügelsprints, Fahrtspiel, Steigerungen (sobald Steigerungen dran sind)
-      const variant = ph === 'base' && !rec && strides && !easyDay(date);
+      // Auftrag 17: Hügelsprints oder kurze Intervalle nur ohne harten Nachbartag; zwischen zwei harten Tagen nur Steigerungen
+      const variant = ph === 'base' && !rec && strides && !easyDay(date) && !hardDays.has((sl.dow + 6) % 7) && !hardDays.has((sl.dow + 1) % 7);
       out.push({ dow: sl.dow, slot: sl, s: null, hard: q || undefined, make: (min) => q ? K.runQuality(inp.run, runQ!) : variant ? K.runBaseVariant(inp.run, min, st.weekN || 0) : W.runEasy(inp.run, min, { strides: easyDay(date) ? 0 : strides }), min: q ? W.totals(K.runQuality(inp.run, runQ!)).min : rec ? range[0] : r5(mid(range)), adj: q ? undefined : rec ? [Math.max(30, range[0] - 10), range[1]] : [range[0], range[1]] });
     }
   }
@@ -194,7 +208,7 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
     if (items.some(x => x.s.sport === 'run' && x.hard && !x.test)) rq[phaseOf(items)] = (rq[phaseOf(items)] || 0) + 1;
     n.keyN = kn; n.runQN = rq;
     if (items.some(x => x.s.sport === 'run' && /Steigerungsläufe/.test(x.s.description || ''))) n.strideWeeks++;
-    if (items.some(x => /^Koppellauf/.test(x.s.title || ''))) n.brickWeeks++;
+    if (items.some(x => /^Koppellauf/.test(x.s.title || ''))) { n.brickWeeks++; n.sinceBrick = 0; } else if (n.sinceBrick != null) n.sinceBrick++;
     if (items.some(x => x.s.sport === 'bike' && ['threshold', 'overunder', 'intervals'].includes((x.s.spec && x.s.spec.kind) || ''))) n.thrWeeks = (n.thrWeeks || 0) + 1;
     n.buildOwn = items.filter(x => !['football', 'rest'].includes(x.s.sport) && !x.s.race).reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.buildOwn;
     n.runRef = items.filter(x => x.s.sport === 'run').reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.runRef;

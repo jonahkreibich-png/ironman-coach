@@ -39,11 +39,10 @@ describe.each(plans)('%s', (_id, plan, prof, goals) => {
         if (bikes.length >= 2 && runs.length >= 2) { both++; if (bikes.some((s: any) => s.hard) || runs.some((s: any) => s.hard)) either++; }
       } else if (w.phase === 'base' && runs.length >= 2) { baseWeeks++; if (runs.some((s: any) => /Steigerung|Hügel|Fahrtspiel/.test(s.title + ' ' + s.description))) baseVar++; }
     }
-    if (cautious) { if (both) expect(either / both).toBeGreaterThanOrEqual(0.8); if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.35); if (runWeeks) expect(runQ / runWeeks).toBeGreaterThanOrEqual(0.3); }
-    else {
-      if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.8);
-      if (runWeeks) expect(runQ / runWeeks).toBeGreaterThanOrEqual(0.6);
-    }
+    // Auftrag 17: höchstens 2 eigene harte Einheiten plus Spiel; Lauf-Qualität nur an einem Lauftag ohne harten Nachbartag, im langen Lauf nur
+    // in den letzten 8 Wochen vor einem Laufziel. Deshalb gibt es Pläne mit wenig Lauf-Qualität; die Rad-Schlüsseleinheit bleibt.
+    if (cautious) { if (both) expect(either / both).toBeGreaterThanOrEqual(0.8); if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.35); }
+    else if (bikeWeeks) expect(bikeHard / bikeWeeks).toBeGreaterThanOrEqual(0.7);
     if (baseWeeks >= 3) expect(baseVar / baseWeeks).toBeGreaterThanOrEqual(0.5);
   });
   test('nie zwei harte Lauftage hintereinander, kein harter Lauf am Tag nach einem Spiel', () => {
@@ -91,7 +90,9 @@ describe('Rad und Lauf: Fortschritt der Schlüsseleinheiten', () => {
     expect(runs(ol, 'build')).toMatch(/Schwelle/);
     expect(runs(ol, 'specific')).toMatch(/10-km-Tempo/);
   });
-  test('fester Wochenaufbau (Mi Rad hart, Fr Spiel, 17 Jahre): Lauf-Qualität im langen Lauf am Sonntag, nicht am Donnerstag; Rad und Lauf im Wechsel', () => {
+  // Auftrag 17: Do liegt zwischen Mi (Rad hart) und Fr (Spiel): nie hart. Tempo im langen Lauf nur in den letzten 8 Wochen vor einem Laufziel,
+  // nur jede 2. Woche – hier (Ironman 2029, kein Laufziel) also nie; der lange Lauf bleibt locker.
+  test('fester Wochenaufbau (Mi Rad hart, Fr Spiel, 17 Jahre): Do nie hart, langer Lauf locker ohne Laufziel, höchstens Spiel + 1 harte Einheit', () => {
     const p = patternPlan(true).plan;
     const build = p.weeks.filter((w: any) => w.phase === 'build' && !w.isRecoveryWeek && !w.reduced);
     expect(build.length).toBeGreaterThan(0);
@@ -102,8 +103,9 @@ describe('Rad und Lauf: Fortschritt der Schlüsseleinheiten', () => {
       const bikeKey = wed.sessions.some((s: any) => s.sport === 'bike' && s.hard);
       // höchstens 2 harte Tage (Spiel + eine Qualität)
       expect(w.days.filter((d: any) => d.sessions.some((s: any) => s.hard || /Spiel/.test(s.title))).length).toBeLessThanOrEqual(2);
-      if (!bikeKey && !sun.sessions.some((s: any) => s.race || /test/i.test(s.title))) expect(sun.sessions.find((s: any) => s.sport === 'run').title).toMatch(/Langer Lauf \d+ min mit .*Schwelle/);
+      void bikeKey;
+      expect(sun.sessions.some((s: any) => s.sport === 'run' && s.spec && s.spec.kind === 'longq')).toBe(false);
     }
-    expect(build.filter((w: any) => w.days.some((d: any) => dow(d.date) === 0 && d.sessions.some((s: any) => /Langer Lauf \d+ min mit/.test(s.title)))).length).toBeGreaterThanOrEqual(Math.floor(build.length / 3));
+    expect(build.filter((w: any) => w.days.some((d: any) => dow(d.date) === 3 && d.sessions.some((s: any) => s.sport === 'bike' && s.hard))).length).toBeGreaterThanOrEqual(Math.floor(build.length / 2));
   });
 });

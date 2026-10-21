@@ -143,7 +143,7 @@ describe('Intensität als feste Regel', () => {
   });
   test('5/10 km: VO2max im Aufbau; Rad-Event: lange Anstiege; Halbmarathon: Schwelle und Wettkampftempo', () => {
     const run10 = PLANS.find(p => p.id === 'zufall-2')!; // 10 km, 15 Jahre: kein VO2max, dafür Schwelle
-    expect(all(run10.weeks).some((s: any) => /Schwellenlauf|10-km-Tempo/.test(s.title))).toBe(true);
+    expect(all(run10.weeks).some((s: any) => /Schwelle|10-km-Tempo/.test(s.title))).toBe(true);
     const r5 = generatePlan({ profile: withEstimates({ ...defaultProfile(), birthYear: 1990, experienceYears: 5, sports: ['run'], freq: { run: [4, 4] }, weeklyHours: 6, skills: { runContinuousMin: 80 } } as any, T), goals: [{ id: 'g', type: 'run_5k', name: '5 km', date: '2027-04-18', priority: 'A' }], today: T });
     expect(all(r5.plan.weeks).some((s: any) => /Lauf-Intervalle \d×\d min sehr hart/.test(s.title))).toBe(true);
     const ev = PLANS.find(p => p.id === 'rad-event')!;
