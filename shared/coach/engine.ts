@@ -184,7 +184,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     const old = ctx.state.coachMsgs?.[m.id];
     if (old && m.id.startsWith('msg-review-')) {
       if ((old.resultText ?? old.text) === m.text) return;
-      out.messages.push({ ...m, at: old.at || m.at, title: 'Bewertung aktualisiert: ' + (m.title || '').replace(/^Bewertung: /, ''), resultText: m.text, text: 'Nach geänderten Trainingsdaten neu bewertet.\n\n' + m.text });
+      out.messages.push({ ...m, at: old.at || m.at, title: 'Bewertung aktualisiert: ' + (m.title || '').replace(/^Bewertung: /, ''), resultText: m.text, text: 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + m.text });
     } else if (!has(ctx, m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m);
   };
 

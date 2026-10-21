@@ -191,11 +191,18 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (d.sport === 'bike' && v.cadence) { if (v.cadence < 75) better.push(`Trittfrequenz ${Math.round(v.cadence)}: eher zu niedrig, ein leichterer Gang (85-95) schont die Beine.`); else if (v.cadence <= 100) good.push(`Trittfrequenz ${Math.round(v.cadence)}: rund.`); }
   // Schwimmen
   if (d.sport === 'swim') {
+    // Auftrag 17: geplant gegen geschafft, nur eingetragene oder gemessene Strecke (nie das Soll)
     const target = Math.max(0, ...(s?.spec?.steps || []).filter((x: any) => x.mode === 'crawl').map((x: any) => Number(x.m) || 0));
-    if (target && v.longest != null && v.longest < target) better.push(`SOLL: ${target} m Kraul am Stück. IST: ${v.longest} m; das Streckenziel ist noch nicht nachgewiesen. Wiederholen oder kürzer schwimmen, bis es technisch kontrolliert gelingt.`);
-    if (target && v.longest == null) missing.push(`tatsächliche Kraulstrecke (SOLL ${target} m ist kein Ergebnis)`);
+    if (target && v.longest != null && v.longest < target) better.push(`Geplant: ${target} m Kraul am Stück. Geschafft: ${v.longest} m. Das ${target}-m-Ziel ist noch nicht erreicht; die nächste Stufe kommt erst, wenn es in 2 Einheiten klappt. Bis dahin Stücke, die du sauber schaffst.`);
+    else if (target && v.longest != null && v.longest >= target) good.push(`Geplant ${target} m Kraul am Stück, geschafft ${v.longest} m.`);
+    if (target && v.longest == null) missing.push(`längste Strecke Kraul am Stück (geplant waren ${target} m, das zählt nicht als Ergebnis)`);
     if (v.spl) good.push(`${de(v.spl)} Züge pro Bahn${v.dps ? ` (${de(v.dps, 2)} m pro Zug)` : ''}.`);
-    if (v.longest) { const best = (p.skills || {}).swimCrawlM || 0; if (v.longest >= best && v.longest >= 25) good.push(`${v.longest} m Kraul am Stück${v.longest > best ? ', neue Bestmarke' : ''}.`); }
+    if (v.longest && !(target && v.longest >= target)) {
+      // Bestmarke nur gegen frühere echte Werte (Einheiten davor), nicht gegen das Profil oder den Plan
+      const before = C.swimProofs(ctx.state, ctx.baseWeeks, C.addDays(d.date, -1), 84).filter((x: any) => x.key !== d.key).map((x: any) => x.crawl || 0);
+      const prev = Math.max(0, ...before);
+      if (v.longest >= 25) good.push(`${v.longest} m Kraul am Stück${prev && v.longest > prev ? `, neue Bestmarke (vorher ${prev} m)` : prev && v.longest === prev ? ' wie zuletzt' : ''}.`);
+    }
     if (v.crawlShare != null && v.crawlShare < 70) better.push(`Kraul-Anteil ${Math.round(v.crawlShare)} %: Stück für Stück mehr Kraul, Brust nur zum Erholen.`);
     if (v.technique) better.push(`Technik-Thema „${v.technique}“: ${/bein|sinken|wasserlage|kopf/i.test(v.technique) ? 'Kopf ruhig und Blick nach unten, dann kommen die Beine hoch' : /atm/i.test(v.technique) ? 'unter Wasser lang ausatmen, beim Drehen nur einatmen' : 'eine Sache pro Bahn üben'}.`);
     if (!v.spl && !v.longest) missing.push('Züge pro Bahn oder Kraul am Stück');
@@ -204,6 +211,17 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (d.sport === 'strength' && !v.min) missing.push('Dauer');
   if ((d.sport === 'run' || d.sport === 'bike') && !v.min && !v.km) missing.push('Dauer oder Strecke');
   if (d.sport === 'run' && !v.pace && v.hr) missing.push('Pace oder Strecke');
+  // Auftrag 17: Strecke gegen Vorgabe (nach den wichtigeren Punkten, damit Technik-Hinweise nicht verdrängt werden) (nur mit eingetragener oder gemessener Strecke)
+  if (s && s.plannedKm && (d.sport === 'run' || d.sport === 'bike') && v.km) {
+    const r = v.km / s.plannedKm;
+    if (r < 0.85) better.push(`Strecke ${de(v.km)} von geplant ${de(s.plannedKm)} km.`);
+    else if (r <= 1.15) good.push(`Strecke passt: ${de(v.km)} von ${de(s.plannedKm)} km.`);
+  }
+  if (s && s.plannedKm && d.sport === 'swim' && v.meters) {
+    const plannedM = Math.round(s.plannedKm * 1000);
+    if (v.meters < plannedM * 0.8) better.push(`${v.meters} m von geplant ${plannedM} m geschwommen.`);
+    else good.push(`${v.meters} von ${plannedM} m geschwommen.`);
+  }
   // Gefühl
   if (v.rpe != null) {
     if (!hard && v.rpe >= 6 && d.sport !== 'football') { better.push(`Gefühl ${v.rpe}/10 für eine lockere Einheit ist hoch. Das spricht für Müdigkeit, Hitze oder zu schnelles Tempo.`); fatigue += 1; }
@@ -323,7 +341,9 @@ function weekStats(ctx: EngineCtx, from: string, to: string) {
   const items = doneItems(ctx, from, to);
   const planned = C.planDays(weeksOf(ctx)).filter((d: any) => d.date >= from && d.date <= to && !C.illnessAt(ctx.state.illnessPeriods, d.date)).flatMap((d: any) => d.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled && !s.fixed).map((s: any) => ({ s, date: d.date })));
   const vals = items.map(d => ({ d, v: valsOf(d) }));
-  const min = vals.reduce((a, x) => a + (x.v.min || (x.d.planned ? x.d.planned.plannedMinutes || 0 : 0)), 0);
+  // Auftrag 17: nur eingetragene oder gemessene Dauer zählt; ohne Dauer wird nichts aus dem Plan eingesetzt
+  const min = vals.reduce((a, x) => a + (x.v.min || 0), 0);
+  const noMin = vals.filter(x => x.v.min == null && x.d.sport !== 'rest').length;
   const plannedMin = planned.reduce((a: number, x: any) => a + (x.s.plannedMinutes || 0), 0);
   const missedKey = planned.filter((x: any) => C.isKey(x.s) && x.date < ctx.today && !((ctx.state.sessions || {})[x.s.id] || {}).completed && !C.illnessAt(ctx.state.illnessPeriods, x.date)).map((x: any) => x.s.title);
   const easyRuns = vals.filter(x => x.d.sport === 'run' && x.v.pace && x.v.hr && !isHardDone(x.d, x.v));
@@ -336,7 +356,7 @@ function weekStats(ctx: EngineCtx, from: string, to: string) {
   const fatigue = vals.reduce((a, x) => a + reviewOne(ctx, x.d).fatigue, 0);
   const illDays: string[] = []; for (let d = from; d <= to; d = C.addDays(d, 1)) if (C.illnessAt(ctx.state.illnessPeriods, d)) illDays.push(d);
   const ill = illDays.length ? illDays : null;
-  return { items, planned, min, plannedMin, missedKey, eff, rpes, hardN, sleepAvg, bySport, fatigue, ill, vals };
+  return { items, planned, min, noMin, plannedMin, missedKey, eff, rpes, hardN, sleepAvg, bySport, fatigue, ill, vals };
 }
 const hh = (m: number) => de(m / 60, 1) + ' h';
 export function reviewWeek(ctx: EngineCtx, compare: boolean, offset = 0): Review {
@@ -348,7 +368,7 @@ export function reviewWeek(ctx: EngineCtx, compare: boolean, offset = 0): Review
   const doneN = W0.items.length, planN = W0.planned.filter((x: any) => x.date <= to).length;
   const label = offset ? 'Letzte Woche' : 'Diese Woche';
   const plannedTo = W0.planned.filter((x: any) => x.date <= to).reduce((a: number, x: any) => a + (x.s.plannedMinutes || 0), 0);
-  const head = `${label} (${fmtD(mon)} bis ${fmtD(to)}): ${doneN} Einheit${doneN === 1 ? '' : 'en'}${planN ? ` von ${planN} geplanten` : ''}, ${hh(W0.min)}${plannedTo ? ` (geplant ${offset || to >= sun ? '' : 'bis heute '}${hh(plannedTo)})` : ''}.`;
+  const head = `${label} (${fmtD(mon)} bis ${fmtD(to)}): ${doneN} Einheit${doneN === 1 ? '' : 'en'}${planN ? ` von ${planN} geplanten` : ''}, ${hh(W0.min)}${W0.noMin ? ` (dazu ${W0.noMin} ohne eingetragene Dauer)` : ''}${plannedTo ? ` (geplant ${offset || to >= sun ? '' : 'bis heute '}${hh(plannedTo)})` : ''}.`;
   if (!doneN) {
     return { intent: 'review', text: [head, `🔧 Besser: ${W0.ill ? 'Du warst krank, da ist Pause richtig.' : 'Noch keine erledigte Einheit eingetragen. Hak erledigte Einheiten im Plan ab oder verbinde deine Uhr, dann kann ich die Woche bewerten.'}`, `➡️ Nächste Tage: ${nextDays(ctx, ctx.today, 0).text}`].join('\n'), options: [{ label: 'Zum Plan', say: '', go: 'plan' }], good, better, next: [], missing: ['erledigte Einheiten'], items: 0 };
   }

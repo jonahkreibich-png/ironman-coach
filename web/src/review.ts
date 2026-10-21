@@ -18,7 +18,7 @@ export function reviewNow(key: string, date: string): boolean {
   const id = 'msg-review-' + key; const old = STATE.coachMsgs[id];
   const text = autoReview(ctx, d, mode);
   if (old && (old.resultText ?? old.text) === text) return false;
-  STATE.coachMsgs[id] = { ...(old || {}), id, at: old ? old.at : Date.now(), date, kind: 'session', from: 'coach', title: (old ? 'Bewertung aktualisiert: ' : 'Bewertung: ') + d.title, resultText: text, text: old ? 'Nach geänderten Trainingsdaten neu bewertet.\n\n' + text : text, unread: true, refs: d.custom ? {} : { sessionId: key } };
+  STATE.coachMsgs[id] = { ...(old || {}), id, at: old ? old.at : Date.now(), date, kind: 'session', from: 'coach', title: (old ? 'Bewertung aktualisiert: ' : 'Bewertung: ') + d.title, resultText: text, text: old ? 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + text : text, unread: true, refs: d.custom ? {} : { sessionId: key } };
   saveSoon();
   return true;
 }
