@@ -104,7 +104,14 @@ export function longRunWithQuality(ctx: W.PaceCtx, min: number, q: NonNullable<R
 /* Grundlage: lockerer Lauf mit Hügelsprints, Fahrtspiel oder Steigerungen (zählt nicht als harte Einheit) */
 export function runBaseVariant(ctx: W.PaceCtx, min: number, k: number): W.Spec {
   const v = k % 3;
-  if (v === 0) return { sport: 'run', kind: 'hills', ctx, why: 'Hügelsprints machen kräftig und ökonomisch, ohne müde zu machen.', steps: [S('main', { min: r5(min - 8), zone: 2 }), S('main', { reps: 8, min: 0.25, zone: 3, restMin: 0.75, note: '10-15 s zügig bergauf, langsam zurückgehen' })] };
+  // Auftrag 17: mit Einlaufen und Auslaufen
+  if (v === 0) {
+    const hills = S('main', { reps: 8, min: 0.25, zone: 3, restMin: 0.75, note: '10-15 s zügig bergauf, langsam zurückgehen' });
+    const why = 'Hügelsprints machen kräftig und ökonomisch, ohne müde zu machen.';
+    if (min < 30) return { sport: 'run', kind: 'hills', ctx, why, steps: [S('main', { min: r5(min - 8), zone: 2 }), hills] };
+    const wu = min >= 40 ? 10 : 5;
+    return { sport: 'run', kind: 'hills', ctx, why, steps: [S('warm', { min: wu, zone: 1, note: 'ganz locker einlaufen' }), S('main', { min: Math.max(10, r5(min - 13 - wu)), zone: 2 }), hills, S('cool', { min: 5, zone: 1, note: 'locker auslaufen' })] };
+  }
   if (v === 1) return { sport: 'run', kind: 'fartlek', ctx, why: 'Kurze, kontrollierte Intervalle: locker-zügig laufen, dazwischen vollständig erholen.', steps: [S('warm', { min: 10, zone: 1 }), S('main', { reps: 6, min: 1, zone: 3, restMin: 2, note: 'locker-zügig, nicht hart' }), S('cool', { min: Math.max(5, r5(min - 10 - 6 - 10)), zone: 2 })] };
   return W.runEasy(ctx, min, { strides: 6 });
 }
@@ -112,10 +119,20 @@ export function runBaseVariant(ctx: W.PaceCtx, min: number, k: number): W.Spec {
 export const BIKE_LONG_VARIANTS = ['gleichmäßig', 'hügelig', 'mit Kadenz-Blöcken', 'mit Zone-3-Blöcken'];
 export function bikeLongVariant(spec: W.Spec, k: number, phase: Ph): W.Spec {
   if (phase === 'taper' || phase === 'race') return spec;
-  const v = BIKE_LONG_VARIANTS[k % BIKE_LONG_VARIANTS.length];
-  const note = { 'gleichmäßig': 'gleichmäßig in Zone 2, alle 20-30 min essen und trinken', 'hügelig': 'hügelige Strecke: Anstiege im Sitzen mit ruhiger Trittfrequenz, bergab locker', 'mit Kadenz-Blöcken': 'darin 5×5 min mit hoher Trittfrequenz (100+), dazwischen normal', 'mit Zone-3-Blöcken': 'darin 3×10 min in Zone 3, dazwischen Zone 2' }[v];
+  let v = BIKE_LONG_VARIANTS[k % BIKE_LONG_VARIANTS.length];
   const out: W.Spec = JSON.parse(JSON.stringify(spec));
-  const main = out.steps.find(s => s.part === 'main'); if (main) main.note = note;
+  const main = out.steps.find(s => s.part === 'main');
+  // Auftrag 17: „locker“ und Zone 3 passen nicht zusammen. Zügige Blöcke nur in längeren Ausfahrten und als echte Abschnitte
+  // (dann stimmen Titel, Zone und „Wie hart“), sonst gleichmäßig.
+  if (v === 'mit Zone-3-Blöcken' && (!main || (main.min || 0) < 60)) v = 'gleichmäßig';
+  const note = { 'gleichmäßig': 'gleichmäßig in Zone 2, alle 20-30 min essen und trinken', 'hügelig': 'hügelige Strecke: Anstiege im Sitzen mit ruhiger Trittfrequenz, bergab locker', 'mit Kadenz-Blöcken': 'darin 5×5 min mit hoher Trittfrequenz (100+), dazwischen normal', 'mit Zone-3-Blöcken': 'locker in Zone 2, alle 20-30 min essen und trinken' }[v];
+  if (main) main.note = note;
+  if (v === 'mit Zone-3-Blöcken' && main) {
+    const rest = (main.min || 0) - 40; const before = Math.max(5, r5(rest * 0.5)), after = Math.max(5, rest - before);
+    out.steps.splice(out.steps.indexOf(main), 1, { ...main, min: before }, S('main', { reps: 3, min: 10, zone: 3, restMin: 5, note: 'zügig, aber gleichmäßig (Zone 3), dazwischen 5 min locker' }), S('main', { min: after, zone: 2, note: 'locker zu Ende fahren' }));
+    out.variant = 'mit 3 zügigen Blöcken';
+    return out;
+  }
   out.variant = v;
   return out;
 }

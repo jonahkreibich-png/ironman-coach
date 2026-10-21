@@ -75,7 +75,7 @@ describe('Bausteine', () => {
   });
   test('Sweet Spot: Titel und Ablauf passen zusammen, Ein- und Ausrollen füllen die Dauer', () => {
     const b = W.build(W.bikeSweetSpot({ indoor: true }, 3, 12, 75));
-    expect(b.title).toBe('Sweet Spot 3×12 min (Rolle)');
+    expect(b.title).toBe('Rad-Intervalle 3×12 min Sweet Spot (Rolle)');
     expect(b.plannedMinutes).toBe(75);
     expect(b.description).toMatch(/3×12 min zügig.*Sweet Spot/);
   });

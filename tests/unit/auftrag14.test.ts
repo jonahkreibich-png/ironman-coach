@@ -145,16 +145,16 @@ describe('Intensität als feste Regel', () => {
     const run10 = PLANS.find(p => p.id === 'zufall-2')!; // 10 km, 15 Jahre: kein VO2max, dafür Schwelle
     expect(all(run10.weeks).some((s: any) => /Schwellenlauf|10-km-Tempo/.test(s.title))).toBe(true);
     const r5 = generatePlan({ profile: withEstimates({ ...defaultProfile(), birthYear: 1990, experienceYears: 5, sports: ['run'], freq: { run: [4, 4] }, weeklyHours: 6, skills: { runContinuousMin: 80 } } as any, T), goals: [{ id: 'g', type: 'run_5k', name: '5 km', date: '2027-04-18', priority: 'A' }], today: T });
-    expect(all(r5.plan.weeks).some((s: any) => /Lauf VO2max \d×\d min/.test(s.title))).toBe(true);
+    expect(all(r5.plan.weeks).some((s: any) => /Lauf-Intervalle \d×\d min sehr hart/.test(s.title))).toBe(true);
     const ev = PLANS.find(p => p.id === 'rad-event')!;
-    expect(all(ev.weeks).some((s: any) => /^Rad Anstiege \d×\d+ min/.test(s.title))).toBe(true);
+    expect(all(ev.weeks).some((s: any) => /^Rad-Intervalle \d×\d+ min am Anstieg/.test(s.title))).toBe(true);
     const hm = PLANS.find(p => p.id === 'laeufer-ohne-rad')!;
-    expect(all(hm.weeks).some((s: any) => /Schwellenlauf/.test(s.title))).toBe(true);
+    expect(all(hm.weeks).some((s: any) => /an der Schwelle|Schwellenlauf/.test(s.title))).toBe(true);
     expect(all(hm.weeks).some((s: any) => /Halbmarathon-Tempo/.test(s.title + ' ' + s.description))).toBe(true);
   });
   test('Intervalle steigen von Woche zu Woche (Schwellenlauf erst 3×8, später länger)', () => {
     const p = PLANS.find(x => x.id === 'laeufer-ohne-rad')!;
-    const thr = all(p.weeks).filter((s: any) => /^Schwellenlauf (\d)×(\d+) min/.test(s.title)).map((s: any) => { const m = /(\d)×(\d+)/.exec(s.title)!; return +m[1] * +m[2]; });
+    const thr = all(p.weeks).filter((s: any) => /^Lauf-Intervalle (\d)×(\d+) min an der Schwelle/.test(s.title)).map((s: any) => { const m = /(\d)×(\d+)/.exec(s.title)!; return +m[1] * +m[2]; });
     expect(thr.length).toBeGreaterThan(2); expect(Math.max(...thr)).toBeGreaterThan(thr[0]);
   });
   test('Jede Qualitätseinheit beschreibt Aufwärmen, Hauptteil mit Wiederholungen × Dauer und Pausen, Ausklang und wofür sie gut ist', () => {

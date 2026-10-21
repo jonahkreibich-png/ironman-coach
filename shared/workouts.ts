@@ -6,6 +6,7 @@
 import { HR_ZONES, POWER_ZONES } from './sports';
 import { termsLine } from './glossary';
 import { speedRange, SPEED_HINT } from './bikespeed';
+import { purposeOf } from './sessiontypes';
 
 export type WSport = 'run' | 'bike' | 'swim' | 'strength' | 'football';
 export type StrokeMode = 'crawl' | 'breast' | 'drill' | 'kick' | 'mixed' | 'easy' | 'pull';
@@ -293,7 +294,9 @@ export function describe(spec: Spec): string {
     L.push(`Wie hart: ${FEEL[zmax]}.`);
     if (spec.sport === 'bike' && spec.ctx.bikeKmh && spec.ctx.speedZones !== false && !spec.ctx.indoor) L.push(SPEED_HINT);
   }
-  if (spec.why) L.push(`Warum: ${spec.why}`);
+  // Auftrag 17: jede Einheit hat einen Satz „Warum“ (sonst der Zweck aus der zentralen Liste der Einheitstypen)
+  const why = spec.why || (spec.sport !== 'football' ? purposeOf({ sport: spec.sport, spec, title: spec.title || '', area: spec.area, stage: spec.stage }) : null);
+  if (why) L.push(`Warum: ${why}`);
   if (spec.tip) L.push(`Achte auf: ${spec.tip}`);
   // Auftrag 15: Fachbegriffe (Sweet Spot, Schwelle, CSS, VO2max …) mit kurzer Erklärung
   const terms = termsLine(`${title(spec)}\n${L.join('\n')}`); if (terms) L.push(terms);
@@ -314,24 +317,26 @@ export function title(spec: Spec): string {
     case 'endurance': return spec.sport === 'swim' ? `Schwimmen: Grundlage${spec.variant ? ' · ' + spec.variant : ''} (${thousands((t.km || 0) * 1000)} m)` : `Ausdauer ${t.min} min`;
     case 'openwater': return `Freiwasser: Sichten, Orientierung, Start (${thousands((t.km || 0) * 1000)} m)`;
     case 'intervals': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min${where}`;
-    case 'threshold': return `${spec.sport === 'run' ? 'Schwellenlauf' : 'Rad Schwelle'} ${m0.reps && m0.reps > 1 ? `${m0.reps}×${m0.min}` : m0.min} min${where}`;
-    case 'tempo': return `${spec.sport === 'run' ? 'Tempolauf' : 'Rad Tempo'} ${m0.reps && m0.reps > 1 ? `${m0.reps}×${m0.min}` : m0.min} min${where}`;
+    // Auftrag 17: strukturierte Intervalle heißen „Intervalle“ (Namen aus shared/sessiontypes.ts)
+    case 'threshold': return m0.reps && m0.reps > 1 ? `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min an der Schwelle${where}` : `${spec.sport === 'run' ? 'Schwellenlauf' : 'Rad an der Schwelle'} ${m0.min} min${where}`;
+    case 'tempo': return m0.reps && m0.reps > 1 ? `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min zügig (Tempo)${where}` : `${spec.sport === 'run' ? 'Tempolauf' : 'Rad Tempo'} ${m0.min} min${where}`;
     // kurze „lange“ Einheiten heißen nicht „lang“ (Auftrag 11: „Lange Ausfahrt 35 min“, „Langer Lauf 30 min“)
-    case 'long': return (spec.sport === 'run' ? `${t.min >= 50 ? 'Langer' : 'Lockerer'} Lauf ${t.min} min` : `${t.min >= 75 ? 'Lange' : 'Lockere'} Ausfahrt ${t.min} min${where}`) + (spec.variant ? `, ${spec.variant}` : '');
-    case 'sweetspot': return `Sweet Spot ${m0.reps}×${m0.min} min${where}`;
-    case 'overunder': return `Over-Unders ${m0.reps}×${m0.min} min${where}`;
-    case 'vo2': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'} VO2max ${m0.reps}×${m0.min} min${where}`;
-    case 'force': return `Rad Kraftausdauer ${m0.reps}×${m0.min} min${where}`;
-    case 'climb': return `Rad Anstiege ${m0.reps}×${m0.min} min${where}`;
-    case 'racepace': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'} Wettkampftempo ${m0.reps && m0.reps > 1 ? `${m0.reps}×${m0.min}` : m0.min} min${where}`;
+    // „Locker“ nur, wenn auch alles locker ist (Auftrag 17: kein „locker“ mit Zone-3-Blöcken)
+    case 'long': { const q = main.some(x => (x.zone || 2) >= 3); return (spec.sport === 'run' ? `${t.min >= 50 ? 'Langer' : q ? '' : 'Lockerer'} Lauf ${t.min} min`.trim() : `${t.min >= 75 ? 'Lange' : q ? '' : 'Lockere'} Ausfahrt ${t.min} min${where}`.trim()).replace(/^(w)/, c => c.toUpperCase()) + (spec.variant ? `, ${spec.variant}` : ''); }
+    case 'sweetspot': return `Rad-Intervalle ${m0.reps}×${m0.min} min Sweet Spot${where}`;
+    case 'overunder': return `Rad-Intervalle ${m0.reps}×${m0.min} min Over-Unders${where}`;
+    case 'vo2': return `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min sehr hart${where}`;
+    case 'force': return `Rad-Intervalle ${m0.reps}×${m0.min} min Kraftausdauer${where}`;
+    case 'climb': return `Rad-Intervalle ${m0.reps}×${m0.min} min am Anstieg${where}`;
+    case 'racepace': return m0.reps && m0.reps > 1 ? `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min im Wettkampftempo${where}` : `${spec.sport === 'run' ? 'Lauf' : 'Rad'} ${m0.min} min im Wettkampftempo${where}`;
     case 'hills': return `Lockerer Lauf ${t.min} min mit Hügelsprints`;
-    case 'fartlek': { const q = main.find(s => (s.reps || 0) > 1) || m0; return `Intervalle ${q.reps}×${q.min} min (Laufen, kontrolliert)`; }
+    case 'fartlek': { const q = main.find(s => (s.reps || 0) > 1) || m0; return `Lauf-Intervalle ${q.reps}×${q.min} min zügig`; }
     case 'longq': { const q = spec.steps.find(x => x.part === 'main' && (x.zone || 2) >= 3) || m0; if (spec.sport === 'bike') return `${t.min >= 75 ? 'Lange Ausfahrt' : 'Ausfahrt'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${(q.zone || 3) >= 5 ? 'VO2max' : (q.zone || 3) >= 4 ? 'Schwelle' : 'Sweet Spot'}${where}`; return `${t.min >= 60 ? 'Langer Lauf' : 'Lauf'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${/^(Tempo|Schwelle|VO2max|\d+-km-Tempo|Halbmarathon-Tempo|Marathon-Tempo)$/.test(q.note || '') ? q.note : (q.zone || 3) >= 4 ? 'Schwelle' : 'Wettkampftempo'}`; }
     case 'brick': return `Koppeltraining Rad + Lauf ${t.min} min`;
     case 'recovery': return spec.sport === 'run' ? `Lockerer Lauf ${t.min} min` : `Lockere Runde ${t.min} min${where}`;
     case 'test': return spec.title || 'Test';
     case 'strength': return spec.area ? `Kraft ${AREA_LABEL[spec.area]} ${t.min} min` : `Kraft ${t.min} min`;
-    default: return (spec.sport === 'run' ? `Lockerer Lauf ${t.min} min` : spec.sport === 'bike' ? `Lockere Ausfahrt ${t.min} min${where}` : `${t.min} min`) + (spec.variant ? `, ${spec.variant}` : '');
+    default: return (spec.sport === 'run' ? `Lockerer Lauf ${t.min} min${/Steigerung/.test(JSON.stringify(spec.steps)) ? ' mit Steigerungen' : ''}` : spec.sport === 'bike' ? `Lockere Ausfahrt ${t.min} min${where}` : `${t.min} min`) + (spec.variant ? `, ${spec.variant}` : '');
   }
 }
 /* Zone der Einheit (Auftrag 14): kurze Stücke (Hügelsprints, Steigerungen, Fahrtspiel bis 1 min, zusammen unter 20 % des Hauptteils)
@@ -463,17 +468,28 @@ const S = (part: Step['part'], o: Omit<Step, 'part'>): Step => ({ part, ...o });
 const r5 = (x: number) => Math.max(5, Math.round(x / 5) * 5);
 export function runEasy(ctx: PaceCtx, min: number, o: { strides?: boolean | number; kind?: Kind } = {}): Spec {
   const n = o.strides === true ? 4 : o.strides || 0;
-  return { sport: 'run', kind: o.kind || 'easy', ctx, steps: [S('main', { min: r5(min), zone: 2, note: n ? (o.strides === true ? 'am Ende 4 kurze Steigerungen über 15 s' : `am Ende ${n} Steigerungsläufe über 15-20 s, dazwischen locker gehen`) : undefined })] };
+  const note = n ? (o.strides === true ? 'am Ende 4 kurze Steigerungen über 15 s' : `am Ende ${n} Steigerungsläufe über 15-20 s, dazwischen locker gehen`) : undefined;
+  // Auftrag 17: ab 30 min mit Ein- und Auslaufen (Aufwärmen, Hauptteil, Auslaufen)
+  const m = r5(min);
+  if (m < 25) return { sport: 'run', kind: o.kind || 'easy', ctx, steps: [S('main', { min: m, zone: 2, note })] };
+  const wu = m >= 35 ? 10 : 5;
+  return { sport: 'run', kind: o.kind || 'easy', ctx, steps: [S('warm', { min: wu, zone: 1, note: 'ganz locker einlaufen' }), S('main', { min: m - wu - 5, zone: 2, note }), S('cool', { min: 5, zone: 1, note: 'locker auslaufen, ein paar Minuten gehen' })] };
 }
-export function runLong(ctx: PaceCtx, min: number): Spec { return { sport: 'run', kind: 'long', ctx, steps: [S('warm', { min: 10, zone: 1 }), S('main', { min: r5(min - 10), zone: 2 })] }; }
+export function runLong(ctx: PaceCtx, min: number): Spec { return { sport: 'run', kind: 'long', ctx, steps: [S('warm', { min: 10, zone: 1 }), S('main', { min: Math.max(5, r5(min - 15)), zone: 2, note: min >= 75 ? 'ab 75 min etwas trinken und essen' : undefined }), S('cool', { min: 5, zone: 1, note: 'ruhig auslaufen' })] }; }
 export function runIntervals(ctx: PaceCtx, reps: number, min: number, rest: number, zone = 4): Spec {
   return { sport: 'run', kind: 'intervals', ctx, steps: [S('warm', { min: 15, zone: 1, note: 'mit 3 kurzen Steigerungen' }), S('main', { reps, min, zone, restMin: rest }), S('cool', { min: 10, zone: 1 })] };
 }
 export function runTempo(ctx: PaceCtx, min: number, zone = 3): Spec {
   return { sport: 'run', kind: zone >= 4 ? 'threshold' : 'tempo', ctx, steps: [S('warm', { min: 15, zone: 1 }), S('main', { min, zone }), S('cool', { min: 10, zone: 1 })] };
 }
-export function bikeEasy(ctx: PaceCtx, min: number, kind: Kind = 'easy'): Spec { return { sport: 'bike', kind, ctx, steps: [S('main', { min: r5(min), zone: 2, note: 'hohe Trittfrequenz, 85-95 Umdrehungen' })], noDistance: !!ctx.indoor }; }
-export function bikeLong(ctx: PaceCtx, min: number): Spec { return { sport: 'bike', kind: 'long', ctx, steps: [S('warm', { min: 15, zone: 1 }), S('main', { min: r5(min - 15), zone: 2, note: 'alle 20-30 min essen und trinken' })], noDistance: !!ctx.indoor }; }
+export function bikeEasy(ctx: PaceCtx, min: number, kind: Kind = 'easy'): Spec {
+  const m = r5(min);
+  // Auftrag 17: ab 40 min mit Ein- und Ausrollen
+  if (m < 25) return { sport: 'bike', kind, ctx, steps: [S('main', { min: m, zone: 2, note: 'hohe Trittfrequenz, 85-95 Umdrehungen' })], noDistance: !!ctx.indoor };
+  const wu = m >= 40 ? 10 : 5;
+  return { sport: 'bike', kind, ctx, steps: [S('warm', { min: wu, zone: 1, note: 'locker einrollen' }), S('main', { min: m - wu - 5, zone: 2, note: 'hohe Trittfrequenz, 85-95 Umdrehungen' }), S('cool', { min: 5, zone: 1, note: 'locker ausrollen' })], noDistance: !!ctx.indoor };
+}
+export function bikeLong(ctx: PaceCtx, min: number): Spec { return { sport: 'bike', kind: 'long', ctx, steps: [S('warm', { min: 15, zone: 1 }), S('main', { min: Math.max(5, r5(min - 25)), zone: 2, note: 'alle 20-30 min essen und trinken' }), S('cool', { min: 10, zone: 1, note: 'locker ausrollen' })], noDistance: !!ctx.indoor }; }
 export function bikeIntervals(ctx: PaceCtx, reps: number, min: number, zone: number, rest: number): Spec {
   return { sport: 'bike', kind: zone >= 4 ? 'threshold' : zone === 3 ? 'tempo' : 'intervals', ctx, steps: [S('warm', { min: 15, zone: 1, note: 'mit 3 kurzen Antritten' }), S('main', { reps, min, zone, restMin: rest }), S('cool', { min: 10, zone: 1 })], noDistance: !!ctx.indoor };
 }

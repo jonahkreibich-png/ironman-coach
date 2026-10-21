@@ -93,12 +93,12 @@ describe('Aufbau einer normalen Woche', () => {
   test('Mi Rad: Sweet Spot ab Woche 8 (3×8 → 3×12 → 2×20), vorher locker, Woche 7 der Radtest', () => {
     expect(titles(W('2026-10-19'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
     expect(titles(W('2026-10-26'), 3)[0]).toBe('Radtest 20 min');
-    expect(titles(W('2026-11-02'), 3)[0]).toMatch(/^Sweet Spot 3×8/);
+    expect(titles(W('2026-11-02'), 3)[0]).toMatch(/^Rad-Intervalle 3×8 min Sweet Spot/);
     expect(titles(W('2026-11-09'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
-    expect(titles(W('2026-11-16'), 3)[0]).toMatch(/^Sweet Spot 3×12/);
+    expect(titles(W('2026-11-16'), 3)[0]).toMatch(/^Rad-Intervalle 3×12 min Sweet Spot/);
     // Abwechslung: nach zwei Sweet-Spot-Wochen Kraftausdauer, dann Sweet Spot weiter (2×20)
-    expect(titles(W('2026-11-23'), 3)[0]).toMatch(/^Rad Kraftausdauer/);
-    expect(titles(W('2026-11-30'), 3)[0]).toMatch(/^Sweet Spot 2×20/);
+    expect(titles(W('2026-11-23'), 3)[0]).toMatch(/^Rad-Intervalle \d×\d+ min Kraftausdauer/);
+    expect(titles(W('2026-11-30'), 3)[0]).toMatch(/^Rad-Intervalle 2×20 min Sweet Spot/);
     for (const w of future.slice(0, 12)) expect(day(w, 3).sessions.find((s: any) => s.sport === 'bike').plannedMinutes).toBeLessThanOrEqual(90);
   });
   test('Do Lauf 40-50 min Zone 2, ab Woche 8 mit 4-6 Steigerungsläufen', () => {

@@ -13,8 +13,9 @@ import { abilityCap, dayCap, freqOf, teamActive } from './plangen';
 import { rulesOf, effectsOf, hardViolations, allowedHard, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
 import { checkPlanRules } from './planrules';
+import { nameIssues } from './sessiontypes';
 
-export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup';
+export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup' | 'names';
 export interface CheckIssue { rule: CheckRule; week?: number; date?: string; msg: string }
 
 const dowOf = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
@@ -120,6 +121,8 @@ export function checkSession(s: any, week?: number, date?: string): CheckIssue[]
   const out: CheckIssue[] = [];
   const bad = (msg: string) => out.push({ rule: 'distance', week, date, msg: `${s.title}: ${msg}` });
   if (!s || s.sport === 'rest' || s.race || s.sport === 'football') return out;
+  // Auftrag 17: klare Namen, kein Widerspruch zwischen Titel und Zone, Aufbau und „Warum“
+  for (const m of nameIssues(s)) out.push({ rule: 'names', week, date, msg: m });
   const spec: W.Spec | undefined = s.spec;
   if (spec) {
     const t = W.totals(spec);

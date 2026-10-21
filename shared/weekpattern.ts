@@ -195,7 +195,7 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
     n.keyN = kn; n.runQN = rq;
     if (items.some(x => x.s.sport === 'run' && /Steigerungsläufe/.test(x.s.description || ''))) n.strideWeeks++;
     if (items.some(x => /^Koppellauf/.test(x.s.title || ''))) n.brickWeeks++;
-    if (items.some(x => /^Rad (Schwelle|-Intervalle)/.test(x.s.title || ''))) n.thrWeeks = (n.thrWeeks || 0) + 1;
+    if (items.some(x => x.s.sport === 'bike' && ['threshold', 'overunder', 'intervals'].includes((x.s.spec && x.s.spec.kind) || ''))) n.thrWeeks = (n.thrWeeks || 0) + 1;
     n.buildOwn = items.filter(x => !['football', 'rest'].includes(x.s.sport) && !x.s.race).reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.buildOwn;
     n.runRef = items.filter(x => x.s.sport === 'run').reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.runRef;
   }

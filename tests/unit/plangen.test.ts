@@ -47,8 +47,9 @@ describe('Plan erzeugen', () => {
       days.forEach((d: any, i: number) => { if (d.sessions.some(isHard) && days[i + 1]) expect(days[i + 1].sessions.some(isHard)).toBe(false); });
     }
     expect(validateWeeks(r.plan.weeks, { minor: true })).toEqual([]);
-    // Jugendliche: keine Lauf-Intervalle ohne Freigabe
-    expect(r.plan.weeks.some((w: any) => w.days.some((d: any) => d.sessions.some((s: any) => /Lauf-Intervalle/.test(s.title))))).toBe(false);
+    // Jugendliche: nie sehr harte Intervalle (Zone 5); Lauf-Einheiten höchstens Zone 4 (Auftrag 17: Intervalle heißen jetzt „Intervalle“)
+    expect(r.plan.weeks.some((w: any) => w.days.some((d: any) => d.sessions.some((s: any) => /sehr hart|VO2/.test(s.title))))).toBe(false);
+    expect(r.plan.weeks.every((w: any) => w.days.every((d: any) => d.sessions.every((s: any) => s.sport !== 'run' || !/5/.test(s.zone || ''))))).toBe(true);
   });
   test('Fehlende Schwellen: Einstiegstests in den ersten zwei Wochen', () => {
     const r = generatePlan({ profile: { ...adult, skills: { swimCrawl: 'yes', swimCrawlM: 1000 } }, goal, today, needTests: { run: true, bike: true, swim: true } });

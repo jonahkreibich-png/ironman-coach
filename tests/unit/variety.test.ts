@@ -81,8 +81,8 @@ describe('Rad und Lauf: Fortschritt der Schlüsseleinheiten', () => {
     const ld = applyOnboarding(PERSONAS.find(p => p.id === 'langdistanz-profi')!.answers, today).gen!.plan;
     const titles = (p: any, phase: string) => p.weeks.filter((w: any) => w.phase === phase).flatMap((w: any) => own(w).filter((s: any) => s.sport === 'bike' && s.hard).map((s: any) => s.title));
     expect(titles(ol, 'base').join(' ')).toMatch(/Sweet Spot/);
-    expect(titles(ol, 'build').join(' ')).toMatch(/Rad Schwelle|Over-Unders/);
-    expect(titles(ol, 'specific').join(' ')).toMatch(/VO2max/);
+    expect(titles(ol, 'build').join(' ')).toMatch(/an der Schwelle|Over-Unders/);
+    expect(titles(ol, 'specific').join(' ')).toMatch(/sehr hart/);
     expect(titles(ld, 'specific').join(' ')).toMatch(/Wettkampftempo/);
   });
   test('Lauf: Aufbau Schwelle, spezifisch Wettkampftempo (Halbmarathon-Tempo vor Mittel-, 10-km-Tempo vor Olympisch)', () => {

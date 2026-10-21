@@ -154,7 +154,8 @@ describe('Struktur jeder Einheit', () => {
   test('gespeicherter Bauplan nutzt die aktuellen Schwellen (nach dem Schwellentest neue Zahlen)', () => {
     const s = { id: 'x', sport: 'run', title: 'Lockerer Lauf 40 min', spec: W.runEasy({ lthrRun: 160, runThrSec: 360 }, 40) };
     const a = structureOf(s, { ...prof, thresholds: { ...prof.thresholds, lthrRun: 170, thresholdPaceRunSec: 339 } }, CHAT_TODAY)!;
-    expect(a.parts[0].lines[0]).toMatch(/Puls 138–151/);
+    // Auftrag 17: lockere Läufe haben Ein- und Auslaufen, die Zone-2-Vorgabe steht im Hauptteil
+    expect(a.parts.find(p => p.label === 'Hauptteil')!.lines[0]).toMatch(/Puls 138–151/);
   });
   test('kürzen: Lernstufe bleibt Lernstufe, Kraft hat weniger Übungen', () => {
     const swim = W.swimLearn({}, { ladder: 'swim', n: 2, breast: true });
