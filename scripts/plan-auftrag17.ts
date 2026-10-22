@@ -69,6 +69,8 @@ profile.weekPattern = {
   longRunStep: 10, testEveryWeeks: 8
 };
 delete profile.weekPattern.longRunMax;
+// gewünschte Häufigkeit passend zum Wochenaufbau (Rad Mi + Sa, Schwimmen Di + Sa, Laufen Do + So, Kraft Di + Fr)
+profile.freq = { ...(profile.freq || {}), bike: [2, 2], swim: [2, 2], run: [2, 3], strength: [2, 2] };
 state.profile = profile;
 
 const goals = recs.filter(r => r.kind === 'goal').map(r => r.data);

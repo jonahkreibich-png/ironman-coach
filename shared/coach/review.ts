@@ -4,6 +4,7 @@
    Einheiten (gleiche Pace bei weniger Puls …), Zeit in Zonen, Entkopplung, Splits, Kadenz, Schwimm-Züge und Kraul am Stück, RPE und Gefühl,
    Morgenwerte und Schlaf. Antwort in 3 Teilen wie ein Trainer: Was gut war (mit Zahlen), Was besser geht (mit Grund), Was das für die
    nächsten Tage heißt. Kurz, ehrlich, nie nur Lob. Fehlen Daten, sagt der Coach, was fehlt, und bietet das Eintragen an. */
+import { claimFacts, stripUnsupported } from './claims';
 import * as C from '../core';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
@@ -235,7 +236,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     const dh = Math.round(v.hr - sim.v.hr);
     if (d.sport === 'run' && v.pace && sim.v.pace) {
       const dp = Math.round(v.pace - sim.v.pace);
-      if (Math.abs(dp) <= 5 && dh <= -2) good.unshift(`Gleiche Pace wie am ${fmtD(sim.d.date)} (${mmss(v.pace)}/km), aber ${-dh} Schläge weniger Puls: du wirst fitter.`);
+      if (Math.abs(dp) <= 5 && dh <= -2) good.unshift(`Gleiche Pace wie am ${fmtD(sim.d.date)} (${mmss(v.pace)}/km), aber ${-dh} Schläge weniger Puls: ein gutes Zeichen (ein einzelner Vergleich ist noch kein Trend).`);
       else if (dp <= -5 && dh <= 2) good.unshift(`${-dp} s/km schneller als am ${fmtD(sim.d.date)} bei ${dh <= 0 ? 'weniger' : 'fast gleichem'} Puls.`);
       else if (dh >= 5 && dp >= -3) { better.push(`Puls ${dh} Schläge höher als am ${fmtD(sim.d.date)} bei ${dp > 3 ? 'langsamerer' : 'gleicher'} Pace${v.tempC && v.tempC > 22 ? ` (bei ${de(v.tempC, 0)} °C normal)` : ''}.`); fatigue += v.tempC && v.tempC > 22 ? 0 : 0.7; }
     } else if (d.sport === 'bike' && (v.power || v.speed) && (sim.v.power || sim.v.speed)) {
@@ -449,8 +450,9 @@ export function reviewAnswer(ctx: EngineCtx, raw: string): Review | null {
 /* Automatisch nach einer erledigten Einheit (Engine und App): kurz oder ausführlich je nach Einstellung */
 export function autoReview(ctx: EngineCtx, d: Done, mode: 'full' | 'short'): string {
   const r = reviewItem(ctx, d);
-  if (mode === 'full') return r.text;
-  const o = reviewOne(ctx, d);
-  return [o.head, o.good[0] ? `👍 ${o.good[0]}` : '', o.better[0] ? `🔧 ${o.better[0]}` : ''].filter(Boolean).join(' ');
+  const o = mode === 'full' ? null : reviewOne(ctx, d);
+  const text = o ? [o.head, o.good[0] ? `👍 ${o.good[0]}` : '', o.better[0] ? `🔧 ${o.better[0]}` : ''].filter(Boolean).join(' ') : r.text;
+  // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen (gilt auch für die Bewertung in der App)
+  try { return stripUnsupported(text, claimFacts(ctx)) || text; } catch (e) { return text; }
 }
 void kindOf;

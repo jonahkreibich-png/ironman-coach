@@ -3,6 +3,7 @@
    2. der Nutzer den Schalter in den Einstellungen eingeschaltet und
    3. der Weitergabe von Gesundheitsdaten zugestimmt hat (Einwilligungs-Bildschirm).
    Ohne das läuft nur die Regel-Engine. Budget: Monatsbudget und Höchstzahl an Nachrichten pro Tag. */
+import { claimFacts, stripUnsupported } from '../../shared/coach/claims';
 import Anthropic from '@anthropic-ai/sdk';
 import { type Env, berlinDate, putRecords, getRecord, userEntitlements } from './store';
 import { needsParentConsent } from '../../shared/features';
@@ -176,7 +177,9 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   }
   // Warnhinweise (z. B. Fieber, Essen) zusätzlich zur Antwort
   hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
-  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: finalText || 'Erledigt.' });
+  // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen; unbelegte Sätze werden nicht gezeigt
+  let shown = finalText || 'Erledigt.'; try { shown = stripUnsupported(shown, claimFacts(ctx)) || shown; } catch (e) { /* unverändert */ }
+  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown });
   out.status = await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today)));
   return out;
 }

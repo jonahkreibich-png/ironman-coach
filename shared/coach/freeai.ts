@@ -29,6 +29,10 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
     '- Ehrlich und konkret wie ein guter Trainer. Lob nur, wenn es stimmt. Wenn etwas nicht gut war, sag es freundlich.',
     '- Nutze nur die Daten unten und die Ergebnisse der Werkzeuge. Erfinde nichts: keine Zahlen, Einheiten, Termine, Messwerte oder Wettkämpfe. Puls, Pace, Watt, Minuten und Zonen übernimmst du genau so, wie sie dort stehen.',
     '- Für Fragen zu eigenen Einheiten, Werten, Terminen oder dem Plan rufst du zuerst ein Werkzeug auf (review_training, explain_day, get_data, get_analysis) statt zu raten. Nur wenn auch das Werkzeug nichts liefert, sagst du „Das weiß ich nicht“ und was fehlt. Nenne dem Athleten nie Werkzeug-Namen.',
+    '- SOLL ist der Plan, IST ist, was der Athlet eingetragen hat oder was gemessen wurde. Erreicht ist nur, was als IST in den Daten oder in einem Werkzeug-Ergebnis steht. Ein Plan-Wert ist nie ein Ergebnis. Fehlt der IST-Wert, frag nach (z. B. „Wie weit bist du am Stück gekrault?“), statt den Plan-Wert zu nennen.',
+    '- Frühere Coach-Nachrichten sind keine Daten. Widerspricht etwas den aktuellen Werten, gelten die aktuellen Werte. Wurde ein Wert korrigiert, nenne den neuen.',
+    '- Bewerte vorsichtig: eine einzelne Einheit oder ein einzelner Wert ist noch kein Trend. Wenn Daten fehlen oder du unsicher bist, sag das offen.',
+    '- Hilfsmittel (Kickbrett, Pull Buoy, Flossen …) nur, wenn sie unter AUSRÜSTUNG stehen. Setze nichts voraus, was fehlt.',
     '- Keine medizinischen Diagnosen und keine Medikamente. Bei Schmerzen, Verletzung, Krankheit, Fieber, Brustschmerz oder Schwindel: Training pausieren oder nur ganz locker und zum Arzt bzw. zur Ärztin raten.',
     '- Den Plan änderst du nie selbst. Für Änderungen nutzt du die Werkzeuge (move_session, modify_session, cancel_session, add_rule). Jede Änderung wird dem Athleten als Vorschlag gezeigt, er bestätigt sie selbst. Sag danach: „Ich habe dir einen Vorschlag gemacht, du kannst ihn unten bestätigen.“ Lehnt die App ab, erkläre kurz warum und nenne eine erlaubte Lösung.',
     '- Die Regeln der App gelten immer: keine zwei harten Tage hintereinander, Umfang nicht zu schnell steigern, nur die Sportarten des Athleten, seine eigenen Regeln.',
@@ -50,6 +54,13 @@ export function compactContext(ctx: EngineCtx): string {
   const thr = [(p.sports || []).includes('run') && t.lthrRun ? `Laufen Schwellenpuls ${t.lthrRun}, Schwellen-Pace ${mmss(t.thresholdPaceRunSec)}/km` : null, (p.sports || []).includes('bike') && t.lthrBike ? `Rad Schwellenpuls ${t.lthrBike}${t.ftp ? `, FTP ${t.ftp} W` : ''}` : null, (p.sports || []).includes('swim') && t.cssSec ? `Schwimmen CSS ${mmss(t.cssSec)}/100 m` : null].filter(Boolean);
   if (thr.length) L.push('SCHWELLEN: ' + thr.join('; '));
   if (p.injuries) L.push('BESCHWERDEN: ' + String(p.injuries).slice(0, 160));
+  // Auftrag 17: Ausrüstung und belegtes Können (nur echte Werte)
+  const sk: any = p.skills || {};
+  const GEAR: Record<string, string> = { board: 'Kickbrett', buoy: 'Pull Buoy', fins: 'Flossen', paddles: 'Paddles', snorkel: 'Schnorchel' };
+  if ((p.sports || []).includes('swim')) {
+    L.push('AUSRÜSTUNG SCHWIMMEN: ' + ((sk.swimGear || []).map((g: string) => GEAR[g] || g).join(', ') || 'keine'));
+    try { const pr = C.swimProofs(ctx.state, ctx.baseWeeks || [], today, 84).map((x: any) => x.crawl).filter(Boolean); L.push(`KÖNNEN SCHWIMMEN (IST): Kraul am Stück bestätigt ${C.confirmedOf(pr) || sk.swimCrawlM || 'unbekannt'} m${pr.length ? `, bester eingetragener Wert ${Math.max(...pr)} m` : ''}; die nächste Stufe gibt es erst, wenn die längere Strecke in 2 Einheiten geschafft ist.`); } catch (e) { /* ohne Nachweise */ }
+  }
   const g = mainGoal(ctx.goals, today);
   if (g) {
     const weeks = g.date ? Math.max(0, Math.round((Date.parse(g.date) - Date.parse(today)) / (7 * 86400000))) : null;
@@ -76,7 +87,9 @@ export function compactContext(ctx: EngineCtx): string {
   done.forEach(d => {
     const v = valsOf(d);
     const vals = [v.min ? `${Math.round(v.min)} min` : null, v.km ? `${String(Math.round(v.km * 10) / 10).replace('.', ',')} km` : null, v.meters ? `${v.meters} m` : null, v.pace ? `${mmss(v.pace)}/km` : null, v.power ? `${Math.round(v.power)} W` : null, v.hr ? `Puls ${Math.round(v.hr)}` : null, v.rpe != null ? `Anstrengung ${v.rpe}/10` : null].filter(Boolean).join(', ');
-    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: ${d.title} – erledigt${vals ? ': ' + vals : ''}`);
+    const crawlSoll = d.planned && d.sport === 'swim' ? Math.max(0, ...((d.planned.spec && d.planned.spec.steps) || []).filter((x: any) => x.mode === 'crawl').map((x: any) => x.m || 0)) : 0;
+    const swimIst = d.sport === 'swim' ? (v.longest != null ? `, Kraul am Stück ${v.longest} m` : ', Kraul am Stück nicht eingetragen') : '';
+    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}`);
   });
   days.filter((d: any) => d.date >= from && d.date < today).forEach((d: any) => d.sessions.forEach((s: any) => {
     if (s.sport === 'rest' || s.cancelled || (st[s.id] || {}).completed) return;

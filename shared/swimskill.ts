@@ -115,7 +115,7 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
   const label = stage ? (stage.ladder === 'swimBreast' ? 'Brust und Kraul-Technik' : W.SWIM_LADDER[stage.n].label) : `normales Training mit Stücken bis ${repNew} m`;
   // Auftrag 17: klar sagen, was passiert ist (Korrektur nach geänderten Werten, neue Stufe nach 2 Einheiten, eigene Angabe)
   const old = num(sk.swimCrawlM) || 0;
-  const head = !best.authoritative ? (crawl ? `Eingetragen: ${crawl} m Kraul am Stück` : 'Keine Kraulstrecke am Stück eingetragen')
+  const head = !best.authoritative ? (crawl ? `Deine Angabe: ${crawl} m Kraul am Stück` : 'Keine Kraulstrecke am Stück eingetragen')
     : crawl < old ? (crawl ? `Korrigiert: Kraul am Stück jetzt ${crawl} m statt ${old} m (nach deinen geänderten Werten)` : `Korrigiert: keine bestätigte Strecke Kraul am Stück mehr (vorher ${old} m)`)
     : crawl > old ? `Neu bestätigt: ${crawl} m Kraul am Stück (in 2 Einheiten geschafft)`
     : crawl ? `Bestätigt: ${crawl} m Kraul am Stück` : 'Noch keine bestätigte Strecke Kraul am Stück';

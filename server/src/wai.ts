@@ -3,6 +3,7 @@
    Regel-Coach (in der App). Ist das Kontingent leer oder gibt es einen Fehler, antwortet die App selbst mit dem Regel-Coach.
    Fair: jede Person höchstens WAI_MAX_PER_DAY Fragen (30) und höchstens ein Viertel des Tageskontingents.
    Oura-Daten gehen nie an die KI (aiSafeCtx). Planänderungen nur als Vorschlag. Zahlen nur aus Daten und Werkzeugen (Zahlen-Wächter). */
+import { claimFacts, unsupportedClaims } from '../../shared/coach/claims';
 import { type Env, berlinDate } from './store';
 import { HttpError } from './http';
 import { aiSafeCtx, type ChatResult, type ChatStream } from './ai';
@@ -186,6 +187,9 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   final = cleanAnswer(final);
   const bad = inventedNumbers(final, sources);
   const claimed = claimsChange(final) && !props.length;
+  // Auftrag 17: behauptete Leistungen (z. B. „100 m geschafft“) müssen in den echten Daten stehen, sonst antwortet der Regel-Coach
+  let fake: string[] = []; try { fake = unsupportedClaims(final, claimFacts(ctx)); } catch (e) { fake = []; }
+  if (fake.length) bad.push(...fake);
   if (!final || bad.length || claimed || leaksInternals(final)) {
     await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 });
     throw new FallbackError(!final ? 'empty' : bad.length ? 'invented: ' + bad.join(', ') : claimed ? 'claimed change without proposal' : 'internals');

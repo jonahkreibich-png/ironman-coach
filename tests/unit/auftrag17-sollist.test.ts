@@ -164,3 +164,22 @@ describe('Stufe nur nach Nachweis', () => {
     expect(v.n).toBe(3); expect(v.why).toMatch(/leichter/);
   });
 });
+
+/* Auftrag 17, Punkt 6: behauptete Leistungen werden deterministisch gegen die Daten geprüft (Regel-Coach und KI) */
+import { claimFacts, unsupportedClaims, stripUnsupported } from '../../shared/coach/claims';
+describe('Behauptungs-Prüfer', () => {
+  test('erkennt erfundene Leistungen, lässt Pläne, Ziele und Bedingungen stehen', () => {
+    const { ctx } = world();
+    const f = claimFacts(ctx);
+    expect(f.crawlBest).toBe(50); expect(f.crawlConfirmed).toBe(50);
+    const bad = ['Super, du hast 100 m Kraul am Stück geschafft!', 'Etappenziel erreicht, Kraul am Stück 100 m (Ziel war 100 m).', 'Neue Stufe: 100-m-Stücke Kraul.', 'Eingetragen: 100 m Kraul am Stück. Deine Schwimm-Stufe: 100-m-Stücke Kraul.', 'Du bist gestern 25 km gelaufen.'];
+    for (const t of bad) expect(unsupportedClaims(t, f), t).not.toEqual([]);
+    const ok = ['Geplant waren 100 m Kraul am Stück, geschafft hast du 50 m.', 'Die nächste Stufe kommt, wenn du 100 m in 2 Einheiten schaffst.', '50 m Kraul am Stück geschafft, sauber!', 'Am Sonntag steht ein langer Lauf über 90 min an.', 'Wie weit schaffst du 100 m?'];
+    for (const t of ok) expect(unsupportedClaims(t, f), t).toEqual([]);
+  });
+  test('Regel-Coach: unbelegte Sätze werden entfernt, der Rest bleibt', () => {
+    const { ctx } = world();
+    const t = stripUnsupported('Gute Einheit. Du hast 100 m Kraul am Stück geschafft. Weiter so.', claimFacts(ctx));
+    expect(t).not.toMatch(/100 m/); expect(t).toMatch(/Gute Einheit/); expect(t).toMatch(/Weiter so/);
+  });
+});

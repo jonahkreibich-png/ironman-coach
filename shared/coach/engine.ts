@@ -1,6 +1,7 @@
 /* Coach-Engine (Algorithmus, ohne KI). Läuft auf dem Server bei jedem neuen Datenpunkt (Einheit, Nachtwerte,
    Krankheits-Notiz, Essen) und zusätzlich täglich und wöchentlich. Wertet aus, passt den Plan nach festen Regeln an
    und schreibt jede Änderung mit Grund als Nachricht in den Coach-Chat. Funktioniert ohne KI und ohne Einwilligung. */
+import { claimFacts, stripUnsupported } from './claims';
 import * as C from '../core';
 import { intervalsOf } from '../activity/structure';
 import { withTerms } from '../glossary';
@@ -186,6 +187,9 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
       if ((old.resultText ?? old.text) === m.text) return;
       out.messages.push({ ...m, at: old.at || m.at, title: 'Bewertung aktualisiert: ' + (m.title || '').replace(/^Bewertung: /, ''), resultText: m.text, text: 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + m.text });
     } else if (!has(ctx, m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m);
+    // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen
+    const last = out.messages[out.messages.length - 1];
+    if (last && last.id === m.id && last.text) { try { const t = stripUnsupported(last.text, claimFacts(ctx)); if (t) last.text = t; } catch (e) { /* Prüfung darf die Nachricht nicht verhindern */ } }
   };
 
   // Warnzeichen in den Daten (einmal pro Art und Woche)
