@@ -50,7 +50,9 @@ describe('Umfang nach den Vorgaben', () => {
     expect(longRun(W('2026-10-19')).plannedMinutes).toBe(55);
     expect(['2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'].map(m => longRun(W(m)).plannedMinutes)).toEqual([65, 75, 50, 85, 90]);
     expect([90, 95]).toContain(longRun(W('2026-11-30')).plannedMinutes);
-    expect(longRun(W('2026-12-07')).title).toBe('Lauftest 30 min');
+    // Auftrag 17: in der Erholungswoche höchstens ein harter Test (Radtest Mi); der Lauftest kommt in die Woche danach
+    expect(longRun(W('2026-12-07')).title).not.toBe('Lauftest 30 min');
+    expect(longRun(W('2026-12-14')).title).toBe('Lauftest 30 min');
     for (const t of targets) {
       const lb = longBike(W(t.start)).plannedMinutes;
       expect(lb).toBeGreaterThanOrEqual(t.longBike![0]); expect(lb).toBeLessThanOrEqual(t.longBike![1]);
@@ -70,7 +72,8 @@ describe('Umfang nach den Vorgaben', () => {
       if (!w.isRecoveryWeek) { expect(lr.plannedMinutes - prev).toBeLessThanOrEqual(10); prev = lr.plannedMinutes; }
       expect(own(w)).toBeLessThanOrEqual(12.05); // Wochenlimit 15 h inklusive 3 h Fußball
     }
-    expect(own(later[0])).toBeGreaterThan(own(W('2026-11-30')));
+    // Auftrag 17: Fußball zählt voll gegen die Spitze; nach den Vorgaben geht es höchstens +10 % weiter
+    expect(own(later[1])).toBeLessThanOrEqual(own(W('2026-11-30')) * 1.1 + 0.3);
     // Erholung alle 4 Wochen
     expect(later.filter((w: any) => w.isRecoveryWeek).map((w: any) => w.startDate).slice(0, 2)).toEqual(['2027-01-04', '2027-02-01']);
   });
@@ -177,12 +180,13 @@ describe('Tests', () => {
     expect(t.description).toMatch(/20 min.*3×1 min zügig/); expect(t.description).toMatch(/5 min.*hart/); expect(t.description).toMatch(/20 min.*maximal gleichmäßig/);
     expect(t.description).toMatch(/Drinnen oder draußen/); expect(t.description).toMatch(/FTP = 95 %/);
   });
-  test('Wiederholung in Woche 13 (Di 8.12., Mi 9.12., So 13.12.), danach alle 8 Wochen in der Erholungswoche', () => {
+  test('Wiederholung in Woche 13 (Di 8.12. Kraul-Check, Mi 9.12. Radtest; Lauftest So 20.12. in der Woche danach), danach alle 8 Wochen', () => {
     expect(at('2026-12-08').some((s: any) => /Kraul-Check/.test(s.title))).toBe(true);
     expect(at('2026-12-09').some((s: any) => s.title === 'Radtest 20 min')).toBe(true);
-    expect(at('2026-12-13').some((s: any) => s.title === 'Lauftest 30 min')).toBe(true);
+    expect(at('2026-12-13').some((s: any) => s.title === 'Lauftest 30 min')).toBe(false);
+    expect(at('2026-12-20').some((s: any) => s.title === 'Lauftest 30 min')).toBe(true);
     const testWeeks = future.filter((w: any) => C.planDays([w]).some((d: any) => d.sessions.some((s: any) => /test/i.test(s.title)))).map((w: any) => w.startDate);
-    expect(testWeeks.slice(0, 4)).toEqual(['2026-10-19', '2026-10-26', '2026-12-07', '2027-02-01']);
+    expect(testWeeks.slice(0, 5)).toEqual(['2026-10-19', '2026-10-26', '2026-12-07', '2026-12-14', '2027-02-01']);
     expect(W('2027-02-01').isRecoveryWeek).toBe(true);
   });
   test('nie zwei harte Tests an aufeinanderfolgenden Tagen, nie am Tag nach einem Spiel', () => {

@@ -10,7 +10,13 @@ import { sportAllowed } from './sports';
 import * as W from './workouts';
 import { isLightQuality } from './intensity';
 
-export interface RuleIssue { rule: 'sport' | 'sameSport' | 'strengthGroup'; week?: number; date?: string; msg: string }
+export interface RuleIssue { rule: 'sport' | 'sameSport' | 'strengthGroup' | 'tripleDay'; week?: number; date?: string; msg: string }
+/* Auftrag 17: Einheiten eines Tages als „Termine“: ein Koppellauf gehört zur Ausfahrt davor (Koppeltraining), Teamsport zählt mit */
+export function dayUnits(d: any): string[] {
+  const list = live(d); const out: string[] = [];
+  for (const s of list) { if (s.sport === 'run' && /^(Koppellauf|Wechsel-Lauf)/.test(s.title || '') && list.some((x: any) => x.sport === 'bike')) continue; out.push(s.sport); }
+  return out;
+}
 const SPORT_DE: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft', football: 'Teamsport' };
 /* längstens so lang darf die „kurze“ Einheit an einem Ausnahme-Tag sein */
 export const SHORT_MIN = 45;
@@ -37,6 +43,12 @@ export function checkPlanRules(weeks: any[], p: Profile, o: { from?: string | nu
   for (const { w, d } of D) for (const s of live(d)) {
     if (s.race || sportAllowed(p, s.sport)) continue;
     out.push({ rule: 'sport', week: w.weekNumber, date: d.date, msg: `${d.date}: ${s.title} (${SPORT_DE[s.sport] || s.sport}), obwohl ${s.sport === 'football' ? 'kein Teamsport angegeben ist' : 'diese Sportart nicht gewählt ist'}.` });
+  }
+  // Auftrag 17: keine Dreifach-Tage (höchstens 2 Termine, Koppeltraining zählt als einer); zwei feste Termine plus eine Einheit nur gemeldet,
+  // wenn die Einheit vom Plan kommt
+  for (const { w, d } of D) {
+    const u = dayUnits(d);
+    if (u.length >= 3 && live(d).some((s: any) => !s.fixed && !s.frozen && !s.race)) out.push({ rule: 'tripleDay', week: w.weekNumber, date: d.date, msg: `${d.date}: ${u.length} Termine an einem Tag (${live(d).map((s: any) => s.title).join(', ')}).` });
   }
   for (let i = 1; i < D.length; i++) {
     const a = D[i - 1], b = D[i];

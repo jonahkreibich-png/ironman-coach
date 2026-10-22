@@ -21,7 +21,8 @@ export interface PatternState { longRun: number; longBike: number; swim: number;
   /** Schwellen-Leiter in der wettkampfspezifischen Phase */ thrWeeks?: number;
   /** Schlüsseleinheiten Rad und Qualitätsläufe je Phase, Wochenzähler (Abwechslung) und Woche im Block (seit der letzten Erholung) */
   keyN?: Record<string, number>; runQN?: Record<string, number>; weekN?: number; blockWeek?: number;
-  /** Auftrag 17: Wochen seit dem letzten Koppellauf (Koppel nur jede 2.-3. Woche) */ sinceBrick?: number }
+  /** Auftrag 17: Wochen seit dem letzten Koppellauf (Koppel nur jede 2.-3. Woche) */ sinceBrick?: number;
+  /** Auftrag 17: Tests, die in die nächste passende Woche verschoben wurden */ carryTests?: string[] }
 export interface PatternWeekIn {
   mon: string; dates: string[]; recovery: boolean; entry: boolean;
   /** eigenes Training dieser Woche (Minuten, ohne Teamsport) */
@@ -85,7 +86,8 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
   let runQ = !rec && !inp.entry && ph !== 'race' && !inp.tests.has('run') ? K.runQualityStep(ph, goal, (st.runQN || {})[ph] || 0, !!inp.minor, { noZ5: inp.noZ5, baseWeek: inp.baseWeek, level: inp.level }) : null;
   // Auftrag 14: harte Tage nach Niveau und Alter; reicht es nur für eine Qualität neben den Spielen, wechseln sich Rad und Lauf ab
   // (Grundlage: das Rad, Tempolauf entfällt)
-  const budget = (inp.maxHard ?? 3) - (inp.hardDows || []).length;
+  // Auftrag 17: ein harter Test (Rad, Lauf) zählt wie eine harte Einheit
+  const budget = (inp.maxHard ?? 3) - (inp.hardDows || []).length - (inp.tests.has('run') ? 1 : 0);
   const runSlots = slots.filter(x => x.sport === 'run' && x.role !== 'brick');
   const longRunSlot = runSlots.find(x => x.role === 'long');
   const keySlot0 = slots.find(x => x.sport === 'bike' && x.role === 'key' && (!x.keyFrom || dateOf(x) >= x.keyFrom));
@@ -129,7 +131,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       if (easy) spec.tip = 'Morgen ist der Radtest: nur 2 Sätze, nichts Explosives.';
       out.push({ dow: sl.dow, slot: sl, s: null, strength: true, make: () => spec });
     } else if (sl.sport === 'bike' && sl.role === 'long') {
-      out.push({ dow: sl.dow, slot: sl, s: null, long: true, make: (min) => { const sp = K.bikeLongVariant(W.bikeLong(inp.bikeOut, min), st.weekN || 0, ph); /* spezifisch: lange Ausfahrt bleibt locker (Freitag Spiel, Sonntag Qualitätslauf), Wettkampftempo im Koppellauf und am Mittwoch */ return sp; }, min: r5(mid(longBikeR)), adj: longBikeR });
+      out.push({ dow: sl.dow, slot: sl, s: null, long: true, make: (min) => { const sp = K.bikeLongVariant(W.bikeLong(inp.bikeOut, min), st.weekN || 0, ph, rec || !!inp.entry); /* spezifisch: lange Ausfahrt bleibt locker (Freitag Spiel, Sonntag Qualitätslauf), Wettkampftempo im Koppellauf und am Mittwoch */ return sp; }, min: r5(mid(longBikeR)), adj: longBikeR });
     } else if (sl.sport === 'bike') {
       if (sl.dow === bikeTestDow) { out.push({ dow: sl.dow, slot: sl, s: null, test: true, hard: true, make: () => W.bikeTest({ ...inp.bikeOut, indoor: false, bikeName: null }) }); continue; }
       const range = sl.min || [50, 75];
@@ -211,7 +213,8 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
     if (items.some(x => /^Koppellauf/.test(x.s.title || ''))) { n.brickWeeks++; n.sinceBrick = 0; } else if (n.sinceBrick != null) n.sinceBrick++;
     if (items.some(x => x.s.sport === 'bike' && ['threshold', 'overunder', 'intervals'].includes((x.s.spec && x.s.spec.kind) || ''))) n.thrWeeks = (n.thrWeeks || 0) + 1;
     n.buildOwn = items.filter(x => !['football', 'rest'].includes(x.s.sport) && !x.s.race).reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.buildOwn;
-    n.runRef = items.filter(x => x.s.sport === 'run').reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.runRef;
+    // Woche mit Lauftest (statt langem Lauf) ist kein Bezug für den Laufumfang (Auftrag 17)
+    if (!tests.has('run')) n.runRef = items.filter(x => x.s.sport === 'run').reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.runRef;
   }
   if (tests.size) n.lastTestMon = mon;
   n.weekN = (n.weekN || 0) + 1;

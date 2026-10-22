@@ -183,7 +183,8 @@ describe('Streaming, Werkzeuge, Wächter', () => {
     const prop = r.data.messages.find((m: any) => m.kind === 'proposal'); expect(prop).toBeTruthy();
     // Vorschlag steht nach der Antwort („unten bestätigen“)
     expect(r.data.messages.indexOf(prop)).toBeGreaterThan(r.data.messages.findIndex((m: any) => m.kind === 'answer'));
-    expect((await recs(env, T)).some((x: any) => x.kind === 'adjust')).toBe(false);
+    // (die Tages-Engine darf unabhängig davon z. B. eine verpasste Schlüsseleinheit verschieben; gestrichen wird erst nach Bestätigen)
+    expect((await recs(env, T)).some((x: any) => x.kind === 'adjust' && x.data.type === 'cancel')).toBe(false);
     expect((await call(env, 'POST', '/api/coach/proposal/' + prop.id, { accept: true }, T)).data.applied).toBe(1);
     expect((await recs(env, T)).some((x: any) => x.kind === 'adjust' && x.data.type === 'cancel')).toBe(true);
   });

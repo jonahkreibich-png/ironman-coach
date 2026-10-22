@@ -117,14 +117,14 @@ export function runBaseVariant(ctx: W.PaceCtx, min: number, k: number): W.Spec {
 }
 /* Variante der langen Ausfahrt je Woche (Grundlage und Aufbau) */
 export const BIKE_LONG_VARIANTS = ['gleichmäßig', 'hügelig', 'mit Kadenz-Blöcken', 'mit Zone-3-Blöcken'];
-export function bikeLongVariant(spec: W.Spec, k: number, phase: Ph): W.Spec {
+export function bikeLongVariant(spec: W.Spec, k: number, phase: Ph, easyOnly = false): W.Spec {
   if (phase === 'taper' || phase === 'race') return spec;
   let v = BIKE_LONG_VARIANTS[k % BIKE_LONG_VARIANTS.length];
   const out: W.Spec = JSON.parse(JSON.stringify(spec));
   const main = out.steps.find(s => s.part === 'main');
   // Auftrag 17: „locker“ und Zone 3 passen nicht zusammen. Zügige Blöcke nur in längeren Ausfahrten und als echte Abschnitte
   // (dann stimmen Titel, Zone und „Wie hart“), sonst gleichmäßig.
-  if (v === 'mit Zone-3-Blöcken' && (!main || (main.min || 0) < 60)) v = 'gleichmäßig';
+  if (v === 'mit Zone-3-Blöcken' && (easyOnly || !main || (main.min || 0) < 60)) v = 'gleichmäßig';
   const note = { 'gleichmäßig': 'gleichmäßig in Zone 2, alle 20-30 min essen und trinken', 'hügelig': 'hügelige Strecke: Anstiege im Sitzen mit ruhiger Trittfrequenz, bergab locker', 'mit Kadenz-Blöcken': 'darin 5×5 min mit hoher Trittfrequenz (100+), dazwischen normal', 'mit Zone-3-Blöcken': 'locker in Zone 2, alle 20-30 min essen und trinken' }[v];
   if (main) main.note = note;
   if (v === 'mit Zone-3-Blöcken' && main) {

@@ -46,7 +46,10 @@ export function ownHardMax(p: Profile, phase: IPhase, today: string, baseWeek = 
 /* Eigene harte Einheiten bei festen harten Terminen: ein Spiel oder Wettkampf kommt dazu („2 plus Spiel“); ab dem zweiten festen
    harten Tag gibt es je einen eigenen weniger. */
 export function ownHardBudget(p: Profile, phase: IPhase, today: string, baseWeek = 0, fixedHard = 0): number {
-  return Math.max(0, ownHardMax(p, phase, today, baseWeek) - Math.max(0, fixedHard - 1));
+  const own = Math.max(0, ownHardMax(p, phase, today, baseWeek) - Math.max(0, fixedHard - 1));
+  // unter 18 vorsichtiger: höchstens 2 harte Tage insgesamt, Spiele zählen mit
+  const age = ageOf(p, today);
+  return age != null && age < 18 ? Math.max(0, Math.min(own, 2 - fixedHard)) : own;
 }
 /* Höchstzahl harter Tage pro Woche einschließlich der festen harten Termine (Spiele, Wettkämpfe) */
 export function maxHard(p: Profile, phase: IPhase, today: string, baseWeek = 0, fixedHard = 0): number {

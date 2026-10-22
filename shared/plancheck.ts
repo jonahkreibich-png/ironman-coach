@@ -15,7 +15,7 @@ import { parseFor } from './ruleparse';
 import { checkPlanRules } from './planrules';
 import { nameIssues } from './sessiontypes';
 
-export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup' | 'names';
+export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup' | 'names' | 'tripleDay';
 export interface CheckIssue { rule: CheckRule; week?: number; date?: string; msg: string }
 
 const dowOf = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();

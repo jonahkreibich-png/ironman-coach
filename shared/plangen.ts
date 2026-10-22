@@ -483,6 +483,14 @@ export function generatePlan(inp: GenInput): GenResult {
       const tests = WP.testsFor(pat, mon, ph.recovery, pst);
       const cOut0 = bikeChoice(profile, false, month, eff);
       if (!tg && inp.needTests && wi >= tw && wi <= tw + 1) { if (wi === tw && inp.needTests.run) tests.add('run'); if (wi === tw && inp.needTests.swim) tests.add('swim'); if (wi === tw + 1 && inp.needTests.bike) tests.add('bike'); }
+      // Auftrag 17: aufgeschobene Tests aus der Vorwoche; in der Erholungswoche höchstens ein harter Test (Rad oder Lauf), nie in den lockeren
+      // Tagen nach einem Wettkampf und nie in der Wettkampfwoche oder im Tapering – der Rest kommt in die nächste passende Woche
+      const carriedIn = new Set(pst.carryTests || []); const scheduled = tests.size > 0;
+      (pst.carryTests || []).forEach(t => tests.add(t as WP.TestSport));
+      const carry: WP.TestSport[] = [];
+      const afterRace = dates.some(d => goals.some(g => g.date && g.type !== 'fitness' && g.priority !== 'C' && d > g.date && daysBetween(g.date, d) <= 7));
+      if (afterRace || ph.phase === 'race' || ph.phase === 'taper') { tests.forEach(t => carry.push(t)); tests.clear(); }
+      else if (ph.recovery || entryWeek[wi]) { const hardT = (['bike', 'run'] as WP.TestSport[]).filter(t => tests.has(t)); hardT.slice(1).forEach(t => { tests.delete(t); carry.push(t); }); }
       const cOut = bikeChoice(profile, false, month, eff), cIn = bikeChoice(profile, true, month, eff);
       const sgP = segGoal(wi);
       // lockere Tage nach einem Wettkampf (Sprint 3, Olympisch 5, Mittel 10, Lang/Marathon 14 Tage)
@@ -507,7 +515,10 @@ export function generatePlan(inp: GenInput): GenResult {
         if (legsStrength({ s: it.s, strength: it.strength, prio: 0 }) && (sl.game || (sl.i < 6 && slots[sl.i + 1].game))) { dropped.push(`Woche ${wi + 1}: Kraft Unterkörper nicht am Spieltag oder am Tag davor`); continue; }
         put(sl.i, { s: it.s, long: it.long, hard: it.hard, test: it.test, strength: it.strength, prio: 1 });
       }
-      pst = WP.advance(pst, items, ph.recovery || entryWeek[wi] || ph.phase === 'taper' || ph.phase === 'race', mon, tests);
+      // nachgeholte Tests verschieben den Testrhythmus nicht (alle 8 Wochen ab dem geplanten Termin)
+      const lastTestMon0 = pst.lastTestMon;
+      pst = { ...WP.advance(pst, items, ph.recovery || entryWeek[wi] || ph.phase === 'taper' || ph.phase === 'race', mon, tests), carryTests: carry };
+      if (!scheduled && carriedIn.size) pst.lastTestMon = lastTestMon0;
       const T: Record<string, string> = { swim: 'Schwimmen (Kraul-Check)', bike: 'Rad', run: 'Lauf' };
       const testDays = items.filter(x => x.test).map(x => `${T[x.s.sport] || x.s.title} ${DOW[x.dow]}`);
       patImportant = [
@@ -614,7 +625,7 @@ export function generatePlan(inp: GenInput): GenResult {
         let rest = mins; let left = n;
         // Tapering mit nur einer Radeinheit: der kurze, scharfe Reiz geht vor der langen Ausfahrt
         const taperKey = ph.phase === 'taper' && n === 1 && hardOk && hardLeft > 0;
-        if (n >= 1 && ph.phase !== 'race' && !taperKey) { const c = bikeChoice(profile, false, month, eff); const longCap = Math.min(capsW(c.indoor).bike, cap ?? 999, ph.phase === 'taper' ? 75 : 999); const L = Math.max(45, Math.min(longCap, rest * (n === 1 ? 1 : 0.5))); add(K.bikeLongVariant(W.bikeLong(pc(c.indoor, c.name), L), wi, ph.phase), { long: true, prio: 1 }); rest -= L; left--; }
+        if (n >= 1 && ph.phase !== 'race' && !taperKey) { const c = bikeChoice(profile, false, month, eff); const longCap = Math.min(capsW(c.indoor).bike, cap ?? 999, ph.phase === 'taper' ? 75 : 999); const L = Math.max(45, Math.min(longCap, rest * (n === 1 ? 1 : 0.5))); add(K.bikeLongVariant(W.bikeLong(pc(c.indoor, c.name), L), wi, ph.phase, ph.recovery || !!entryWeek[wi]), { long: true, prio: 1 }); rest -= L; left--; }
         // Einsteiger: in der Grundlage noch keine Intervalle auf dem Rad (Auftrag 14)
         if (hardOk && hardLeft > 0 && left >= 1 && !(lv === 'beginner' && ph.phase === 'base')) {
           const c = bikeChoice(profile, true, month, eff);
@@ -703,11 +714,13 @@ export function generatePlan(inp: GenInput): GenResult {
         // harte Regeln der Person (Tage, Orte, Zeiträume) werden nie verletzt
         if (!c.fixed && evaluate(rules, probe, sl.date).hard.length) return false;
         const own = sl.items.filter(x => !x.fixed || x.s.sport === 'football');
+        // Auftrag 17: höchstens 2 Termine am Tag, auch mit Morgen-Einheit (kein Dreifach-Tag)
+        if (own.length >= 2) return false;
         if (morningDay(sl)) {
           const pm = own.filter(x => x.slot !== 'am');
           const pmFree = (c.onDays ? true : !(sl.team || sl.game)) && pm.length < 2;
           if (!pmFree && !amFree(i, sx)) return false;
-        } else if (own.length >= 2) return false;
+        }
         if (sl.items.some(x => x.s.sport === s.sport && !c.pairDay)) return false;
         if (c.hard) { if ((i === 0 ? prevSundayStrength : slots[i - 1].items.some(legs)) || sl.noHard || isHardDay(i) || prevHard(i) || isHardDay(i + 1) || (i + 1 < 7 && slots[i + 1].noHard && !!slots[i + 1].race) || (i > 0 && !!slots[i - 1].race) || (sl.team && !sl.game)) return false; }
         if (c.strength && !c.onDays) { if (isHardDay(i) || isHardDay(i + 1) || (i + 1 < 7 && (slots[i + 1].game || !!slots[i + 1].race)) || sl.noHard && sl.cap < 45) return false; }
@@ -900,6 +913,20 @@ export function generatePlan(inp: GenInput): GenResult {
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });
   inBlock.forEach(g => { const a = goalAllowed(g.type, profile.birthYear ? +g.date!.slice(0, 4) - profile.birthYear : null); if (!a.ok) violations.push({ rule: 'age', msg: `${g.name}: ${a.msg}` }); });
 
+  // Auftrag 17: Spiel kurz vor einem wichtigen Wettkampf: Hinweis statt stiller Überlastung
+  for (const w of weeks) for (const r of (w.races || []).filter((x: any) => x.priority !== 'C')) {
+    const g = w.days.find((d: any) => d.date < r.date && daysBetween(d.date, r.date) <= 2 && d.sessions.some((x: any) => x.sport === 'football' && /spiel/i.test(x.title || '')));
+    if (g) { const t = `Spiel am ${DOW_LONG[dowOf(g.date)]} vor ${r.name}: nur kurz spielen oder aussetzen, damit du frisch an den Start gehst.`; w.important = [w.important, t].filter(Boolean).join(' '); }
+  }
+  // Auftrag 17: ist ein Ziel mit Zeit und Stand nicht realistisch, keine Überlastung erzwingen, sondern Hinweis und Zwischenziel
+  const goalHints: string[] = [];
+  const NEED_LONG: Partial<Record<GoalType, number>> = { run_10k: 60, run_half: 90, run_marathon: 150, tri_olympic: 60, tri_middle: 90, tri_long: 120, duathlon: 60 };
+  const SHORTER: Partial<Record<GoalType, string>> = { run_marathon: 'Halbmarathon', run_half: '10-km-Lauf', tri_long: 'Mitteldistanz', tri_middle: 'Olympische Distanz', tri_olympic: 'Sprint-Triathlon', run_10k: '5-km-Lauf' };
+  for (const g of [A as Goal, ...inBlock].filter(x => x.date && x.date <= addDays(start, weeks.length * 7) && NEED_LONG[x.type] && sports.includes('run'))) {
+    const longest = Math.max(0, ...weeks.filter(w => w.endDate < g.date!).flatMap(w => w.days.flatMap((d: any) => d.sessions)).filter((x: any) => x.sport === 'run' && !x.race && !x.stage).map((x: any) => x.plannedMinutes || 0));
+    const need = NEED_LONG[g.type]!;
+    if (longest && longest < need * 0.8) goalHints.push(`${g.name} am ${+g.date!.slice(8)}.${+g.date!.slice(5, 7)}.: Bis dahin wächst dein langer Lauf mit höchstens 10 % pro Woche nur auf etwa ${longest} min, sinnvoll wären etwa ${need} min. Der Plan erzwingt das nicht. Vorschlag: ${SHORTER[g.type] ? SHORTER[g.type] + ' als Zwischenziel' : 'ein späterer Termin'} oder ein späterer Termin für ${g.name}.`);
+  }
   const keyDates = [{ date: goalDate, label: A.name }, ...inBlock.map(g => ({ date: g.date!, label: g.name }))];
   weeks.forEach(w => w.days.forEach((d: any) => d.sessions.forEach((s: any) => { if (/test/i.test(s.title) && !s.race) keyDates.push({ date: d.date, label: s.title }); })));
   const phaseList: GenResult['phases'] = [];
@@ -924,8 +951,9 @@ export function generatePlan(inp: GenInput): GenResult {
   const way = goals.filter(g => g.date! >= start).sort((a, b) => a.date!.localeCompare(b.date!));
   if (way.length > 1 || placed.length) explain.push(`Dein Weg: ${way.map(g => `${g.name} ${fmtD(g.date!)}${String(g.date).slice(2, 4)}${(g as any).placeholder ? ' (Platzhalter)' : ''}`).join(' → ')}.${placed.length ? ' Platzhalter richten sich nach Reihenfolge, Saison und deiner Form. Trag das echte Datum beim Ziel ein, dann plant die App neu.' : ''}`);
   explain.splice(1, 0, `Zyklen: ${cycleText(macro, start)}`);
+  goalHints.forEach(h => explain.push(h));
   const plan = {
-    meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, ...(inp.hoursUnknown ? { calibrateAt: addDays(from || start, 14) } : {}), goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? true, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}), ...(intensityFixes.length ? { intensityFixes: intensityFixes.slice(0, 40) } : {}), ...(ruleFixes.length ? { ruleFixes: ruleFixes.slice(0, 40) } : {}), intensityOpts: { runEasyOnly: !!eff.runEasyOnly, runAllowed, longQWeeks: weeks.map(w => w.startDate).filter(m => longRunTempoOk(allGoals, m)) } },
+    meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, ...(inp.hoursUnknown ? { calibrateAt: addDays(from || start, 14) } : {}), goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? true, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}), ...(intensityFixes.length ? { intensityFixes: intensityFixes.slice(0, 40) } : {}), ...(ruleFixes.length ? { ruleFixes: ruleFixes.slice(0, 40) } : {}), ...(goalHints.length ? { goalHints } : {}), intensityOpts: { runEasyOnly: !!eff.runEasyOnly, runAllowed, longQWeeks: weeks.map(w => w.startDate).filter(m => longRunTempoOk(allGoals, m)) } },
     weeks: shown, keyDates,
     zonePercents: HR_ZONES.map(z => ({ zone: z.zone, label: z.label, low: z.low, high: z.high }))
   };

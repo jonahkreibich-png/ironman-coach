@@ -101,8 +101,9 @@ describe('Rad und Lauf: Fortschritt der Schlüsseleinheiten', () => {
       expect(thu.sessions.filter((s: any) => s.sport === 'run').some((s: any) => s.hard)).toBe(false);
       const wed = w.days.find((d: any) => dow(d.date) === 3);
       const bikeKey = wed.sessions.some((s: any) => s.sport === 'bike' && s.hard);
-      // höchstens 2 harte Tage (Spiel + eine Qualität)
-      expect(w.days.filter((d: any) => d.sessions.some((s: any) => s.hard || /Spiel/.test(s.title))).length).toBeLessThanOrEqual(2);
+      // unter 18 höchstens 2 harte Tage (Spiel + eine Qualität), ab 18 höchstens 2 eigene plus Spiel
+      const adult = +w.startDate.slice(0, 4) - 2009 >= 18;
+      expect(w.days.filter((d: any) => d.sessions.some((s: any) => s.hard || /Spiel/.test(s.title))).length).toBeLessThanOrEqual(adult ? 3 : 2);
       void bikeKey;
       expect(sun.sessions.some((s: any) => s.sport === 'run' && s.spec && s.spec.kind === 'longq')).toBe(false);
     }
