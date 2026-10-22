@@ -12,6 +12,8 @@ import { parseFor } from '../ruleparse';
 import { doneItems, valsOf, isReviewQuestion, norm2 } from './review';
 import { mmss } from './texts';
 import { TOOL_DEFS } from './tools';
+/* Auftrag 18: Ursachen nur mit Daten (gilt für jede KI; zusätzlich prüft claims.ts jede Antwort deterministisch) */
+export const CAUSE_RULE = 'Ursachen und Zusammenhänge (z. B. Schlaf → Puls, Müdigkeit → Pace, Hitze → Puls) nennst du nur, wenn beide Werte für genau diese Einheit bzw. diesen Tag in den Daten stehen und die Abweichung zur eigenen Basis wirklich besteht (z. B. Puls bei gleicher Pace mindestens 5 Schläge über dem 6-Wochen-Schnitt, Temperatur über 25 °C gemessen). Sonst höchstens neutral, z. B. „Du hast nur 5,5 h geschlafen, mach heute lieber locker.“ Kein Puls eingetragen heißt: keine Aussage über den Puls.';
 
 const SPORT: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft', football: 'Teamsport', rest: 'Ruhe', walk: 'Gehen' };
 const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -32,6 +34,7 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
     '- SOLL ist der Plan, IST ist, was der Athlet eingetragen hat oder was gemessen wurde. Erreicht ist nur, was als IST in den Daten oder in einem Werkzeug-Ergebnis steht. Ein Plan-Wert ist nie ein Ergebnis. Fehlt der IST-Wert, frag nach (z. B. „Wie weit bist du am Stück gekrault?“), statt den Plan-Wert zu nennen.',
     '- Frühere Coach-Nachrichten sind keine Daten. Widerspricht etwas den aktuellen Werten, gelten die aktuellen Werte. Wurde ein Wert korrigiert, nenne den neuen.',
     '- Bewerte vorsichtig: eine einzelne Einheit oder ein einzelner Wert ist noch kein Trend. Wenn Daten fehlen oder du unsicher bist, sag das offen.',
+    `- ${CAUSE_RULE}`,
     '- Hilfsmittel (Kickbrett, Pull Buoy, Flossen …) nur, wenn sie unter AUSRÜSTUNG stehen. Setze nichts voraus, was fehlt.',
     '- Keine medizinischen Diagnosen und keine Medikamente. Bei Schmerzen, Verletzung, Krankheit, Fieber, Brustschmerz oder Schwindel: Training pausieren oder nur ganz locker und zum Arzt bzw. zur Ärztin raten.',
     '- Den Plan änderst du nie selbst. Für Änderungen nutzt du die Werkzeuge (move_session, modify_session, cancel_session, add_rule). Jede Änderung wird dem Athleten als Vorschlag gezeigt, er bestätigt sie selbst. Sag danach: „Ich habe dir einen Vorschlag gemacht, du kannst ihn unten bestätigen.“ Lehnt die App ab, erkläre kurz warum und nenne eine erlaubte Lösung.',

@@ -192,7 +192,7 @@ function runPaceCard(I: TrendInput, from: string): TrendCard {
   const pace = (sp: number) => 3600 / sp;
   const rel = (fl.last - fl.first) / fl.first * 100;
   return { id: 'runpace', group: 'efficiency', title: `Laufen: Pace bei Puls ${ref}`, value: mmss(pace(fl.last)), unit: '/km', delta: `${rel >= 0 ? '▲' : '▼'} ${mmss(Math.abs(pace(fl.first) - pace(fl.last)))} ${rel >= 0 ? 'schneller' : 'langsamer'}`,
-    text: rel >= 2 ? `Bei gleichem Puls läufst du schneller: deine Grundlagenausdauer wird besser.` : rel > -2 ? `Bei gleichem Puls etwa gleich schnell: stabil. Fortschritt zeigt sich hier über Wochen.` : `Bei gleichem Puls etwas langsamer. Häufige Gründe: Müdigkeit, Hitze, wenig Schlaf.`,
+    text: rel >= 2 ? `Bei gleichem Puls läufst du schneller: deine Grundlagenausdauer wird besser.` : rel > -2 ? `Bei gleichem Puls etwa gleich schnell: stabil. Fortschritt zeigt sich hier über Wochen.` : `Bei gleichem Puls etwas langsamer. Mögliche Gründe prüfen: Schlaf, Hitze, beginnender Infekt.`,
     tone: rel >= 2 ? 'good' : rel > -2 ? 'info' : 'warn', spark: pts.map(p => -pace(p.sp)),
     chart: { pts: pts.map(p => ({ date: p.date, v: Math.round(pace(p.sp)) })), series: [{ key: 'v', name: `Pace bei Puls ${ref}`, color: 'var(--run)' }], invert: true, fmt: 'pace' } };
 }
@@ -227,7 +227,7 @@ function efCard(I: TrendInput, from: string): TrendCard {
   const fl = firstLast(main)!; const rel = (fl.last - fl.first) / fl.first * 100;
   const isRun = r.length >= b.length;
   return { id: 'ef', group: 'efficiency', title: 'Efficiency Factor', value: de(fl.last, 2), unit: isRun ? 'm/min pro Schlag' : 'W pro Schlag', delta: pctTxt(rel),
-    text: `${isRun ? 'Meter pro Minute' : 'Watt'} je Herzschlag in lockeren Einheiten. ${rel >= 2 ? 'Steigt: du wirst ökonomischer.' : rel > -2 ? 'Stabil.' : 'Sinkt etwas: oft ein Zeichen von Müdigkeit.'}`,
+    text: `${isRun ? 'Meter pro Minute' : 'Watt'} je Herzschlag in lockeren Einheiten. ${rel >= 2 ? 'Steigt: du wirst ökonomischer.' : rel > -2 ? 'Stabil.' : 'Sinkt etwas. Mögliche Gründe prüfen: Schlaf, Erholung.'}`,
     tone: rel >= 2 ? 'good' : rel > -2 ? 'info' : 'warn', spark: main,
     chart: { pts: sorted([...r, ...b] as any[]), series: [...(r.length ? [{ key: 'run', name: 'Laufen (m/min/Schlag)', color: 'var(--run)' }] : []), ...(b.length ? [{ key: 'bike', name: 'Rad (W/Schlag)', color: 'var(--bike)' }] : [])], fmt: 'num' } };
 }
@@ -269,7 +269,7 @@ function swimCards(I: TrendInput, from: string): TrendCard[] {
   };
   mk('swimpace', 'Pace pro 100 m', a => a.swim!.pace100, '/100 m', true, v => mmss(v), 'Du schwimmst schneller pro 100 m.', 'Etwas langsamer pro 100 m, z. B. mehr Technik oder Müdigkeit.', 3, 'pace100');
   mk('dps', 'Meter pro Zug', a => a.swim!.metersPerStroke, 'm', false, v => de(v, 2), 'Mehr Meter pro Zug: dein Zug wird länger und effizienter.', 'Weniger Meter pro Zug: auf langes Gleiten achten.');
-  mk('spl', 'Züge pro Bahn', a => a.swim!.strokesPerLength, '', true, v => de(v, 1), 'Weniger Züge pro Bahn: bessere Wasserlage und mehr Vortrieb.', 'Mehr Züge pro Bahn: oft ein Zeichen von Müdigkeit oder hektischem Zug.');
+  mk('spl', 'Züge pro Bahn', a => a.swim!.strokesPerLength, '', true, v => de(v, 1), 'Weniger Züge pro Bahn: bessere Wasserlage und mehr Vortrieb.', 'Mehr Züge pro Bahn: ruhiger und länger ziehen.');
   const cont = s.filter(a => a.swim!.longestContinuousM).map(a => ({ date: a.date, v: a.swim!.longestContinuousM! }));
   const fieldCont = (Object.entries(I.state.customWorkouts || {}) as any[]).flatMap(([d, l]: any) => (l || []).filter((w: any) => w.sport === 'swim' && num((w.metrics || {}).longestCrawl) && d >= from).map((w: any) => ({ date: d, v: num(w.metrics.longestCrawl)! })));
   const all = sorted([...cont, ...fieldCont]);

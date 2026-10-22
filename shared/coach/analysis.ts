@@ -114,7 +114,7 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
     const lastE = effPts[effPts.length - 1].y;
     const goalTxt = goalEff ? ` Ziel ${mmss(prof.runGoal!.paceSec)}/km bei Puls ${prof.runGoal!.hr} entspricht ${de(goalEff, 2)} m pro Schlag, du bist bei ${Math.round(lastE / goalEff * 100)} %.` : '';
     if (per4w >= 2) add({ id: 'eff-up', kind: 'trend', tone: 'good', score: 55, title: 'Aerobe Effizienz steigt', why: `Bei lockeren Läufen schaffst du ${de(per4w, 0)} % mehr Strecke pro Herzschlag als vor 4 Wochen (zuletzt ${de(lastE, 2)} m pro Schlag, ${effPts.length} Läufe).${goalTxt}`, tip: 'Genau so weiter: viel Zone 2, ruhig und regelmäßig.' });
-    else if (per4w <= -3) add({ id: 'eff-down', kind: 'trend', tone: 'warn', score: 60, title: 'Aerobe Effizienz sinkt', why: `Bei lockeren Läufen ${de(-per4w, 0)} % weniger Strecke pro Herzschlag als vor 4 Wochen (${effPts.length} Läufe). Oft ein Zeichen von Müdigkeit, Hitze oder Krankheit.`, tip: 'Ein paar ruhige Tage, dann wieder locker in Zone 2.' });
+    else if (per4w <= -3) add({ id: 'eff-down', kind: 'trend', tone: 'warn', score: 60, title: 'Aerobe Effizienz sinkt', why: `Bei lockeren Läufen ${de(-per4w, 0)} % weniger Strecke pro Herzschlag als vor 4 Wochen (${effPts.length} Läufe). Mögliche Gründe prüfen: Schlaf, Hitze, beginnender Infekt.`, tip: 'Ein paar ruhige Tage, dann wieder locker in Zone 2.' });
     else add({ id: 'eff-flat', kind: 'trend', tone: 'info', score: 25, title: 'Aerobe Effizienz stabil', why: `Zuletzt ${de(lastE, 2)} m pro Herzschlag bei lockeren Läufen.${goalTxt}`, tip: 'Mehr lockere Kilometer in Zone 2 bringen sie nach oben.' });
   }
   // Entkopplung bei längeren Einheiten

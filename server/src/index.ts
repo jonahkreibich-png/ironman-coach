@@ -2,7 +2,7 @@ import { entitlements, FEATURE_KEYS } from '../../shared/features';
 /* Server: Geräte-Login, Datensatz-Sync, Backup, Datenabruf, Coach, Mitteilungen.
    Mehrere Nutzer, aber keine offene Registrierung: neue Nutzer nur mit Einladungscode.
    Geheimnisse nur über env (Cloudflare-Secrets). */
-import { type Env, berlinDate, berlinParts, putRecords, getMeta, setMeta, activeUsers, type Change } from './store';
+import { type Env, berlinDate, berlinParts, putRecords, getMeta, setMeta, activeUsers, touchRecord, gateChanges, type Change } from './store';
 import { HttpError, json, corsHeaders, readJson } from './http';
 import { type Auth, authDevice, setup, createPairCode, redeemPairCode, createInvite, listInvites } from './auth';
 import { runImport, intervalsCreds } from './intervals';
@@ -184,6 +184,12 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     if (changes.length > 5000) throw new HttpError(413, 'Zu viele Änderungen auf einmal');
     const bad = changes.find(c => !validChange(c));
     if (bad) throw new HttpError(400, 'Ungültiger Datensatz: ' + String(bad && (bad as any).kind) + '/' + String(bad && (bad as any).key));
+    // Auftrag 18: nach einem Einspielen überschreibt ein Gerät mit alter App-Version Plan und Profil nicht mehr
+    if (changes.length) {
+      const g = gateChanges(changes, await getMeta(env, uid, 'min_client_version'), String(req.headers.get('X-App-Version') || ''));
+      for (const c of g.dropped) await touchRecord(env, uid, c.kind, c.key);
+      changes.splice(0, changes.length, ...g.keep);
+    }
     if (changes.length) {
       await putRecords(env, uid, changes);
       // Neue Daten (Einheit, Nachtwerte, Notiz, Essen …) stoßen den Coach an, ohne die Antwort aufzuhalten

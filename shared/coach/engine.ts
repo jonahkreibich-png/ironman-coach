@@ -1,7 +1,7 @@
 /* Coach-Engine (Algorithmus, ohne KI). Läuft auf dem Server bei jedem neuen Datenpunkt (Einheit, Nachtwerte,
    Krankheits-Notiz, Essen) und zusätzlich täglich und wöchentlich. Wertet aus, passt den Plan nach festen Regeln an
    und schreibt jede Änderung mit Grund als Nachricht in den Coach-Chat. Funktioniert ohne KI und ohne Einwilligung. */
-import { claimFacts, stripUnsupported } from './claims';
+import { claimFacts, stripUnsupported, HR_DELTA, HEAT_C } from './claims';
 import * as C from '../core';
 import { intervalsOf } from '../activity/structure';
 import { withTerms } from '../glossary';
@@ -104,7 +104,7 @@ export function sessionComment(ctx: EngineCtx, act: any, s: any): string {
       const d = Math.round(same.avgHr - act.avgHr);
       const weeks = Math.max(1, Math.round((+new Date(act.date) - +new Date(same.date)) / (7 * 86400000)));
       if (d >= 2) lines.push(`${d} Schläge weniger Puls als bei derselben Runde vor ${weeks === 1 ? 'einer Woche' : weeks + ' Wochen'}. Dein Herz arbeitet sparsamer.`);
-      else if (d <= -4) lines.push(`Puls ${-d} Schläge höher als bei derselben Runde vor ${weeks === 1 ? 'einer Woche' : weeks + ' Wochen'}${act.tempC && act.tempC > 22 ? `, bei ${de(act.tempC, 0)} °C ist das normal` : '. Wenn das öfter vorkommt, brauchst du mehr Erholung'}.`);
+      else if (d <= -HR_DELTA) lines.push(`Puls ${-d} Schläge höher als bei derselben Runde vor ${weeks === 1 ? 'einer Woche' : weeks + ' Wochen'}${act.tempC && act.tempC >= HEAT_C ? `, bei ${de(act.tempC, 0)} °C ist das normal` : '. Kommt das öfter vor, plane ich mehr Erholung ein'}.`);
     }
   }
   // Auftrag 16: Intervalle nur nennen, wenn sie geplant waren (oder ohne Plan erkannt); automatische Runden sind keine

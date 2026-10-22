@@ -4,7 +4,7 @@
    Einheiten (gleiche Pace bei weniger Puls …), Zeit in Zonen, Entkopplung, Splits, Kadenz, Schwimm-Züge und Kraul am Stück, RPE und Gefühl,
    Morgenwerte und Schlaf. Antwort in 3 Teilen wie ein Trainer: Was gut war (mit Zahlen), Was besser geht (mit Grund), Was das für die
    nächsten Tage heißt. Kurz, ehrlich, nie nur Lob. Fehlen Daten, sagt der Coach, was fehlt, und bietet das Eintragen an. */
-import { claimFacts, stripUnsupported } from './claims';
+import { claimFacts, stripUnsupported, hrVsBase, HR_DELTA, HEAT_C } from './claims';
 import * as C from '../core';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
@@ -101,6 +101,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   const lthr = d.sport === 'bike' ? th.lthrBike : th.lthrRun;
   const pc = paceCtx(p, v.indoor, null, d.date);
   const z = plannedZone(s) ?? (hard ? 4 : 2);
+  let hardSeen = false; // ohne Plan: am Puls als harte Einheit erkannt
   const facts: string[] = [];
   if (v.min) facts.push(`${Math.round(v.min)} min`);
   if (v.km) facts.push(`${de(v.km)} km`); if (v.meters) facts.push(`${v.meters} m`);
@@ -125,6 +126,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
         if (d.sport === 'run' && v.pace) { const rg = W.runPaceRange(pc, z); fix = ` Nächstes Mal langsamer, etwa ${mmss(rg[0])}-${mmss(rg[1])}/km, auch wenn es sich zu ruhig anfühlt.`; }
         if (d.sport === 'bike') fix = ` Nächstes Mal ruhiger treten${pc.bikeKmh && !v.indoor ? `, auf flacher Strecke etwa ${speedRange(pc.bikeKmh, z)}` : ''}, bergauf kleinerer Gang.`;
         // Auftrag 14: selbst hinzugefügte Einheit: nichts war geplant – eine harte Einheit ist dann einfach hart
+        if (!s && hz >= 4) hardSeen = true;
         if (!s && hz >= 4) better.push(`Puls Ø ${Math.round(v.hr)} in Zone ${hz}: das war eine harte Einheit, keine lockere. Sie zählt als harter Tag, der Tag danach sollte locker sein.`);
         else better.push(`Puls Ø ${Math.round(v.hr)} lag in Zone ${hz}, ${s ? 'geplant war' : 'für eine lockere Einheit passt'} Zone ${z} (bis ${zr.hi}). Locker trainiert die Grundlage, zu schnell macht nur müde.${fix}`);
         if (hz >= z + 1) fatigue += 0.5;
@@ -225,7 +227,8 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   }
   // Gefühl
   if (v.rpe != null) {
-    if (!hard && v.rpe >= 6 && d.sport !== 'football') { better.push(`Gefühl ${v.rpe}/10 für eine lockere Einheit ist hoch. Das spricht für Müdigkeit, Hitze oder zu schnelles Tempo.`); fatigue += 1; }
+    // Auftrag 18: keine Ursache ohne Daten (vorher „spricht für Müdigkeit, Hitze …“ ohne Schlaf- oder Temperaturwert)
+    if (!hard && !hardSeen && v.rpe >= 6 && d.sport !== 'football') { better.push(`Gefühl ${v.rpe}/10 für eine lockere Einheit ist hoch. Nächstes Mal ruhiger anfangen.`); fatigue += 1; }
     else if (hard && v.rpe <= 4) better.push(`Nur ${v.rpe}/10 für eine harte Einheit: da wäre mehr gegangen.`);
     else good.push(`Anstrengung ${v.rpe}/10 passt zur Vorgabe.`);
   } else missing.push('Anstrengung (RPE 1-10)');
@@ -238,7 +241,10 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
       const dp = Math.round(v.pace - sim.v.pace);
       if (Math.abs(dp) <= 5 && dh <= -2) good.unshift(`Gleiche Pace wie am ${fmtD(sim.d.date)} (${mmss(v.pace)}/km), aber ${-dh} Schläge weniger Puls: ein gutes Zeichen (ein einzelner Vergleich ist noch kein Trend).`);
       else if (dp <= -5 && dh <= 2) good.unshift(`${-dp} s/km schneller als am ${fmtD(sim.d.date)} bei ${dh <= 0 ? 'weniger' : 'fast gleichem'} Puls.`);
-      else if (dh >= 5 && dp >= -3) { better.push(`Puls ${dh} Schläge höher als am ${fmtD(sim.d.date)} bei ${dp > 3 ? 'langsamerer' : 'gleicher'} Pace${v.tempC && v.tempC > 22 ? ` (bei ${de(v.tempC, 0)} °C normal)` : ''}.`); fatigue += v.tempC && v.tempC > 22 ? 0 : 0.7; }
+      else if (dh >= 5 && dp >= -3) {
+        // Hitze als Grund nur mit gemessener Temperatur UND Puls über dem 6-Wochen-Schnitt bei gleicher Pace (Auftrag 18)
+        const hb = hrVsBase(ctx, d, v); const heat = !!v.tempC && v.tempC >= HEAT_C && !!hb && hb.delta >= HR_DELTA;
+        better.push(`Puls ${dh} Schläge höher als am ${fmtD(sim.d.date)} bei ${dp > 3 ? 'langsamerer' : 'gleicher'} Pace${heat ? ` (bei ${de(v.tempC!, 0)} °C ist das normal)` : ''}.`); fatigue += heat ? 0 : 0.7; }
     } else if (d.sport === 'bike' && (v.power || v.speed) && (sim.v.power || sim.v.speed)) {
       const a = v.power && sim.v.power ? v.power / v.hr : v.speed && sim.v.speed ? v.speed / v.hr : null;
       const b = v.power && sim.v.power ? sim.v.power / sim.v.hr! : v.speed && sim.v.speed ? sim.v.speed / sim.v.hr! : null;
@@ -246,9 +252,18 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     }
   } else if (sim === null && (d.sport === 'run' || d.sport === 'bike') && v.hr && v.min) { /* keine Vergleichseinheit */ }
   // Morgenwerte und Schlaf
+  // Auftrag 18: Zusammenhang Morgenwerte → Puls nur, wenn der Puls dieser Einheit bei gleicher Pace wirklich über dem 6-Wochen-Schnitt lag;
+  // sonst nur der Wert selbst (neutral) und heute ein Rat
   const mf = readinessFacts(ctx, d.date);
-  if (mf.length) { better.push(`Morgenwerte: ${joinDe(mf)}. Das erklärt ${hard ? 'eine schwere Einheit' : 'einen höheren Puls'} oft schon.`); fatigue += 0.5 * mf.length; }
+  if (mf.length) {
+    const hb = hrVsBase(ctx, d, v);
+    const link = hb && hb.delta >= HR_DELTA ? ` Dein Puls lag bei gleichem Tempo ${hb.delta} Schläge über deinem 6-Wochen-Schnitt, das passt zu den Morgenwerten.` : '';
+    better.push(`Morgenwerte ${d.date === ctx.today ? 'heute' : 'an dem Tag'}: ${joinDe(mf)}.${link}${d.date === ctx.today && !link ? ' Mach heute lieber locker.' : ''}`); fatigue += 0.5 * mf.length;
+  }
   else { const tr = (ctx.state.trend || []).find((x: any) => x && x.date === d.date); if (tr && tr.sleepHours != null && tr.sleepHours >= 7.5) good.push(`Gut geschlafen (${de(tr.sleepHours)} h).`); }
+  // Müdigkeit und Gefühl zuerst (die Antwort zeigt nur die ersten zwei Punkte), Strecke und Dauer danach
+  const pri = (t: string) => /müde gefühlt|Gefühl \d+\/10/.test(t) ? 2 : /^(Strecke|Nur \d+ von)/.test(t) ? -1 : 0;
+  better.sort((a, b) => pri(b) - pri(a));
   return { good, better, next: [], missing, head, fatigue };
 }
 
@@ -393,7 +408,7 @@ export function reviewWeek(ctx: EngineCtx, compare: boolean, offset = 0): Review
       const line = `Lockere Läufe: Ø ${mmss(W0.eff.pace)}/km bei Puls ${Math.round(W0.eff.hr)}, letzte Woche ${mmss(W1.eff.pace)}/km bei ${Math.round(W1.eff.hr)}.`;
       cmp.push(line);
       if (dh <= -2 && dp <= 3) good.push(`Lockere Läufe effizienter: ${-dh} Schläge weniger Puls bei ${dp <= -3 ? 'schnellerer' : 'gleicher'} Pace.`);
-      else if (dh >= 4 && dp >= -3) better.push(`Lockere Läufe mit ${dh} Schlägen mehr Puls als letzte Woche: Müdigkeit, Hitze oder Schlaf prüfen.`);
+      else if (dh >= HR_DELTA && dp >= -3) better.push(`Lockere Läufe mit ${dh} Schlägen mehr Puls als letzte Woche. Mögliche Gründe prüfen: Schlaf, Hitze, beginnender Infekt.`);
     }
   }
   const n = nextDays(ctx, ctx.today, offset ? 0 : W0.fatigue / Math.max(1, doneN) * 2);
@@ -453,6 +468,6 @@ export function autoReview(ctx: EngineCtx, d: Done, mode: 'full' | 'short'): str
   const o = mode === 'full' ? null : reviewOne(ctx, d);
   const text = o ? [o.head, o.good[0] ? `👍 ${o.good[0]}` : '', o.better[0] ? `🔧 ${o.better[0]}` : ''].filter(Boolean).join(' ') : r.text;
   // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen (gilt auch für die Bewertung in der App)
-  try { return stripUnsupported(text, claimFacts(ctx)) || text; } catch (e) { return text; }
+  try { return stripUnsupported(text, claimFacts(ctx, d.date)) || text; } catch (e) { return text; }
 }
 void kindOf;

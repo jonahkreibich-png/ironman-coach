@@ -407,7 +407,7 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
     return { intent: 'scope', text: 'Meinst du heute oder die ganze Woche?', pending: { kind: 'scope', at: Date.now() }, options: [{ label: 'Heute', say: 'heute' }, { label: 'Morgen', say: 'morgen' }, { label: 'Die ganze Woche', say: 'die ganze Woche' }] };
   }
   // Tag frei
-  if (/\b(tag frei|frei haben|freien tag|ruhetag|pause machen|heute frei|pause heute|heute pause)\b/.test(j) && !verbOf(toks)) return dayOff(ctx, d, ds.from || ctx.today, 'Wunsch: Tag frei');
+  if (/\b(tag frei|frei haben|freien tag|ruhetag|pause machen|heute frei|pause heute|heute pause)\b/.test(j) && !verbOf(toks) && !/^(warum|wieso|weshalb)\b/.test(j)) return dayOff(ctx, d, ds.from || ctx.today, 'Wunsch: Tag frei');
   // Woche leichter / wenig Zeit
   if (/\b(woche)\b/.test(j) && (has(toks, ['leichter', 'lockerer', 'weniger', 'ruhiger', 'entspannter']) || /zu viel|zu hart|zu anstrengend/.test(j))) return weekScale(ctx, 0.85, 'Woche leichter');
   if (/\b(woche)\b/.test(j) && /wenig zeit|stressig|stress|viel los|kaum zeit/.test(j)) return weekLittle(ctx);

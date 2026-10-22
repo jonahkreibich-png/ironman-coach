@@ -96,9 +96,10 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
       const blocked = sp === 'swim' && (eff.noSwim || (eff.noSwimMonths && eff.noSwimMonths.includes(+w.startDate.slice(5, 7))));
       // Wunsch-Häufigkeit nur so weit, wie die harten Regeln Tage erlauben (sonst meldet der Plan einen Konflikt)
       const can = (w.days || []).filter((d: any) => dayCap(profile, dowOf(d.date)) > 0 && dayLimit(rules, d.date).cap > 0 && !d.sessions.some((s: any) => s.race) && allowedHard(rules, { sport: sp, place: sp === 'swim' ? 'pool' : undefined }, d.date)).length;
-      if (normal && n < Math.min(f[0], can) && !blocked) out.push({ rule: 'frequency', week: w.weekNumber, msg: `Woche ${w.weekNumber}: ${n}× ${sp}, gewünscht mindestens ${f[0]}×.` });
+      // Auftrag 18: fällt eine Einheit für den Ruhetag weg (Woche sonst ohne freien Tag), ist das kein Fehler
+      if (normal && n < Math.min(f[0], can) && !blocked && !(w.restDropped || []).includes(sp)) out.push({ rule: 'frequency', week: w.weekNumber, msg: `Woche ${w.weekNumber}: ${n}× ${sp}, gewünscht mindestens ${f[0]}×.` });
     }
-    if (strengthWanted && w.phase !== 'race' && !(count.strength)) out.push({ rule: 'strength', week: w.weekNumber, msg: `Woche ${w.weekNumber}: keine Krafteinheit, obwohl Kraft gewählt ist.` });
+    if (strengthWanted && w.phase !== 'race' && !(count.strength) && !(w.restDropped || []).includes('strength')) out.push({ rule: 'strength', week: w.weekNumber, msg: `Woche ${w.weekNumber}: keine Krafteinheit, obwohl Kraft gewählt ist.` });
     if (!w.headline && !w.target) out.push({ rule: 'goals', week: w.weekNumber, msg: `Woche ${w.weekNumber}: kein Ziel angegeben.` });
   });
   // Alle Ziele im Zeitraum stehen als Wettkampf im Plan

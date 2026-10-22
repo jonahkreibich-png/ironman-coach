@@ -50,7 +50,8 @@ describe.each(PERSONAS.map(p => [p.id, p] as const))('%s', (_id, p) => {
         if (s.sport === 'run') expect(s.plannedMinutes).toBeLessThanOrEqual(caps.run + 5);
         if (s.sport === 'bike' && !s.hard) expect(s.plannedMinutes).toBeLessThanOrEqual(caps.bike + 5);
       }
-      const lr = Math.max(0, ...w.days.flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.race && !/test/i.test(s.title)).map((s: any) => s.plannedMinutes || 0)));
+      // Auftrag 18: nur lange Läufe; in Koppel-Wochen ist der Lauf am Tag danach bewusst kürzer (kein langer Lauf) und kein Bezug
+      const lr = Math.max(0, ...w.days.flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.race && !/test/i.test(s.title) && (s.long || /^Langer Lauf/.test(s.title || ''))).map((s: any) => s.plannedMinutes || 0)));
       if (lr && lastLR != null && !w.isRecoveryWeek) expect(lr - lastLR).toBeLessThanOrEqual(15);
       if (lr && !w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') lastLR = lr;
       void i;

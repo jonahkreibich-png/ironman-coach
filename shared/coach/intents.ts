@@ -12,6 +12,8 @@ import { sleepNeed, isMinor } from '../profile';
 import { mainGoal, nextGoal, GOALS } from '../goals';
 import { parseConsiderations } from '../considerations';
 import { hrZonesFor } from '../sports';
+import { restDayReason } from '../trainingrules';
+const KNOWLEDGE_REST = 'In der Pause passt sich der Körper an das Training an und wird stärker.';
 
 export interface ChatAction { label: string; kind: 'illness-start' | 'illness-end' | 'add-note' | 'adjust' | 'go' | 'say' | 'rule-fix'; payload?: any }
 export interface ChatReply { intent: string; text: string; actions?: ChatAction[]; suggestions?: string[] }
@@ -90,6 +92,16 @@ interface Intent { id: string; when: (toks: string[], raw: string) => boolean; a
 const A = (...g: string[][]) => (toks: string[]) => g.every(words => has(toks, words));
 
 export const INTENTS: Intent[] = [
+  // Auftrag 18: „Warum habe ich heute frei?“ – Grund aus dem Plan (Spiel, langer Tag, Wettkampf, Erholungswoche) und die Ruhetag-Regel
+  { id: 'why-rest', when: t => has(t, ['warum', 'wieso', 'weshalb']) && has(t, ['frei', 'ruhetag', 'kein training', 'nichts geplant', 'pause', 'nichts']),
+    answer: (ctx, _t, r0) => { const t0 = ctx.today; const d = /morgen/.test(String(r0 || '')) ? C.addDays(t0, 1) : t0;
+      const r = restDayReason(weeksOf(ctx), d, ctx.profile, ctx.goals);
+      return r || `${d === t0 ? 'Heute' : 'Morgen'} ist Training geplant. Ruhetage sind fest im Plan: mindestens einer pro Woche${isMinor(ctx.profile, t0) ? ', für dich eher zwei' : ''}. ${KNOWLEDGE_REST}`; } },
+  // Auftrag 18: Trainingsregeln erklären („Warum kein Koppellauf/Kraft/Tempo?“, „Welche Regeln gelten?“)
+  { id: 'why-rule', when: t => (has(t, ['warum', 'wieso', 'weshalb']) && has(t, ['koppel', 'keine kraft', 'kuerzer', 'kein tempo', 'ohne tempo', 'kein intervall', 'keine intervalle', 'nur locker'])) || has(t, ['trainingsregeln', 'welche regeln', 'regeln der app']),
+    answer: ctx => { const days = C.planDays(weeksOf(ctx)).filter((d: any) => d.date >= C.addDays(ctx.today, -1) && d.date <= C.addDays(ctx.today, 7));
+      const n = days.flatMap((d: any) => live(d).filter((s: any) => s.ruleNote).map((s: any) => `${fmtD(d.date)} ${s.title}: ${s.ruleNote}`))[0];
+      return { intent: 'why-rule', text: `${n ? n + ' ' : ''}Die App hält feste Trainingsregeln ein: mindestens ein Ruhetag pro Woche, nach einem langen Tag nur Lockeres, höchstens 2 harte Einheiten plus Spiel, nie zwei harte Tage hintereinander, in der Wettkampfwoche keine Kraft, nach dem Wettkampf erst locker. Alle Regeln mit Begründung: Mehr → Lexikon → Training verstehen.`, actions: [{ label: 'Training verstehen', kind: 'go', payload: 'lexikon' }] }; } },
   { id: 'healthy', when: t => has(t, ['wieder gesund', 'wieder fit', 'symptomfrei', 'nicht mehr krank', 'bin gesund']),
     answer: ctx => C.illnessAt(ctx.state.illnessPeriods, ctx.today) ? { intent: 'healthy', text: 'Schön! Soll ich die Krankheitsphase mit gestern beenden? Dann beginnt heute der Wiedereinstieg: die ersten Tage nur locker.', actions: [{ label: 'Ja, Krankheit beenden', kind: 'illness-end' }] } : 'Super, dann läuft der Plan normal weiter.' },
   { id: 'sick', when: t => has(t, ['krank', 'erkaeltet', 'erkaeltung', 'fieber', 'grippe', 'halsschmerzen', 'schnupfen', 'husten', 'corona', 'covid', 'infekt']) && !has(t, ['nicht mehr', 'wieder gesund']),

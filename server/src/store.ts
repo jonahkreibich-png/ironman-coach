@@ -71,6 +71,25 @@ export async function putRecords(env: Env, uid: number, changes: Change[]): Prom
   for (let i = 0; i < stmts.length; i += 200) await env.DB.batch(stmts.slice(i, i + 200));
 }
 
+/* Auftrag 18: Datensatz erneut ausliefern (neue Revision), z. B. wenn eine Änderung eines alten Geräts nicht angenommen wurde */
+export async function touchRecord(env: Env, uid: number, kind: string, key: string): Promise<void> {
+  await env.DB.batch([env.DB.prepare("UPDATE meta SET v = CAST(v AS INTEGER) + 1 WHERE k = 'rev'"),
+    env.DB.prepare("UPDATE records SET rev = (SELECT CAST(v AS INTEGER) FROM meta WHERE k = 'rev') WHERE user_id = ? AND kind = ? AND key = ?").bind(uid, kind, key)]);
+}
+/* Versionen vergleichen („3.4.0“ < „3.5.0“); unbekannt gilt als alt */
+export function cmpVersion(a: string, b: string): number {
+  const p = (v: string) => String(v || '0').split(/[.+-]/).slice(0, 3).map(x => parseInt(x, 10) || 0);
+  const x = p(a), y = p(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  return 0;
+}
+/* Auftrag 18: Nach einem Einspielen durch den Betreiber (user_meta min_client_version = { version, kinds }) nimmt der Server Änderungen
+   dieser Arten nur noch von Geräten mit mindestens dieser App-Version an. Ältere Geräte bekommen stattdessen den Stand vom Server. */
+export function gateChanges<T extends { kind: string }>(changes: T[], gate: any, clientVersion: string): { keep: T[]; dropped: T[] } {
+  if (!gate || !gate.version || cmpVersion(clientVersion, gate.version) >= 0) return { keep: changes, dropped: [] };
+  const kinds = new Set<string>(Array.isArray(gate.kinds) && gate.kinds.length ? gate.kinds : ['plan', 'profile']);
+  return { keep: changes.filter(c => !kinds.has(c.kind)), dropped: changes.filter(c => kinds.has(c.kind)) };
+}
 export async function getMeta(env: Env, uid: number, k: string): Promise<any> {
   const r = await env.DB.prepare('SELECT v FROM user_meta WHERE user_id = ? AND k = ?').bind(uid, k).first();
   if (!r) return null;

@@ -69,6 +69,8 @@ if (!TABS.some(x => x.id === UI.tab)) UI.tab = 'heute';
 if (UI.sub && !SUBS[UI.sub]) UI.sub = null;
 
 const byId = (id: string) => document.getElementById(id)!;
+/* Auftrag 18: mit Sync erst nach dem ersten Abgleich automatisch am Plan ändern (Schwimm-Stufe, Kalibrierung) */
+let autoReady = !isSyncOn();
 
 function coachUnread(): number {
   const seen = UI.coachSeenAt || 0;
@@ -90,7 +92,8 @@ function renderTabs() {
 }
 
 function render() {
-  if (HAS_PLAN && checkSwimSkill()) saveState();
+  // Auftrag 18: automatische Plan-Änderungen erst nach dem ersten Abgleich (sonst überschreibt ein alter Stand auf dem Gerät den neueren Plan vom Server)
+  if (HAS_PLAN && autoReady && checkSwimSkill()) saveState();
   invalidate();
   for (const k in CHARTS) delete (CHARTS as any)[k];
   document.body.classList.toggle('no-plan', !HAS_PLAN);
@@ -185,7 +188,8 @@ function updateBadge() {
 /* ---------- Start ---------- */
 try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } catch (e) {}
 // „Stunden bisher: weiß ich nicht“: nach 2 Wochen an die echten Daten anpassen (Auftrag 11)
-try { if (HAS_PLAN) calibrateIfDue(); } catch (e) { /* nie den Start verhindern */ }
+{ const cal = () => { try { if (HAS_PLAN && calibrateIfDue()) rerender(); } catch (e) { /* nie den Start verhindern */ } };
+  if (isSyncOn()) onSynced(() => { if (!autoReady) { autoReady = true; cal(); rerender(); } }); else cal(); }
 // Auftrag 15: nur gewählte Sportarten, gleiche Sportart nicht an zwei Tagen hintereinander. Mit Sync erst nach dem ersten Abgleich
 // (sonst könnte ein alter Stand auf diesem Gerät den neueren Plan vom Server überschreiben).
 { let ran = false; const check = () => { if (ran) return; ran = true; try { if (HAS_PLAN && planRulesOnStart()) rerender(); } catch (e) { /* nie den Start verhindern */ } };

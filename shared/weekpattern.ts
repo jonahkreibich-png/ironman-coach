@@ -149,7 +149,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       out.push({ dow: sl.dow, slot: sl, s: null, long: true, hard: lq || undefined, make: (min) => lq ? K.longRunWithQuality(inp.run, min, runQ!) : W.runLong(inp.run, min), min: easyDay(date) ? r5(longRun * 0.6) : longRun });
     } else if (sl.sport === 'run' && sl.role === 'brick') {
       // Auftrag 17: Koppel nur gezielt: im Aufbau jede 3., in der spezifischen Phase jede 2. Woche, kurz; nie in Grundlage, Erholung, Tapering
-      if (rec || inp.entry || ph === 'taper' || ph === 'race' || ph === 'base' || easyDay(date)) continue;
+      if (rec || inp.entry || ph === 'taper' || ph === 'race' || ph === 'base' || easyDay(date) || /^run_/.test(goal)) continue; // Auftrag 18: vor einem Laufziel kein Koppellauf
       if (st.sinceBrick != null && st.sinceBrick < (ph === 'specific' ? 1 : 2)) continue;
       const min = ph === 'specific' ? 20 : st.brickWeeks > 0 ? 15 : 10;
       out.push({ dow: sl.dow, slot: sl, s: null, make: () => { const sp = W.runEasy(inp.run, min); if (ph === 'specific') sp.steps[0].note = 'die mittleren 10 min im Wettkampftempo'; sp.title = `Koppellauf ${min} min (direkt nach dem Rad)`; sp.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.'; sp.tip = 'Nur wenn du gut erholt bist (Ampel grün). Sonst weglassen, das ist kein Problem.'; return sp; } });

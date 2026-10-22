@@ -5,6 +5,7 @@
    einen Änderungsvorschlag als feste Aktion, der erst nach Bestätigung gilt.
    structureOf() liefert dieselbe Struktur für die Plan-Ansicht; Einheiten ohne Bauplan (alte, von Hand geschriebene) bekommen einen. */
 import * as C from '../core';
+import { restDayReason } from '../trainingrules';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
 import { readinessFacts, readinessFallback } from './engine';
@@ -131,6 +132,10 @@ export function explainDay(ctx: EngineCtx, date: string, sport: string | null, l
   const when = date === ctx.today ? 'Heute' : date === C.addDays(ctx.today, 1) ? 'Morgen' : `Am ${DOWL[dowOf(date)]}`;
   const SP: Record<string, string> = { swim: 'Schwimmen', bike: 'Rad', run: 'Laufen', strength: 'Kraft', football: 'Fußball' };
   if (!day) return { intent: 'explain', text: `${when} (${fmtD(date)}) gibt es noch keinen Plan.` };
+  // krank geht vor (auch an Ruhetagen); Ruhetag mit Begründung aus dem Plan (Auftrag 18)
+  const ill0 = C.illnessAt(ctx.state.illnessPeriods, date);
+  if (ill0 && !list.length) return { intent: 'explain', text: `${when} (${fmtD(date)}): Du bist krank eingetragen${ill0.note ? ` (${ill0.note})` : ''}. Heute kein Training, auch nicht locker. Wenn du 24 Stunden ohne Fieber und Symptome bist, tipp auf „Wieder gesund“, dann steigen wir in Stufen ein.`, options: [{ label: 'Wieder gesund', say: 'Ich bin wieder gesund' }] };
+  if (!list.length && !sport && !all.length) { const rr = restDayReason(weeks, date, ctx.profile, ctx.goals); if (rr) return { intent: 'explain', text: rr }; }
   if (!list.length) {
     const next = C.planDays(weeks).filter((d: any) => d.date > date).flatMap((d: any) => d.sessions.filter((s: any) => s.sport === sport && !s.cancelled).map((s: any) => ({ s, date: d.date })))[0];
     return { intent: 'explain', text: `${when} (${fmtD(date)}) ist ${sport ? `kein ${SP[sport] || 'Training'}` : 'kein Training'} geplant${all.length ? `, sondern ${joinDe(all.map((s: any) => s.title))}` : ''}.${next ? ` Nächstes ${SP[sport!] || 'Training'}: ${next.s.title} am ${fmtD(next.date)}.` : ''}`,

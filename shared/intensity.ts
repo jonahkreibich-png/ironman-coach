@@ -132,7 +132,8 @@ export function intensityStats(weeks: any[], p: Profile): IntensityStats {
 }
 
 /* Prüft einen Plan. o.runEasyOnly: keine Lauf-Intensität (Beschwerden), o.runAllowed: Lauf-Intervalle freigegeben */
-export interface CheckOpts { goalType?: GoalType; runEasyOnly?: boolean; runAllowed?: boolean; from?: string | null; baseOffset?: number; /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt? */ longQ?: (date: string) => boolean; /** dasselbe gespeichert im Plan: erlaubte Wochen (Montag) */ longQWeeks?: string[] }
+export interface CheckOpts { goalType?: GoalType; runEasyOnly?: boolean; runAllowed?: boolean; from?: string | null; baseOffset?: number; /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt? */ longQ?: (date: string) => boolean; /** dasselbe gespeichert im Plan: erlaubte Wochen (Montag) */ longQWeeks?: string[];
+  /** Auftrag 18: Tage, an denen die Trainingsregeln nichts Hartes erlauben (gespeichert im Plan) */ hardBlocked?: string[]; blocked?: (date: string) => boolean }
 const fixedHard = (s: any) => isHardSession(s) && (!!s.fixed || !!s.race || isGameOrRace(s) || /test/i.test(s.title || ''));
 /* Tage mit festen harten Terminen (Spiel, Wettkampf, eigener fester harter Termin), ohne Tests */
 export const fixedHardDays = (w: any) => (w.days || []).filter((d: any) => (d.sessions || []).some((s: any) => s && !s.cancelled && isHardSession(s) && (isGameOrRace(s) || !!s.race || !!s.fixed) && !/test/i.test(s.title || ''))).length;
@@ -169,11 +170,12 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
     const runs = (w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => s && s.sport === 'run' && !s.cancelled && !s.race).map((s: any) => ({ s, d })));
     const lq = runs.filter((x: any) => x.s.spec && x.s.spec.kind === 'longq' && (x.s.long || /^Lang/.test(x.s.title || '')));
     for (const x of lq) {
-      if (o.longQ && !o.longQ(x.d.date)) out.push({ rule: 'longRun', week: w.weekNumber, date: x.d.date, msg: `${x.d.date} ${x.s.title}: Tempo im langen Lauf nur in den letzten 8 Wochen vor einem Laufziel und nur jede 2. Woche.` });
+      if (o.longQ && !o.longQ(x.d.date)) out.push({ rule: 'longRun', week: w.weekNumber, date: x.d.date, msg: `${x.d.date} ${x.s.title}: Tempo im langen Lauf nur in den letzten 7 Wochen vor einem Laufziel.` });
       if (runs.some((y: any) => y !== x && isHardSession(y.s) && !/test/i.test(y.s.title || ''))) out.push({ rule: 'longRun', week: w.weekNumber, date: x.d.date, msg: `${x.d.date} ${x.s.title}: Tempo im langen Lauf und dazu ein harter Lauf in derselben Woche.` });
     }
-    if (lq.length && prevLongQ) out.push({ rule: 'longRun', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Tempo im langen Lauf zwei Wochen hintereinander.` });
-    prevLongQ = lq.length > 0; // Kalenderwochen: jede 2. Woche (eine Erholungswoche dazwischen reicht)
+    // Auftrag 18: in den letzten 7 Wochen vor einem Laufziel ist jede Woche eine Lauf-Qualität richtig (auch im langen Lauf, wenn unter
+    // der Woche kein Tag ohne harten Nachbartag frei ist); die Regel „nicht zwei Wochen hintereinander“ entfällt
+    prevLongQ = lq.length > 0; void prevLongQ;
   }
   // Anteil locker (Zeit im geplanten Training): mindestens 75 %
   const st = intensityStats(weeks.filter(w => !o.from || !w.endDate || w.endDate >= o.from), p);
@@ -224,14 +226,17 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
       const full = (w: any) => (w.days || []).filter((d: any) => (d.sessions || []).some((x: any) => x && !x.cancelled && isHardSession(x))).length >= maxHard(p, seg.phase, w.startDate || today, 4, fixedHardDays(w));
       if (seg.phase !== 'base' && sport !== 'run') needHard = Math.min(needHard, norm.filter((w: any, wi: number) => per[wi].some((x: any) => isHardSession(x) && !/test/i.test(x.title || '')) || !full(w)).length);
       // Lauf-Qualität nur, wo sie Platz hat (Lauftag ohne harten Nachbartag; langer Lauf nur im 8-Wochen-Fenster vor einem Laufziel)
-      if (sport === 'run' && seg.phase !== 'base') {
+      // Qualität nur, wo sie Platz hat (Tag ohne harten Nachbartag, von den Trainingsregeln nicht gesperrt; langer Lauf nur im Fenster vor
+      // einem Laufziel). Auftrag 18: für alle Sportarten (vorher nur Laufen), mit gesperrten Tagen
+      if ((sport === 'run' && seg.phase !== 'base') || ((o.hardBlocked || o.blocked) && sport !== 'run' && !(seg.phase === 'base' && sport === 'swim'))) {
+        const blockedAt = (dt: string) => !!((o.blocked && o.blocked(dt)) || (o.hardBlocked && o.hardBlocked.includes(dt)));
         const hardAt = (d: any, ign: any) => !!d && (d.sessions || []).some((x: any) => x !== ign && x && !x.cancelled && isHardSession(x));
         const feasible = norm.filter((w: any, wi: number) => per[wi].some((x: any) => isHardSession(x) && !/test/i.test(x.title || '')) || !full(w) && (w.days || []).some((d: any) => (d.sessions || []).some((x: any) => {
-          if (x.sport !== 'run' || x.stage || x.fixed || /^(Koppel|Wechsel)/.test(x.title || '') || (x.plannedMinutes || 0) < 25) return false;
+          if (x.sport !== sport || x.stage || x.fixed || /^(Koppel|Wechsel)/.test(x.title || '') || (x.plannedMinutes || 0) < 25 || blockedAt(d.date)) return false;
           const i = D.findIndex(y => y.d === d); if (i < 0) return false;
           if (hardAt(D[i - 1] && D[i - 1].d, null) || hardAt(D[i + 1] && D[i + 1].d, null) || hardAt(d, x)) return false;
           const long = !!x.long || /^Lang/.test(x.title || '');
-          if (long && o.longQ && !o.longQ(d.date)) return false;
+          if (long && sport === 'run' && o.longQ && !o.longQ(d.date)) return false;
           // muss sich auch wirklich in eine Qualität umwandeln lassen (Dauer, Freigabe)
           if (!flexible(x, o.from, d.date) || isLightQuality(x)) return false;
           const q = qualityFor(x, seg.phase, { ...o, goalType: o.goalType || 'fitness' } as RepairOpts, p, 0, d.date);
@@ -254,11 +259,12 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
 }
 
 /* ---------- Korrektur ---------- */
-export interface RepairOpts extends CheckOpts { goalType: GoalType; minor?: boolean; noZ5?: (date: string) => boolean; /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt? */ longQ?: (date: string) => boolean }
+export interface RepairOpts extends CheckOpts { goalType: GoalType; minor?: boolean; noZ5?: (date: string) => boolean; /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt? */ longQ?: (date: string) => boolean;
+  /** Auftrag 18: an diesem Tag nichts Hartes (Trainingsregeln: nach langem Tag, vor Spiel/Wettkampf, Erholungs- und Wettkampfwoche …) */ blocked?: (date: string) => boolean }
 const flexible = (s: any, from: string | null | undefined, date: string) => !!s && !!s.spec && !s.adjacentOk && !s.fixed && !s.race && !s.frozen && !s.stage && !/test/i.test(s.title || '') && !isGameOrRace(s) && (!from || date >= from) && ['run', 'bike', 'swim'].includes(s.sport);
 const swimRep = (sp: W.Spec) => Math.max(25, ...sp.steps.filter(x => x.mode === 'crawl' || x.mode === 'pull').map(x => x.m || 0));
 /* Locker statt hart (gleiche Dauer, höchstens 60 min Lauf bzw. 90 min Rad) */
-function easyOf(s: any, phase: string): any {
+export function easyOf(s: any, phase: string): any {
   const sp: W.Spec = s.spec; const min = s.plannedMinutes || 45;
   // gleiche Dauer wie geplant (der Wochenumfang bleibt), lange Einheiten bleiben lang
   const long = !!s.long || sp.kind === 'longq' || sp.kind === 'long';
@@ -297,6 +303,18 @@ export function qualityFor(s: any, phase: IPhase, o: RepairOpts, p: Profile, n: 
     else if (phase === 'base') q = K.runBaseVariant(ctx, Math.max(30, Math.min(60, min)), n);
     else if (o.runAllowed !== false && !o.runEasyOnly) { const rq = K.runQualityStep(phase, o.goalType, n, !!o.minor, { noZ5, level: levelOf(p), baseWeek: 4 }); if (rq) q = s.long || /^Lang/.test(s.title || '') ? K.longRunWithQuality(ctx, min, rq) : K.runQuality(ctx, rq); }
   } else if (s.sport === 'bike') {
+    // Auftrag 18: lange Ausfahrt (über 90 min): Qualitätsblock darin (erst locker, dann der harte Block, locker zu Ende), gleiche Dauer
+    if ((s.long || sp.kind === 'long') && min > 90 && phase !== 'base') {
+      const key = K.bikeKey(ctx, phase as any, o.goalType, n, 75, { noZ5 }); const hq0 = key.steps.find((x: any) => x.part === 'main' && (x.zone || 0) >= 3);
+      if (hq0) { const hq: any = { ...hq0, reps: hq0.reps || 1 };
+        while (hq.reps > 1 && hq.reps * (hq.min || 10) + (hq.reps - 1) * (hq.restMin || 3) > min - 35) hq.reps--;
+        if ((hq.min || 10) * hq.reps > min - 35) hq.min = Math.max(5, Math.floor((min - 35) / 5) * 5);
+        const qMin = hq.reps * (hq.min || 10) + (hq.reps - 1) * (hq.restMin || 3); const easy = Math.max(10, min - 15 - qMin);
+        const before = Math.max(10, Math.round(easy * 0.4 / 5) * 5), after = Math.max(5, easy - before);
+        const b = W.build({ sport: 'bike', kind: 'longq', ctx, noDistance: sp.noDistance, why: 'Qualität in der langen Ausfahrt: erst locker, dann der harte Block, locker zu Ende fahren.',
+          steps: [{ part: 'warm', min: 15, zone: 1 }, { part: 'main', min: before, zone: 2 }, hq, { part: 'main', min: after, zone: 2, note: 'locker zu Ende fahren, essen und trinken' }] } as any);
+        if (Math.abs(b.plannedMinutes - min) <= 5) return { ...s, ...b, id: s.id, long: true, hard: true, checkFix: 'quality' }; }
+    }
     if (!(phase === 'base' && levelOf(p) === 'beginner')) q = K.bikeKey(ctx, phase as any, o.goalType, n, Math.max(45, Math.min(90, min)), { noZ5 });
   } else if (s.sport === 'swim') {
     const rep = swimRep(sp);
@@ -393,8 +411,9 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o0: Rep
             const i = AD.findIndex(x => x.d === d);
             const near = [AD[i - 1], AD[i + 1]].filter(Boolean);
             if (!light && (hardExcept(d, ign) || near.some(x => hardExcept(x.d, ign)))) continue;
+            if (!light && o.blocked && o.blocked(d.date)) continue;
             const s = (d.sessions || []).find((x: any) => (m.sport ? x.sport === m.sport : !(light && x.sport === 'swim')) && flexible(x, o.from, d.date) && !isHardSession(x) && !(isLightQuality(x) && x.sport !== 'swim')
-              && (allowLong ? x.sport === 'run' && m.phase !== 'base' && (x.long || /^Lang/.test(x.title || '')) && (!o.longQ || o.longQ(d.date)) : !x.long && !/^Lang/.test(x.title || '')) && (x.plannedMinutes || 0) >= 25);
+              && (allowLong ? ((x.sport === 'run' && (!o.longQ || o.longQ(d.date))) || x.sport === 'bike') && m.phase !== 'base' && (x.long || /^Lang/.test(x.title || '')) : !x.long && !/^Lang/.test(x.title || '')) && (x.plannedMinutes || 0) >= 25);
             if (!s) continue;
             // passt die nächste Stufe der Leiter nicht in die Zeit, dann die erste (kürzere)
             const nx = qualityFor(s, m.phase as IPhase, o, p, n, d.date) || qualityFor(s, m.phase as IPhase, o, p, 0, d.date); if (nx) return { d, s, nx };

@@ -57,7 +57,7 @@ export function placeholders(goals: Goal[], A: Goal | null, today: string, fitne
 
 /* Lockere Tage nach einem Wettkampf je Distanz */
 export function easyAfterDays(t: GoalType): number {
-  return ({ tri_supersprint: 3, tri_sprint: 3, aquathlon: 3, run_5k: 3, swim_goal: 2, tri_olympic: 5, duathlon: 5, run_10k: 4, run_half: 5, bike_event: 5, tri_middle: 10, run_marathon: 14, tri_long: 14, fitness: 2 } as Record<GoalType, number>)[t] ?? 3;
+  return ({ tri_supersprint: 3, tri_sprint: 3, aquathlon: 3, run_5k: 3, swim_goal: 2, tri_olympic: 7, duathlon: 5, run_10k: 3, run_half: 7, bike_event: 5, tri_middle: 10, run_marathon: 14, tri_long: 14, fitness: 2 } as Record<GoalType, number>)[t] ?? 3;
 }
 /* Wochen je Phase vor einem Ziel (ideal); bei wenig Zeit wird anteilig gekürzt */
 const SPEC_W: Partial<Record<GoalType, number>> = { run_5k: 3, run_10k: 4, run_half: 6, run_marathon: 8, tri_supersprint: 3, tri_sprint: 4, tri_olympic: 6, tri_middle: 8, tri_long: 10, duathlon: 4, aquathlon: 3, bike_event: 6, swim_goal: 3, fitness: 0 };

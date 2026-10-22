@@ -148,7 +148,9 @@ test('verschieben bietet abends den heutigen Tag nicht mehr an', () => {
 
 test('D4: Schnellaktionen passen zur Lage', () => {
   const W = world('jugend-langdistanz');
-  expect(quickOptions(W.ctx(), {}).map(o => o.label)).toEqual(expect.arrayContaining(['Keine Zeit heute', "Mir geht's nicht gut", 'Tag tauschen']));
+  // Auftrag 18: heute kann ein Ruhetag sein (mindestens 1 pro Woche) – dann passen die Aktionen ohne Einheit
+  const todayOwn = (W.day(W.today) || { sessions: [] }).sessions.some((s: any) => s.sport !== 'rest' && s.sport !== 'football' && !s.cancelled);
+  expect(quickOptions(W.ctx(), {}).map(o => o.label)).toEqual(expect.arrayContaining(todayOwn ? ['Keine Zeit heute', "Mir geht's nicht gut", 'Tag tauschen'] : ['Was steht morgen an?', 'Woche leichter']));
   W.say('Ich bin krank'); W.say('ja');
   expect(quickOptions(W.ctx(), {}).map(o => o.label)).toContain('Wieder gesund');
   // jede Schnellaktion führt zu einer sinnvollen Antwort (2 Tipps)

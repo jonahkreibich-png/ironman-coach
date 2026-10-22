@@ -67,7 +67,8 @@ describe('Umfang nach den Vorgaben', () => {
     let prev = 95;
     for (const w of later) {
       const lr = longRun(w);
-      if (!lr || /test/i.test(lr.title)) continue;
+      // Auftrag 18: in Koppel-Wochen ist der Sonntag bewusst kürzer (kein langer Lauf) und kein Bezug
+      if (!lr || /test/i.test(lr.title) || !lr.long) continue;
       expect(lr.plannedMinutes).toBeLessThanOrEqual(100);
       if (!w.isRecoveryWeek) { expect(lr.plannedMinutes - prev).toBeLessThanOrEqual(10); prev = lr.plannedMinutes; }
       expect(own(w)).toBeLessThanOrEqual(12.05); // Wochenlimit 15 h inklusive 3 h Fußball
@@ -97,11 +98,14 @@ describe('Aufbau einer normalen Woche', () => {
       expect(day(w, 2).sessions.some((s: any) => s.sport === 'strength' && s.area === 'lower')).toBe(true);
       expect(day(w, 5).sessions.some((s: any) => s.sport === 'strength' && s.area === 'upper')).toBe(true);
       expect(day(w, 5).sessions.some((s: any) => /Spiel/.test(s.title))).toBe(true);
-      expect(day(w, 6).sessions.some((s: any) => s.sport === 'swim')).toBe(true);
+      // Auftrag 18: höchstens 2 Sportarten pro Tag – in Koppel-Wochen (Rad + Koppellauf am Samstag) wandert das Schwimmen auf den Sonntag
+      const brick = day(w, 6).sessions.some((s: any) => /^Koppellauf/.test(s.title));
+      expect(day(w, brick ? 0 : 6).sessions.some((s: any) => s.sport === 'swim')).toBe(true);
     }
   });
   test('Mi Rad: Sweet Spot ab Woche 8 (3×8 → 3×12 → 2×20), vorher locker, Woche 7 der Radtest', () => {
-    expect(titles(W('2026-10-19'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
+    // Auftrag 18: in der ersten Woche ist Mittwoch der Ruhetag (sonst kein freier Tag in der Woche)
+    expect(titles(W('2026-10-19'), 3)[0] || 'Ruhetag').toMatch(/^(Lockere Ausfahrt|Ruhetag)/);
     expect(titles(W('2026-10-26'), 3)[0]).toBe('Radtest 20 min');
     expect(titles(W('2026-11-02'), 3)[0]).toMatch(/^Rad-Intervalle \d×8 min Sweet Spot/);
     expect(titles(W('2026-11-09'), 3)[0]).toMatch(/^Lockere Ausfahrt/);
@@ -109,18 +113,15 @@ describe('Aufbau einer normalen Woche', () => {
     // Abwechslung: nach zwei Sweet-Spot-Wochen Kraftausdauer, dann Sweet Spot weiter (2×20)
     expect(titles(W('2026-11-23'), 3)[0]).toMatch(/^Rad-Intervalle \d×\d+ min Kraftausdauer/);
     expect(titles(W('2026-11-30'), 3)[0]).toMatch(/^Rad-Intervalle 2×20 min Sweet Spot/);
-    for (const w of future.slice(0, 12)) expect(day(w, 3).sessions.find((s: any) => s.sport === 'bike').plannedMinutes).toBeLessThanOrEqual(90);
+    for (const w of future.slice(1, 12)) expect(day(w, 3).sessions.find((s: any) => s.sport === 'bike').plannedMinutes).toBeLessThanOrEqual(90);
   });
-  test('Do Lauf 40-50 min Zone 2, ab Woche 8 mit 4-6 Steigerungsläufen', () => {
-    for (const w of future.slice(0, 12)) {
-      const run = day(w, 4).sessions.find((s: any) => s.sport === 'run');
-      // Grundlage: im Wechsel Hügelsprints, Fahrtspiel, Steigerungen (locker, höchstens kurz Zone 3)
-      expect(['Zone 2', 'Zone 3']).toContain(run.zone); expect(run.hard).toBeFalsy();
-      if (!w.isRecoveryWeek) { expect(run.plannedMinutes).toBeGreaterThanOrEqual(40); expect(run.plannedMinutes).toBeLessThanOrEqual(50); }
+  // Auftrag 18: mindestens ein Ruhetag pro Woche. Der Donnerstag liegt zwischen der Rad-Qualität (Mi) und dem Spiel (Fr) und ist der Ruhetag;
+  // der lockere Lauf dort entfällt (Laufen nur Do/Sa/So erlaubt, Sa nach dem Spiel und So mit dem langen Lauf belegt).
+  test('Do Ruhetag zwischen Rad-Qualität und Spiel, jede Woche mindestens ein freier Tag', () => {
+    for (const w of future.slice(1, 16)) {
+      expect(day(w, 4).sessions.filter((s: any) => s.sport !== 'rest')).toEqual([]);
+      expect(w.days.filter((d: any) => !d.sessions.some((s: any) => s.sport !== 'rest')).length).toBeGreaterThanOrEqual(1);
     }
-    expect(day(W('2026-10-19'), 4).sessions[0].description).not.toMatch(/Steigerungsläufe/);
-    expect(day(W('2026-11-02'), 4).sessions[0].description).toMatch(/Steigerungsläufe|Hügelsprints|zügig/);
-    expect(day(W('2026-11-16'), 4).sessions[0].description).toMatch(/Steigerungsläufe|Hügelsprints|zügig/);
   });
   // Auftrag 17: Koppel nur gezielt: nie in der Grundlage oder Erholung, im Aufbau höchstens jede 3., spezifisch jede 2. Woche, kurz
   test('Sa Koppellauf nur im Aufbau/spezifisch, höchstens jede 2.-3. Woche, kurz, nur wenn gut erholt', () => {
