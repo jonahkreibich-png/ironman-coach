@@ -2,6 +2,8 @@
 
 ## Auftrag 17: Soll/Ist, Schwimmen, Plan-Balance, Übersicht, großer Test (22.10.)
 
+**Live in der echten App (Version 3.4.0)**, vorher in stamio-test mit einer Kopie deiner Daten geprüft. Sicherungen: `data-export/prod-vor-release17.sql`, `prod-2026-10-22.sql`, `test-vor-kopie-2026-10-22-*.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Kraul 50 m), Einstellungen, eine Coach-Nachricht „Plan angepasst“ und alte Schwimm-Anpassungen (als rückgängig markiert). Alle 286 Datensätze sind erhalten; dein Lauf von heute früh bleibt, wie er ist.
+
 **Von Codex übernommen:** Belastungsrechnung, Kraftvorlagen, Fortschritts-Diagramme, Trends, Ergebnis-Werte, Score-Änderungen, Soll/Ist-Grundlage, Lexikon-Anfang. **Entfernt:** Codex' Planungs-Änderungen (12 Tests rot, Tests gelockert) und Diagnose-Dateien. Der Plan-Audit mit deinen Daten liegt nur in `data-export/` (nicht im Git). Eine AGENTS.md gibt es nicht.
 
 **Fehler, Ursache, Lösung**
@@ -47,7 +49,7 @@ Dreifach-Tage: vorher 0, nachher 0. Ruhetage: 0 (Mo Training, Di-So eigene Einhe
 
 **Großer Test (nur Test-Umgebung, erfundene Nutzer):** 65 Nutzer (14-75 J., Einsteiger bis Erfahrene, alle Ziele und Sportart-Kombinationen, mit/ohne Teamsport, Kraul ja/etwas/nein, verschiedene Hilfsmittel, wenig/viel Zeit, dazu Kraul 25 m, Kraul 50 m, Triathlet + Fußball, Auslasser/Korrigierer, widersprüchliche Angaben). Je Nutzer: Fragebogen → Plan → 3 Wochen mit weniger als geplant, ausgelassenen und Extra-Einheiten → Korrekturen (72) → Coach-Fragen → Scores/Prognose → Profil ändern. Automatisch geprüft: Soll ≠ Ist, nur gewählte Sportarten, keine Dreifach-Tage, harte Einheiten pro Woche, Abstand, Umfang, realistische Meter/Zeit, nur vorhandene Hilfsmittel, Kraul-Stücke ≤ Können, Namen, Stufe ≤ Eingetragenem. Ergebnis: 3 Fehlerarten gefunden (oben) und behoben, danach 0 Befunde. Bildschirme (11 je Nutzer) für die 5 neuen und jeden fünften der übrigen in Chromium und WebKit: nichts ragt heraus, keine Konsolen-Fehler, keine Betreiber-Infos, keine fremden Daten.
 
-**Getestet:** typecheck, 1.729 Unit-Tests, Build, alle Browser-Tests (Chromium + WebKit). Jonahs Plan zuerst an einer Kopie in stamio-test.
+**Getestet:** typecheck, 1.729 Unit-Tests, Build, 299 Browser-Tests (Chromium + WebKit). Dein Plan zuerst an einer Kopie in stamio-test, danach deine echten Daten in der echten App angezeigt: keine Fehler, nichts ragt heraus, „Korrigiert: 50 m“ im Coach, keine 100-m-Stücke mehr.
 **Nicht getestet:** echte KI-Antworten mit dem neuen Prüfer (nur mit nachgebauten Antworten); dein iPhone selbst.
 **Offen:** Die nächste Kraul-Stufe kommt erst, wenn du 100 m in 2 Einheiten einträgst. Ein fester Ruhetag fehlt in deiner Woche (so vorgegeben); sag Bescheid, wenn du einen willst.
 
