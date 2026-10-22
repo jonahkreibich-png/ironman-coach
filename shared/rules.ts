@@ -56,7 +56,10 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
     if (refMin >= 60 && cur > Math.max(refMin * maxInc, refMin + 15) + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
     // Laufumfang ohne Wettkampf (der Wettkampf selbst ist keine Steigerung)
     const runOf = (x: any) => (x.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport === 'run' && !s.race && !s.cancelled).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
-    const refRun = runOf(ref), curRun = runOf(w);
+    // Auftrag 17: eine Woche mit Lauftest (statt langem Lauf) ist kein Bezug für den Laufumfang
+    const runTest = (x: any) => (x.days || []).some((d: any) => (d.sessions || []).some((s: any) => s && s.sport === 'run' && /^Lauftest/.test(s.title || '')));
+    let jr = j; while (jr > 0 && (runTest(all[jr]) || all[jr].isRecoveryWeek || all[jr].reduced || all[jr].entry || all[jr].phase === 'taper' || all[jr].phase === 'race' || (all[jr].races || []).length)) jr--;
+    const refRun = runOf(all[jr]), curRun = runOf(w);
     if (refRun >= 40 && curRun > refRun * maxInc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });
   }
   // Harte Tage

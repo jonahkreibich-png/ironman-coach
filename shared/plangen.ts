@@ -62,6 +62,8 @@ export interface GenInput {
   hoursUnknown?: boolean;
   /** Auftrag 17: wirklich erledigtes eigenes Training (Minuten, meiste der letzten 3 Wochen ohne Krankheit): Start höchstens +Steigerung darauf */
   recentOwnMin?: number | null;
+  /** Auftrag 17: längster wirklich erledigter Lauf / längste Ausfahrt der letzten 4 Wochen (Minuten): lange Einheiten wachsen von dort */
+  recentLong?: { run?: number | null; bike?: number | null } | null;
 }
 /* CTL ist etwa die tägliche Belastung (TSS) der letzten 6 Wochen. Lockeres Ausdauertraining bringt etwa 50 TSS pro Stunde. */
 export const TSS_PER_HOUR = 50;
@@ -394,7 +396,11 @@ export function generatePlan(inp: GenInput): GenResult {
   let prevSunday: any[] = [];
   /* Lauf-Geh-Stufen: so viele Einheiten wie in der ersten Woche (nicht kürzbar, eine mehr wären +33-50 % Laufumfang) */
   let runStageN: number | null = null;
-  let lastLR: number | null = cont && cont.lastLongRun ? cont.lastLongRun : null;
+  // Auftrag 17: lange Einheiten wachsen vom wirklich Erledigten aus (nie vom alten Soll, wenn weniger gemacht wurde)
+  const lowerOf = (a: number | null | undefined, b: number | null | undefined) => a && b ? Math.min(a, b) : a || b || null;
+  const lastLongRun0 = lowerOf(cont && cont.lastLongRun, inp.recentLong && inp.recentLong.run);
+  const lastLongBike0 = lowerOf(cont && cont.lastLongBike, inp.recentLong && inp.recentLong.bike);
+  let lastLR: number | null = lastLongRun0;
   const gq: { bikeN: Record<string, number>; runQN: Record<string, number>; swimN: Record<string, number>; brickN: Record<string, number> } = { bikeN: {}, runQN: {}, swimN: {}, brickN: {} };
   const blockWeekOf = (wi: number) => { let k = 0; for (let i = wi - 1; i >= 0 && !phases[i].recovery; i--) k++; return k; };
   // Woche innerhalb der Grundlage (für Tempo in der späten Grundlage), bei Fortsetzung mit den Wochen davor
@@ -405,7 +411,7 @@ export function generatePlan(inp: GenInput): GenResult {
   const strideSlot = pat ? pat.slots.find(x => x.stridesFrom) : null;
   const brickSlot = pat ? pat.slots.find(x => x.role === 'brick' && x.from) : null;
   const ks = weeksSince(keySlot && keySlot.keyFrom);
-  let pst: WP.PatternState = { longRun: (cont && cont.lastLongRun) || 60, longBike: (cont && cont.lastLongBike) || 90, swim: (cont && cont.lastSwim) || 45,
+  let pst: WP.PatternState = { longRun: lastLongRun0 || 60, longBike: lastLongBike0 || 90, swim: (cont && cont.lastSwim) || 45,
     keyWeeks: ks - Math.floor(ks / 4), strideWeeks: weeksSince(strideSlot && strideSlot.stridesFrom), brickWeeks: weeksSince(brickSlot && brickSlot.from),
     lastTestMon: pat ? ((pat.targets || []).filter(t => (t.tests || []).length && t.start < start).map(t => t.start).sort().pop() || null) : null,
     runRef: cont && cont.lastNormalWeek ? weekMinutes(cont.lastNormalWeek, 'run') || null : null };
@@ -894,13 +900,13 @@ export function generatePlan(inp: GenInput): GenResult {
   // Umfang in einem Durchgang begrenzen: jede Woche höchstens +10 % (unter 18 +8 %) gegenüber der letzten normalen Woche
   const prevRef = cont && cont.lastNormalWeek ? [cont.lastNormalWeek] : [];
   // langer Lauf zuerst (kürzt nur), damit die Steigerung danach gegen die endgültigen Wochen geprüft wird (Auftrag 15)
-  enforceLongRun(weeks, cont && cont.lastLongRun ? cont.lastLongRun : null);
+  enforceLongRun(weeks, lastLongRun0);
   enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null);
   // Auftrag 15: Erholungswochen spürbar leichter als die letzte normale Woche (vorher oft gleich viel, weil das Ziel über dem lag, was die Einheiten hergeben)
   enforceRecovery(weeks, prevRef[0] || null);
   // Auftrag 17: Kürzungen oben können einen langen Lauf verkürzt haben; danach wieder höchstens +10 min pro Woche und der Umfang
   // wieder höchstens +10 % (beides kürzt nur, deshalb endet es)
-  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, cont && cont.lastLongRun ? cont.lastLongRun : null); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null); }
+  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null); }
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
     const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };

@@ -47,8 +47,10 @@ export function replanPlan(old: any, profile: Profile, goals: Goal[], today: str
   const eff = C.applyAdjustments(old.weeks || [], o.adjustments || {});
   const load = o.state ? C.loadBaseline({ ...o.state, adjustments: o.adjustments || o.state.adjustments }, eff, today) : null;
   // Auftrag 17: Steigerung gedeckelt durch das wirklich erledigte eigene Training der letzten Wochen
-  const recentOwnMin = o.state ? C.recentOwnMinutes({ ...o.state, adjustments: o.adjustments || o.state.adjustments }, old.weeks || [], from) : null;
-  const gen = generatePlan({ profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, from, frozen: frozenDays(old, o.adjustments, o.state, from), measuredStartMin: o.measuredStartMin ?? null, recentOwnMin,
+  const st0 = o.state ? { ...o.state, adjustments: o.adjustments || o.state.adjustments } : null;
+  const recentOwnMin = st0 ? C.recentOwnMinutes(st0, old.weeks || [], from) : null;
+  const recentLong = st0 ? { run: C.recentLongest(st0, old.weeks || [], from, 'run'), bike: C.recentLongest(st0, old.weeks || [], from, 'bike') } : null;
+  const gen = generatePlan({ profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, from, frozen: frozenDays(old, o.adjustments, o.state, from), measuredStartMin: o.measuredStartMin ?? null, recentOwnMin, recentLong,
     continueFrom: continuationOf(old, today, o.state ? { ...o.state, adjustments: o.adjustments || o.state.adjustments } : undefined, from), needTests: o.needTests,
     stages: { swim: stages.swim === undefined ? undefined as any : stages.swim, runwalk: stages.runwalk === undefined ? undefined as any : stages.runwalk } });
   const next = transitionPlan(old, gen.plan, today, from);

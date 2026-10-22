@@ -691,16 +691,31 @@ function ownDoneMinutes(state, weeks, mon, sun) {
   recordedActivities(state).filter(a => a.date >= mon && a.date <= sun && !a.sessionId && !used.has(a.id) && a.sport !== 'football' && toNum(a.min)).forEach(a => { min += toNum(a.min); n++; });
   return { min: Math.round(min), n };
 }
-/* Bezug für die Steigerung: das meiste eigene Training einer der letzten 3 abgeschlossenen Wochen (ohne Krankheitswochen). null ohne Daten. */
+/* Bezug für die Steigerung: das meiste eigene Training einer der letzten 3 abgeschlossenen Wochen. Wochen mit mindestens 2 Krankheitstagen
+   zählen nicht, dafür geht es eine Woche weiter zurück (höchstens 5 Wochen). null ohne Daten. */
 function recentOwnMinutes(state, weeks, date) {
   const mon = addDays(date, -((new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7));
-  const vals = [];
-  for (let k = 1; k <= 3; k++) {
+  const vals = []; let looked = 0;
+  for (let k = 1; k <= 5 && looked < 3; k++) {
     const m = addDays(mon, -7 * k), s = addDays(m, 6);
-    if ((state.illnessPeriods || []).some(p => p && p.start && p.start <= s && (!p.end || p.end >= m))) continue;
+    let sick = 0; for (let d = m; d <= s; d = addDays(d, 1)) if (illnessAt(state.illnessPeriods, d)) sick++;
+    if (sick >= 2) continue;
+    looked++;
     const r = ownDoneMinutes(state, weeks, m, s); if (r.n >= 2) vals.push(r.min);
   }
   return vals.length ? Math.max(...vals) : null;
+}
+
+/* Auftrag 17: längste wirklich erledigte Einheit einer Sportart (Minuten) in den letzten 4 Wochen; null ohne Daten */
+function recentLongest(state, weeks, date, sport, days = 28) {
+  let best = 0; const from = addDays(date, -days);
+  planDays(applyAdjustments(weeks, state.adjustments || {})).filter(d => d.date < date && d.date >= from).forEach(d => d.sessions.forEach(x => {
+    const st = (state.sessions || {})[x.id]; if (!st || !st.completed || x.sport !== sport || x.race) return;
+    const m = toNum(actualMetrics(st, st.activityId ? (state.activities || {})[st.activityId] : null).min); if (m) best = Math.max(best, m);
+  }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d < date && d >= from) (l || []).forEach(c => { if (c && c.sport === sport && c.completed !== false) { const m = toNum(actualMetrics(c, null).min); if (m) best = Math.max(best, m); } }); });
+  recordedActivities(state).filter(a => a.sport === sport && !a.sessionId && a.date < date && a.date >= from).forEach(a => { if (toNum(a.min)) best = Math.max(best, toNum(a.min)); });
+  return best || null;
 }
 
 /* ---------- Wöchentlich (Sonntag 18 Uhr) für die nächste Woche ---------- */
@@ -957,5 +972,5 @@ export {
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
-  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, ownDoneMinutes, recentOwnMinutes
+  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

@@ -123,12 +123,13 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
     } else if (sl.role === 'lower' || sl.role === 'upper') {
       const area = sl.role;
       // Tag vor dem Radtest: Unterkörper nur leicht (2 Sätze, nichts Explosives)
-      const easy = area === 'lower' && bikeTestDow >= 0 && ((sl.dow + 1) % 7) === bikeTestDow;
+      // Auftrag 17: auch vor der Rad-Qualität nur leicht (die Beine sollen für den harten Tag frisch sein)
+      const easy = area === 'lower' && ((bikeTestDow >= 0 && ((sl.dow + 1) % 7) === bikeTestDow) || (!!keySlot && !rec && !inp.entry && ((sl.dow + 1) % 7) === keySlot.dow));
       // Auftrag 17: im Aufbau und in der spezifischen Phase Kraft als Erhaltung (25-30 min)
       const min = easy ? 25 : rec ? 30 : ph === 'build' || ph === 'specific' ? Math.min(30, r5(mid(sl.min || [30, 35]))) : r5(mid(sl.min || [30, 35]));
       const spec = W.strengthArea(area, { ...inp.strength, light: rec && !easy, easy, minutes: min,
         why: area === 'lower' ? 'kräftige Beine und Hüfte schützen Knie, Leiste und Achillessehne und machen dich beim Laufen ökonomischer.' : 'Schultern und Rücken stark machen, das hilft beim Kraulen und schützt die Schulter.' });
-      if (easy) spec.tip = 'Morgen ist der Radtest: nur 2 Sätze, nichts Explosives.';
+      if (easy) spec.tip = bikeTestDow >= 0 && ((sl.dow + 1) % 7) === bikeTestDow ? 'Morgen ist der Radtest: nur 2 Sätze, nichts Explosives.' : 'Morgen ist die Rad-Qualität: nur 2 Sätze, nichts Explosives.';
       out.push({ dow: sl.dow, slot: sl, s: null, strength: true, make: () => spec });
     } else if (sl.sport === 'bike' && sl.role === 'long') {
       out.push({ dow: sl.dow, slot: sl, s: null, long: true, make: (min) => { const sp = K.bikeLongVariant(W.bikeLong(inp.bikeOut, min), st.weekN || 0, ph, rec || !!inp.entry); /* spezifisch: lange Ausfahrt bleibt locker (Freitag Spiel, Sonntag Qualitätslauf), Wettkampftempo im Koppellauf und am Mittwoch */ return sp; }, min: r5(mid(longBikeR)), adj: longBikeR });
@@ -170,6 +171,23 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
     const diff = inp.ownMin - total(); if (Math.abs(diff) < 5) break;
     const [lo, hi] = x.adj!;
     x.min = r5(Math.max(lo, Math.min(hi, (x.min || 0) + diff)));
+  }
+  // Auftrag 17: liegt die Woche dann noch über dem Umfang (z. B. wegen der Obergrenze aus dem echten Training), werden auch die langen
+  // Einheiten und das Schwimmen kürzer – nie unter sinnvolle Mindestlängen, Tests und Lernstufen bleiben
+  {
+    // in Erholungs- und Einstiegswochen dürfen die Einheiten kürzer werden als sonst
+    const easyW = rec || !!inp.entry;
+    const floor = (x: any) => x.long ? (x.slot.sport === 'bike' ? (easyW ? 45 : 60) : (easyW ? 35 : 45)) : x.slot.role === 'swim' ? (easyW ? 25 : 30) : x.slot.sport === 'bike' ? (easyW ? 30 : 40) : x.slot.sport === 'run' ? (easyW ? 25 : 30) : (x.min || 0);
+    // zuerst die kurzen Einheiten unter der Woche, dann Schwimmen, zuletzt die langen Einheiten
+    const cut = [...out.filter(x => !x.long && !x.test && (x.slot.sport === 'bike' || x.slot.sport === 'run') && x.adj), ...out.filter(x => x.slot.role === 'swim' && !x.test), ...out.filter(x => x.long && x.slot.sport === 'bike'), ...out.filter(x => x.long && x.slot.sport === 'run')];
+    for (let pass = 0; pass < 3; pass++) for (const x of cut) {
+      const over = total() - inp.ownMin; if (over <= 10) break;
+      if (x.min == null) continue;
+      // ausdrückliche Vorgaben der Woche (lange Ausfahrt, langer Lauf, Schwimmen) bleiben
+      if (t && ((x.long && x.slot.sport === 'bike' && t.longBike) || (x.long && x.slot.sport === 'run' && t.longRun) || (x.slot.role === 'swim' && t.swim))) continue;
+      const nx = r5(Math.max(floor(x), x.min - Math.min(over, x.min * 0.35)));
+      if (nx < x.min) x.min = nx;
+    }
   }
   // Laufen steigt höchstens um inc gegenüber der letzten Aufbauwoche: zuerst den lockeren Lauf kürzen (nicht unter 30 min)
   if (st.runRef && inp.inc && !rec) {
