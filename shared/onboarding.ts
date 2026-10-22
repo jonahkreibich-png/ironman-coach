@@ -204,7 +204,7 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   // Häufigkeit nie öfter als Tage, an denen die Sportart laut Wochenraster geht
   if (a.dayLoad && Object.values(a.dayLoad).some((x: any) => +x > 0)) weekSummary({ ...a, sports: p.sports }, today).sports.forEach(x => { const f = (p.freq || {})[x.sport as SportKey]; if (f) p.freq = { ...p.freq, [x.sport]: [Math.min(f[0], x.days), Math.min(f[1], x.days)] }; });
   p.skills = {
-    swimCrawl: a.swimCrawl || null, swimCrawlM: num(a.swimCrawlM), swimBreast: a.swimBreast === true ? true : a.swimBreast === false ? false : undefined,
+    swimCrawl: a.swimCrawl || null, swimCrawlM: a.swimCrawl === 'yes' || a.swimCrawl === 'some' ? num(a.swimCrawlM) : null /* Auftrag 17: alte Meterangabe gilt nicht bei „kann nicht kraulen“ */, swimBreast: a.swimBreast === true ? true : a.swimBreast === false ? false : undefined,
     runContinuousMin: num(a.runContinuousMin), bikeLongestMin: num(a.bikeLongestMin),
     poolM: a.poolM === '50' || a.poolM === 50 ? 50 : a.poolM === 'both' ? 'both' : a.poolM === '25' || a.poolM === 25 ? 25 : null,
     openWater: a.openWater === true ? true : a.openWater === false ? false : null,

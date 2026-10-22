@@ -457,7 +457,11 @@ export function scaleSpec(spec: Spec, f: number): Spec {
 }
 export function rebuildScaled(session: any, f: number): any {
   if (!session || !session.spec) return null;
-  const b = build(scaleSpec(session.spec, f));
+  let b = build(scaleSpec(session.spec, f));
+  // Auftrag 17: eine harte Einheit (kein Test) wird nicht kürzer als 25 min gekürzt, sonst bleibt vom Hauptteil nur ein Stück übrig
+  if (b.hard && session.spec.kind !== 'test' && session.sport !== 'swim' && b.plannedMinutes < 25 && (session.plannedMinutes || 0) >= 25) {
+    for (let g = f; g < 1 && b.plannedMinutes < 25; g = Math.min(1, g + 0.05)) b = build(scaleSpec(session.spec, g));
+  }
   return { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec };
 }
 

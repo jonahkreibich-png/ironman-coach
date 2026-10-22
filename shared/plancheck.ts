@@ -81,7 +81,9 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
       }
       if (!ts && list.some((s: any) => s.sport === 'football')) out.push({ rule: 'teamSport', week: w.weekNumber, date: d.date, msg: `${d.date}: Teamsport im Plan, obwohl keiner angegeben ist.` });
       // Kraft nicht direkt vor harten Tagen
-      if (list.some((s: any) => s.sport === 'strength')) {
+      // Auftrag 17: bewusst leichte Kraft (2 Sätze, nichts Explosives) vor dem harten Tag ist erlaubt
+      const lightStrength = (s: any) => !!s.spec && Array.isArray(s.spec.exercises) && s.spec.exercises.length > 0 && s.spec.exercises.every((e: any) => /leicht/.test(e.note || ''));
+      if (list.some((s: any) => s.sport === 'strength' && !lightStrength(s))) {
         const next = (w.days || []).find((x: any) => x.date === addDays(d.date, 1)) || (weeks[wi + 1] && weeks[wi + 1].days[0].date === addDays(d.date, 1) ? weeks[wi + 1].days[0] : null);
         if (next && next.sessions.some((s: any) => s && !s.cancelled && (s.race || (s.sport === 'football' && /spiel/i.test(s.title || '')) || isIntense(s)))) out.push({ rule: 'strength', week: w.weekNumber, date: d.date, msg: `${d.date}: Kraft direkt vor einem harten Tag.` });
       }

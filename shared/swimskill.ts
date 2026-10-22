@@ -68,7 +68,9 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
     evidence.mode = { value: storedMode, baseline: storedMode, manual: true };
   } else {
     const baseline = modeRecord ? modeRecord.baseline : storedMode;
-    mode = crawl >= W.SWIM_NORMAL_M ? 'yes' : crawl > 0 ? (baseline === 'yes' ? 'yes' : 'some') : baseline;
+    // Auftrag 17: die Kraul-Art steigt nur mit echtem Nachweis, nie aus einer gespeicherten Zahl allein
+    const seen = best.authoritative ? Math.min(crawl, num(best.crawl) || 0) : crawl;
+    mode = seen >= W.SWIM_NORMAL_M ? 'yes' : seen > 0 ? (baseline === 'yes' ? 'yes' : 'some') : baseline;
     if (modeRecord || mode !== storedMode) evidence.mode = { value: mode, baseline };
   }
   if (!best.authoritative && crawlValue !== num(sk.swimCrawlM)) evidence.mode = { value: mode || null, baseline: mode || null, manual: true };

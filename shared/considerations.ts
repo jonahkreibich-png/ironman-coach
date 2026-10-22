@@ -34,7 +34,7 @@ export function tipFor(sport: string, rules: Rule[]): string | null {
     if (has('calf')) return 'Wade: gut aufwärmen, keine Bergsprints.';
     if (rules.some(x => x.kind === 'body' && x.noDownhill)) return 'Strecke ohne steile Bergab-Stücke wählen.';
   }
-  if (sport === 'swim' && has('shoulder')) return 'Schulter: ruhige Züge, keine Paddles, bei Schmerz Beinschlag statt Armzug.';
+  if (sport === 'swim' && has('shoulder')) return 'Schulter: ruhige, lange Züge, bei Schmerz Beinschlag statt Armzug.';
   if (sport === 'strength' && has('back')) return 'Rücken: Bauch anspannen, keine schweren Hebeübungen.';
   if (has('asthma')) return 'Asthma: lange aufwärmen, Spray griffbereit.';
   return null;

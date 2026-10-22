@@ -2,6 +2,12 @@
 
 Nur das, was du selbst tun musst.
 
+## Neu am 22.10. (Auftrag 17)
+
+Nichts Pflicht. App einmal neu öffnen (bei „Neue Version“ neu laden).
+- **Schwimmen:** Trag nach jeder Schwimmeinheit „Kraul am Stück“ ein (was du wirklich geschafft hast). Die nächste Stufe (100-m-Stücke) kommt, sobald du 100 m in 2 Einheiten einträgst.
+- **Ruhetag:** Deine Woche hat keinen festen Ruhetag (Mo Training, Di-So Einheiten, wie von dir vorgegeben). Willst du einen, sag Claude welchen Tag.
+
 ## Stand 20.10.2026
 
 **Abschluss 17:35:** Die Änderungen sind jetzt unter https://coach-app-efc7.pages.dev veröffentlicht. App und Backend sind bei Cloudflare bestätigt; die Datenbanksicherung liegt lokal vor. Bei noch alter Anzeige die App neu öffnen beziehungsweise neu laden. Die folgenden Hinweise sind ältere Zwischenstände.

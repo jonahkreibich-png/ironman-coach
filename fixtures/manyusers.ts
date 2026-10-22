@@ -90,3 +90,28 @@ export function manyUsers(): ManyUser[] {
   out.push({ ...build(out.length, { type: 'tri_sprint', name: 'Sprint', weeks: 26, sports: ['swim', 'bike', 'run', 'strength'] }, ['swim', 'bike', 'run', 'strength'], { age: 20, team: 2, crawl: 'yes', exp: 2 }), id: 'n60-team-tri' });
   return out;
 }
+
+/* Auftrag 17, Punkt 7: dazu Personen für die neuen Fälle – Einsteiger mit 25 bzw. 50 m Kraul, Triathlet mit Fußball (Training und Spiel),
+   jemand, der oft auslässt und Werte korrigiert, und jemand mit fehlenden und widersprüchlichen Angaben. Opt: Verhalten in der Simulation. */
+export interface ManyUser17 extends ManyUser { skipper?: boolean; corrector?: boolean }
+export function manyUsers17(): ManyUser17[] {
+  const out: ManyUser17[] = manyUsers();
+  const base = (i: number, g: G, sp: string[], o: any = {}) => build(i, g, sp, o);
+  const k25 = base(60, { type: 'tri_sprint', name: 'Sprint', weeks: 26, sports: ['swim', 'bike', 'run'] }, ['swim', 'bike', 'run'], { age: 35, exp: 0, crawl: 'some', team: 0, inj: 'keine', ill: false });
+  k25.answers.swimCrawlM = 25; k25.answers.swimGear = [];
+  out.push({ ...k25, id: 'n61-kraul-25' });
+  const k50 = base(61, { type: 'tri_olympic', name: 'Olympisch', weeks: 36, sports: ['swim', 'bike', 'run', 'strength'] }, ['swim', 'bike', 'run', 'strength'], { age: 28, exp: 1, crawl: 'yes', team: 0, inj: 'keine', ill: false });
+  k50.answers.swimCrawlM = 50; k50.answers.swimGear = ['board', 'buoy']; k50.answers.swimBreast = true;
+  out.push({ ...k50, id: 'n62-kraul-50' });
+  const tri = base(62, { type: 'tri_middle', name: 'Mitteldistanz', weeks: 40, sports: ['swim', 'bike', 'run', 'strength'] }, ['swim', 'bike', 'run', 'strength'], { age: 17, exp: 4, crawl: 'yes', team: 0, time: 3, inj: 'keine', ill: false });
+  Object.assign(tri.answers, { swimCrawlM: 50, swimGear: ['board', 'buoy'], swimBreast: true, teamYes: true, teamName: 'Fußball', teamTrainingDays: [1, 3], teamTrainingMinutes: 90, teamGames: true, teamGameDays: [5], teamGameMinutes: 90,
+    goals: [{ id: 'g62a', type: 'run_half', name: 'Halbmarathon', date: '2027-04-04', priority: 'B', timeMode: 'total' }, { id: 'g62', type: 'tri_middle', name: 'Mitteldistanz', date: '2027-07-25', priority: 'A', timeMode: 'total' }] });
+  out.push({ ...tri, id: 'n63-tri-fussball' });
+  const sk = base(63, { type: 'run_10k', name: '10 km', weeks: 14, sports: ['run', 'bike', 'swim'] }, ['run', 'bike', 'swim'], { age: 46, exp: 3, crawl: 'yes', team: 0, inj: 'keine', ill: false });
+  out.push({ ...sk, id: 'n64-auslasser-korrigierer', skipper: true, corrector: true });
+  const bad = base(64, { type: 'run_marathon', name: 'Marathon', weeks: 10, sports: ['run', 'swim'] }, ['run', 'swim'], { age: 52, exp: 0, crawl: 'no', team: 0, time: 0, inj: 'keine', ill: false });
+  Object.assign(bad.answers, { weeklyHoursNow: 12, runContinuousMin: 5, swimCrawlM: 400, swimGear: undefined, poolM: undefined, sleep: undefined });
+  delete bad.answers.weightKg; delete bad.answers.heightCm;
+  out.push({ ...bad, id: 'n65-widerspruechlich' });
+  return out;
+}

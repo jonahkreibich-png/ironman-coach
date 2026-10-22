@@ -31,7 +31,7 @@ const local = `data-export/prod-${day}-migriert.sqlite`;
 if (fs.existsSync(local)) fs.unlinkSync(local);
 const db = new DatabaseSync(local);
 db.exec(fs.readFileSync(dump, 'utf8'));
-const liveBefore = db.prepare('SELECT COUNT(*) AS n FROM records WHERE deleted = 0').get().n;
+const liveBefore = db.prepare('SELECT COUNT(*) AS n FROM records WHERE user_id = 1 AND deleted = 0').get().n; // nur Nutzer 1 (es gibt inzwischen mehrere Konten)
 upgradeCopy(db, 'server/migrations');
 const rows = db.prepare('SELECT kind, key, data, updated_at, deleted, src FROM records WHERE user_id = 1 ORDER BY rev').all();
 const want = Object.fromEntries(db.prepare('SELECT kind, COUNT(*) AS n FROM records WHERE user_id = 1 AND deleted = 0 GROUP BY kind').all().map(r => [r.kind, r.n]));

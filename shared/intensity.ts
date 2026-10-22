@@ -135,7 +135,7 @@ export function intensityStats(weeks: any[], p: Profile): IntensityStats {
 export interface CheckOpts { goalType?: GoalType; runEasyOnly?: boolean; runAllowed?: boolean; from?: string | null; baseOffset?: number; /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt? */ longQ?: (date: string) => boolean; /** dasselbe gespeichert im Plan: erlaubte Wochen (Montag) */ longQWeeks?: string[] }
 const fixedHard = (s: any) => isHardSession(s) && (!!s.fixed || !!s.race || isGameOrRace(s) || /test/i.test(s.title || ''));
 /* Tage mit festen harten Terminen (Spiel, Wettkampf, eigener fester harter Termin), ohne Tests */
-const fixedHardDays = (w: any) => (w.days || []).filter((d: any) => (d.sessions || []).some((s: any) => s && !s.cancelled && isHardSession(s) && (isGameOrRace(s) || !!s.race || !!s.fixed) && !/test/i.test(s.title || ''))).length;
+export const fixedHardDays = (w: any) => (w.days || []).filter((d: any) => (d.sessions || []).some((s: any) => s && !s.cancelled && isHardSession(s) && (isGameOrRace(s) || !!s.race || !!s.fixed) && !/test/i.test(s.title || ''))).length;
 const mondayOfDate = (d: string) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
 const withLongQ = <T extends CheckOpts>(o: T): T => o.longQ || !o.longQWeeks ? o : { ...o, longQ: (d: string) => o.longQWeeks!.includes(mondayOfDate(d)) };
 export function checkIntensity(weeks: any[], p: Profile, today: string, o0: CheckOpts = {}): IntensityIssue[] {

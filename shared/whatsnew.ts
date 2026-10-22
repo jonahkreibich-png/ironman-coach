@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.4.0', items: [
+    'Ehrlich gezählt: Fortschritt, Bestwerte und Schwimm-Stufen kommen nur noch aus dem, was du eingetragen hast oder die Uhr gemessen hat, nie aus dem Plan. Korrigierst du einen Wert, rechnet die App alles neu und sagt „Korrigiert: …“. Die nächste Kraul-Stufe kommt, wenn du sie in 2 Einheiten geschafft hast.',
+    'Plan in Balance: höchstens 2 harte Einheiten pro Woche plus Spiel, keine drei Termine an einem Tag, der lange Lauf bleibt locker und wächst von dem, was du wirklich gemacht hast. Einheiten haben klare Namen (z. B. „Lauf-Intervalle 6×1 min zügig“).',
+    'Alle Fachbegriffe stehen jetzt unter Mehr → Lexikon, nach Themen und mit Suche. In den Ansichten führt ein unterstrichener Begriff direkt dorthin.'
+  ] },
   { version: '3.3.0', items: [
     'Neu: Der Coach kann deine Fragen mit einer KI beantworten, kostenlos. Einmal kurz zustimmen (unter 16 mit Eltern), abschaltbar unter Einstellungen. Zahlen und Planänderungen kommen weiter aus der App, Änderungen gelten erst nach deinem OK. Werte von Oura bekommt die KI nie.',
     "Trainingsbewertung: Automatische Runden der Uhr (z. B. jeder Kilometer) zählen nicht mehr als Intervalle. Die App erkennt Dauerlauf, Intervalle, Fahrtspiel, Hügel und „ab km 8 schneller geworden“ und vergleicht mit dem Plan."
@@ -7,7 +12,7 @@ export const WHATS_NEW: { version: string; items: string[] }[] = [
   { version: '3.2.0', items: [
     'Dein Plan enthält nur noch die Sportarten, die du gewählt hast. Dieselbe Sportart liegt nicht mehr an zwei Tagen hintereinander; geht es nicht anders, ist eine Einheit locker und kurz und sagt, warum.',
     'Verbinden geht jetzt für alle: Tipp bei Oura, Dropbox oder intervals.icu auf „Verbinden“, die App legt dabei ein privates Konto für dich an. Erholungswochen sind spürbar leichter.',
-    'Fachbegriffe wie Schwelle, Sweet Spot oder HFV werden direkt dabei kurz erklärt.'
+    'Fachbegriffe wie Schwelle, Sweet Spot oder HFV sind kurz erklärt.'
   ] },
   { version: '3.1.0', items: [
     'Die Ampel auf „Heute“ zeigt jetzt einen klaren Wert: Ring, Wort, Farbe und Satz passen immer zusammen. Unter „Warum?“ hat jeder Einzelwert seine eigene Farbe. Fehlen die Morgenwerte, steht dort „Ampel unsicher“. Neu: Gefühl und Muskelkater am Morgen eintragen.',

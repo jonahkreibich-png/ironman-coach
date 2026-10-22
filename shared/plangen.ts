@@ -187,11 +187,13 @@ export function freqOf(p: Profile, sport: SportKey): [number, number] {
   return [0, 0];
 }
 
+/* empfindliche Schulter: keine Paddles, auch wenn die Person welche hat */
+const shoulderOf = (p: Profile, today: string) => !!effectsOf(rulesOf(p, parseFor(today))).strengthShoulder;
 export function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, today: string): W.PaceCtx {
   const th = p.thresholds; const age = ageOf(p, today) ?? 35;
   const pos = (v: any) => (typeof v === 'number' && v > 0 ? v : null);
   return { runThrSec: pos(th.thresholdPaceRunSec), lthrRun: pos(th.lthrRun), lthrBike: pos(th.lthrBike), bikeKmh: pos(th.thresholdSpeedBikeKmh) ? speedFor(p, kindFromName(bikeName, indoor)) : null, ftp: p.powerMeter ? pos(th.ftp) : null, css: cssFor(p), breast100: pos(th.breast100Sec) || 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0), indoor, bikeName,
-    pool: (p.skills || {}).poolM === 50 ? 50 : 25, gear: Array.isArray((p.skills || {}).swimGear) ? (p.skills || {}).swimGear as string[] : [],
+    pool: (p.skills || {}).poolM === 50 ? 50 : 25, gear: Array.isArray((p.skills || {}).swimGear) ? ((p.skills || {}).swimGear as string[]).filter(g => g !== 'paddles' || !shoulderOf(p, today)) : [],
     swimMPerMin: pos((p.skills || {}).swimMPerMin),
     // ohne CSS: Kraul-Tempo aus dem Kraul-Check (25 m auf Zeit, auf 100 m hochgerechnet mit Wenden und Ermüdung)
     crawl100: !cssFor(p) && pos(th.crawl25Sec) ? Math.round(pos(th.crawl25Sec)! * 4 * 1.1) : null };

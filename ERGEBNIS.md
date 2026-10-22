@@ -1,5 +1,56 @@
 # Ergebnis
 
+## Auftrag 17: Soll/Ist, Schwimmen, Plan-Balance, Übersicht, großer Test (22.10.)
+
+**Von Codex übernommen:** Belastungsrechnung, Kraftvorlagen, Fortschritts-Diagramme, Trends, Ergebnis-Werte, Score-Änderungen, Soll/Ist-Grundlage, Lexikon-Anfang. **Entfernt:** Codex' Planungs-Änderungen (12 Tests rot, Tests gelockert) und Diagnose-Dateien. Der Plan-Audit mit deinen Daten liegt nur in `data-export/` (nicht im Git). Eine AGENTS.md gibt es nicht.
+
+**Fehler, Ursache, Lösung**
+- **„100 m geschafft“, obwohl 50 m eingetragen:** Das Können nahm den größeren Wert aus Eingabe (50 m) und Uhr (100 m „am Stück“, die Uhr zählt Brust und Kraul zusammen). Daraus wurde Stufe 5 und im Profil 100 m. Jetzt: deine Eingabe geht vor, die Uhr zählt nur reines Kraul, geplante Werte sind nie ein Nachweis. Nächste Stufe erst nach 2 Einheiten, zweimal nicht geschafft → eine Stufe leichter. Korrekturen rechnen Stufe, Bestwerte, Scores und kommende Einheiten neu, der Coach schreibt „Korrigiert: …“. Fester Test: geplant 100 / gemacht 50 → nie „100 m geschafft“, keine Stufe 100, kein Bestwert 100.
+- **Coach behauptet Unbelegtes:** Neuer Prüfer vor jeder Anzeige (Regel-Coach, kostenlose KI, Claude). Unbelegte Sätze fallen weg bzw. die KI-Antwort fällt auf den Regel-Coach zurück. Die KI bekommt SOLL und IST getrennt, deine Ausrüstung und dein belegtes Können.
+- **Aus dem großen Test:** „kann nicht kraulen“ mit alter Meterangabe wurde zu „Bestätigt: 400 m“ → alte Angabe gilt nicht mehr, Kraul-Art steigt nur mit Nachweis. Schulter-Hinweis nannte Paddles, die es nicht gab → bei empfindlicher Schulter gar keine Paddles. Harte Einheiten wurden beim Kürzen bis 19 min klein → nie unter 25 min.
+- **Kopier-Skript Test-Umgebung** brach ab, seit es mehrere Konten gibt → vergleicht jetzt nur Nutzer 1.
+
+**Plan-Logik (für alle):** höchstens 2 eigene harte Einheiten pro Woche plus Spiel (Einsteiger 0-1, sehr Erfahrene bis 3, unter 18 höchstens 2 harte Tage inkl. Spiel); keine Dreifach-Tage; Koppellauf nur im Aufbau/spezifisch alle 2-3 Wochen, kurz; langer Lauf locker, Tempo-Teil nur in den letzten 8 Wochen vor einem Laufziel, jede 2. Woche, nie neben harten Lauf-Intervallen; langer Lauf passend zum Ziel (Halbmarathon ≤ 105 min); Steigerung höchstens +10 % auf das wirklich Erledigte; Teamsport zählt voll; Kraft im Aufbau 2 × 25-30 min; höchstens ein harter Test pro Erholungswoche, keine Tests nach Wettkämpfen; unrealistisches Ziel → Hinweis mit Zwischenziel. Schwimmen: Hilfsmittel gezielt (je Einheit ein Schwerpunkt), Meter und Pausen aus deinem Tempo. Klare Namen aus einer zentralen Liste („Lauf-Intervalle 6×1 min zügig“ statt „Fahrtspiel“), jede Einheit mit Ein-/Auslaufen und „Warum“.
+
+**Übersicht:** Fachbegriffe stehen nur noch unter Mehr → Lexikon (nach Themen, mit Suche, inkl. aller Einheiten). In Werte, Belastung und Fortschritt führt ein unterstrichener Begriff dorthin; die Erklärtexte dort sind weg. Sicherheitshinweise bleiben.
+
+**Dein Plan** (ab heute, Vergangenes und Erledigtes bleibt; Schwimmen zurück auf 50-m-Stücke; Di Schwimmen + Kraft unten (leicht), Mi Rad-Qualität, Do lockerer Lauf mit Steigerungen, Fr Kraft oben + Spiel, Sa Schwimmen + lange Ausfahrt, So langer Lauf, Mo Fußball-Training; Erholung alle 4 Wochen). Der Plan startet bei dem, was du zuletzt wirklich gemacht hast (≈ 6,9 h), und steigt dann:
+
+| Woche | Phase | eigene h | hart (eigene+Spiel) | langer Lauf | lange Ausfahrt |
+|---|---|---|---|---|---|
+| 6 (19.10.) | Grundlage | 6.4 → 6.2 | 1+1 → 0+1 | 55 → 75 | 75 → 50 |
+| 7 (26.10.) | Grundlage | 7.4 → 7 | 1+1 → 1+1 | 65 → 75 | 105 → 70 |
+| 8 (02.11.) | Grundlage | 8.3 → 7.6 | 2+1 → 1+1 | 75 → 85 | 115 → 85 |
+| 9 (09.11.) | Grundlage (Erh.) | 5.8 → 5.5 | 0+1 → 0+1 | 50 → 55 | 75 → 55 |
+| 10 (16.11.) | Grundlage | 8.9 → 8.1 | 2+1 → 1+1 | 85 → 95 | 135 → 90 |
+| 11 (23.11.) | Grundlage | 9.5 → 8.5 | 2+1 → 1+1 | 90 → 105 | 145 → 95 |
+| 12 (30.11.) | Grundlage | 9.6 → 8.8 | 2+1 → 1+1 | 95 → 105 | 150 → 110 |
+| 13 (07.12.) | Grundlage (Erh.) | 6.4 → 6.1 | 2+1 → 1+1 | 55 → 70 | 90 → 70 |
+| 14 (14.12.) | Grundlage | 9.9 → 8.1 | 2+1 → 2+1 | 105 → 55 | 150 → 125 |
+| 15 (21.12.) | Grundlage | 10 → 8.6 | 2+1 → 1+1 | 115 → 105 | 150 → 125 |
+| 16 (28.12.) | Aufbau | 10.1 → 8.6 | 2+1 → 1+1 | 120 → 105 | 150 → 125 |
+| 17 (04.01.) | Aufbau (Erh.) | 6.7 → 6.5 | 0+1 → 0+1 | 80 → 70 | 90 → 75 |
+| 18 (11.01.) | Aufbau | 10.1 → 9.1 | 2+1 → 1+1 | 120 → 105 | 150 → 135 |
+| 19 (18.01.) | Aufbau | 10.1 → 9.4 | 2+1 → 1+1 | 120 → 105 | 150 → 150 |
+| 20 (25.01.) | Aufbau | 10.1 → 9.6 | 2+1 → 1+1 | 120 → 105 | 150 → 150 |
+| 21 (01.02.) | Aufbau (Erh.) | 6.6 → 6.5 | 2+1 → 1+1 | 55 → 70 | 90 → 90 |
+| 22 (08.02.) | spezifisch | 10.2 → 8.6 | 2+1 → 2+1 | 120 → 55 | 150 → 150 |
+| 23 (15.02.) | spezifisch | 10.2 → 9.6 | 2+1 → 2+1 | 120 → 105 | 150 → 150 |
+| 24 (22.02.) | spezifisch | 10.2 → 9.4 | 2+1 → 1+1 | 120 → 105 | 150 → 150 |
+| 25 (01.03.) | spezifisch (Erh.) | 6.8 → 6.6 | 0+1 → 0+1 | 80 → 70 | 90 → 90 |
+| 26 (08.03.) | spezifisch | 10.5 → 9.6 | 2+1 → 1+1 | 120 → 105 | 165 → 160 |
+| 27 (15.03.) | spezifisch | 10.7 → 9.1 | 2+1 → 2+1 | 120 → 105 | 180 → 160 |
+| 28 (22.03.) | Tapering | 7.1 → 5.5 | 1+1 → 1+1 | 70 → 65 | 110 → 70 |
+| 29 (29.03.) | Wettkampf | 5 → 4.4 | 0+2 → 0+2 | 40 → 30 | 70 → 60 |
+
+Dreifach-Tage: vorher 0, nachher 0. Ruhetage: 0 (Mo Training, Di-So eigene Einheiten wie vorgegeben). Doppel-Tage: 3 pro Woche (Di, Fr, Sa). Wochen 14 und 22: Lauftest statt langem Lauf. Tempo im langen Lauf ab Februar jede 2. Woche (zählt dann als harte Einheit).
+
+**Großer Test (nur Test-Umgebung, erfundene Nutzer):** 65 Nutzer (14-75 J., Einsteiger bis Erfahrene, alle Ziele und Sportart-Kombinationen, mit/ohne Teamsport, Kraul ja/etwas/nein, verschiedene Hilfsmittel, wenig/viel Zeit, dazu Kraul 25 m, Kraul 50 m, Triathlet + Fußball, Auslasser/Korrigierer, widersprüchliche Angaben). Je Nutzer: Fragebogen → Plan → 3 Wochen mit weniger als geplant, ausgelassenen und Extra-Einheiten → Korrekturen (72) → Coach-Fragen → Scores/Prognose → Profil ändern. Automatisch geprüft: Soll ≠ Ist, nur gewählte Sportarten, keine Dreifach-Tage, harte Einheiten pro Woche, Abstand, Umfang, realistische Meter/Zeit, nur vorhandene Hilfsmittel, Kraul-Stücke ≤ Können, Namen, Stufe ≤ Eingetragenem. Ergebnis: 3 Fehlerarten gefunden (oben) und behoben, danach 0 Befunde. Bildschirme (11 je Nutzer) für die 5 neuen und jeden fünften der übrigen in Chromium und WebKit: nichts ragt heraus, keine Konsolen-Fehler, keine Betreiber-Infos, keine fremden Daten.
+
+**Getestet:** typecheck, 1.729 Unit-Tests, Build, alle Browser-Tests (Chromium + WebKit). Jonahs Plan zuerst an einer Kopie in stamio-test.
+**Nicht getestet:** echte KI-Antworten mit dem neuen Prüfer (nur mit nachgebauten Antworten); dein iPhone selbst.
+**Offen:** Die nächste Kraul-Stufe kommt erst, wenn du 100 m in 2 Einheiten einträgst. Ein fester Ruhetag fehlt in deiner Woche (so vorgegeben); sag Bescheid, wenn du einen willst.
+
 ## Verbesserungsauftrag vom 20.10.2026 – veröffentlicht
 
 **Abschluss 20.10., 17:35: Echte App veröffentlicht.** Jonah hat die Produktionsveröffentlichung freigegeben und aus seinem normalen Terminal ausgeführt. Vorher wurde `data-export/prod-vor-update-2026-10-20.sql` erfolgreich gespeichert (8.080.482 Bytes). Cloudflare bestätigt Pages-Deployment `703d2e04-950b-400c-870e-3df0fb25869e` am 20.10. um 17:34 Uhr mit Status `success` sowie Worker-Deployment `ee696b9d-d5b3-4738-8f03-c1ec38101ab7` mit Version `a21ae81f-d3d8-4bcb-91ab-73a010c256d9` bei 100 %. Adresse: https://coach-app-efc7.pages.dev. Die folgenden datierten Abschnitte sind Zwischenstände des Ablaufs. Deployment und Sicherung sind bestätigt; ein zusätzlicher angemeldeter Produktionstest aus dieser Sitzung wurde nicht ausgeführt. Kein Datenbankumzug und keine neue Migration; keine Zusammenführung nach main in dieser Sitzung.
