@@ -1,12 +1,21 @@
 import { describe, expect, test } from 'vitest';
-import { JARGON, searchGlossary, termsLine, withTerms } from '../../shared/glossary';
+import { JARGON, searchGlossary, findTerm, termsLine, withTerms } from '../../shared/glossary';
+import { SESSION_TYPES } from '../../shared/sessiontypes';
 
-describe('zentrales Trainingslexikon', () => {
-  test('enthält die verwendeten Kernbegriffe mit verständlichen Definitionen', () => {
-    for (const term of ['CTL', 'ATL', 'TSB', 'ATL/CTL', 'ACWR', 'VO2max', 'FTP', 'CSS', 'Zonen', 'Belastung', 'Periodisierung', 'Tapering', 'RPE', 'HFV', 'LTHR', 'Kadenz', 'Sweet Spot', 'Over-Unders', 'Koppellauf']) {
-      expect(JARGON.find(j => j.term === term)?.text.length, term).toBeGreaterThan(60);
+describe('zentrales Trainingslexikon (Auftrag 17)', () => {
+  test('enthält alle Begriffe der App, kurz und verständlich', () => {
+    for (const term of ['CTL', 'ATL', 'TSB', 'ATL/CTL', 'ACWR', 'HFV', 'Ruhepuls', 'SpO2', 'VO2max', 'FTP', 'W/kg', 'CSS', 'LTHR', 'Zonen', 'Sweet Spot', 'Over-Unders', 'Intervalle',
+      'Koppellauf', 'Tapering', 'Periodisierung', 'RPE', 'Entkopplung', 'SWOLF', 'Kadenz', 'Belastung', 'Pull Buoy', 'Kickbrett', 'Kraul am Stück', 'Soll und Ist', 'Harte Einheit', 'Erholungswoche']) {
+      const j = JARGON.find(x => x.term === term);
+      expect(j, term).toBeTruthy();
+      expect(j!.text.length, term).toBeGreaterThan(40);
+      expect(j!.text.length, term).toBeLessThan(260);
     }
     expect(new Set(JARGON.map(j => j.term)).size).toBe(JARGON.length);
+  });
+  test('jede Einheit aus der zentralen Liste steht im Lexikon', () => {
+    for (const s of SESSION_TYPES) expect(findTerm(s.name)?.term, s.name).toBeTruthy();
+    expect(searchGlossary('', 'sessions').length).toBeGreaterThan(20);
   });
   test('sucht auch Aliase, Umlaute, mehrere Wörter und Themen; sortiert alphabetisch', () => {
     expect(searchGlossary('vo₂max').map(j => j.term)).toContain('VO2max');
@@ -17,6 +26,8 @@ describe('zentrales Trainingslexikon', () => {
     expect(searchGlossary('nichtvorhanden')).toEqual([]);
     const names = searchGlossary().map(j => j.term);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'de')));
+    expect(findTerm('HRV')?.term).toBe('HFV');
+    expect(findTerm('ctl')?.term).toBe('CTL');
   });
   test('fügt weder Coach- noch Einheitentexten wiederholte Erklärungen an', () => {
     const text = 'FTP-Intervalle, RPE 7. Bei Schmerzen abbrechen. CSS = Schwellentempo im Wasser.';

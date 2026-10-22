@@ -4,7 +4,7 @@ import { STATE, PLAN, saveState, currentWeekIdx } from '../store';
 import { esc, fmtDate, todayStr } from '../util';
 import { t, num, hours } from '../../../shared/i18n';
 import { D } from '../data';
-import { on, sec, ic, sparkline, bar, openSheet, armed, empty, more, sportLabel, field } from '../kit';
+import { on, sec, ic, sparkline, bar, openSheet, armed, empty, more, sportLabel, field, termLink } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
 import { fmtDuration, type Prognosis } from '../../../shared/prognosis';
 import { pacingPlan } from '../../../shared/race';
@@ -17,14 +17,14 @@ import { renderTrends } from './trends';
 export function renderFortschritt(): string {
   const d = D();
   const f = d.form;
-  let h = `<div class="card"><div class="spread"><div><div class="lbl">${esc(t('prog.form'))}</div><div class="hero-num">${f.score}<small class="xs muted"> / 100</small></div></div>${d.goal ? `<div style="text-align:right" class="small muted">${esc(t('prog.formOf', { name: d.goal.name }))}<br>CTL ${num(f.ctl ?? 0, 0)} / ${f.target}</div>` : ''}</div>
-    ${bar(f.score, 'var(--accent)')}<div class="hint">${esc(t('prog.formHint'))}</div></div>`;
+  let h = `<div class="card"><div class="spread"><div><div class="lbl">${termLink('Gesamt-Form', t('prog.form'))}</div><div class="hero-num">${f.score}<small class="xs muted"> / 100</small></div></div>${d.goal ? `<div style="text-align:right" class="small muted">${esc(t('prog.formOf', { name: d.goal.name }))}<br>${termLink('CTL')} ${num(f.ctl ?? 0, 0)} / ${f.target}</div>` : ''}</div>
+    ${bar(f.score, 'var(--accent)')}</div>`;
   h += sec(t('prog.scores'), `<div class="score-grid">${d.scores.map(s => {
     const first = s.trend[0].score, last = s.score; const delta = last - first;
     return `<button class="score" data-act="score-open" data-sport="${s.sport}" style="--c:${SPORT_COLOR[s.sport]}"><div class="top-l"><span style="color:var(--c);width:20px;height:20px;display:inline-block">${sportIcon(s.sport)}</span><span class="nm">${esc(sportLabel(s.sport))}</span></div>
       <div class="spread"><span class="val">${s.score}<small class="xs muted lvl"> ${esc(s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
       ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.confidence < 0.3 ? t('prog.lowData') : (s.gains[0] && s.gains[0].delta ? s.gains[0].text : t('prog.scale')))}</div></button>`;
-  }).join('')}</div><div class="hint">${esc(t('prog.scaleHint'))}</div>`, t('prog.tapWhy'));
+  }).join('')}</div><div class="xs muted">${termLink('Score', t('prog.scaleLink'))}</div>`, t('prog.tapWhy'));
   // Auftrag 13: Trends (Erholung, Fitness, Effizienz, Intensität, Schwimmen, Bestwerte, lange Einheiten, Zusammenhänge)
   h += renderTrends();
   // Prognose

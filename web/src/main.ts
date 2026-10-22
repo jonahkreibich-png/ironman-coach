@@ -5,7 +5,7 @@ import './design.css';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
-import { ACTIONS, CHANGE, on, ic, closeSheet, sheetOpen , explainTerms } from './kit';
+import { ACTIONS, CHANGE, on, ic, closeSheet, sheetOpen  } from './kit';
 import { CHARTS, chartTap } from './charts';
 import { effStatus } from './domain';
 import { D, invalidate } from './data';
@@ -15,7 +15,7 @@ import { renderPlan, scrollToPlanDay } from './views/plan';
 import { renderCoach, scrollCoachBottom } from './views/coach';
 import { renderFortschritt } from './views/fortschritt';
 import { renderMehr } from './views/mehr';
-import { renderLexikon } from './views/lexikon';
+import { renderLexikon, setLexiconQuery } from './views/lexikon';
 import { renderWerte, openCheckin } from './views/werte';
 import { renderStrength } from './views/strength';
 import { renderEssen } from './views/essen';
@@ -99,7 +99,6 @@ function render() {
   else if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) html = SUBS[UI.sub]();
   else html = TABS.find(x => x.id === UI.tab)!.render();
   byId('app').innerHTML = `<div class="view" data-view="${esc(UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab)}">${html}</div>`;
-  explainTerms(byId('app'));
   if (HAS_PLAN && UI.tab === 'coach') { if (!UI.coachVisit) { UI.coachSeenPrev = UI.coachSeenAt || 0; UI.coachVisit = true; } UI.coachSeenAt = Date.now(); saveUi(); } else if (UI.coachVisit) { UI.coachVisit = false; saveUi(); }
   // Letzte Bildschirme (für „Fehler melden“)
   const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');
@@ -124,6 +123,7 @@ nav.render = render; nav.rerender = rerender; nav.go = go;
 
 /* ---------- Aktionen ---------- */
 on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!; if (tab === UI.tab && !UI.sub) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } if (tab === 'plan') UI.planDate = null; go(tab); });
+on('lex', el => { if (sheetOpen()) closeSheet(); setLexiconQuery(el.dataset.q || ''); go('lexikon'); });
 on('go-sub', el => { if (sheetOpen()) closeSheet(); go(el.dataset.sub!); });
 on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
 on('ill-start', () => { STATE.illnessPeriods.push({ id: 'ill-' + Date.now(), start: todayStr(), end: null, note: '' }); saveState(); rerender(); toast(t('ill.started')); });

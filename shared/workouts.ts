@@ -4,7 +4,6 @@
    Die Bauanleitung (spec) bleibt an der Einheit, damit Anpassungen (z. B. Umfang −10 %) Text und Zahlen gemeinsam ändern.
    Keine Abhängigkeit von core.ts (core importiert dieses Modul). */
 import { HR_ZONES, POWER_ZONES } from './sports';
-import { termsLine } from './glossary';
 import { speedRange, SPEED_HINT } from './bikespeed';
 import { purposeOf } from './sessiontypes';
 
@@ -299,7 +298,6 @@ export function describe(spec: Spec): string {
   if (why) L.push(`Warum: ${why}`);
   if (spec.tip) L.push(`Achte auf: ${spec.tip}`);
   // Auftrag 15: Fachbegriffe (Sweet Spot, Schwelle, CSS, VO2max …) mit kurzer Erklärung
-  const terms = termsLine(`${title(spec)}\n${L.join('\n')}`); if (terms) L.push(terms);
   return L.join('\n');
 }
 export function title(spec: Spec): string {

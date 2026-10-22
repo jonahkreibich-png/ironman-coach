@@ -509,5 +509,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* Zentrales Lexikon */
 .lexicon-filters { display:grid; gap:var(--s2); }
 .lexicon-entry { scroll-margin-top:80px; }
-.lexicon-entry h2 { margin:0; font-size:var(--fs-lg, 18px); }
+.lexicon-entry h3 { margin:0; font-size:var(--fs-md, 16px); }
+.lexicon-topic { margin:var(--s4) 0 var(--s2); font-size:var(--fs-lg, 18px); }
+.term { all:unset; cursor:pointer; color:inherit; text-decoration:underline dotted; text-decoration-color:var(--muted, currentColor); text-underline-offset:3px; }
+.term:focus-visible { outline:2px solid var(--accent, currentColor); outline-offset:2px; border-radius:2px; }
 .lexicon-entry p { margin:var(--s2) 0 0; }

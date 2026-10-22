@@ -3,7 +3,7 @@ import { LOAD_FIELDS, validDate, recordLoadEdit, undoLoadEdit, loadConstants } f
 import { setManual, resetToOriginal } from '../../../shared/activity/merge';
 import { STATE, PLAN, saveState } from '../store';
 import { esc, todayStr, fmtDate } from '../util';
-import { on, onChange, openSheet, refreshSheet, sec } from '../kit';
+import { on, onChange, openSheet, refreshSheet, sec, termLink } from '../kit';
 import { nav } from '../nav';
 import { toast } from '../toast';
 
@@ -18,7 +18,7 @@ function put(p: any) {
 }
 export function renderLoadValues(): string {
   const value = current(todayStr());
-  return sec('Trainingsbelastung', `<div class="card stack" data-load-values><div class="crit-grid">${LOAD_FIELDS.map(k => `<div><div class="lbl">${label(k)}</div><div class="big">${show(value?.[k])}</div></div>`).join('')}</div><div class="hint">${value ? esc(value.source) + ' · ' + fmtDate(value.date) : 'Noch keine Belastungsdaten'} · Tagesende. TSB = CTL − ATL.</div>${value?.inconsistent ? '<div class="banner warn">Manuelle Werte widersprechen CTL und ATL.</div>' : ''}<button class="btn ghost" data-act="load-edit">Belastungswerte bearbeiten</button><div class="hint">Verläufe findest du unter Fortschritt. Fehlende Historie und nicht erfasste Einheiten machen die Berechnung unsicher.</div></div>`);
+  return sec('Trainingsbelastung', `<div class="card stack" data-load-values><div class="crit-grid">${LOAD_FIELDS.map(k => `<div><div class="lbl">${termLink(label(k))}</div><div class="big">${show(value?.[k])}</div></div>`).join('')}</div><div class="hint">${value ? esc(value.source) + ' · ' + fmtDate(value.date) : 'Noch keine Belastungsdaten'}</div>${value?.inconsistent ? '<div class="banner warn">Manuelle Werte widersprechen CTL und ATL.</div>' : ''}<button class="btn ghost" data-act="load-edit">Belastungswerte bearbeiten</button></div>`);
 }
 function sheet(): string {
   const p = point(), value = current(), constants = loadConstants(STATE.settings);

@@ -6,7 +6,7 @@ import { STATE, saveState } from '../store';
 import { esc, fmtDate, dowShort, todayStr, parseNum } from '../util';
 import { t, num, temp } from '../../../shared/i18n';
 import { D } from '../data';
-import { on, onChange, sec, srcBadge, openSheet, refreshSheet, ic } from '../kit';
+import { on, onChange, sec, srcBadge, openSheet, refreshSheet, ic, termLink } from '../kit';
 import { setManual, resetToOriginal, hasOriginal, bestAuto, SOURCE_LABEL } from '../../../shared/activity/merge';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -32,7 +32,7 @@ function tile(field: string, label: string, unit: string, dec: number): string {
 }
 
 export function renderWerte(): string {
-  let h = `<div class="crit-grid">${tile('hrv', t('v.hrv'), 'ms', 0)}${tile('restingHR', t('v.rhr'), 'bpm', 0)}${tile('sleepHours', t('v.sleep'), 'h', 1)}${tile('bodyTemp', t('v.tempShort'), '°C', 1)}${tile('spo2', 'SpO2', '%', 1)}${tile('breathingRate', t('v.breathShort'), '/min', 1)}</div>
+  let h = `<div class="crit-grid">${tile('hrv', t('v.hrv'), 'ms', 0)}${tile('restingHR', t('v.rhr'), 'bpm', 0)}${tile('sleepHours', t('v.sleep'), 'h', 1)}${tile('bodyTemp', t('v.tempShort'), '°C', 1)}${tile('spo2', 'SpO2', '%', 1)}${tile('breathingRate', t('v.breathShort'), '/min', 1)}</div><p class="xs muted" data-term-links>${termLink('HFV')} · ${termLink('Ruhepuls')} · ${termLink('SpO2')} · ${termLink('Körpertemperatur', t('v.tempShort'))}</p>
     <button class="btn ghost block" data-act="checkin-open" data-date="${todayStr()}" style="margin-top:var(--s3)">${ic('edit')} ${esc(t('v.edit'))}</button>`;
   h += renderLoadValues();
   // Tabelle
