@@ -43,6 +43,8 @@ export function pacingPlan(goal: Goal, prog: Prognosis | null, thr: { lthrRun: n
   const legs = legsOf(goal);
   const long = GOALS[goal.type].hours[1] >= 4;
   const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+  // Auftrag 18: Aufwärmen gehört zum Rennplan
+  out.push({ leg: 'Aufwärmen', part: 'vor dem Start', target: long ? '10-15 min' : '15-20 min', hint: long ? 'Locker einlaufen oder einrollen, 2-3 kurze Steigerungen, 10 min vor dem Start fertig.' : 'Locker einlaufen, 3-4 Steigerungen, 10 min vor dem Start fertig. Kurze Rennen brauchen mehr Aufwärmen.' });
   legs.forEach((l, i) => {
     const pred = prog && prog.parts ? prog.parts.find(p => p.label.startsWith(l.sport === 'swim' ? 'Schwimmen' : l.sport === 'bike' ? 'Rad' : 'Laufen')) : null;
     if (l.sport === 'swim') {

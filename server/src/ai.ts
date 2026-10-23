@@ -9,6 +9,7 @@ import { type Env, berlinDate, putRecords, getRecord, userEntitlements } from '.
 import { needsParentConsent } from '../../shared/features';
 import { HttpError } from './http';
 import { COACHING_HANDBOOK } from '../../shared/coach/handbook';
+import { rulesForAi } from '../../shared/trainingknowledge';
 import { TOOL_DEFS, runTool, type ToolChange } from '../../shared/coach/tools';
 import { checkMessage } from '../../shared/coach/safety';
 import { buildContext } from '../../shared/coach/summary';
@@ -99,6 +100,7 @@ function systemPrompt(ctx: EngineCtx): string {
     `\n## Diese App\nDu bist der Coach in der App „${BRAND.name}“. Heute ist ${ctx.today}. Antworte in höchstens 120 Wörtern, außer der Athlet will eine ausführliche Wochenplanung.`,
     minor ? `\n## Wichtig\nDer Athlet ist ${ageOf(ctx.profile, ctx.today)} Jahre alt und minderjährig: keine Gewichtsziele, keine Kalorien-Defizite, kein Druck. Schule und Schlaf gehen vor.` : '',
     rulesBlock(ctx),
+    '\n## ' + rulesForAi(),
     '\nNutze die Werkzeuge für jede Planänderung. Neue dauerhafte Einschränkungen speicherst du mit add_rule. Wenn die Regel-Engine ablehnt, erkläre kurz warum und schlage eine erlaubte Alternative vor.',
     '\nFragt der Athlet, was er an einem Tag genau machen soll, rufe explain_day auf und übernimm Schritte, Wiederholungen, Pausen, Zonen und Pulswerte daraus unverändert (nichts dazuerfinden). Wenn explain_day eine Änderung vorschlägt (Krankheit, schlechte Werte, wenig Zeit), biete sie an und ändere erst nach seiner Zustimmung mit modify_session oder cancel_session.',
     '\nFür Trends und Ermüdung rufe get_analysis auf; diese Regeln sind die Grundlage, du formulierst nur. Für Werte einzelner Einheiten (Puls, Pace, Entkopplung, Kadenz, RPE, Gefühl) nutze get_data mit what "sessions".'

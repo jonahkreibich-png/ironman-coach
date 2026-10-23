@@ -149,11 +149,12 @@ function readinessFor(trend, illness, date, fallback) {
       const h = num(q.sleepHours), sq = num(q.sleepQuality);
       const veryShort = h != null && h < Math.min(5, NEED[0] - 2.5);
       const short = h != null && h < Math.min(7, NEED[0] - 0.5), poor = sq != null && sq < 5;
-      const st = veryShort ? 'bad' : (short || poor) ? 'warn' : 'ok';
+      // Auftrag 18: kurzer Schlaf nimmt die Intensität raus (gelb), sagt aber nicht allein alles ab
+      const st = veryShort || short || poor ? 'warn' : 'ok';
       add({ k: 'Schlaf', v: h != null ? fmt(h, 1) + ' h' : fmt(sq, 0) + '/10', t: (h != null && sq != null ? 'Qualität ' + fmt(sq, 0) + ' · ' : '') + 'Bedarf ' + needTxt, st });
       if (h != null && h < NEED[0]) score -= (NEED[0] - h) * 8;
       if (sq != null && sq < 7) score -= (7 - sq) * 3;
-      if (st === 'bad' || short) why(st, `Nur ${fmt(h, 1)} h geschlafen (du brauchst ${needTxt})`, st === 'bad' ? 3 : 2);
+      if (short || veryShort) why(st, `Nur ${fmt(h, 1)} h geschlafen (du brauchst ${needTxt})`, veryShort ? 3 : 2);
       else if (poor) why('warn', 'Schlecht geschlafen', 1);
     }
     // Gefühl und Muskelkater (Morgen-Eingabe oder intervals.icu): Gefühl 1 sehr frisch … 5 sehr müde, Muskelkater 0 keiner … 3 stark
@@ -391,6 +392,39 @@ function loadBaseline(state, weeks, today) {
 }
 
 /* ---------- Hilfen für Anpassungen ---------- */
+/* Auftrag 18: Trainingspause ohne Krankheit: Tage seit der letzten erledigten eigenen Einheit (null ohne Verlauf). Krankheitstage zählen
+   nicht als Pause (dafür gilt der Stufenplan nach Krankheit). */
+function doneDates(state, weeks) {
+  const out = new Set();
+  planDays(weeks || []).forEach(d => (d.sessions || []).forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && s.sport !== 'football' && s.sport !== 'rest') out.add(d.date); }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach(c => { if (c && c.completed !== false && c.sport !== 'football') out.add(d); }));
+  recordedActivities(state).forEach(a => { if (a && a.sport !== 'football') out.add(a.date); });
+  return [...out].sort();
+}
+/* Rückkehr nach einer Pause: wurde heute oder gestern wieder trainiert und lag davor eine Pause ohne Krankheit, deren Länge in Tagen */
+function returnAfterPause(state, weeks, date) {
+  const ds = doneDates(state, weeks).filter(d => d <= date);
+  const last = ds[ds.length - 1], prev = ds[ds.length - 2];
+  if (!last || !prev || last < addDays(date, -1)) return null;
+  let gap = 0; for (let d = addDays(prev, 1); d < last; d = addDays(d, 1)) if (!illnessAt(state.illnessPeriods, d)) gap++;
+  return gap;
+}
+function trainingGap(state, weeks, date) {
+  let last = null;
+  const take = d => { if (d < date && (!last || d > last)) last = d; };
+  planDays(weeks || []).forEach(d => (d.sessions || []).forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && s.sport !== 'football' && s.sport !== 'rest') take(d.date); }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach(c => { if (c && c.completed !== false && c.sport !== 'football') take(d); }));
+  recordedActivities(state).forEach(a => { if (a && a.sport !== 'football') take(a.date); });
+  if (!last) return null;
+  // nur wer vorher regelmäßig eingetragen hat (mindestens 4 Tage in den 3 Wochen davor): sonst fehlen nur Daten
+  const before = doneDates(state, weeks).filter(d => d <= last && d > addDays(last, -21)).length;
+  if (before < 4) return null;
+  let gap = 0;
+  for (let d = addDays(last, 1); d < date; d = addDays(d, 1)) if (!illnessAt(state.illnessPeriods, d)) gap++;
+  return gap;
+}
+/* Wiedereinstieg nach einer Pause: Umfang je nach Länge (bis 1 Woche 90 %, 2-4 Wochen 70 %, länger 60 %) */
+function pauseFactor(gap) { return gap == null || gap < 8 ? 1 : gap <= 14 ? 0.9 : gap <= 28 ? 0.7 : 0.6; }
 function returnStageActive(illness, date) {
   const ended = (illness || []).filter(p => p && p.end && p.end < date).sort((a, b) => b.end.localeCompare(a.end))[0];
   if (!ended) return false;
@@ -414,6 +448,16 @@ function painFlag(state, weeks, date) {
   return null;
 }
 const painLabel = p => p && p !== 'Schmerz' ? `Schmerz (${p})` : 'Schmerz';
+/* Auftrag 18: stärkster Schmerz der letzten 7 Tage (Körperteil und Wert 0-10); ab 4/10 ersetzt die App Laufen durch Rad oder Schwimmen */
+function painInfo(state, weeks, date) {
+  const from = addDays(date, -6); const texts = [];
+  planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); if (st && st.deviation) texts.push(st.deviation); }); });
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.description) texts.push(w.description); }); });
+  (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
+  let best = null;
+  for (const t of texts) { let m; PAIN_RE.lastIndex = 0; while ((m = PAIN_RE.exec(t))) { const v = parseFloat(m[2].replace(',', '.')); if (v <= 10 && (!best || v > best.level)) best = { part: PAIN_NAMES[m[1].toLowerCase()] || 'Schmerz', level: v }; } }
+  return best;
+}
 const groinFlag = (state, weeks, date) => !!painFlag(state, weeks, date);
 const LADDER = [[3, 6], [3, 8], [3, 10], [2, 15], [2, 20]];
 const STEP_RE = /(\d)\s*[×x]\s*(\d{1,2})(?!\d)/;
@@ -491,6 +535,40 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
         what: `${s.title} → lockerer Lauf in Zone 2`, reason: pain ? painLabel(pain) + ' über 2/10 in deinen Notizen' : 'Lauf-Intervalle hat der Coach noch nicht freigegeben' });
     }
   });
+
+  // 1b) Auftrag 18: Schmerz ab 4/10 – Laufen heute und die nächsten 2 Tage durch lockeres Rad (sonst Schwimmen) gleicher Dauer ersetzen
+  const pi = painInfo(state, weeks, date);
+  if (pi && pi.level >= 4) {
+    const prof = state.profile || {}; const sp = prof.sports || [];
+    const why0 = `Schmerz ${String(pi.level).replace('.', ',')}/10${pi.part ? ' (' + pi.part + ')' : ''}: Laufen pausieren, locker Rad oder Schwimmen gleich lang. Wird es nicht besser oder hinkst du, bitte zu Arzt oder Physio`;
+    let any = false;
+    for (const dd of [date, addDays(date, 1), addDays(date, 2)]) live(dd).forEach(s0 => {
+      if (s0.sport !== 'run' || sessDone(state, s0) || isTestOrRace(s0)) return;
+      const min = s0.plannedMinutes || 30; let set = null;
+      if (sp.includes('bike') && ruleOk(rules, Object.assign({}, s0, { sport: 'bike', hard: false, long: false }), dd, live(dd))) { const b = W.build(Object.assign(W.bikeEasy(Object.assign({}, s0.spec ? s0.spec.ctx : {}, { indoor: false }), min), { why: 'Statt Laufen: schont die schmerzende Stelle und hält die Ausdauer.' })); set = { sport: 'bike', title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: null, zone: b.zone, description: b.description, spec: b.spec, hard: false, long: false }; }
+      else if (sp.includes('swim') && ruleOk(rules, Object.assign({}, s0, { sport: 'swim', hard: false, long: false }), dd, live(dd))) set = { sport: 'swim', title: 'Lockeres Schwimmen ' + min + ' min', plannedMinutes: min, plannedKm: null, zone: 'Zone 2', description: 'Statt Laufen locker schwimmen, ohne Schmerz. Brust oder Kraul, wie es angenehm ist.', spec: null, hard: false, long: false };
+      if (push({ id: 'pain-' + s0.id, type: set ? 'modify' : 'cancel', sessionId: s0.id, group: 'daily-' + date, set, what: s0.title + (set ? ' → ' + set.title : ' entfällt'), reason: why0 })) any = true;
+    });
+    if (any) push({ id: 'pain-note-' + date, type: 'note', group: 'daily-' + date, what: 'Laufen pausiert', reason: why0 });
+  }
+
+  // 1c) Auftrag 18: Wiedereinstieg nach einer Pause ohne Krankheit (Urlaub, Prüfungen, Verletzung): die nächsten 7 Tage ohne Intensität,
+  //     nach mehr als 2 Wochen Pause auch kürzer (70 %, über 4 Wochen 60 %)
+  const gap = returnAfterPause(state, baseWeeks, date);
+  if (gap != null && gap >= 8) {
+    const f = pauseFactor(gap); const g = 'pause-' + date;
+    const why1 = `Wiedereinstieg nach ${gap} Tagen Pause: eine Woche ohne Intensität${f < 0.9 ? `, Umfang etwa ${Math.round(f * 100)} %` : ''}. Danach steigt es wieder Schritt für Schritt`;
+    let n = 0;
+    for (let k = 0; k < 7; k++) { const dd = addDays(date, k); live(dd).forEach(s0 => {
+      if (sessDone(state, s0) || isTestOrRace(s0) || isGame(s0) || s0.fixed || s0.stage) return;
+      const hard = isIntervals(s0);
+      if (!hard && f >= 0.9) return;
+      const mins = s0.plannedMinutes ? round5(s0.plannedMinutes * (f < 0.9 ? f : 1)) : null;
+      if (push({ id: 'pause-' + s0.id, type: 'modify', sessionId: s0.id, group: g, set: Object.assign({}, hard ? { title: 'Zone 2 statt: ' + s0.title, zone: 'Zone 2', hard: false } : {}, mins ? { plannedMinutes: mins, plannedKm: s0.plannedKm ? r1(s0.plannedKm * f) : null } : {}),
+        what: `${s0.title}${hard ? ' → locker in Zone 2' : ''}${mins && mins !== s0.plannedMinutes ? `, ${mins} min` : ''}`, reason: why1 })) n++;
+    }); }
+    if (n) push({ id: 'pause-note-' + date, type: 'note', group: g, what: 'Wiedereinstieg nach der Pause', reason: why1 });
+  }
 
   // 2) Ampel von heute
   if (R.level === 2 || R.level === 1) {
@@ -779,6 +857,14 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   } else {
     why = S.ratio != null && S.ratio >= 0.7 ? `${ratioTxt}: Umfang bleibt gleich` : 'Zu wenig Daten für eine Änderung';
   }
+  // Auftrag 18: Großteil der Woche ausgelassen (ohne Krankheit): die nächste Woche wiederholt diese Woche statt zu steigern
+  if (!S.sick && S.red < 2 && S.ratio != null && S.ratio < 0.5 && !next.isRecoveryWeek) {
+    const [mT, sT] = weekRange(date);
+    const ownOf = (list) => list.filter(x => !['football', 'rest'].includes(x.sport) && !x.cancelled && !x.race && !x.fixed).reduce((acc, x) => acc + (x.plannedMinutes || 0), 0);
+    const thisOwn = ownOf(planDays(weeks).filter(d => d.date >= mT && d.date <= sT).flatMap(d => d.sessions));
+    const nextOwn = ownOf(planDays([next]).flatMap(d => d.sessions));
+    if (thisOwn > 0 && nextOwn > 0) { pct = Math.max(-20, Math.min(0, Math.round((thisOwn / nextOwn - 1) * 100))); why = `${ratioTxt}: der Großteil der Woche fehlt, deshalb wiederholt die nächste Woche diese Woche (kein Steigern)`; }
+  }
   if (pct > 0 && pain) { pct = 0; why = painLabel(pain) + ' über 2/10: diese Woche keine Steigerung'; }
   if (pct > 0 && (returnStageActive(illness, addDays(date, 1)))) { pct = 0; why = 'Nach Krankheit gilt der Stufenplan'; }
   if (next.isRecoveryWeek) { pct = 0; why = 'Erholungswoche aus dem Plan bleibt bestehen'; }
@@ -971,6 +1057,6 @@ export {
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
-  recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive,
+  recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
   isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

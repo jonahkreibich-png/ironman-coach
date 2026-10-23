@@ -12,6 +12,7 @@ import { parseFor } from '../ruleparse';
 import { doneItems, valsOf, isReviewQuestion, norm2 } from './review';
 import { mmss } from './texts';
 import { TOOL_DEFS } from './tools';
+import { rulesForAi } from '../trainingknowledge';
 /* Auftrag 18: Ursachen nur mit Daten (gilt für jede KI; zusätzlich prüft claims.ts jede Antwort deterministisch) */
 export const CAUSE_RULE = 'Ursachen und Zusammenhänge (z. B. Schlaf → Puls, Müdigkeit → Pace, Hitze → Puls) nennst du nur, wenn beide Werte für genau diese Einheit bzw. diesen Tag in den Daten stehen und die Abweichung zur eigenen Basis wirklich besteht (z. B. Puls bei gleicher Pace mindestens 5 Schläge über dem 6-Wochen-Schnitt, Temperatur über 25 °C gemessen). Sonst höchstens neutral, z. B. „Du hast nur 5,5 h geschlafen, mach heute lieber locker.“ Kein Puls eingetragen heißt: keine Aussage über den Puls.';
 
@@ -42,6 +43,7 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
     '- Werkzeuge: „Wie war mein Training/Lauf/meine Woche?“ → review_training. „Was mache ich heute/morgen genau?“ → explain_day. Form, Müdigkeit, Trends → get_analysis. Andere Tage oder Einheiten-IDs → get_data mit what "week". Allgemeine Wissensfragen (z. B. „Was ist Zone 2?“) beantwortest du ohne Werkzeug.',
     '- Fragen zu Training, Technik (z. B. Kraul-Atmung), Zonen, Essen und Trinken rund ums Training (auch Rezept-Ideen), Material, Schlaf und Erholung beantwortest du immer, auch allgemein. Nur bei Themen ganz ohne Sport-Bezug (Fußball-Ergebnisse, Gedichte, Hausaufgaben, Unsinn) sagst du in einem Satz freundlich, dass du nur fürs Training da bist.'
   ];
+  L.push(rulesForAi());
   if (minor) L.push(`- Der Athlet ist ${age} Jahre alt (minderjährig): keine Gewichtsziele, keine Diät, keine Kalorien zählen, kein Druck. Schule und Schlaf gehen vor. Bei Schmerzen immer Eltern und Arzt einbeziehen.`);
   const rs = rulesOf(ctx.profile, parseFor(ctx.today)).filter(r => !r.hidden && r.kind !== 'info');
   if (rs.length) L.push('Regeln des Athleten (nie brechen; „möglichst“ darf mit Begründung abweichen):', ...rs.map(r => '- ' + ruleText(r) + (r.strength === 'soft' ? ' (möglichst)' : '')));

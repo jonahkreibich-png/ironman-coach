@@ -3,7 +3,7 @@ import { t } from '../../../shared/i18n';
 import { esc } from '../util';
 
 /* Auftrag 17, Punkt 5: alle Begriffe an einem Ort, nach Themen, mit Suche. Begriffs-Links aus den Ansichten öffnen das Lexikon mit dem Begriff. */
-const topics: GlossaryTopic[] = ['load', 'values', 'intensity', 'planning', 'technique', 'sessions'];
+const topics: GlossaryTopic[] = ['understand', 'load', 'values', 'intensity', 'planning', 'technique', 'sessions'];
 let preset = '';
 export function setLexiconQuery(q: string): void { const j = findTerm(q); preset = j ? j.term : q; }
 const card = (j: Term) => `<article class="card lexicon-entry" data-lexicon-term="${esc(j.term)}"><h3>${esc(j.term)}</h3><p>${esc(j.text)}</p></article>`;

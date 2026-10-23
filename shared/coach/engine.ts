@@ -14,6 +14,7 @@ import { checkData, type SafetyHit } from './safety';
 import { underEatingCheck } from '../nutrition';
 import { doneItems, autoReview, type Done } from './review';
 import { extraChecks } from './extra';
+import { easyAfterDays } from '../periodize';
 
 export interface CoachMsg {
   id: string; at: number; date: string;
@@ -251,6 +252,14 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     }
   }
 
+  // Auftrag 18: nach einem Wettkampf (A/B) kurze Auswertung mit dem Coach anstoßen
+  if (ev.type === 'daily' || ev.type === 'trend') for (const g of (ctx.goals || []).filter((x: any) => x && x.date && (x.priority === 'A' || x.priority === 'B') && x.type !== 'fitness')) {
+    const k = Math.round((+new Date(today + 'T12:00:00Z') - +new Date(g.date + 'T12:00:00Z')) / 86400000);
+    if (k < 1 || k > 3) continue;
+    const easy = easyAfterDays(g.type);
+    push(msg(ctx, { id: 'msg-race-review-' + g.id, date: today, kind: 'info', title: `Wie lief ${g.name}?`, important: true,
+      text: `${(g as any).result ? 'Glückwunsch zum Wettkampf!' : 'Wie lief es? Trag deine Zeit unter Mehr → Wettkampf ein.'} Kurze Auswertung: Was lief gut (Tempo, Verpflegung, Wechsel)? Was machst du beim nächsten Mal anders? Schreib es mir hier, dann merke ich es mir für den nächsten Rennplan. Die ersten ${easy} Tage danach sind nur locker und kurz.` }));
+  }
   // Auftrag 14: Schwimm-Hilfsmittel fehlen noch → einmal fragen (bis dahin plant die App ohne Hilfsmittel)
   if ((ev.type === 'daily' || ev.type === 'trend') && (ctx.profile.sports || []).includes('swim') && (ctx.profile.skills || {}).swimGear == null)
     push(msg(ctx, { id: 'msg-swimgear', date: today, kind: 'info', title: 'Welche Schwimm-Hilfsmittel hast du?', text: 'Damit deine Schwimmeinheiten passen: Hast du Kickbrett, Pull Buoy, Flossen, Paddles oder Frontschnorchel (oder kannst du sie im Bad leihen)? Tipp sie unter Mehr → Berücksichtigungen → Können und Ausrüstung an. Bis dahin plane ich ohne Hilfsmittel, z. B. Beinschlag in Seitlage statt mit Brett.' }));

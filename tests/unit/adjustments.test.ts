@@ -107,7 +107,8 @@ ok(W.adjustments.some(a => a.type === 'note' && a.id === 'week-2-summary'), 'Zus
 W = C.weeklyAdjustments(s, plan({ recovery: true }), '2026-10-11', { now: 1 });
 ok(!W.adjustments.some(a => a.id.includes('-vol-')), 'Erholungswoche bleibt bestehen');
 W = C.weeklyAdjustments(Object.assign({}, s, { sessions: { 'w1-di': doneAll['w1-di'] } }), plan(), '2026-10-11', { now: 1 });
-ok(W.adjustments.find(a => a.id.includes('-vol-') && a.sessionId === 'w2-so').set.plannedMinutes === 120, 'Unter 50 % umgesetzt → −20 % (150 → 120 min)');
+// Auftrag 18: Großteil der Woche ausgelassen → die nächste Woche wiederholt diese Woche (gleich groß), statt zu steigern oder stark zu kürzen
+ok(!W.adjustments.some(a => a.id.includes('-vol-') && a.sessionId === 'w2-so' && a.set.plannedMinutes > 150) && /wiederholt/.test(W.adjustments.find(a => a.type === 'note').reason), 'Unter 50 % umgesetzt → Woche wiederholen (nicht steigern)');
 W = C.weeklyAdjustments(Object.assign({}, s, { sessions: Object.assign({}, doneAll, { 'w1-di': { completed: true, rpe: '9', quality: 'ok' } }) }), plan(), '2026-10-11', { now: 1 });
 ok(!W.adjustments.some(a => a.id.includes('ladder')), 'RPE 9 → Stufe wiederholen (keine Änderung)');
 const groinW = Object.assign({}, s, { sessions: Object.assign({}, doneAll, { 'w1-fr': { completed: true, notes: 'Leiste 4/10' } }) });

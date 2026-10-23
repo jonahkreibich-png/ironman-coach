@@ -70,6 +70,8 @@ export interface Spec {
   fillMin?: number;
   /** Variante der Woche (z. B. „hügelig“, „Kadenz“, „Pull Buoy“): steht im Titel, damit sich Wochen unterscheiden */
   variant?: string;
+  /** Auftrag 18: kurze Hinweise (Verpflegung, Hitze, Technik …), je eine Zeile */
+  notes?: string[];
 }
 
 /* ---------- Tempo je Zone ---------- */
@@ -118,6 +120,7 @@ export const DRILLS: Record<string, { name: string; what: string; focus: string 
   fist: { name: 'Faustschwimmen', what: 'Mit geschlossener Faust kraulen – du spürst, wie viel der Unterarm zieht; danach greift die offene Hand besser.', focus: 'mit dem Unterarm ziehen' },
   count: { name: 'Züge zählen', what: 'Züge pro Bahn zählen und mit jeder Bahn einen weniger versuchen – für einen langen, effizienten Zug.', focus: 'ein Zug weniger pro Bahn' },
   breath3: { name: 'Dreier-Atmung', what: 'Alle 3 Züge atmen, abwechselnd links und rechts – für einen gleichmäßigen Zug und Orientierung im Freiwasser.', focus: 'beide Seiten gleich' },
+  six36: { name: '6-3-6', what: '6 Beinschläge in Seitlage, 3 Kraulzüge, 6 Beinschläge auf der anderen Seite – übt Rollen, Wasserlage und Atmung nach beiden Seiten.', focus: 'ruhig rollen, Kopf bleibt unten' },
   scull: { name: 'Wriggen', what: 'Hände vor dem Kopf ziehen kleine Achten, die Beine ruhig – für Wassergefühl beim Greifen.', focus: 'Druck an den Handflächen spüren' }
 };
 const DRILL_ROT = ['catchup', 'fingertip', 'sidekick', 'onearm', 'fist', 'count', 'breath3', 'scull'];
@@ -297,6 +300,7 @@ export function describe(spec: Spec): string {
   const why = spec.why || (spec.sport !== 'football' ? purposeOf({ sport: spec.sport, spec, title: spec.title || '', area: spec.area, stage: spec.stage }) : null);
   if (why) L.push(`Warum: ${why}`);
   if (spec.tip) L.push(`Achte auf: ${spec.tip}`);
+  (spec.notes || []).forEach(n => L.push(n));
   // Auftrag 15: Fachbegriffe (Sweet Spot, Schwelle, CSS, VO2max …) mit kurzer Erklärung
   return L.join('\n');
 }

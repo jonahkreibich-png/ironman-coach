@@ -34,7 +34,7 @@ export const KNOWLEDGE: Knowledge[] = [
   { id: 'game-strength', topic: 'Belastung und Erholung', title: 'Kraft am Spieltag', check: 'strengthGameDay', status: 'neu',
     rule: 'Kraft für den Oberkörper am Spieltag ist okay, aber kurz (höchstens 30 min) und nicht direkt vor dem Spiel. In der Wettkampfwoche keine Kraft.',
     why: 'Das Spiel ist die harte Einheit des Tages.', source: 'Auftrag 18, Punkt 5', where: 'Plan-Check' },
-  { id: 'recovery-week', topic: 'Belastung und Erholung', title: 'Erholungswoche', check: 'recoveryIntervals', status: 'verbessert',
+  { id: 'recovery-week', topic: 'Belastung und Erholung', title: 'Erholungswochen ohne Intervalle', check: 'recoveryIntervals', status: 'verbessert',
     rule: 'Alle 3-4 Wochen eine Erholungswoche mit etwa 2/3 des Umfangs. Darin keine Intervalle, nur Tests (höchstens ein harter Test), und kein Test direkt neben einem Spiel.',
     why: 'Die Anpassung an das Training passiert in der Erholung; Tests brauchen frische Beine.', source: 'Periodisierung (Bompa), Auftrag 17', where: 'Generator und Plan-Check' },
   { id: 'warmup', topic: 'Belastung und Erholung', title: 'Aufwärmen und Auslaufen', check: 'warmup', status: 'war schon da',
@@ -47,7 +47,7 @@ export const KNOWLEDGE: Knowledge[] = [
   { id: 'race-week', topic: 'Wettkämpfe und Saison', title: 'Wettkampfwoche', check: 'raceWeek', status: 'neu',
     rule: 'In der Wettkampfwoche keine Kraft und nichts Hartes außer kurzen Aktivierungen (Steigerungen). Ist 1-2 Tage vorher ein festes Teamsport-Spiel, wird die ganze Woche leichter, und der Coach rät, nur kurz zu spielen.',
     why: 'Frisch an den Start; ein Spiel kurz davor kostet viel Frische.', source: 'Tapering-Forschung (Mujika), Auftrag 18', where: 'Plan-Check' },
-  { id: 'taper', topic: 'Wettkämpfe und Saison', title: 'Tapering', status: 'war schon da',
+  { id: 'taper', topic: 'Wettkämpfe und Saison', title: 'Tapering vor dem Wettkampf', status: 'war schon da',
     rule: 'Vor A-Wettkämpfen Umfang um 40-60 % senken, kurze Intensität bleibt: Sprint/10 km etwa 1 Woche, Olympisch/Halbmarathon 1-1,5 Wochen, Mittel- und Langdistanz 2 Wochen. C-Wettkämpfe als Training ohne Tapering.',
     why: 'Weniger Umfang bei kurzer Intensität bringt die beste Form am Wettkampftag.', source: 'Mujika & Padilla (Tapering)', where: 'Phasen im Generator (periodize.ts)' },
   { id: 'a-races', topic: 'Wettkämpfe und Saison', title: 'Wenige Hauptwettkämpfe', status: 'neu',
@@ -79,7 +79,7 @@ export const KNOWLEDGE: Knowledge[] = [
   { id: 'overreach', topic: 'Schmerzen und Überlastung', title: 'Überlastung früh erkennen', status: 'war schon da',
     rule: 'Mehrere Zeichen über mindestens 3 Tage (HFV runter, Ruhepuls hoch, schlechter Schlaf, Leistung schlechter bei gleichem Puls, Gefühl schlechter): Entlastungstage oder eine leichtere Woche. Ohne Puls schätzt die App die Belastung aus Anstrengung × Dauer.',
     why: 'Früh reagieren verhindert Übertraining.', source: 'Meeusen u. a. (Overtraining-Konsens), Foster (Session-RPE)', where: 'Analyse und Vorschlag „Woche leichter“' },
-  { id: 'easy-easy', topic: 'Schmerzen und Überlastung', title: 'Locker heißt locker', status: 'verbessert',
+  { id: 'easy-easy', topic: 'Schmerzen und Überlastung', title: 'Locker heißt locker', status: 'war schon da',
     rule: 'Sind lockere Einheiten regelmäßig zu hart (Puls über Zone 2), sagt der Coach es und nennt eine Puls-Grenze für die kommenden lockeren Einheiten.',
     why: 'Zu schnelle lockere Einheiten machen müde, ohne die Grundlage besser zu trainieren.', source: 'Seiler (polarisiertes Training)', where: 'Analyse, Bewertung nach der Einheit' },
   // ---------- Essen und Trinken ----------
@@ -138,7 +138,9 @@ export const KNOWLEDGE: Knowledge[] = [
 
 /* kurzer Kontext für den KI-Coach (eine Zeile je Regel) */
 export function rulesForAi(): string {
-  return 'Trainingsregeln der App (gelten für jeden Plan, du erklärst sie bei Bedarf):\n' + KNOWLEDGE.filter(k => k.topic !== 'Coach').map(k => `- ${k.title}: ${k.rule}`).join('\n');
+  // kurz: je Regel der erste Satz (die App setzt die Regeln selbst durch, die KI soll sie kennen und erklären können)
+  const first = (t: string) => (t.match(/^.*?[.!](?=\s|$)/) || [t])[0];
+  return 'Trainingsregeln der App (gelten für jeden Plan; erkläre sie bei Fragen wie „Warum habe ich heute frei?“ mit den Daten des Plans):\n' + KNOWLEDGE.filter(k => k.topic !== 'Coach').map(k => `- ${k.title}: ${first(k.rule)}`).join('\n');
 }
 export const byId = (id: string) => KNOWLEDGE.find(k => k.id === id) || null;
 

@@ -1,7 +1,8 @@
+import { cycleHint, shoeHint } from '../../../shared/care';
 /* Heute: das Zentrum der App. Oben die Antwort des Tages (Ampel + Einheit + ein Satz vom Coach), darunter Morgen,
    Zuletzt, Woche. Details erst beim Antippen. Zwei Entwürfe: A „Antwort“ (Standard) und B „Feed“ (siehe DESIGN.md). */
 import * as C from '../../../shared/core';
-import { STATE, UI, PLAN, findDay } from '../store';
+import { STATE, UI, PLAN, findDay, BASE_WEEKS } from '../store';
 import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
 import { t, tn, num, duration } from '../../../shared/i18n';
 import { D, RETURN_STAGES } from '../data';
@@ -151,11 +152,17 @@ function feedVariant(): string {
     ${sec(t('heute.values'), critTiles())}`;
 }
 
+/* Auftrag 18: freiwillige Hinweise (Laufschuhe, Zyklus) – nur wenn eingetragen */
+function careHints(): string {
+  const d = D(); const st = STATE.settings || {};
+  const l = [cycleHint(st.cycle, d.today), shoeHint(STATE, BASE_WEEKS, st.shoe, d.today)].filter(Boolean) as string[];
+  return l.length ? `<div class="card stack" data-care-hints style="margin-top:var(--s3)">${l.map(x => `<div class="hint">${esc(x)}</div>`).join('')}</div>` : '';
+}
 export function renderHeute(): string {
   const d = D();
   const head = `<div class="spread" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill accent">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
   if (UI.heuteVariant === 'feed') return head + feedVariant() + illnessBlock() + raceBanner() + sec(t('heute.week'), weekStrip()) + foodMini();
-  return head + answerCard() + illnessBlock() + raceBanner() + nextRows() + sec(t('heute.week'), weekStrip()) + coachPreview() + foodMini();
+  return head + answerCard() + illnessBlock() + raceBanner() + careHints() + nextRows() + sec(t('heute.week'), weekStrip()) + coachPreview() + foodMini();
 }
 
 on('plan-day', el => { UI.planDate = el.dataset.date; nav.go('plan'); });

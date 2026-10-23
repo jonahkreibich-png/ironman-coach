@@ -50,6 +50,7 @@ export function renderEinstellungen(): string {
   h += sec(t('set.ai'), aiCard());
   h += sec(t('set.illness'), illnessCard());
   h += sec(t('set.ready'), readyCard(), t('set.readyAside'));
+  h += sec(t('set.care'), careCard());
   h += sec(t('set.score'), scoreCard(), t('set.scoreAside'));
   return h;
 }
@@ -213,6 +214,24 @@ onChange('ill-f', el => {
   p[f] = v || (f === 'end' ? null : f === 'note' ? '' : p.start);
   if (p.end && p.start && p.end < p.start) p.end = p.start;
   saveState(); invalidate(); nav.rerender();
+});
+
+/* ---------- Auftrag 18: freiwillig – Laufschuhe und Zyklus ---------- */
+function careCard(): string {
+  const sh = STATE.settings.shoe || {}; const cy = STATE.settings.cycle || {};
+  return `<div class="card stack" data-care><div class="hint">${esc(t('set.careHint'))}</div>
+    <span class="lab">${esc(t('set.shoe'))}</span><div class="fgrid">
+      <div class="fld"><label for="shoe-name">${esc(t('set.shoeName'))}</label><input id="shoe-name" class="inp" data-ch="care" data-g="shoe" data-k="name" value="${esc(sh.name || '')}"></div>
+      <div class="fld"><label for="shoe-since">${esc(t('set.shoeSince'))}</label><input id="shoe-since" class="inp" type="date" data-ch="care" data-g="shoe" data-k="since" value="${esc(sh.since || '')}"></div>
+      <div class="fld"><label for="shoe-km0">${esc(t('set.shoeKm0'))}</label><input id="shoe-km0" class="inp" inputmode="numeric" data-ch="care" data-g="shoe" data-k="km0" value="${sh.km0 ?? ''}"></div></div>
+    <label class="row"><input type="checkbox" data-ch="care" data-g="cycle" data-k="on" ${cy.on ? 'checked' : ''}> ${esc(t('set.cycleOn'))}</label>
+    ${cy.on ? `<div class="fgrid"><div class="fld"><label for="cy-start">${esc(t('set.cycleStart'))}</label><input id="cy-start" class="inp" type="date" data-ch="care" data-g="cycle" data-k="start" value="${esc(cy.start || '')}"></div>
+      <div class="fld"><label for="cy-len">${esc(t('set.cycleLen'))}</label><input id="cy-len" class="inp" inputmode="numeric" data-ch="care" data-g="cycle" data-k="length" value="${cy.length ?? 28}"></div></div>` : ''}</div>`;
+}
+onChange('care', el => {
+  const g = el.dataset.g!, k = el.dataset.k!; const inp = el as HTMLInputElement;
+  const v: any = inp.type === 'checkbox' ? inp.checked : k === 'km0' || k === 'length' ? (parseNum(inp.value) ?? null) : (inp.value || null);
+  STATE.settings[g] = { ...(STATE.settings[g] || {}), [k]: v }; saveState(); invalidate(); if (inp.type === 'checkbox') nav.rerender(); toast(t('common.saved'));
 });
 
 /* ---------- Ampel-Rückfallwerte ---------- */

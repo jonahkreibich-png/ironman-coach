@@ -300,8 +300,8 @@ export function sleepNeed(p: Pick<Profile, 'birthYear'>, today: string): [number
   const a = ageOf(p, today);
   if (a == null) return [7.5, 9];
   if (a < 13) return [9, 11];
-  if (a < 18) return [8.5, 9.5];
-  if (a < 26) return [7.5, 9];
+  // Auftrag 18: Jugendliche etwa 8-10 h, Erwachsene 7-9 h
+  if (a < 18) return [8, 10];
   return [7, 9];
 }
 /* Maximalpuls: gemessen, sonst aus dem Alter geschätzt */

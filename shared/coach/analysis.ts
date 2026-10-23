@@ -130,6 +130,10 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const tired = recent.filter(x => (x.f.feel || 0) >= 4);
   const hardEasy = recent.filter(x => x.f.rpe != null && x.f.rpe >= 7 && x.planned && !C.isHard(x.planned));
   if (tired.length >= 2 || hardEasy.length >= 2) add({ id: 'feel', kind: 'recovery', tone: 'warn', score: 70, title: 'Einheiten fühlen sich schwer an', why: [tired.length >= 2 ? `${tired.length}× „müde“ in den letzten 10 Tagen` : '', hardEasy.length >= 2 ? `${hardEasy.length} lockere Einheiten mit RPE 7 oder mehr` : ''].filter(Boolean).join(', ') + '.', tip: 'Ein lockerer Tag mehr diese Woche, früher schlafen.' });
+  // Auftrag 18: Warnzeichen für zu wenig Energie (RED-S): häufige Infekte plus Müdigkeit – vorsichtiger Hinweis, Arzt empfehlen, keine Diagnose
+  { const ills = (st.illnessPeriods || []).filter((p: any) => p && p.start >= C.addDays(today, -90)).length;
+    const tiredSigns = ins.some(x => ['feel', 'fatigue', 'eff-down'].includes(x.id));
+    if (ills >= 2 && tiredSigns) add({ id: 'reds', kind: 'recovery', tone: 'warn', score: 72, title: 'Mehrere Warnzeichen zusammen', why: `${ills} Infekte in 3 Monaten und Müdigkeit im Training.`, tip: 'Manchmal steckt zu wenig Energie dahinter: rund ums Training genug essen (Kohlenhydrate und Eiweiß). Bei Frauen auch auf Zyklus-Veränderungen achten. Lass das bitte ärztlich abklären, das ist keine Diagnose.' }); }
   // Schwimmen: Kraul am Stück und Züge pro Bahn
   const swims = done.filter(x => x.sport === 'swim');
   const crawl = swims.filter(x => x.f.longestCrawl).map(x => ({ d: x.date, m: x.f.longestCrawl! }));

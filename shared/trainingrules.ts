@@ -54,7 +54,7 @@ const dayMin = (d: any) => live(d).filter((s: any) => !s.race).reduce((a: number
 const sportsOf = (d: any) => new Set<string>(live(d).filter((s: any) => !s.race).map((s: any) => isBrick(s) ? 'run' : s.sport));
 const hardDay = (d: any) => !!d && live(d).some(hardS);
 const eventDay = (d: any) => !!d && live(d).some((s: any) => s.race || isGame(s));
-const raceSimDay = (d: any) => live(d).length > 0 && live(d).filter((s: any) => !s.race).every((s: any) => s.raceSim);
+const raceSimDay = (d: any) => { const l = live(d).filter((s: any) => !s.race); return l.length > 0 && l.every((s: any) => s.raceSim); };
 const testIn = (w0: any, sp: string) => (w0.days || []).some((d: any) => live(d).some((s: any) => s.sport === sp && isTestS(s)));
 /* Bezug für „+10 min“: die längste Einheit der Sportart in der Woche (ohne Tests, Koppel, Wettkampf) */
 const refOf = (w0: any, sp: string) => Math.max(0, ...(w0.days || []).flatMap((d: any) => live(d)).filter((s: any) => s.sport === sp && !s.race && !isTestS(s) && !isBrick(s)).map(minOf));
@@ -688,6 +688,52 @@ export function capLongSessions(weeks: any[], p: Profile, o: TOpts = {}): string
       const lr = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && isLongS(s)).map(minOf)), lb = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && isLongS(s)).map(minOf));
       if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race' && !w.entry && !w.reduced) { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
     }
+  }
+  return fixes;
+}
+/* Auftrag 18, Punkt 6: Generalprobe vor einem Triathlon (A/B, ab 16): einmal in der spezifischen Phase, etwa 3-5 Wochen vorher, am Tag der
+   langen Ausfahrt Schwimmen + Rad + Koppellauf im Wettkampf-Ablauf (Wechsel und Verpflegung üben). Zählt als erlaubter Dreifach-Tag. */
+export function addRaceRehearsals(weeks: any[], p: Profile, o: TOpts & { sports?: string[] } = {}): string[] {
+  const fixes: string[] = [];
+  const keep = (s: any) => !!(o.keep && o.keep(s));
+  for (const r of racesOf(weeks, o.goals || []).filter(x => x.priority !== 'C' && x.type && /^tri_/.test(x.type) && x.type !== 'tri_supersprint')) {
+    if ((ageOf(p, r.date) ?? 30) < 16) continue;
+    const D = daysOf(weeks);
+    const cands = D.filter(x => { const k = Math.floor(diffD(x.d.date, r.date) / 7); return k >= 3 && k <= 5 && x.w.phase === 'specific' && !x.w.isRecoveryWeek && (!o.from || x.d.date >= o.from); })
+      .filter(x => live(x.d).some((s: any) => s.sport === 'bike' && isLongS(s) && !fixedS(s) && !keep(s) && s.spec))
+      .sort((a, b) => Math.abs(diffD(a.d.date, r.date) - 28) - Math.abs(diffD(b.d.date, r.date) - 28));
+    if (D.some(y => raceSimDay(y.d) && Math.abs(diffD(y.d.date, r.date)) <= 60)) continue;
+    if (!(o.sports || []).includes('run')) continue;
+    const okNext = (c: DayRef) => { const nx = at(D, D.indexOf(c), 1); return !(nx && (eventDay(nx.d) || hardDay(nx.d))) && (!o.allowed || o.allowed({ sport: 'run', plannedMinutes: 20 }, c.d.date)); };
+    /* Schwimmen nur, wenn am Tag davor und danach kein Schwimmen liegt (gleiche Sportart nicht an Folgetagen) */
+    const swimFree = (c: DayRef) => live(c.d).some((s: any) => s.sport === 'swim') || [-1, 1].every(k => { const y = at(D, D.indexOf(c), k); return !y || !live(y.d).some((s: any) => s.sport === 'swim'); });
+    const x = cands.find(c => okNext(c) && swimFree(c)) || cands.find(okNext);
+    if (!x) continue;
+    const bike = live(x.d).find((s: any) => s.sport === 'bike' && isLongS(s));
+    const ctx = bike.spec.ctx;
+    const why = `Generalprobe für ${r.name}: Schwimmen, Rad und Laufen hintereinander wie im Rennen. Wechsel üben (Neopren aus, Helm, Schuhe) und genau die Wettkampf-Verpflegung testen.`;
+    const b = W.build({ ...bike.spec, why, notes: [...(bike.spec.notes || []), 'Die letzten 20 min im geplanten Wettkampftempo, sonst gleichmäßig.'] });
+    const run = W.runEasy(ctx, 20); run.title = 'Koppellauf 20 min (Generalprobe)'; run.why = why; (run as any).notes = ['Die ersten 10 min im Wettkampftempo, dann locker auslaufen.'];
+    const out: any[] = [];
+    /* Schwimmen am Nachbartag weglassen, wenn dort noch eine andere Einheit liegt – die Generalprobe ersetzt es */
+    if ((o.sports || []).includes('swim') && !swimFree(x)) for (const k of [1, -1]) {
+      const y = at(D, D.indexOf(x), k); if (!y) continue;
+      const sw = live(y.d).filter((s: any) => s.sport === 'swim');
+      if (sw.length && live(y.d).length > sw.length && sw.every((s: any) => !fixedS(s) && !keep(s) && !isTestS(s) && !hardS(s))) {
+        y.d.sessions = y.d.sessions.filter((s: any) => !sw.includes(s));
+        fixes.push(`${y.d.date}: Schwimmen entfällt, weil die Generalprobe am ${x.d.date} Schwimmen enthält`);
+      }
+    }
+    const swimOk = (o.sports || []).includes('swim') && swimFree(x) && (!o.allowed || o.allowed({ sport: 'swim', plannedMinutes: 25 }, x.d.date));
+    if (swimOk && !live(x.d).some((s: any) => s.sport === 'swim')) {
+      const sp = W.swimNormal(ctx, 'endurance', 25, 'specific', W.swimRepMax(p as any)); sp.title = 'Schwimmen 25 min (Generalprobe)'; sp.why = why;
+      (sp as any).notes = ['Ein- und Ausschwimmen locker, dazwischen 10-15 min im Wettkampftempo (wie die erste Rennstrecke).'];
+      const sw = { ...W.build(sp), id: `${bike.id}-gp-swim`, raceSim: true };
+      out.push(sw);
+    }
+    const swimNow = live(x.d).find((s: any) => s.sport === 'swim');
+    x.d.sessions = [...(swimNow ? [{ ...swimNow, raceSim: true }] : out), { ...bike, ...b, id: bike.id, long: true, raceSim: true }, { ...W.build(run), id: `${bike.id}-gp-run`, raceSim: true }];
+    fixes.push(`${x.d.date}: Generalprobe für ${r.name} (Schwimmen, Rad, Koppellauf)`);
   }
   return fixes;
 }

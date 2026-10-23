@@ -23,7 +23,9 @@ import * as K from './keysessions';
 import { placeholders, macroPhases, timelineOf, capsFor, easyAfterDays, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
 import { levelOf, maxHard, ownHardBudget, repairIntensity, qualityFor } from './intensity';
 import { repairSports, repairSpacing } from './planrules';
-import { repairTrainingRules, hardBlocked, capLongSessions } from './trainingrules';
+import { repairTrainingRules, hardBlocked, capLongSessions, addRaceRehearsals } from './trainingrules';
+import { addSessionNotes } from './sessionnotes';
+import { seasonHint } from './goalcheck';
 
 export type Phase = 'base' | 'build' | 'specific' | 'taper' | 'race';
 export interface GenInput {
@@ -65,6 +67,8 @@ export interface GenInput {
   recentOwnMin?: number | null;
   /** Auftrag 17: längster wirklich erledigter Lauf / längste Ausfahrt der letzten 4 Wochen (Minuten): lange Einheiten wachsen von dort */
   recentLong?: { run?: number | null; bike?: number | null } | null;
+  /** Auftrag 18: Tage ohne Training (ohne Krankheit) vor „from“: ab 8 Tagen Wiedereinstieg in Stufen */
+  pauseDays?: number | null;
 }
 /* CTL ist etwa die tägliche Belastung (TSS) der letzten 6 Wochen. Lockeres Ausdauertraining bringt etwa 50 TSS pro Stunde. */
 export const TSS_PER_HOUR = 50;
@@ -366,8 +370,12 @@ export function generatePlan(inp: GenInput): GenResult {
   const ENTRY_F = [0.72, 0.9];
   const ownVols: number[] = []; const entryWeek: boolean[] = [];
   let lastNormal = baseOwn, afterEntry = false;
+  // Auftrag 18: nach einer Pause ohne Krankheit: bis 2 Wochen 90 %, bis 4 Wochen 70 % → 85 %, länger 60 % → 75 % → 90 %, die Wochen ohne Intensität
+  const pg = inp.pauseDays ?? null;
+  const PAUSE_F = pg == null || pg < 8 || afterIllness ? null : pg <= 14 ? [0.9] : pg <= 28 ? [0.7, 0.85] : [0.6, 0.75, 0.9];
   phases.forEach((p, i) => {
     const mon = addDays(start, i * 7);
+    if (PAUSE_F && i < PAUSE_F.length && !p.recovery) { ownVols.push(Math.round(baseOwn * PAUSE_F[i])); entryWeek.push(true); afterEntry = true; return; }
     const tg = pat ? WP.targetFor(pat, mon) : null;
     if (tg) {
       if (tg.recovery != null) p.recovery = tg.recovery;
@@ -547,6 +555,7 @@ export function generatePlan(inp: GenInput): GenResult {
     let hardLeft = ph.recovery || ph.phase === 'race' ? 0 : ownHardBudget(profile, ph.phase, mon, baseWeekOf(wi), fixedHardN);
     // erste Woche nach einer Krankheit: nichts Hartes (ein Test am Ende der Woche ist die Ausnahme)
     if (wi === 0 && afterIllness) hardLeft = 0;
+    if (entryWeek[wi]) hardLeft = 0;
     // laufende Woche: schon erledigte harte Einheiten zählen mit (keine doppelte harte Einheit)
     if (part) hardLeft = Math.max(0, hardLeft - doneHard);
     // Spiel und C-Rennen zählen in Grundlage und Tapering als harte Einheit; im Aufbau/spezifisch ist das Kontingent für Intervall-Einheiten (Abstand gilt trotzdem)
@@ -635,7 +644,7 @@ export function generatePlan(inp: GenInput): GenResult {
         let rest = mins; let left = n;
         // Tapering mit nur einer Radeinheit: der kurze, scharfe Reiz geht vor der langen Ausfahrt
         const taperKey = ph.phase === 'taper' && n === 1 && hardOk && hardLeft > 0;
-        if (n >= 1 && ph.phase !== 'race' && !taperKey) { const c = bikeChoice(profile, false, month, eff); const longCap = Math.min(capsW(c.indoor).bike, cap ?? 999, ph.phase === 'taper' ? 75 : 999); const L = Math.max(45, Math.min(longCap, rest * (n === 1 ? 1 : 0.5))); add(K.bikeLongVariant(W.bikeLong(pc(c.indoor, c.name), L), wi, ph.phase, ph.recovery || !!entryWeek[wi]), { long: true, prio: 1 }); rest -= L; left--; }
+        if (n >= 1 && ph.phase !== 'race' && !taperKey) { const c = bikeChoice(profile, false, month, eff); const longCap = Math.min(capsW(c.indoor).bike, cap ?? 999, ph.phase === 'taper' ? 75 : 999); const L = Math.max(45, Math.min(longCap, rest * (n === 1 ? 1 : 0.5) * (c.indoor ? 0.8 : 1))); add(K.bikeLongVariant(W.bikeLong(pc(c.indoor, c.name), L), wi, ph.phase, ph.recovery || !!entryWeek[wi]), { long: true, prio: 1 }); rest -= L; left--; }
         // Einsteiger: in der Grundlage noch keine Intervalle auf dem Rad (Auftrag 14)
         if (hardOk && hardLeft > 0 && left >= 1 && !(lv === 'beginner' && ph.phase === 'base')) {
           const c = bikeChoice(profile, true, month, eff);
@@ -932,6 +941,8 @@ export function generatePlan(inp: GenInput): GenResult {
   // Ruhetage und Kürzungen können eine Woche kleiner gemacht haben: die Steigerung danach wieder höchstens +10 % (kürzt nur)
   enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
+  // Auftrag 18: Generalprobe vor Triathlons (Schwimmen, Rad, Koppellauf an einem Tag)
+  trainingFixes.push(...addRaceRehearsals(weeks, profile, { ...trOpts, sports }));
   // noch einmal Intensität (fehlende Qualität, Abwechslung) auf den nun gültigen Plan – nur an Tagen, die die Regeln erlauben – und Regeln
   intensityFixes.push(...repairIntensity(weeks, profile, today, intOpts));
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
@@ -956,6 +967,7 @@ export function generatePlan(inp: GenInput): GenResult {
     const need = NEED_LONG[g.type]!;
     if (longest && longest < need * 0.8) goalHints.push(`${g.name} am ${+g.date!.slice(8)}.${+g.date!.slice(5, 7)}.: Bis dahin wächst dein langer Lauf mit höchstens 10 % pro Woche nur auf etwa ${longest} min, sinnvoll wären etwa ${need} min. Der Plan erzwingt das nicht. Vorschlag: ${SHORTER[g.type] ? SHORTER[g.type] + ' als Zwischenziel' : 'ein späterer Termin'} oder ein späterer Termin für ${g.name}.`);
   }
+  { const sh = seasonHint(goals0 as Goal[], today); if (sh) goalHints.push(sh); }
   const keyDates = [{ date: goalDate, label: A.name }, ...inBlock.map(g => ({ date: g.date!, label: g.name }))];
   weeks.forEach(w => w.days.forEach((d: any) => d.sessions.forEach((s: any) => { if (/test/i.test(s.title) && !s.race) keyDates.push({ date: d.date, label: s.title }); })));
   const phaseList: GenResult['phases'] = [];
@@ -973,6 +985,7 @@ export function generatePlan(inp: GenInput): GenResult {
     pat ? patternText(pat, profile) : '',
     inp.hoursUnknown ? 'Deine bisherigen Stunden kanntest du nicht: der Plan startet vorsichtig und passt sich nach 2 Wochen an dein echtes Training an.' : '',
     midWeek && !cont ? `Dein Plan beginnt ${from === today ? 'heute' : 'morgen'}; diese Woche ist deshalb kürzer.` : '',
+    PAUSE_F ? `Nach ${pg} Tagen Trainingspause: Wiedereinstieg in Stufen (${PAUSE_F.map(f => Math.round(f * 100) + ' %').join(', ')} des Umfangs), in diesen Wochen nichts Hartes.` : '',
     afterIllness && !patTargets.length ? 'Nach deiner Krankheit: die erste Woche ohne harte Einheiten' + (inp.needTests && inp.needTests.run ? ', der Test kommt erst am Ende der Woche.' : '.') : '',
     missingForGoal.length ? `Dein Ziel enthält auch ${missingForGoal.map(s => SPORT_DE[s]).join(' und ')}. Du hast es nicht gewählt, deshalb plant die App es nicht ein. Willst du es trainieren: Mehr → Profil und Ziele → Sportarten.` : ''
   ].filter(Boolean));
@@ -981,6 +994,8 @@ export function generatePlan(inp: GenInput): GenResult {
   if (way.length > 1 || placed.length) explain.push(`Dein Weg: ${way.map(g => `${g.name} ${fmtD(g.date!)}${String(g.date).slice(2, 4)}${(g as any).placeholder ? ' (Platzhalter)' : ''}`).join(' → ')}.${placed.length ? ' Platzhalter richten sich nach Reihenfolge, Saison und deiner Form. Trag das echte Datum beim Ziel ein, dann plant die App neu.' : ''}`);
   explain.splice(1, 0, `Zyklen: ${cycleText(macro, start)}`);
   goalHints.forEach(h => explain.push(h));
+  // Auftrag 18: kurze Hinweise in den Einheiten (Verpflegung, Hitze/Kälte, Technik …)
+  addSessionNotes(weeks, profile, { from: from || start, keep: (s: any) => keepIds.has(s.id), hasTrainer: (profile.bikes || []).some(b => b === 'trainer' || b === 'spin') });
   const plan = {
     meta: { timeline: timelineOf(start, macro, anchors, []), placeholders: placed.map(g => ({ id: g.id, name: g.name, date: g.date })), generated: true, generatedAt: today, ...(inp.hoursUnknown ? { calibrateAt: addDays(from || start, 14) } : {}), goalId: A.id, event: A.name, eventDate: goalDate, goalIds: allGoals.map(g => g.id), blockName: `Block ${shown[0].block} · ${PHASE_LABEL[shown[0].phase as Phase]}`, runIntervalsAllowed: inp.runIntervalsAllowed ?? true, phases: phaseList, explain, totalWeeks: nTotal, plannedUntil: shown[shown.length - 1].endDate, progression: prog, conflicts, ...(pat ? { pattern: true } : {}), ...(intensityFixes.length ? { intensityFixes: intensityFixes.slice(0, 40) } : {}), ...(ruleFixes.length ? { ruleFixes: ruleFixes.slice(0, 40) } : {}), ...(trainingFixes.length ? { trainingFixes: trainingFixes.slice(0, 60) } : {}), ...(goalHints.length ? { goalHints } : {}), intensityOpts: { runEasyOnly: !!eff.runEasyOnly, runAllowed, longQWeeks: weeks.map(w => w.startDate).filter(m => longRunTempoOk(allGoals, m)), hardBlocked: weeks.flatMap((w: any) => (w.days || []).map((d: any) => d.date)).filter((d: string) => hardBlocked(weeks, d, goals)) } },
     weeks: shown, keyDates,

@@ -39,3 +39,17 @@ export function realism(g: Goal, p: Profile, today: string): Realism | null {
   if (g.targetTimeSec >= r.low * 0.98) return { ...r, ok: true, text: `Deine Wunschzeit ${fmt(g.targetTimeSec)} ist realistisch (Prognose ${range}${est ? ', grob geschätzt' : ''}).` };
   return { ...r, ok: false, text: `${fmt(g.targetTimeSec)} ist bis zum Termin sehr ehrgeizig. Realistisch wären etwa ${range}${est ? ' (grob geschätzt, ein Test macht es genauer)' : ''}.` };
 }
+
+/* Auftrag 18: höchstens 2-3 A-Wettkämpfe pro Jahr mit genug Abstand (sonst Hinweis: weitere als B oder C) */
+export function seasonHint(goals: Goal[], today: string): string | null {
+  const a = (goals || []).filter(g => g && g.priority === 'A' && g.date && g.date >= today && !g.result && g.type !== 'fitness').sort((x, y) => x.date!.localeCompare(y.date!));
+  for (let i = 0; i < a.length; i++) {
+    const within = a.filter(g => g.date! >= a[i].date! && +new Date(g.date! + 'T12:00:00Z') - +new Date(a[i].date! + 'T12:00:00Z') < 365 * 86400000);
+    if (within.length > 3) return `${within.length} Hauptziele (A) innerhalb eines Jahres: Mehr als 2-3 echte Form-Spitzen pro Jahr gehen kaum. Mach die weniger wichtigen zu B (kurzes Tapering) oder C (als Training).`;
+  }
+  for (let i = 1; i < a.length; i++) {
+    const d = (+new Date(a[i].date! + 'T12:00:00Z') - +new Date(a[i - 1].date! + 'T12:00:00Z')) / 86400000;
+    if (d < 42) return `${a[i - 1].name} und ${a[i].name} sind beide Hauptziele (A), aber nur ${Math.round(d / 7)} Wochen auseinander. Zwischen zwei A-Wettkämpfen braucht es Erholung und Aufbau: eins davon besser als B oder C planen.`;
+  }
+  return null;
+}

@@ -13,7 +13,9 @@ export type Op =
   | { op: 'goal'; goal: Goal }
   | { op: 'freq'; sport: string; n: number }
   | { op: 'replan'; reason: string }
-  | { op: 'swim-skill'; skills: Record<string, any> };
+  | { op: 'swim-skill'; skills: Record<string, any> }
+  /** Auftrag 18: Notiz in die Tageswerte (z. B. „Knie 5/10“), die tägliche Anpassung liest sie (Schmerz ab 4/10: Laufen ersetzen) */
+  | { op: 'trend-note'; text: string };
 export interface Undo { skills?: any; adj: string[]; illness: string[]; illnessEnd?: { id: string; prev: string | null }; rules: string[]; note?: string; goal?: { id: string; prev: Goal | null }; freq?: { sport: string; prev: any } }
 export interface OpStore { state: any; profile: Profile; goals: Record<string, Goal>; saveProfile(p: Profile): void }
 export interface Applied { undo: Undo; summary: string[]; replan: string | null; adjChanged: boolean }
@@ -61,6 +63,12 @@ export function applyOps(store: OpStore, ops: Op[], now: number, today: string):
       const p = { ...store.profile }; undo.skills = { ...(p.skills || {}) };
       p.skills = { ...(p.skills || {}), ...o.skills }; store.saveProfile(p); store.profile = p;
       summary.push('Schwimmen: ' + (o.skills.swimCrawlM ? o.skills.swimCrawlM + ' m Kraul am Stück' : '') + (o.skills.swimPullM ? ', ' + o.skills.swimPullM + ' m mit Pull Buoy' : ''));
+    }
+    if (o.op === 'trend-note') {
+      st.trend = st.trend || []; let tp = st.trend.find((x: any) => x && x.date === today);
+      if (!tp) { tp = { date: today }; st.trend.push(tp); st.trend.sort((a: any, b: any) => a.date.localeCompare(b.date)); }
+      tp.illness = [tp.illness, o.text].filter(Boolean).join('; ');
+      summary.push('Notiz: ' + o.text);
     }
     if (o.op === 'replan') replan = o.reason;
   });

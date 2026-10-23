@@ -2,8 +2,10 @@
  *  In den Ansichten stehen keine Erklärblöcke mehr, höchstens ein dezenter Link auf den Begriff. Die Einheiten-Typen kommen aus der
  *  zentralen Liste (shared/sessiontypes.ts), damit Plan, Anzeige, Coach und Lexikon dieselben Namen verwenden. */
 import { SESSION_TYPES } from './sessiontypes';
+import { KNOWLEDGE } from './trainingknowledge';
+import { DRILLS } from './workouts';
 
-export type GlossaryTopic = 'load' | 'values' | 'intensity' | 'planning' | 'technique' | 'sessions';
+export type GlossaryTopic = 'understand' | 'load' | 'values' | 'intensity' | 'planning' | 'technique' | 'sessions';
 export interface Term { term: string; topic: GlossaryTopic; aliases: string; text: string; re: RegExp; ok?: RegExp }
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const entry = (term: string, topic: GlossaryTopic, aliases: string, text: string): Term => ({ term, topic, aliases, text, re: new RegExp(esc(term), 'i') });
@@ -72,7 +74,12 @@ const BASE: Term[] = [
 ];
 /* Einheiten aus der zentralen Liste: Name, Zweck und Aufbau */
 const SESSIONS: Term[] = SESSION_TYPES.filter(t => !BASE.some(b => b.term === t.name)).map(t => entry(t.name, 'sessions', `Einheit ${t.key} ${t.intensity}`, `${t.purpose} Aufbau: ${t.structure}`));
-export const JARGON: Term[] = [...BASE, ...SESSIONS];
+/* Auftrag 18: Technik-Übungen im Wasser (Übungs-Katalog) und „Training verstehen“ (die Trainingsregeln mit Begründung). Beide werden nur
+   im Lexikon gezeigt, nicht in Texten gesucht. */
+const NEVER = /(?!)/;
+const DRILL_TERMS: Term[] = Object.values(DRILLS).filter(d => !BASE.some(b => b.term === d.name)).map(d => ({ term: d.name, topic: 'technique' as GlossaryTopic, aliases: `Übung Technik Schwimmen ${d.focus}`, text: `Übung im Wasser: ${d.what}`, re: NEVER }));
+const UNDERSTAND: Term[] = KNOWLEDGE.map(k => ({ term: k.title, topic: 'understand' as GlossaryTopic, aliases: `Regel ${k.topic} ${k.id}`, text: `${k.rule} Warum: ${k.why}`, re: NEVER }));
+export const JARGON: Term[] = [...BASE, ...DRILL_TERMS, ...SESSIONS, ...UNDERSTAND];
 
 const normalize = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss').replace(/₂/g, '2');
 export function searchGlossary(query = '', topic: GlossaryTopic | '' = ''): Term[] {
@@ -85,7 +92,7 @@ export function findTerm(q: string): Term | null {
   return JARGON.find(j => normalize(j.term) === n) || JARGON.find(j => normalize(j.aliases).split(/\s+/).includes(n)) || searchGlossary(q)[0] || null;
 }
 /** Nur für gezielte Textprüfungen; keine zusätzliche Anweisung. */
-export function unexplained(text: string): string[] { return JARGON.filter(j => j.topic !== 'sessions' && j.re.test(String(text || '')) && !(j.ok && j.ok.test(text))).map(j => j.term); }
+export function unexplained(text: string): string[] { return JARGON.filter(j => j.topic !== 'sessions' && j.topic !== 'understand' && j.re.test(String(text || '')) && !(j.ok && j.ok.test(text))).map(j => j.term); }
 /** Alte Aufrufer bleiben kompatibel; Erklärungen stehen unter Mehr → Lexikon. */
 export function termsLine(_text: string): string { return ''; }
 /** Ausdrücklich geschriebene Erklärungen und Sicherheitshinweise bleiben erhalten. */

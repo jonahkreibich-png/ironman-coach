@@ -152,7 +152,7 @@ export function capsFor(goal: GoalType, date: string, o: { age?: number | null; 
   if (o.runEasySecKm) { const m = Math.round(32000 / 1000 * o.runEasySecKm / 60 / 5) * 5; if (m < run) { run = m; why.push('höchstens etwa 32 km'); } }
   const month = +date.slice(5, 7);
   if ([11, 12, 1, 2].includes(month)) { const w = o.indoor ? 120 : 150; if (bike > w) { bike = w; why.push(o.indoor ? 'Winter drinnen: höchstens 2 h' : 'Winter: höchstens 2:30 h'); } }
-  else if (o.indoor && bike > 150) { bike = 150; why.push('drinnen höchstens 2:30 h'); }
+  else if (o.indoor && bike > 120) { bike = 120; why.push('drinnen höchstens 2 h'); } // Auftrag 18: drinnen höchstens etwa 2 h
   if (o.age != null && o.age < 18) { if (run > 120) { run = 120; why.push('unter 18: langer Lauf höchstens 2 h'); } if (bike > 240) { bike = 240; why.push('unter 18: Rad höchstens 4 h'); } }
   // Schwimmen wächst mit der Phase: Grundlage 70 %, Aufbau 85 %, spezifisch 100 % der Obergrenze (mindestens 45 min)
   const pf = o.phase ? ({ base: 0.7, build: 0.85, specific: 1, taper: 0.7, race: 0.5 } as Record<MPhase, number>)[o.phase] : 1;

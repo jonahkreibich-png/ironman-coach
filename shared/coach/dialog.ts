@@ -362,12 +362,24 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
   if (has(toks, ['krank', 'erkaeltet', 'erkaeltung', 'grippe', 'halsschmerzen', 'schnupfen', 'husten', 'corona', 'covid', 'infekt', 'magen darm', 'mir ist uebel', 'ist mir uebel', 'uebelkeit', 'kopfweh', 'kopfschmerzen', 'migraene', 'nicht gut', 'schlecht drauf', 'unwohl', 'angeschlagen']) && !has(toks, ['nicht mehr', 'wieder gesund'])) {
     if (illNow) return { intent: 'sick', text: 'Du bist schon als krank eingetragen. Schlafen, trinken, genug essen. Sag mir Bescheid, wenn du 24 Stunden ohne Symptome bist, dann starten wir in Stufen.', options: [{ label: 'Wieder gesund', say: 'Ich bin wieder gesund' }] };
     const mild = has(toks, ['nicht gut', 'unwohl', 'angeschlagen', 'schlecht drauf', 'kopfweh', 'kopfschmerzen']) && !has(toks, ['krank', 'fieber', 'grippe']);
+    // Auftrag 18: Hals-Regel. Nur über dem Hals (Schnupfen, Niesen, leichtes Halskratzen) ohne Fieber: locker und kurz möglich.
+    // Unter dem Hals (Husten, Gliederschmerzen, Magen-Darm) oder Fieber: kein Training, Krankheitsphase.
+    const above = has(toks, ['schnupfen', 'nase', 'verschnupft', 'niesen', 'halskratzen', 'kratzen im hals', 'halsweh', 'halsschmerzen']);
+    const below = has(toks, ['fieber', 'husten', 'glieder', 'gliederschmerzen', 'grippe', 'magen', 'uebel', 'uebelkeit', 'corona', 'covid', 'brust', 'schuettelfrost', 'durchfall', 'erbrechen']);
+    if (above && !below && !has(toks, ['krank', 'erkaeltet', 'erkaeltung'])) {
+      const g = 'neck-' + ctx.today;
+      const e = live(dayOf(ctx, ctx.today)).filter((s: any) => !s.fixed && !s.race && ['run', 'bike', 'swim'].includes(s.sport) && !((ctx.state.sessions || {})[s.id] || {}).completed)
+        .map((s: any) => ({ id: `${g}-${s.id}`, group: g, type: 'modify', sessionId: s.id, set: { title: 'Locker und kurz statt: ' + s.title, zone: 'Zone 1-2', plannedMinutes: Math.min(30, s.plannedMinutes || 30), plannedKm: null, hard: false, long: false, description: 'Hals-Regel: Schnupfen ohne Fieber, deshalb nur locker und kurz (höchstens 30 min, Zone 1-2). Fühlst du dich schlechter, lieber ganz Pause.' }, what: `${s.title} → locker und kurz`, reason: 'Schnupfen ohne Fieber (über dem Hals)' }));
+      return { intent: 'unwell', text: 'Gute Besserung! Hals-Regel: Nur Schnupfen ohne Fieber („über dem Hals“) – dann geht heute höchstens locker und kurz (bis 30 min), nichts Hartes. Hast du Husten, Gliederschmerzen oder Fieber („unter dem Hals“), bitte kein Training: dann trage ich eine Krankheitsphase ein.',
+        pending: { kind: 'confirm', at: Date.now(), ops: e.length ? [{ op: 'adjust', adj: e }] : [], data: { done: 'heute nur locker und kurz' } },
+        options: [...(e.length ? [{ label: 'Heute locker und kurz', say: 'ja' }] : []), { label: 'Husten oder Fieber', say: 'Ich bin krank mit Fieber' }, { label: 'Heute ganz frei', say: 'heute frei' }] };
+    }
     if (mild) {
       const e = easyToday(ctx);
       return { intent: 'unwell', text: `Gute Besserung! Wenn du dich nur etwas schlapp fühlst, reicht heute locker oder Pause. Bist du richtig krank (Fieber, Halsweh, Gliederschmerzen), trage ich eine Krankheitsphase ein.`, pending: { kind: 'confirm', at: Date.now(), ops: e.length ? [{ op: 'adjust', adj: e }] : [], data: { done: 'heute nur locker' } },
         options: [...(e.length ? [{ label: 'Heute nur locker', say: 'ja' }] : []), { label: 'Ich bin richtig krank', say: 'Ich bin krank' }, { label: 'Heute ganz frei', say: 'heute frei' }] };
     }
-    return propose('sick', 'Gute Besserung! Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Bei Fieber gilt: kein Training.', [{ op: 'illness-start', date: ctx.today }], [{ label: 'Ja, Krankheit eintragen', say: 'ja' }, { label: 'Nur heute locker', say: 'heute nur locker' }, { label: 'Nein', say: 'nein' }]);
+    return propose('sick', 'Gute Besserung! Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Hals-Regel: Bei Fieber, Husten oder Gliederschmerzen kein Training; nur Schnupfen ohne Fieber erlaubt höchstens locker und kurz.', [{ op: 'illness-start', date: ctx.today }], [{ label: 'Ja, Krankheit eintragen', say: 'ja' }, { label: 'Nur heute locker', say: 'heute nur locker' }, { label: 'Nein', say: 'nein' }]);
   }
   // Während einer Krankheitsphase: Fragen nach Training beantwortet der Coach zur Krankheit, statt den Plan zu ändern
   if (illNow && /^(kann|darf|soll|koennte|duerfte|sollte) ich\b|\b(wieder|schon) (trainieren|laufen|schwimmen|radfahren|rad fahren|fahren|sport)\b/.test(j) && !verbOf(toks.filter(x => x !== 'locker' && x !== 'lockerer'))) {
@@ -575,8 +587,17 @@ function painOps(ctx: EngineCtx, body: string, lvl: number): Reply {
     if (next.length) ops.push(cancelOp(ctx, next, `${body}: starke Schmerzen`));
     return propose('injury', `Bei starken Schmerzen bitte nicht trainieren und ärztlich anschauen lassen. Ich streiche ${next.length ? joinDe(next.map(label)) : 'nichts weiter'} und plane die kommenden Wochen schonender (${joinDe(rules.map(ruleText))}). Übernehmen?`, ops);
   }
+  // Auftrag 18: Schmerz-Skala. 4-6 von 10: Laufen pausieren, die nächsten Tage Rad oder Schwimmen gleich lang und locker statt Laufen
+  const fit = ['Knie', 'Rücken', 'Hüfte', 'Leiste'].some(x => String(body).includes(x)) && (ctx.profile.sports || []).includes('bike') ? ' Tritt es beim Radfahren auf: Rad-Einstellung (Bike-Fit, Sattelhöhe) prüfen lassen.' : '';
+  if (lvl === 2) {
+    const sp = ctx.profile.sports || [];
+    // Notiz „Körperteil 5/10“: die tägliche Anpassung ersetzt danach jeden Morgen die Läufe der nächsten 2 Tage (Rad oder Schwimmen gleich lang)
+    ops.splice(1, 0, { op: 'trend-note', text: `${body} 5/10` });
+    if (e.length) ops.push({ op: 'adjust', adj: e });
+    return propose('pain', `Ab 4 von 10 gilt: Laufen abbrechen bzw. pausieren. Statt Laufen fährst du die nächsten Tage ${sp.includes('bike') ? 'locker Rad' : sp.includes('swim') ? 'locker schwimmen' : 'nichts'}, gleich lang, und ich plane schonender: ${joinDe(rules.map(ruleText))}. Wird es nicht besser oder hinkst du, bitte zu Arzt oder Physio.${fit} Übernehmen?`, ops);
+  }
   if (e.length) ops.push({ op: 'adjust', adj: e });
-  return propose('pain', `Dann plane ich schonender: ${joinDe(rules.map(ruleText))}.${e.length ? ' Heute machst du nur locker.' : ''} Bei Schmerzen über 2 von 10 lieber nichts Hartes. Wird es nicht besser: bitte ärztlich anschauen lassen. Übernehmen?`, ops);
+  return propose('pain', `Dann plane ich schonender: ${joinDe(rules.map(ruleText))}.${e.length ? ' Heute machst du nur locker.' : ''} Schmerz bis 3 von 10, gleichbleibend und ohne Hinken: weiter, aber beobachten. Ab 4 von 10 oder wenn es schlimmer wird: abbrechen. Wird es nicht besser: bitte ärztlich anschauen lassen.${fit} Übernehmen?`, ops);
 }
 /* Neue Regeln oder Zeiträume: dauerhaft über das Regel-Modell, danach neu planen */
 function ruleOps(ctx: EngineCtx, rules: Rule[], text: string, kind: 'rule' | 'period'): Reply {
