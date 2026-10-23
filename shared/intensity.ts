@@ -442,7 +442,19 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o0: Rep
           cand = findCand(false, other.s) || findCand(true, other.s);
           if (!cand) continue;
           setS(other.d, other.s, easyOf(other.s, w.phase)); fixes.push(`${other.d.date}: ${other.s.title} locker (Tausch für ${m.sport === 'run' ? 'Laufen' : m.sport === 'bike' ? 'Rad' : 'Schwimmen'})`);
-        } else cand = findCand(false) || findCand(true);
+        } else {
+          cand = findCand(false);
+          // Auftrag 19: Tapering ohne Platz für etwas Hartes (z. B. nur Wochenende, langer Lauf am Tag danach): ein lockerer Lauf bekommt
+          // kurze Steigerungen – der kurze, scharfe Reiz ohne Ermüdung (vor Tempo im langen Lauf, das nur jede 2. Woche sein darf)
+          if (!cand && m.phase === 'taper') for (const d of w.days || []) {
+            const s = (d.sessions || []).find((x: any) => x && x.sport === 'run' && !x.cancelled && !x.race && x.spec && x.spec.ctx && !x.pinned && !x.fixed && !x.frozen && !x.stage && (!o.from || d.date >= o.from) && !isHardSession(x) && !isLightQuality(x) && !x.long && !/^Lang/.test(x.title || '') && (x.plannedMinutes || 0) >= 25);
+            if (!s) continue;
+            const b = W.build({ ...W.runEasy(s.spec.ctx, s.plannedMinutes, { strides: 6 }), why: [s.adjacentOk ? 'Ausnahme: zwei Tage hintereinander Laufen, deshalb locker und kurz.' : '', 'Tapering: kurze Steigerungen halten die Beine wach, ohne müde zu machen.'].filter(Boolean).join(' ') });
+            if (b.plannedMinutes > s.plannedMinutes + 3) continue;
+            cand = { d, s, nx: { ...s, ...b, id: s.id } }; break;
+          }
+          if (!cand) cand = findCand(true);
+        }
         if (cand) { setS(cand.d, cand.s, cand.nx); n++; fixes.push(`${cand.d.date}: ${cand.s.title} → ${cand.nx.title} (${m.msg.split(':')[0]})`);
           // kurze lockere Läufe am Nachbartag: als Ausnahme begründen (gleiche Sportart an Folgetagen, aber kurz und locker)
           if (cand.nx.sport === 'run' && isHardSession(cand.nx)) { const i = AD.findIndex(x => x.d === cand!.d); for (const y of [AD[i - 1], AD[i + 1]].filter(Boolean)) (y.d.sessions || []).forEach((z: any) => { if (z && z.sport === 'run' && !z.race && !isHardSession(z) && (z.plannedMinutes || 0) <= 46 && !z.adjacentOk) markExcuse(z, 'kurz und locker, am Tag daneben ist der harte Lauf.'); }); } }

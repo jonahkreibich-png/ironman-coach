@@ -67,10 +67,12 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
     if (refMin >= 60 && cur > Math.max(refMin * inc, refMin + 15) + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
     // Laufumfang ohne Wettkampf (der Wettkampf selbst ist keine Steigerung)
     const runOf = (x: any) => (x.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport === 'run' && !s.race && !s.cancelled).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
-    let jr = j; while (jr > 0 && (runTest(all[jr]) || all[jr].isRecoveryWeek || all[jr].lightWeek || all[jr].reduced || all[jr].entry || all[jr].phase === 'taper' || all[jr].phase === 'race' || (all[jr].races || []).length)) jr--;
-    let jr1 = jr - 1; while (jr1 > 0 && skip(all[jr1])) jr1--;
-    const refRun = Math.max(runOf(all[jr]), jr1 >= 0 && jr1 < jr && i - jr1 <= 3 && !skip(all[jr1]) ? runOf(all[jr1]) : 0), curRun = runOf(w);
-    if (refRun >= 40 && curRun > refRun * inc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });
+    // Auftrag 19: Wochen mit dem abwechselnden Ruhetag haben meist den vollen Laufumfang: für das Laufen sind sie Bezug
+    let jr = i - 1; while (jr > 0 && (runTest(all[jr]) || all[jr].isRecoveryWeek || all[jr].reduced || all[jr].entry || all[jr].partial || all[jr].entry || all[jr].phase === 'taper' || all[jr].phase === 'race' || (all[jr].races || []).length)) jr--;
+    const skipR = (x: any) => runTest(x) || x.isRecoveryWeek || x.reduced || x.entry || x.partial || x.phase === 'taper' || x.phase === 'race' || (x.races || []).length;
+    let jr1 = jr - 1; while (jr1 > 0 && skipR(all[jr1])) jr1--;
+    const refRun = Math.max(runOf(all[jr]), jr1 >= 0 && jr1 < jr && i - jr1 <= 3 && !skipR(all[jr1]) ? runOf(all[jr1]) : 0), curRun = runOf(w);
+    if (refRun >= 40 && !all[jr].partial && curRun > refRun * maxInc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });
   }
   // Harte Tage
   const days = all.flatMap(w => (w.days || []).map((d: any) => ({ ...d, weekNumber: w.weekNumber }))).sort((a: any, b: any) => a.date.localeCompare(b.date));

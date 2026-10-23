@@ -483,9 +483,16 @@ export function scaleSpec(spec: Spec, f: number): Spec {
     if (out.sport === 'swim') {
       // Auftrag 19: ein einzelnes Kraul-Stück wird nie länger als vorher (Können), auch nicht beim Runden auf 100 m
       if (reps > 1) s.reps = Math.max(2, Math.round(reps * g)); else { const lim = s.mode === 'crawl' || s.mode === 'pull' ? (s.m || 0) : Infinity; s.m = Math.min(lim, Math.max(Math.min(100, s.m || 0), Math.round((s.m || 0) * g / 50) * 50)); }
-    } else if (reps > 1 && !s.walkMin && (out.kind === 'intervals' || out.kind === 'threshold' || out.kind === 'tempo')) s.reps = Math.max(2, Math.round(reps * g));
+    } else if ((s.min || 0) <= 1 && (s.zone || 0) >= 3) {
+      // Auftrag 19: kurze Stücke (Steigerungen, Hügelsprints) bleiben kurz; weniger Wiederholungen, aber mindestens 4
+      if (reps > 1) s.reps = Math.min(reps, Math.max(4, Math.round(reps * g)));
+    } else if (reps > 1 && !s.walkMin && (out.kind === 'intervals' || out.kind === 'threshold' || out.kind === 'tempo')) {
+      // Auftrag 19: bei 2 Stücken werden die Stücke kürzer (z. B. 2×15 → 2×12 min), sonst ließe sich die Einheit nie kürzen
+      if (Math.round(reps * g) < 2 && (s.min || 0) >= 6) { s.reps = 2; s.min = Math.max(5, Math.round((s.min || 0) * reps * g / 2)); }
+      else s.reps = Math.max(2, Math.round(reps * g));
+    }
     else if (reps > 1) s.reps = Math.max(1, Math.round(reps * g));
-    else s.min = Math.max(5, Math.round((s.min || 0) * g / 5) * 5);
+    else if ((s.min || 0) >= 5) s.min = Math.max(5, Math.round((s.min || 0) * g / 5) * 5);
   }
   // Ein-/Ausrollen kürzen, wenn der Hauptteil schon minimal ist
   // Auftrag 18: harte Einheiten behalten mindestens 10 min Aufwärmen

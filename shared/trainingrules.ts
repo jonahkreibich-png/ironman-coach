@@ -468,7 +468,9 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         clearGap(w); qn++; continue;
       }
       const ph = (w.phase === 'base' ? 'build' : w.phase) as any;
-      const rq0 = K.runQualityStep(ph, r.type as GoalType, qn, minor(w.startDate), { noZ5: noZ5(w.startDate), level: levelOf(p), baseWeek: 4 });
+      const rq00 = K.runQualityStep(ph, r.type as GoalType, qn, minor(w.startDate), { noZ5: noZ5(w.startDate), level: levelOf(p), baseWeek: 4 });
+      // Auftrag 19: vor dem Laufziel zählt nur Schwelle oder Wettkampftempo; eine lockere Form der Bibliothek (Tempowechsel, Progression) wird Schwelle
+      const rq0 = rq00 && !RUN_Q.has(rq00.kind || '') ? K.thresholdQuality(r.type as GoalType, qn, { noZ5: noZ5(w.startDate) }) : rq00;
       if (!rq0) continue;
       const fitQ = (room: number) => { const q = { ...rq0 }; while (q.reps > 1 && q.reps * q.min + (q.reps - 1) * q.rest > room) q.reps--; if (q.reps * q.min > room) q.min = Math.max(5, Math.floor(room / 5) * 5); return q; };
       // Auftrag 19: auch kein längerer Lauf (über 46 min) am Nachbartag; kurze lockere Läufe daneben werden begründet (siehe unten)
@@ -478,7 +480,8 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       // a) lockerer Lauf unter der Woche
       for (const { d, s } of runs) {
         if (!movable(s, d.date) || isLongS(s) || hardS(s) || !s.spec || minOf(s) < 30) continue;
-        const i = idx(d); if (i < 0 || !freeAround(i)) continue;
+        const i = idx(d);
+        if (i < 0 || !freeAround(i)) continue;
         const room = Math.max(minOf(s), 45) - 25; const q = fitQ(room);
         let spec = K.runQuality(s.spec.ctx, q); if (W.totals(spec).min > Math.max(minOf(s), 45) + 5) spec = K.runQuality(s.spec.ctx, q, { short: true });
         if (W.totals(spec).min > Math.max(minOf(s), 45) + 10) continue;
@@ -518,6 +521,34 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         placed = { d, s, nx: { ...W.build({ ...spec, why: `${spec.why} ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}: einmal pro Woche im Wettkampftempo, kurz gehalten.` }), id: s.id, ruleNote: 'Lauf-Qualität vor dem Laufziel' } };
         if (add > 0 && other) { if (minOf(other.s) - add >= 15) { const nx2 = scaled(other.s, (minOf(other.s) - add) / minOf(other.s)); if (nx2) setS(other.d, other.s, nx2); } else { removeS(other.d, other.s); fixes.push(`${other.d.date}: ${other.s.title} entfällt (Minuten für die Lauf-Qualität)`); } }
         break;
+      }
+      // d) Auftrag 19: kein Lauftag passt, aber ein anderer Tag ohne harten Nachbarn ist frei (oder hat nur Kraft): ein lockerer Lauf
+      //    zieht dorthin und wird die Qualität; die Kraft von dem Tag tauscht mit dem alten Lauftag. Umfang bleibt gleich.
+      if (!placed) for (const { d, s } of runs) {
+        if (placed || !movable(s, d.date) || isLongS(s) || hardS(s) || !s.spec || minOf(s) < 15 || pinnedS(s)) continue;
+        const q = fitQ(Math.max(minOf(s), 45) - 25);
+        const spec = K.runQuality(s.spec.ctx, q, { short: minOf(s) < 40 });
+        const qs = { ...W.build({ ...spec, why: `${spec.why} ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}: einmal pro Woche im Schwellen- bzw. Wettkampftempo.` }), id: s.id, ruleNote: 'Lauf-Qualität vor dem Laufziel' };
+        if (qs.plannedMinutes > Math.max(minOf(s), 45) + 10) continue;
+        const i0 = idx(d);
+        for (let j = 0; j < D.length && !placed; j++) {
+          const y = D[j]; if (y.w !== w || y.d === d || !inR(y.d.date) || live(y.d).some((z: any) => z.sport === 'run' || z.race) || !freeAround(j)) continue;
+          const side = live(y.d).filter((z: any) => z.sport === 'strength' && movable(z, y.d.date) && !pinnedS(z));
+          const saveY = y.d.sessions, saveD = d.sessions;
+          removeS(d, s); side.forEach((z: any) => removeS(y.d, z));
+          const ok = canPlace(D, qs, j);
+          if (ok) {
+            addS(y.d, qs); placed = { d: y.d, s: qs, nx: qs }; fixes.push(`${s.title}: ${d.date} → ${y.d.date} als Lauf-Qualität`);
+            // Kraft von dem Tag: lieber auf den alten Lauftag, sonst einen anderen passenden Tag der Woche, sonst fällt sie diese Woche weg
+            for (const z of side) {
+              const js = [i0, ...D.map((_, k) => k).filter(k => D[k].w === w && k !== i0 && k !== j)];
+              const t = js.find(k => canPlace(D, z, k));
+              if (t != null) { addS(D[t].d, z); fixes.push(`${z.title}: ${y.d.date} → ${D[t].d.date} (Platz für die Lauf-Qualität)`); }
+              else fixes.push(`${y.d.date}: ${z.title} entfällt (Lauf-Qualität vor ${r.name} geht vor)`);
+            }
+          }
+          else { y.d.sessions = saveY; d.sessions = saveD; }
+        }
       }
       if (!placed) {
         // kein Tag ohne harten Nachbartag frei (z. B. nur Wochenende, Spiel am Samstag): ehrlich sagen statt die Regel zu brechen

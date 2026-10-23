@@ -683,7 +683,8 @@ function generatePlanIn(inp: GenInput): GenResult {
           // Auftrag 14: die Qualität passt in den Anteil eines Laufs dieser Woche (sonst steigt der Laufumfang zu stark); passt sie nicht, bekommt sie eine andere Sportart
           const share = Math.min(cap ?? 60, 60, rest / Math.max(1, left));
           let spec = rq.kind === 'tempo' ? K.longRunWithQuality(ctx, r5(Math.max(rq.reps * rq.min + (rq.reps - 1) * rq.rest + 25, share)), rq) : K.runQuality(ctx, rq);
-          const fits = (sp: W.Spec) => W.totals(sp).min <= share * 1.2 + 5 || W.totals(sp).min + (left - 1) * 25 <= rest + 5;
+          // Auftrag 19: nie länger als das Können (längster Lauf am Stück + Steigerung), sonst die kurze Form
+          const fits = (sp: W.Spec) => (cap == null || W.totals(sp).min <= cap + 5) && (W.totals(sp).min <= share * 1.2 + 5 || W.totals(sp).min + (left - 1) * 25 <= rest + 5);
           if (rq.kind !== 'tempo' && !fits(spec)) spec = K.runQuality(ctx, rq, { short: true });
           if (ph.phase !== 'taper' && !fits(spec)) spec = null as any;
           if (spec) { add(spec, { hard: true, prio: 2, easy: W.runEasy(ctx, Math.min(60, W.totals(spec).min)) }); rest -= W.totals(spec).min; left--; hardLeft--; gq.runQN[ph.phase] = (gq.runQN[ph.phase] || 0) + 1; }
@@ -1141,10 +1142,11 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
     for (const sport of [undefined, 'run'] as (string | undefined)[]) {
       // Auftrag 18: Laufumfang nie gegen eine Woche mit Lauftest messen (der Test ersetzt den langen Lauf), sondern gegen die normale Woche davor
       const runTestWeek = (w: any) => (w.days || []).some((d: any) => (d.sessions || []).some((s: any) => s && s.sport === 'run' && s.spec && s.spec.kind === 'test'));
-      let j = j0; if (sport === 'run') while (j > 0 && (runTestWeek(all[j]) || all[j].isRecoveryWeek || all[j].lightWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
+      // Auftrag 19: für das Laufen zählen Wochen mit dem abwechselnden Ruhetag als Bezug (Laufumfang meist voll)
+      let j = j0; if (sport === 'run') { j = i - 1; while (j > 0 && (runTestWeek(all[j]) || all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--; }
       // Auftrag 19: Bezug ist die größere der letzten zwei normalen Wochen (bei festem Wechsel, z. B. jede 2. Woche ein Ruhetag, sonst
       // würde die leichtere Woche die nächste bremsen und der Plan Woche für Woche schrumpfen)
-      let j1 = j - 1; const bad = (w: any) => runTestWeek(w) || w.isRecoveryWeek || w.lightWeek || w.reduced || w.entry || w.partial || w.phase === 'taper' || w.phase === 'race' || (w.races || []).length;
+      let j1 = j - 1; const bad = (w: any) => runTestWeek(w) || w.isRecoveryWeek || (sport !== 'run' && w.lightWeek) || w.reduced || w.entry || w.partial || w.phase === 'taper' || w.phase === 'race' || (w.races || []).length;
       while (j1 > 0 && bad(all[j1])) j1--;
       for (let guard = 0; guard < 6; guard++) {
         const ref = Math.max(ownMin(all[j], sport), j1 >= 0 && j1 < j && !bad(all[j1]) && i - j1 <= 3 ? ownMin(all[j1], sport) : 0), cur = ownMin(all[i], sport);

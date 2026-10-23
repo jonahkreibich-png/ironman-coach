@@ -6,7 +6,7 @@
 export const MANY_TODAY = '2026-10-19'; // Montag
 export interface ManyUser { id: string; label: string; answers: Record<string, any>; ill?: boolean; teen?: boolean }
 
-type G = { type: string; name: string; weeks: number | null; sports: string[]; why?: string };
+export type G = { type: string; name: string; weeks: number | null; sports: string[]; why?: string };
 const S = ['swim', 'bike', 'run', 'strength'];
 /* alle 15 Kombinationen aus Schwimmen, Rad, Laufen, Kraft (auch nur eine Sportart) */
 const COMBOS: string[][] = Array.from({ length: 15 }, (_, i) => S.filter((_, k) => (i + 1) & (1 << k)));
@@ -30,7 +30,7 @@ const INJ = ['keine', 'keine', 'Knie zwickt beim Bergablaufen', 'keine', 'Achill
 const GEAR = [[], ['board'], ['board', 'buoy'], ['buoy', 'fins'], ['board', 'buoy', 'fins', 'paddles', 'snorkel']];
 const SUNDAY = (weeks: number) => { const d = new Date(Date.UTC(2026, 9, 19 + weeks * 7)); while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
 
-function build(i: number, g: G, sports: string[], o: Partial<{ age: number; team: 0 | 1 | 2; time: number; crawl: string; exp: number; medical: boolean; ill: boolean; pool: string; inj: string; teen: boolean }> = {}): ManyUser {
+export function build(i: number, g: G, sports: string[], o: Partial<{ age: number; team: 0 | 1 | 2; time: number; crawl: string; exp: number; medical: boolean; ill: boolean; pool: string; inj: string; teen: boolean }> = {}): ManyUser {
   const age = o.age ?? AGES[(i * 7) % AGES.length];
   const exp = Math.min(o.exp ?? EXP[(i * 3) % EXP.length], Math.max(0, age - 10));
   const team = o.team ?? (i % 5 === 0 ? 2 : i % 7 === 0 ? 1 : 0); // 2: mit Spielen, 1: ohne Spiele

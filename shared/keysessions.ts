@@ -126,6 +126,12 @@ export function calmQuality(goal: GoalType, n: number, o: { noZ5?: boolean } = {
   const m = runMain('run.racepace', Math.max(0, n), { runThrSec: 300 }, g, { noZ5: o.noZ5 })!;
   return { reps: m.reps, min: m.min, zone: Math.min(3, m.zone), rest: m.rest, label: m.label, why: m.why + ' Kontrolliert (Zone 3), weil am nächsten Tag ein Spiel ist.', kind: 'racepace', lib: { key: 'run.racepace', stage: Math.max(0, n), label: m.label }, note: m.label };
 }
+/* Auftrag 19: Schwellen-Intervalle als Wochen-Qualität vor einem Laufziel, wenn die Bibliothek gerade eine lockere Form vorsieht
+   (z. B. Tempowechsel für unter 18-Jährige ohne Zone 5): steigt wie üblich 3×8 → 3×10 → 2×15 → 20-25 min am Stück */
+export function thresholdQuality(goal: GoalType, n: number, o: { noZ5?: boolean } = {}): RunQ {
+  const m = runMain('run.threshold', Math.max(0, n), { runThrSec: 300 }, goal, { noZ5: o.noZ5 })!;
+  return { reps: m.reps, min: m.min, zone: m.zone, rest: m.rest, label: m.label, why: m.why, kind: 'threshold', lib: { key: 'run.threshold', stage: Math.max(0, n), label: m.label }, note: m.label };
+}
 /* Qualitätslauf als eigene Einheit (Ein-/Auslaufen dazu) */
 export function runQuality(ctx: W.PaceCtx, q: NonNullable<ReturnType<typeof runQualityStep>>, o: { short?: boolean } = {}): W.Spec {
   const kind: W.Kind = q.kind === 'vo2' ? 'vo2' : q.kind === 'tempo' ? 'tempo' : q.kind === 'racepace' ? 'racepace' : q.kind === 'intervals' ? 'intervals' : q.kind === 'fartlek' ? 'fartlek' : q.zone >= 4 ? 'threshold' : 'racepace';

@@ -311,13 +311,16 @@ function runRaw(c: Ctx): Raw {
   const dec = wmedian(decs);
   const easyMins = runs.filter(a => !a.avgHr || a.avgHr <= 0.9 * lthr).map(a => a.min || 0);
   const skillCont = (inp.profile.skills || {}).runContinuousMin || null;
-  const longest = easyMins.length ? Math.max(...easyMins) : skillCont;
+  // Auftrag 19: kurze Läufe im Fenster sind kein Beweis, dass ein längerer nicht geht: höchster Wert aus Einheiten und Fragebogen
+  const runMax = easyMins.length ? Math.max(...easyMins) : null;
+  const longest = runMax != null && skillCont != null ? Math.max(runMax, skillCont) : runMax ?? skillCont;
+  const longFromSkill = longest != null && longest !== runMax;
   const f = c.f;
   const lvl = (sp: number) => scale(SCALES.runVdot, vdotFromThreshold(sp * f));
   const parts: ScorePart[] = [
     mk('thr', 'Schwellen-Pace', 0.65, thrSpeed ? 1000 / thrSpeed : null, thrSpeed ? lvl(thrSpeed) : null, thrSpeed ? mmss(1000 / thrSpeed) + '/km' : '–', { lowerBetter: true }),
     mk('eff', 'Effizienz locker', 0, effSpeed ? 1000 / effSpeed : null, effSpeed ? lvl(effSpeed) : null, eff ? `${de(eff, 2)} m pro Herzschlag${effSpeed ? ` (≈ ${mmss(1000 / effSpeed)}/km an der Schwelle)` : ''}` : '–', { lowerBetter: true }),
-    mk('long', easyMins.length ? 'Längster lockerer Lauf' : 'Laufen am Stück (Fragebogen)', 0.2, longest, longest ? scale(SCALES.longRun, longest) : null, longest ? longest + ' min' : '–'),
+    mk('long', !longFromSkill ? 'Längster lockerer Lauf' : 'Laufen am Stück (Fragebogen)', 0.2, longest, longest ? scale(SCALES.longRun, longest) : null, longest ? longest + ' min' : '–'),
     mk('dec', 'Aerobe Entkopplung', 0.15, dec, dec != null ? scale(SCALES.dec, dec) : null, dec != null ? de(dec) + ' %' : '–', { lowerBetter: true, target: 'unter 5 %' })
   ];
   const latest = runs.map(a => a.date).sort().pop() || null;
@@ -379,7 +382,9 @@ function bikeRaw(c: Ctx): Raw {
   const decs = rides.filter(a => a.decouplingPct != null && a.min! >= 60).map(a => ({ v: a.decouplingPct!, w: 1, date: a.date }));
   const dec = wmedian(decs);
   const skillLong = (p.skills || {}).bikeLongestMin || null;
-  const longest = rides.length ? Math.max(...rides.map(a => a.min || 0)) : skillLong;
+  const rideMax = rides.length ? Math.max(...rides.map(a => a.min || 0)) : null;
+  const longest = rideMax != null && skillLong != null ? Math.max(rideMax, skillLong) : rideMax ?? skillLong;
+  const rideFromSkill = longest != null && longest !== rideMax;
   const f = c.f;
   const usePower = !!ftp;
   const lvlW = (w: number) => scale(SCALES.bikeWkg, w / weight * f);
@@ -391,7 +396,7 @@ function bikeRaw(c: Ctx): Raw {
     usePower ? mk('thr', 'FTP', 0.65, ftp! / weight, lvlW(ftp!), `${Math.round(ftp!)} W (${de(ftp! / weight, 1)} W/kg)`)
       : mk('thr', 'Schwellen-Tempo', 0.65, shownKmh, thrKmh ? lvlS(thrKmh) : null, shownKmh ? `${de(shownKmh)} km/h (${mainLabel}, flach)` : '–'),
     mk('eff', 'Effizienz locker', 0, effVal, effVal ? (usePower ? lvlW(effVal) : lvlS(effVal)) : null, effVal ? (usePower ? `≈ ${Math.round(effVal)} W an der Schwelle` : `≈ ${de(bs.main === 'gravel' ? effVal * GRAVEL_F : effVal)} km/h an der Schwelle`) + ' (aus lockeren Fahrten)' : '–'),
-    mk('long', rides.length ? 'Längste Fahrt' : 'Längste Fahrt (Fragebogen)', 0.2, longest, longest ? scale(SCALES.longRide, longest) : null, longest ? longest + ' min' : '–'),
+    mk('long', !rideFromSkill ? 'Längste Fahrt' : 'Längste Fahrt (Fragebogen)', 0.2, longest, longest ? scale(SCALES.longRide, longest) : null, longest ? longest + ' min' : '–'),
     mk('dec', 'Aerobe Entkopplung', 0.15, dec, dec != null ? scale(SCALES.dec, dec) : null, dec != null ? de(dec) + ' %' : '–', { lowerBetter: true, target: 'unter 5 %' })
   ];
   const latest = rides.map(a => a.date).sort().pop() || null;
@@ -427,7 +432,8 @@ function swimRaw(c: Ctx): Raw {
   const flt = filterFor(c, 'swim', swimObs(c));
   const cssV = flt ? Math.exp(-flt.z) : wmedian(s)!;
   const conts = swims.map(a => (a.swim && a.swim.longestContinuousM) || 0).filter(x => x > 0);
-  const cont = conts.length ? Math.max(...conts) : (sk.swimCrawlM ?? null);
+  // ein kurzes Stück in einer Technik-Einheit senkt das Können nicht: höchster Wert aus Einheiten und Fragebogen
+  const cont = conts.length ? Math.max(...conts, sk.swimCrawlM || 0) : (sk.swimCrawlM ?? null);
   const pool = (a: Activity) => (a.swim && a.swim.poolLengthM) || 25;
   const dpsVals = swims.filter(a => inWindow(a, end, RECENT) && a.swim && (a.swim.strokesPerLength || a.swim.metersPerStroke)).map(a => ({ v: a.swim!.strokesPerLength ? (pool(a) - 5) / a.swim!.strokesPerLength! : a.swim!.metersPerStroke!, w: 1, date: a.date }));
   const dps = wmedian(dpsVals);

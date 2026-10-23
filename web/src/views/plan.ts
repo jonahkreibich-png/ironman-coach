@@ -76,7 +76,7 @@ export function renderPlan(): string {
   h += editBar(w);
   // Auftrag 19, Punkt 3: drei Ansichten zum Vergleichen (nur in der Testumgebung umschaltbar)
   const v = planView();
-  if (APP_ENV !== 'production') h += `<div class="seg pv-switch" role="group" aria-label="${esc(t('plan.viewSwitch'))}">${(['A', 'B', 'C'] as const).map(x => `<button class="seg-b ${v === x ? 'on' : ''}" data-act="plan-view" data-v="${x}" aria-pressed="${v === x}">${esc(t('plan.view' + x))}</button>`).join('')}</div>`;
+  if (APP_ENV !== 'production') h += `<div class="seg pv-switch" role="group" aria-label="${esc(t('plan.viewSwitch'))}">${(['A', 'B', 'C'] as const).map(x => `<button class="seg-b ${v === x ? 'on' : ''}" data-act="plan-view" data-v="${x}" aria-pressed="${v === x}">${esc(({ A: t('plan.viewA'), B: t('plan.viewB'), C: t('plan.viewC') } as const)[x])}</button>`).join('')}</div>`;
   h += v === 'B' ? weekGrid(w, today) : v === 'C' ? weekMix(w, today) : dayList(w, today);
   h += `<button class="btn ghost block" data-act="custom-add" data-date="${UI.planDate && w.days.some((d: any) => d.date === UI.planDate) ? UI.planDate : (w.days.some((d: any) => d.date === today) ? today : w.startDate)}" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('plan.addExtra'))}</button>`;
   h += sec(t('plan.adjustments'), adjustmentsList(), t('plan.last30'));
