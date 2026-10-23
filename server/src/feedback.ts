@@ -119,7 +119,7 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
     for (const r of (rows.results || []) as any[]) {
       const op = operatorHint(r.place, r.msg);
       const key = op ? op.key : errorKey(r.place, r.msg);
-      if (acks[key] && r.at <= acks[key]) continue;
+      if (acks[key] && r.at < acks[key]) continue; // gleiche Millisekunde: zählt als neu (sonst verschwindet ein sofort wiederkehrender Fehler)
       const tgt = op ? ops : groups;
       const g = tgt[key] = tgt[key] || (op ? { key, text: op.text, help: op.help, count: 0, lastAt: 0 } : { key, label: errorLabel(r.place), text: errorShort(r.msg), count: 0, lastAt: 0, users: [] as string[], versions: [] as string[] });
       g.count++; g.lastAt = Math.max(g.lastAt, r.at);

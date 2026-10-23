@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.6.0', items: [
+    'Scores neu: Jeder Wert ist jetzt eine laufende Schätzung mit Bereich (z. B. ± 3). Tests und harte Einheiten zählen am meisten, fehlende Werte sind unbekannt statt schlecht, und nach einer Pause sinkt der Wert nur langsam. „Warum?“ zeigt die letzten Einheiten mit + und −.',
+    'Mehr Abwechslung und Steigerung: Einheiten kommen aus einer Bibliothek (Mehr → Lexikon → Einheiten, mit Bild), werden nur schwerer, wenn die letzte geklappt hat, und jede Sportart bekommt regelmäßig Qualität – auch Schwimmen.',
+    'Plan nach neuen Regeln: genug Läufe vor Laufzielen, Ruhetage auch mit Teamsport (mindestens alle 2 Wochen), Tempo im langen Lauf nur jede 2. Woche. Neue Frage: Hügel oder Laufbahn in der Nähe?'
+  ] },
   { version: '3.5.0', items: [
     'Plan nach festen Trainingsregeln: mindestens ein Ruhetag pro Woche, nach einem langen Tag kein langer oder harter Lauf, vor einem Laufziel jede Woche ein Lauf im Wettkampftempo, in der Wettkampfwoche keine Kraft und nach dem Wettkampf erst mal locker. Frag den Coach „Warum habe ich heute frei?“.',
     'Plan-Tab aufgeräumt: Die Wochenleiste bleibt bei der gewählten Woche, „Heute“ springt zurück. Jede Woche zeigt eine Zeile (Phase, Ziel, Stunden) und die 7 Tage mit Ruhetagen; Details beim Antippen.',

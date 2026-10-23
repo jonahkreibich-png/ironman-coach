@@ -184,7 +184,7 @@ function readinessFor(trend, illness, date, fallback) {
       add({ k: 'Belastung', v: 'Form ' + sign(tsb, 0), t: `ACWR ${fmt(r, 2)} · gut 0,8-1,3`, st });
       if (r > 1.3) score -= (r - 1.3) * 50;
       if (rel < -0.2) score -= (-rel - 0.2) * 40;
-      why(st, st === 'bad' ? 'Belastung zuletzt viel zu hoch (Form ' + sign(tsb, 0) + ', ACWR ' + fmt(r, 2) + ')' : 'Belastung zuletzt sehr hoch (ATL/CTL ' + fmt(r, 2) + ')', st === 'bad' ? 3 : 2);
+      why(st, st === 'bad' ? 'Belastung zuletzt viel zu hoch (etwa ' + Math.round((r - 1) * 100) + ' % mehr als gewohnt)' : 'Belastung zuletzt sehr hoch (etwa ' + Math.round((r - 1) * 100) + ' % mehr als gewohnt)', st === 'bad' ? 3 : 2);
     } else add({ k: 'Belastung', v: 'Form ' + sign(tsb, 0), t: 'noch zu wenig Trainingsverlauf', st: 'none' });
   }
 

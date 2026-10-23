@@ -44,7 +44,7 @@ ok(r.level === 1 && r.reasons[0].includes('8,5-9 h'), 'Unter 7 h Schlaf → Gelb
 r = C.readinessFor(withToday(base(28), { hrv: 70, restingHR: 50, sleepHours: 8, sleepQuality: 4 }), [], T, FB);
 ok(r.level === 1, 'Schlafqualität unter 5 → Gelb');
 r = C.readinessFor(withToday(base(28), { hrv: 70, restingHR: 50, sleepHours: 8.7, ctl: 40, atl: 62 }), [], T, FB);
-ok(r.level === 1 && r.reasons.some(x => x.includes('ATL/CTL')), 'ATL/CTL 1,55 → Gelb');
+ok(r.level === 1 && r.reasons.some(x => x.includes('mehr als gewohnt')), 'ATL/CTL 1,55 → Gelb');
 r = C.readinessFor(withToday(base(28), { hrv: 54, restingHR: 56, bodyTemp: 0.6, sleepHours: 6 }), [], T, FB);
 ok(r.reasons.length === 3 && r.score <= 40, 'Höchstens 3 Gründe, Rot hat Score ≤ 40 (' + r.score + ')');
 

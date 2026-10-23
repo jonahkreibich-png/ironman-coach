@@ -2,6 +2,12 @@
 
 Nur das, was du selbst tun musst.
 
+## Neu am 24.10. (Auftrag 19)
+
+- **Plan-Tab wählen:** Schau dir die drei Ansichten an (https://claude.ai/artifact/V9wkXfjE88v4yEL6g8Sdwm, oder in stamio-test oben im Plan-Tab umschalten) und schreib mir A, B, C oder eine Mischung.
+- **App einmal neu öffnen** (bei „Neue Version“ neu laden). Erst ab Version 3.6.0 kann das Handy Plan und Profil wieder ändern; bis dahin kommt der neue Plan vom Server.
+- **Freiwillig:** Unter Berücksichtigungen „Hügel, Laufbahn, Laufband“ in der Nähe ankreuzen, dann gibt es passende Berg- und Bahn-Einheiten.
+
 ## Neu am 23.10. (Auftrag 18)
 
 - **App einmal neu öffnen** (bei „Neue Version“ neu laden). Wichtig: Erst mit der neuen Version (3.5.0) kann das Handy Plan und Profil wieder ändern. Ein Gerät mit alter Version bekommt automatisch den neuen Plan vom Server.

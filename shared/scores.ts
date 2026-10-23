@@ -546,9 +546,12 @@ function stepLines(sport: ScoreSport, now: ReturnType<typeof scoreAt>, today: st
     const sign = n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '±0';
     const dd = `${s.date.slice(8)}.${s.date.slice(5, 7)}.`;
     if (s.kind === 'pause') return `${sign} ${label}: ${s.days} Tage ohne ${what} bis ${dd}, die Form sinkt langsam (etwa 1 % pro Woche)`;
-    const dir = d > 0.3 ? 'besser als erwartet' : d < -0.3 ? 'schwächer als erwartet' : 'wie erwartet';
+    // Richtung passend zur gezeigten Zahl (nie „±0 … schwächer“)
+    const dir = n > 0 ? 'besser als erwartet' : n < 0 ? 'schwächer als erwartet' : 'wie erwartet';
+    // allgemeiner Titel („Schwimmen“, „Lauf“) wiederholt nur die Sportart
+    const nm = /^(Lauf|Radfahrt|Schwimmen|Kraft|Einheit)$/.test(s.title) ? '' : ' ' + s.title;
     const extra = [s.ill ? 'krank, zählt weniger' : '', s.manual ? 'von Hand' : ''].filter(Boolean).join(', ');
-    return `${sign} ${label}: ${dd} ${s.title}, ${s.value}: ${dir} (${KIND_WHY[s.kind] || 'Messung'}${extra ? ', ' + extra : ''})`;
+    return `${sign} ${label}: ${dd}${nm}, ${s.value}: ${dir} (${KIND_WHY[s.kind] || 'Messung'}${extra ? ', ' + extra : ''})`;
   });
 }
 /* Umstieg auf die neue Rechnung (Version 3.6): 4 Wochen lang sagen, was die alte Rechnung ergeben hätte */

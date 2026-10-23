@@ -6,9 +6,9 @@ Markierung: **war schon da** / **verbessert** / **neu** (Stand Auftrag 18).
 
 ## Belastung und Erholung
 
-### Ruhetage (neu)
+### Ruhetage (verbessert)
 
-Mindestens 1 echter Ruhetag pro Woche (kein Training, höchstens Mobility). Unter 18 und Einsteiger 2, wenn die festen Termine es zulassen. Teamsport-Tage zählen als Trainingstage. Der Ruhetag liegt möglichst jede Woche am selben Tag, gern zwischen harten Tagen oder vor einem Spiel.
+Mindestens 1 echter Ruhetag pro Woche (kein Training, höchstens Mobility). Unter 18 und Einsteiger 2, wenn die festen Termine es zulassen. Teamsport-Tage zählen als Trainingstage. Der Ruhetag liegt möglichst jede Woche am selben Tag, gern zwischen harten Tagen oder vor einem Spiel. Auftrag 19: Geht mit Teamsport ein Ruhetag pro Woche nicht ohne Schlüsseleinheiten zu verlieren, dann mindestens alle 2 Wochen einer und in jeder Erholungswoche zwei; der Coach erklärt das einmal.
 
 - Warum: Im Ruhetag passt sich der Körper an; ohne ihn steigt das Risiko für Überlastung. Für Jugendliche empfiehlt die AAP 1-2 freie Tage pro Woche.
 - Quelle: American Academy of Pediatrics (AAP), Bericht zu Überlastungsverletzungen bei Jugendlichen; ACSM-Empfehlungen
@@ -46,9 +46,33 @@ Höchstens 2 eigene harte Einheiten pro Woche plus Teamsport-Spiel (Einsteiger 0
 - Quelle: Seiler (polarisiertes Training), Auftrag 14/17
 - Umgesetzt: Generator, Intensitäts- und Plan-Check (Prüfung „hardCount“)
 
+### Mindest-Häufigkeit je Sportart (neu)
+
+Laufziel ab 10 km: mindestens 3 Läufe pro Woche (wenig Zeit: 2; ein Koppellauf zählt halb). Triathlon: jede Sportart mindestens 2× pro Woche. Muss für den Ruhetag etwas weg, fällt zuerst eine Nebeneinheit (zweite Kraft, kurzes Rad), nie die Hauptsportart des nächsten Ziels. Passt es nicht, steht es ehrlich in der Woche.
+
+- Warum: Für Anpassungen von Sehnen, Laufökonomie und Technik zählt die Häufigkeit mehr als einzelne lange Einheiten.
+- Quelle: Trainingspraxis Lauf und Triathlon (Daniels, Friel); Auftrag 19
+- Umgesetzt: Generator und Plan-Check (Nebeneinheit tauschen oder ergänzen) (Prüfung „minFreq“)
+
+### Tempo im langen Lauf (neu)
+
+Tempo-Teil im langen Lauf nur in den letzten 6-8 Wochen vor einem Laufziel, höchstens jede 2. Woche und nie in einer Woche mit einem harten Qualitätslauf.
+
+- Warum: Ein langer Lauf mit Tempo ist eine der härtesten Einheiten; zweimal pro Woche oder jede Woche kostet mehr Erholung als er bringt.
+- Quelle: Pfitzinger/Douglas (Advanced Marathoning); Auftrag 19
+- Umgesetzt: Generator und Plan-Check (Prüfung „longRunTempo“)
+
+### Schwelle regelmäßig anheben (neu)
+
+Jede Sportart bekommt ihre Qualität aus der Einheiten-Bibliothek: Laufen Grundlage Steigerungen/Hügelsprints/Tempowechsel, Aufbau Schwelle (3×8 → 3×10 → 2×15 → 20-25 min am Stück) mit kurzen Intervallen alle 2-3 Wochen, spezifisch Wettkampftempo; Rad im Wechsel Sweet Spot, Schwelle, Over-Unders, VO2max, niedrige Kadenz; Schwimmen in einer von zwei Einheiten ein kurzer harter Teil (Lernende kurze schnelle 25er). Höchstens 2 harte Einheiten plus Spiel pro Woche; die Sportart mit dem größten Rückstand bekommt öfter Qualität. Eine Stufe höher nur, wenn die letzte laut Messdaten geklappt hat; zweimal nicht geschafft: eine Stufe zurück.
+
+- Warum: Ohne steigende Reize bleibt die Schwelle stehen; Abwechslung und Steigerung nach Nachweis verhindern Überforderung.
+- Quelle: Seiler, Coggan/Allen (Training and Racing with a Power Meter), Swim Smooth (CSS); Auftrag 19
+- Umgesetzt: shared/workoutlib.ts, Generator, Wochenanpassung
+
 ### Qualität passend zum Ziel (verbessert)
 
-Vor einem Laufziel (z. B. Halbmarathon) in den letzten 7 Wochen jede normale Woche ein Schwellen- oder Wettkampftempo-Lauf, dann ist der Sonntag locker. Ist unter der Woche kein Lauftag ohne harten Nachbartag frei, kommt die Qualität in den langen Lauf, und der Tag davor bleibt ohne lange Ausfahrt. Für Triathlon passende Qualität je Sportart und Phase.
+Vor einem Laufziel (z. B. Halbmarathon) in den letzten 7 Wochen jede normale Woche ein Schwellen- oder Wettkampftempo-Lauf, dann ist der Sonntag locker. Ist unter der Woche kein Lauftag ohne harten Nachbartag frei, zieht ein lockerer Lauf auf einen freien Tag (Kraft tauscht oder fällt diese Woche weg); erst wenn das nicht geht, kommt die Qualität in den langen Lauf (höchstens jede 2. Woche), und der Tag davor bleibt ohne lange Ausfahrt. Unter 18 statt Tempowechsel kontrollierte Schwelle. Für Triathlon passende Qualität je Sportart und Phase.
 
 - Warum: Wettkampftempo muss man üben; ohne regelmäßige Qualität bleibt die Form unter den Möglichkeiten.
 - Quelle: Daniels’ Running Formula, Pfitzinger; Auftrag 14
@@ -321,6 +345,14 @@ Technik vor Umfang. Übungen mit kurzer Erklärung (Abschlag, Catch-up, Seitlage
 - Umgesetzt: Schwimmeinheiten, Lexikon
 
 ## Coach
+
+### Scores als laufende Schätzung (neu)
+
+Der Score je Sportart ist eine laufende Schätzung mit Bereich (±). Tests und Wettkämpfe zählen am meisten, dann harte Einheiten mit Puls oder Watt, dann lockere Einheiten mit Puls (Hitze und Höhenmeter herausgerechnet), dann Tempo nach Gefühl. Fehlende Werte sind unbekannt, nicht schlecht. Ohne Training sinkt der Wert langsam (ab 10 Tagen etwa 1 % pro Woche, mit anderem Ausdauertraining halb so viel), Krankheit macht Messungen unsicherer. „Warum?“ zeigt die letzten Einheiten mit +/− und Grund.
+
+- Warum: Ein einzelner Lauf sagt wenig; viele Messungen mit ihrer Genauigkeit gewichtet ergeben ein ehrliches Bild (Prinzip des Kalman-Filters).
+- Quelle: Kalman-Filter (Schätzung mit Unsicherheit); Mujika/Padilla (Formverlust bei Pausen); Auftrag 19
+- Umgesetzt: shared/scorefilter.ts, shared/scores.ts
 
 ### Keine Ursache ohne Daten (neu)
 

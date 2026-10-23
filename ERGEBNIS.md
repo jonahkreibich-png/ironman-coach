@@ -1,5 +1,132 @@
 # Ergebnis
 
+## Auftrag 19: Plan-Regeln, Einheiten-Bibliothek, neue Scores, großer Test (23.10.)
+
+**Stand:** Alles fertig und getestet bis auf **Punkt 3 (Plan-Tab): wartet auf deine Wahl** (A, B oder C). Live-Stand siehe unten unter „Veröffentlicht“.
+
+### 1. Dein Plan vorher/nachher (gilt ab 24.10.)
+Wochenraster wie gewünscht (Mo Fußball · Di Schwimmen + Kraft Ganzkörper 30 min · Mi Rad-Intervalle, jede 2. Woche Ruhetag mit Sweet Spot in der Samstags-Ausfahrt · Do Lauf, ab Februar Schwelle/HM-Tempo · Fr früh lockeres Rad auf der Rolle, abends Spiel · Sa Schwimmen + lange Ausfahrt, Koppel jede 3. Woche · So langer Lauf, Tempo-Teil jede 2. Woche ab Februar · Erholungswoche Mi und So frei). Geprüft bis zum Ende (Ironman 2029, 196 Wochen inkl. Server-Verlängerung): **Regelverstöße vorher 22 (13× zu wenig Läufe, 6× kein Ruhetag, 3× Tempo im langen Lauf zu oft), nachher 0**; Umfang und Intensität ohne Fehler.
+
+| Woche | Phase | eigene Stunden | Läufe | Ruhetage | hart (eigene+Spiel) | langer Lauf (min) | lange Ausfahrt (min) |
+|---|---|---|---|---|---|---|---|
+| 6 (19.10.) | Grundlage | 6.3 → 6.4 | 2 | 0 | 0+1 | 75 → 70 | 50 |
+| 7 (26.10.) | Grundlage | 6.2 → 6.6 | 1 → 2 | 1 | 1+1 | 75 → 80 | 70 → 65 |
+| 8 (02.11.) | Grundlage | 6.8 → 7.4 | 1 → 2 | 1 → 0 | 1+1 | 85 → 90 | 85 → 70 |
+| 9 (09.11.) | Grundlage (Erh.) | 4.7 → 3.7 | 2 → 1 | 1 → 2 | 0+1 | 55 → 40 | 40 |
+| 10 (16.11.) | Grundlage | 7.2 → 7.7 | 1 → 2 | 1 → 0 | 1+1 | 95 → 100 | 90 → 70 |
+| 11 (23.11.) | Grundlage | 7.7 → 7.3 | 1 → 2 | 1 | 1+1 | 105 → 100 | 95 → 80 |
+| 12 (30.11.) | Grundlage | 7.9 → 8 | 1 → 2 | 1 → 0 | 1+1 | 105 | 110 → 80 |
+| 13 (07.12.) | Grundlage (Erh.) | 5.9 → 4.1 | 1 | 1 → 2 | 1+1 → 0+1 | 70 → 40 | 70 → 50 |
+| 14 (14.12.) | Grundlage | 6.5 → 7.6 | 1 → 2 | 1 → 0 | 2+1 | 55 | 90 |
+| 15 (21.12.) | Grundlage | 7.9 → 7.5 | 1 → 2 | 1 | 1+1 | 105 | 125 → 90 |
+| 16 (28.12.) | Aufbau | 7.9 → 8.2 | 1 → 2 | 1 → 0 | 1+1 | 105 | 130 → 105 |
+| 17 (04.01.) | Aufbau (Erh.) | 5.6 → 4.1 | 2 → 1 | 1 → 2 | 0+1 | 70 → 40 | 80 → 65 |
+| 18 (11.01.) | Aufbau | 8.3 → 8.6 | 1 → 2 | 1 → 0 | 1+1 | 105 | 140 → 115 |
+| 19 (18.01.) | Aufbau | 8.6 → 8.2 | 1 → 2 | 1 | 1+1 | 105 | 150 → 130 |
+| 20 (25.01.) | Aufbau | 8.6 → 9.4 | 1 → 2 | 1 → 0 | 1+1 | 105 | 150 → 140 |
+| 21 (01.02.) | Aufbau (Erh.) | 6.3 → 4.6 | 1 | 1 → 2 | 1+1 → 0+1 | 70 → 40 | 90 → 85 |
+| 22 (08.02.) | spezifisch | 6.5 → 7.7 | 1 → 2 | 1 → 0 | 2+1 | 55 | 90 |
+| 23 (15.02.) | spezifisch | 7.3 → 7.9 | 1 → 2 | 1 | 2+1 → 1+1 | 105 → 100 | 90 → 105 |
+| 24 (22.02.) | spezifisch | 7.3 → 8.9 | 1 → 2 | 1 → 0 | 2+1 | 105 (Tempo) | 90 |
+| 25 (01.03.) | spezifisch (Erh.) | 5.9 → 4.1 | 2 → 1 | 1 → 2 | 0+1 | 70 → 40 | 90 → 55 |
+| 26 (08.03.) | spezifisch | 7.3 → 9.1 | 1 → 2 | 1 → 0 | 2+1 | 105 (Tempo) | 90 |
+| 27 (15.03.) | spezifisch | 7 → 8.1 | 1 → 2 | 1 | 2+1 → 1+1 | 105 → 100 | 75 → 105 |
+| 28 (22.03.) | Tapering | 5.4 → 6.1 | 1 → 2 | 1 → 0 | 2+1 | 65 (Tempo) | 70 → 65 |
+| 29 (29.03.) | Wettkampf | 2.3 → 2.8 | 0 → 1 | 2 → 1 | 0+2 | 0 → 25 | 50 → 30 |
+| 30 (05.04.) | Grundlage (Erh.) | 5 → 4.1 | 1 | 1 → 2 | 0+1 | 40 | 60 |
+| 31 (12.04.) | Aufbau | 5.9 → 7.2 | 1 → 2 | 1 → 0 | 2+1 | 55 | 75 |
+
+Lauf-Qualität bis zum Halbmarathon: Grundlage Steigerungen, ab Februar jede Woche eine (im Wechsel Do und So, nie beide). Schwimmen neu jede Woche ein kurzer harter Teil (vorher 0).
+
+### 1b/1c. Qualität und Bibliothek
+Neue Einheiten-Bibliothek (52 Formen, Mehr → Lexikon → Einheiten, mit Bild). Stufen steigen nur, wenn die letzte laut Daten geklappt hat. Gelände-Frage („Hügel, Laufbahn, Laufband“) mit Ersatz.
+
+Harte Einheiten pro normaler Woche (Schnitt, nur wer die Sportart macht):
+
+| Phase | Laufen vorher → nachher | Rad | Schwimmen |
+|---|---|---|---|
+| Grundlage | 0,2 → 0,2 (dazu Steigerungen/Hügelsprints) | 0,5 → 0,6 | 0 → 0,7 |
+| Aufbau | 0,6 → 0,5 | 0,6 → 0,6 | 0,3 → 0,6 |
+| spezifisch | 0,6 → 0,6 | 0,6 → 0,5 | 0,3 → 0,5 |
+| Tapering | 0,7 → 0,6 | 0,9 → 0,8 | 0,2 → 0,7 |
+| **Du** (bis HM) | Grundlage 0,1, spezifisch 1,0 | 0,9-1,0 | 0 → 0,9-1,0 |
+
+Welche Formen je Ziel, Niveau und Phase (Auszug; alle 52 Kombinationen in test-results/auftrag19-bibliothek.json):
+
+| Ziel | Niveau | Phase | Laufen | Rad | Schwimmen |
+|---|---|---|---|---|---|
+| 10 km | Einsteiger | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | – | – |
+| 10 km | Einsteiger | Aufbau | Schwellen-Intervalle, Tempowechsel-Lauf (Fahrtspiel), 30/30 | – | – |
+| 10 km | Einsteiger | spezifisch | Tempowechsel-Lauf (Fahrtspiel), Schwellen-Intervalle | – | – |
+| 10 km | Fortgeschritten | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | – | – |
+| 10 km | Fortgeschritten | Aufbau | Schwellen-Intervalle, VO2max-Intervalle, Lauf-Pyramide, Tempowechsel-Lauf (Fahrtspiel) | – | – |
+| 10 km | Fortgeschritten | spezifisch | Wettkampftempo-Blöcke, VO2max-Intervalle, Schwellen-Intervalle, Tempowechsel-Lauf (Fahrtspiel) | – | – |
+| Halbmarathon | Einsteiger | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | – | – |
+| Halbmarathon | Einsteiger | Aufbau | Schwellen-Intervalle, 30/30 | – | – |
+| Halbmarathon | Einsteiger | spezifisch | Schwellen-Intervalle | – | – |
+| Halbmarathon | Fortgeschritten | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | – | – |
+| Halbmarathon | Fortgeschritten | Aufbau | Schwellen-Intervalle, VO2max-Intervalle, 30/30 | – | – |
+| Halbmarathon | Fortgeschritten | spezifisch | Wettkampftempo-Blöcke, Schwellen-Intervalle | – | – |
+| Olympisch | Einsteiger | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | Sweet Spot, Sprints | Kurze schnelle Stücke |
+| Olympisch | Einsteiger | Aufbau | Schwellen-Intervalle, 30/30 | Sweet Spot | CSS-Intervalle, Schwellen-Sets, Kurze schnelle Stücke |
+| Olympisch | Einsteiger | spezifisch | Tempowechsel-Lauf (Fahrtspiel), Schwellen-Intervalle | Sweet Spot | CSS-Intervalle, Schwellen-Sets, Kurze schnelle Stücke |
+| Olympisch | Fortgeschritten | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | Sweet Spot, Kraftausdauer (niedrige Kadenz), Sprints | Kurze schnelle Stücke, Pyramide |
+| Olympisch | Fortgeschritten | Aufbau | Schwellen-Intervalle, VO2max-Intervalle, 30/30 | Sweet Spot, Schwelle, Over-Unders, VO2max, Kraftausdauer (niedrige Kadenz) | CSS-Intervalle, Schwellen-Sets, Absteigend / negativ, Kurze schnelle Stücke, Pyramide |
+| Olympisch | Fortgeschritten | spezifisch | Wettkampftempo-Blöcke, VO2max-Intervalle, Schwellen-Intervalle, Tempowechsel-Lauf (Fahrtspiel) | VO2max, Schwelle, Over-Unders, Zeitfahr-Simulation, Sweet Spot | CSS-Intervalle, Geteilte Strecke, Wettkampfstart, Schwellen-Sets, Absteigend / negativ |
+| Langdistanz | Einsteiger | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | Sweet Spot, Sprints | Kurze schnelle Stücke |
+| Langdistanz | Einsteiger | Aufbau | Schwellen-Intervalle, 30/30 | Sweet Spot | CSS-Intervalle, Schwellen-Sets, Kurze schnelle Stücke |
+| Langdistanz | Einsteiger | spezifisch | Schwellen-Intervalle | Sweet Spot | CSS-Intervalle, Schwellen-Sets, Kurze schnelle Stücke |
+| Langdistanz | Fortgeschritten | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | Sweet Spot, Kraftausdauer (niedrige Kadenz), Sprints | Kurze schnelle Stücke, Pyramide |
+| Langdistanz | Fortgeschritten | Aufbau | Schwellen-Intervalle, Tempodauerlauf, 30/30 | Sweet Spot, Schwelle, Over-Unders, VO2max, Kraftausdauer (niedrige Kadenz) | CSS-Intervalle, Schwellen-Sets, Absteigend / negativ, Kurze schnelle Stücke, Pyramide |
+| Langdistanz | Fortgeschritten | spezifisch | Wettkampftempo-Blöcke, Schwellen-Intervalle | Lange Ausfahrt mit Renntempo-Blöcken, Sweet Spot, Schwelle, Over-Unders | CSS-Intervalle, Geteilte Strecke, Wettkampfstart, Schwellen-Sets, Absteigend / negativ |
+| Fitness | Einsteiger | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | Sweet Spot, Sprints | – |
+| Fitness | Einsteiger | Aufbau | Tempowechsel-Lauf (Fahrtspiel), Progressionslauf, 30/30, Schwellen-Intervalle | Sweet Spot | – |
+| Fitness | Einsteiger | spezifisch | Progressionslauf, Schwellen-Intervalle, Tempowechsel-Lauf (Fahrtspiel) | Sweet Spot | – |
+| Fitness | Fortgeschritten | Grundlage | Steigerungen, Tempowechsel-Lauf (Fahrtspiel), Lauf-ABC + Steigerungen, Progressionslauf | Sweet Spot, Kraftausdauer (niedrige Kadenz), Sprints | – |
+| Fitness | Fortgeschritten | Aufbau | Tempowechsel-Lauf (Fahrtspiel), Progressionslauf, 30/30, Schwellen-Intervalle | Sweet Spot, Schwelle, Over-Unders, VO2max, Kraftausdauer (niedrige Kadenz) | – |
+| Fitness | Fortgeschritten | spezifisch | Progressionslauf, Schwellen-Intervalle, Tempowechsel-Lauf (Fahrtspiel) | VO2max, Schwelle, Over-Unders, Sweet Spot | – |
+
+Unter 18 (Halbmarathon, Aufbau): Schwellen-Intervalle, Tempowechsel-Lauf (Fahrtspiel) – nie Zone 5.
+
+### 2. Scores neu (5 Sätze)
+Jeder Score ist jetzt eine laufende Schätzung wie bei einem Kalman-Filter: jede Einheit ist eine Messung mit eigener Genauigkeit (Test am genauesten, dann harte Einheit mit Puls/Watt, dann lockere mit Puls, am ungenauesten nur Gefühl). Fehlende Werte ändern nichts am Wert, nur die Unsicherheit wächst; ohne Training sinkt der Wert langsam (ab 10 Tagen etwa 1 % pro Woche, mit anderem Ausdauertraining halb so viel), Krankheit macht Messungen unsicherer. Neben dem Score steht der Bereich („± 2, gut belegt“ oder „± 6, wenig Daten“), und „Warum?“ zeigt die letzten 3-5 Einheiten mit + oder − und Grund. Die feste Skala und die drei Marken (nötig, Etappenziel, Wunschzeit) bleiben; der Verlauf ist mit der neuen Rechnung berechnet, und 4 Wochen lang steht dabei, was die alte ergeben hätte. **Beispiel:** 14 lockere Läufe mit Puls ergeben 48 (± 2); ein 30-min-Lauftest danach hebt auf 51 („+3 … Test, zählt stark“), ein gleich schneller lockerer Lauf bewegt ihn kaum („±0 … wie erwartet“), 4 Wochen Pause senken auf 45.
+
+### 3. Plan-Tab: wartet auf deine Wahl
+Drei Ansichten als Bilder (iPhone, hell/dunkel; aktuelle Woche, Erholungswoche, Wettkampfwoche): **https://claude.ai/artifact/V9wkXfjE88v4yEL6g8Sdwm** (Datei: plan-varianten.html). In stamio-test oben im Plan-Tab umschaltbar.
+- **A Liste:** alle 7 Tage untereinander mit Titel, Dauer und Haken; alles ohne Tippen sichtbar, volle Wochen sind lang.
+- **B Raster:** Kalender mit 7 Spalten (Symbole, Minuten, Blitz für hart); Antippen zeigt den Tag darunter.
+- **C Mix:** Balken je Tag oben (Höhe = Minuten, Farbe = Sportart), darunter jeder Tag als Zeile, heute aufgeklappt.
+
+### 4. Großer Test
+54 neue Test-Nutzer (alle Ziele; Uhr, von Hand, Watt, nur Puls; mit/ohne Teamsport; wenig/viel Zeit; 14-70 J.; dazu „wie Jonah“ und zwei Laufziele hintereinander), komplett: Fragebogen → Plan → 3 Wochen mit erledigten, abweichenden, ausgelassenen und Extra-Einheiten und Korrekturen → Coach → Scores/Trend/Prognose → Profil ändern → Verlängerung bis zum Ende. Dazu in der App (Chromium + WebKit): kein seitliches Scrollen, keine Konsolen-Fehler, keine Betreiber-Infos, nur gewählte Sportarten, Bereich beim Score. Alles dauerhafte Tests.
+
+| Regel (gleiche 54 Nutzer, heutige Prüfung) | vorher (Nutzer) | nachher |
+|---|---|---|
+| Mindest-Häufigkeit je Sportart | 83 (15) | 0 |
+| Ruhetage | 19 (1) | 0 |
+| Tempo im langen Lauf nur jede 2. Woche | 10 (4) | 0 |
+| Intensität im langen Lauf | 10 (4) | 0 |
+| Laufumfang +10 % | 8 (7) | 0 |
+| Umfang +10 % | 1 (1) | 0 |
+| fehlende Qualität in einer Phase | 1 (1) | 0 |
+| **Summe** | **132** | **0** |
+
+Dabei gefunden und an der Ursache behoben: Hügelsprints wurden beim mehrfachen Kürzen zu „5 min Zone 3“; Qualitätslauf länger als das Können; Tapering ohne kurzen Reiz bei Wochenend-Läufern; Schwellen-Einheit mit 2 Stücken ließ sich nicht kürzen; vor Laufzielen bei unter 18-Jährigen Tempowechsel statt Schwelle; kein freier Tag für den Qualitätslauf genutzt; Ruhe nach dem Ironman fehlte in verlängerten Plänen; Schwimm-Score fiel durch ein kurzes Kraul-Stück; „Fehler erledigt“ in derselben Millisekunde.
+
+**Selbst-Review als neuer Nutzer, Top 10:**
+1. ✓ „Warum?“ sagte „±0 … schwächer als erwartet“ – Richtung passt jetzt zur Zahl.
+2. ✓ „Warum?“ wiederholte die Sportart („Schwimmen: … Schwimmen“) – weg.
+3. ✓ Heute: „ATL/CTL 1,44“ → „etwa 44 % mehr als gewohnt“.
+4. ✓ Heute: „Zuletzt: Langer Lauf 50 min · 34 min“ → Titel ohne Plan-Minuten.
+5. Offen: Fortschritt ist sehr lang (über 20 Trend-Karten) – Vorschlag: Trends eingeklappt, nur die 3 wichtigsten offen.
+6. Offen: Hinweis-Meldungen unten („Schwimmen: bitte prüfen“) verdecken kurz die Wochenleiste auf Heute.
+7. Offen: Coach-Karte auf Heute schneidet den Text ab, ohne „mehr“.
+8. Offen: Bild der Einheit (Lexikon/Einheit) ohne Beschriftung der Zonen.
+9. Offen: „Neu berechnet …“ steht 4 Wochen ganz oben im „Warum?“ – reicht vielleicht einmal.
+10. Offen: Plan-Tab-Ansicht (Punkt 3, deine Wahl).
+
+### Veröffentlicht
+
 ## Auftrag 18: Trainingsregeln, ehrlicher Coach, Plan-Tab, großer Test (23.10.)
 
 **Live in der echten App (Version 3.5.0)**, vorher in stamio-test mit einer Kopie deiner Daten geprüft. Sicherungen: `data-export/prod-2026-10-23.sql`, `prod-vor-release18.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Stand Auftrag 17 + Schwimm-Tempo), Einstellungen, eine Coach-Nachricht „Plan angepasst“ und die Sperre gegen alte App-Versionen. Alle 354 Datensätze sind erhalten.
