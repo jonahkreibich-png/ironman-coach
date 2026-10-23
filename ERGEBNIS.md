@@ -2,7 +2,7 @@
 
 ## Auftrag 18: Trainingsregeln, ehrlicher Coach, Plan-Tab, großer Test (23.10.)
 
-**Stand:** fertig auf `entwicklung`, Version 3.5.0. Veröffentlichung: siehe Abschnitt „Veröffentlicht“ unten.
+**Live in der echten App (Version 3.5.0)**, vorher in stamio-test mit einer Kopie deiner Daten geprüft. Sicherungen: `data-export/prod-2026-10-23.sql`, `prod-vor-release18.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Stand Auftrag 17 + Schwimm-Tempo), Einstellungen, eine Coach-Nachricht „Plan angepasst“ und die Sperre gegen alte App-Versionen. Alle 354 Datensätze sind erhalten.
 
 **1. Coach nennt Ursachen nur mit Daten.** „Wenig Schlaf erklärt den höheren Puls“ kommt nur noch, wenn Schlaf und Puls für diesen Tag da sind und der Puls bei gleichem Tempo mindestens 5 Schläge über deinem 6-Wochen-Schnitt liegt (Hitze nur mit gemessenen ab 25 °C). Sonst neutral: „Du hast nur 5,5 h geschlafen, mach heute lieber locker.“ Ein Prüfer streicht unbelegte Ursachen vor jeder Anzeige (Regel-Coach und KI). 15 feste Tests (wenig Schlaf ohne Puls, mit normalem, mit erhöhtem Puls, Hitze ohne Temperatur, Müdigkeit ohne Belastungsgefühl …).
 
