@@ -21,10 +21,14 @@ describe('Qualität der Fitness-Schätzung', () => {
     const repeated = { ...one, laps: Array(40).fill(lap) };
     expect(score([...normal, repeated]).parts[0].raw).toBe(score([...normal, one]).parts[0].raw);
   });
-  test('ein alter langer Lauf verschwindet an einem Ruhetag nicht aus der Fähigkeit', () => {
+  test('ein alter langer Lauf verschwindet an einem Ruhetag nicht aus der Fähigkeit; lange Pause: langsamer Formverlust (Auftrag 19)', () => {
     const activities = [run('long', 41, { min: 120, avgHr: 140 }), run('recent', 2, { avgHr: 140 })];
     expect(score(activities, addDays(today, 2)).score).toBe(score(activities).score);
-    expect(score(activities, addDays(today, 30)).score).toBe(score(activities).score);
+    // 32 Tage ohne Lauf: etwas weniger, aber kein Absturz; der lange Lauf zählt weiter
+    const later = score(activities, addDays(today, 30));
+    expect(later.score).toBeLessThan(score(activities).score);
+    expect(later.score).toBeGreaterThanOrEqual(score(activities).score - 5);
+    expect(later.parts.find(p => p.key === 'long')!.raw).toBe(120);
     expect(score(activities, addDays(today, 30)).confidence).toBeLessThan(score(activities).confidence);
   });
   test('fehlende Schwimmstrecke ist unbekannt und kein Nullpunkt', () => {

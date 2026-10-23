@@ -191,7 +191,7 @@ export const de: Record<string, string> = {
   'prog.gains': 'Was am meisten bringt', 'prog.counted': 'Diese Einheiten zählen', 'prog.byHand': 'von Hand', 'prog.noProg': 'Für dieses Ziel gibt es keine Zeit-Prognose.',
   'prog.ifToday': 'Wenn du heute starten würdest', 'prog.expectedAt': 'Erwartet am {d}', 'prog.today': 'heute', 'prog.assumptions': 'So ist gerechnet',
   'prog.courseHint': 'Höhenmeter, Freiwasser, Neopren und Temperatur trägst du beim Ziel ein (Mehr → Profil und Ziele). Nach dem Rennen dein Ergebnis eintragen, dann lernt die Prognose dazu.',
-  'prog.scoreHint': 'Der Score kommt aus Messdaten (Pace, Leistung, Puls, Umfang) und deinen Tests, jede neue Einheit rechnet ihn neu. Die Striche zeigen „Für dein Ziel nötig“, „Nächstes Etappenziel“ und „Wunschzeit“. Eine manuelle Korrektur gibt es unter Einstellungen.',
+  'prog.scoreHint': 'Der Score ist eine laufende Schätzung aus Messdaten (Pace, Leistung, Puls, Umfang) und deinen Tests: Tests und harte Einheiten zählen am meisten, jede neue Einheit rechnet ihn neu, das ± zeigt die Genauigkeit. Die Striche zeigen „Für dein Ziel nötig“, „Nächstes Etappenziel“ und „Wunschzeit“. Eine manuelle Korrektur gibt es unter Einstellungen.',
 
   /* ---------- Wettkampf ---------- */
   'race.today': 'Heute: {name}!', 'race.inDays': '{name} in {n} Tagen', 'race.open': 'Wettkampf-Modus öffnen', 'race.enterResult': '{name}: Ergebnis eintragen',
