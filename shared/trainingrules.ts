@@ -8,17 +8,22 @@ import type { Goal, GoalType } from './goals';
 import { GOALS } from './goals';
 import * as W from './workouts';
 import * as K from './keysessions';
-import { isHardSession, isGameOrRace, levelOf, ownHardBudget, easyOf, hardMinutes } from './intensity';
+import { isHardSession, isGameOrRace, levelOf, ownHardBudget, easyOf, hardMinutes, qualityFor } from './intensity';
 import { capsFor, easyAfterDays } from './periodize';
+import { rulesOf, evaluate, dayLimit, allowedHard } from './constraints';
+import { parseFor } from './ruleparse';
+import { legsOf } from './goals';
+import { markExcuse } from './planrules';
 
 export type TRuleId = 'restDay' | 'teenHours' | 'bigDayNext' | 'maxSports' | 'hardCount' | 'hardAdjacent' | 'hardBeforeEvent' | 'goalQuality' | 'afterRace' | 'raceWeek'
-  | 'longCap' | 'longStep' | 'legsStrength' | 'strengthGameDay' | 'recoveryIntervals' | 'testLoad' | 'warmup' | 'raceSim';
+  | 'longCap' | 'longStep' | 'legsStrength' | 'strengthGameDay' | 'recoveryIntervals' | 'testLoad' | 'warmup' | 'raceSim' | 'minFreq' | 'longRunTempo';
 export const TRULE_LABEL: Record<TRuleId, string> = {
   restDay: 'Ruhetage (mind. 1, unter 18/Einsteiger 2)', teenHours: 'Jugendliche: Wochenstunden ≤ Alter', bigDayNext: 'Nach langem Tag kein langer/harter Lauf',
   maxSports: 'Höchstens 2 Sportarten pro Tag', hardCount: 'Harte Einheiten pro Woche', hardAdjacent: 'Keine harten Tage hintereinander', hardBeforeEvent: 'Nichts Hartes vor Spiel/Wettkampf',
   goalQuality: 'Lauf-Qualität vor dem Laufziel', afterRace: 'Locker nach dem Wettkampf', raceWeek: 'Wettkampfwoche (keine Kraft, nichts Hartes)', longCap: 'Lange Einheit passend zum Ziel',
   longStep: 'Lange Einheit höchstens +10 min/Woche', legsStrength: 'Kraft Beine nicht vor/an Spiel, Wettkampf, langem Lauf', strengthGameDay: 'Kraft am Spieltag kurz (≤ 30 min)',
-  recoveryIntervals: 'Erholungswoche ohne Intervalle (Tests erlaubt)', testLoad: 'Tests nicht neben Spiel/Wettkampf', warmup: 'Harte Einheit mit Ein- und Auslaufen', raceSim: 'Dreifach-Tag nur als Wettkampf-Simulation'
+  recoveryIntervals: 'Erholungswoche ohne Intervalle (Tests erlaubt)', testLoad: 'Tests nicht neben Spiel/Wettkampf', warmup: 'Harte Einheit mit Ein- und Auslaufen', raceSim: 'Dreifach-Tag nur als Wettkampf-Simulation',
+  minFreq: 'Mindest-Häufigkeit je Sportart (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×)', longRunTempo: 'Tempo im langen Lauf nur jede 2. Woche, nie mit hartem Lauf'
 };
 export interface TIssue { rule: TRuleId; week?: number; date?: string; msg: string }
 export interface TOpts {
@@ -38,6 +43,7 @@ const addD = (d: string, n: number) => new Date(+new Date(d + 'T12:00:00Z') + n 
 const diffD = (a: string, b: string) => Math.round((+new Date(b + 'T12:00:00Z') - +new Date(a + 'T12:00:00Z')) / DAY);
 const r5 = (x: number) => Math.max(5, Math.round(x / 5) * 5);
 const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const DOW_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const dowOf = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
 const fmt = (d: string) => `${DOW[dowOf(d)]} ${+d.slice(8)}.${+d.slice(5, 7)}.`;
 export const live = (d: any): any[] => ((d && d.sessions) || []).filter((s: any) => s && s.sport !== 'rest' && !s.cancelled && !s.removed);
@@ -46,6 +52,8 @@ export const isTestS = (s: any) => !!s && !s.race && (!!s.test || (!!s.spec && s
 const isGame = (s: any) => !!s && isGameOrRace(s) && !s.race;
 export const isLongS = (s: any) => !!s && !isBrick(s) && !s.race && s.sport !== 'strength' && s.sport !== 'football' && (!!s.long || (s.spec ? s.spec.kind === 'long' || s.spec.kind === 'longq' : /^Lang/.test(s.title || '')));
 const fixedS = (s: any) => !!s && (!!s.fixed || !!s.race || !!s.frozen || s.sport === 'football' || !!s.locked);
+/* Auftrag 19: ausdrücklicher Wunsch aus dem Wochenraster (z. B. Qualitätslauf Do vor dem Spiel, Sweet Spot Sa nach dem Spiel): bleibt so */
+export const pinnedS = (s: any) => !!s && !!s.pinned;
 const hardS = (s: any) => isHardSession(s) && !(s.spec && s.spec.kind === 'test' && /Kraul-Check/.test(s.title || ''));
 const ownHard = (s: any) => hardS(s) && !fixedS(s) && !isTestS(s);
 const legsS = (s: any) => !!s && s.sport === 'strength' && s.area !== 'upper' && s.area !== 'core';
@@ -107,6 +115,62 @@ export function restNeed(w: any, p: Profile): number {
   // 2 Ruhetage passen, wenn alle eigenen Einheiten in die übrigen 5 Tage passen (höchstens 2 pro Tag, an festen Tagen 1)
   return fixedDays <= 5 && units <= (5 - fixedDays) * 2 + fixedDays ? 2 : 1;
 }
+/* ---------- Auftrag 19: Mindest-Häufigkeit je Sportart nach dem Ziel des Zyklus ----------
+   Laufziel ab 10 km: mindestens 3 Läufe pro Woche, bei wenig Zeit (unter 6 h eigenes Training oder Teamsport 2× pro Woche) mindestens 2;
+   Triathlon: jede Sportart mindestens 2×. Ein Koppellauf zählt halb. Nur normale Wochen (keine Erholung, kein Tapering, keine Wettkampfwoche,
+   keine lockeren Tage nach einem Wettkampf). Lassen die Regeln der Person weniger Tage zu, gilt die Zahl der erlaubten Tage. */
+const RUN_GOAL10 = new Set(['run_10k', 'run_half', 'run_marathon']);
+export function lowTime(p: Profile, date: string): boolean {
+  const ts = p.teamSport; const on = !!ts && (!ts.seasonFrom || date >= ts.seasonFrom) && (!ts.seasonTo || date <= ts.seasonTo);
+  const team = on ? (ts!.trainingDays || []).length + (ts!.gameDays || []).length : 0;
+  const teamMin = on ? (ts!.trainingDays || []).length * (ts!.trainingMinutes || 90) + (ts!.gameDays || []).length * (ts!.gameMinutes || 90) : 0;
+  const own = (p.weeklyHours || 5) * 60 - (p.budgetInclTeam ? teamMin : 0);
+  return own < 360 || team >= 2;
+}
+export function minFreqOf(w: any, p: Profile, races: RaceAt[], o: TOpts): Partial<Record<'run' | 'bike' | 'swim', number>> {
+  const t = cycleType(w, w.startDate, races, o);
+  const chosen = new Set<string>(p.sports || []);
+  // Plätze in der Woche: je Tag mit Zeit höchstens 2 Einheiten (an Teamsport-Tagen 1); verteilt auf die Ausdauer-Sportarten
+  const dl = p.dayLoad || {}; const ts = p.teamSport;
+  // kurze Tage (bis 45 min) tragen eine Einheit, an Teamsport-Tagen eine weniger; mit Teamsport bleibt ein Platz für den Ruhetag alle 2 Wochen
+  const team = (d: number) => !!ts && ((ts.trainingDays || []).includes(d) || (ts.gameDays || []).includes(d));
+  const slots = Object.keys(dl).length ? [0, 1, 2, 3, 4, 5, 6].reduce((a, d) => { const v = (dl as any)[d] || 0; return a + Math.max(0, (v >= 2 ? 2 : v >= 1 ? 1 : 0) - (team(d) ? 1 : 0)); }, 0) - (ts ? 1 : 0) : 14;
+  const cap = (n: number, k: number) => Math.max(1, Math.min(n, Math.floor(slots / Math.max(1, k))));
+  if (RUN_GOAL10.has(t)) return chosen.has('run') ? { run: cap(lowTime(p, w.startDate) ? 2 : 3, 1) } : {};
+  if (GOALS[t] && GOALS[t].group === 'tri') {
+    const legs = new Set(legsOf({ id: 'x', type: t, name: '', date: null, priority: 'A' } as any).map(l => l.sport));
+    const out: Partial<Record<'run' | 'bike' | 'swim', number>> = {};
+    const list = (['swim', 'bike', 'run'] as const).filter(sp => legs.has(sp) && chosen.has(sp));
+    list.forEach(sp => { out[sp] = cap(2, list.length); });
+    return out;
+  }
+  return {};
+}
+/* Tage dieser Woche, an denen die Sportart laut den Regeln der Person und der Zeit pro Tag möglich ist */
+function feasibleDays(w: any, p: Profile, sport: string, o: TOpts): number {
+  const rules = rulesOf(p, parseFor(o.today || w.startDate));
+  // ausdrücklicher Wunsch „höchstens n× pro Woche“ zählt wie eine Grenze
+  const f = ((p.freq || {}) as any)[sport]; const wishMax = Array.isArray(f) && f.length === 2 && f[1] > 0 ? f[1] : 99;
+  return Math.min(wishMax, (w.days || []).filter((d: any) => {
+    if (live(d).some((s: any) => s.race)) return false;
+    if (o.allowed) return o.allowed({ sport, plannedMinutes: 30 }, d.date) && (!o.dayCap || o.dayCap(d.date) > 0);
+    if (dayLimit(rules, d.date).cap <= 0) return false;
+    if (evaluate(rules, { sport, plannedMinutes: 30 } as any, d.date).hard.length) return false;
+    if (sport === 'swim' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, d.date)) return false;
+    return true;
+  }).length);
+}
+// Wochen mit Test (Einstiegstests, Tests nach der Erholung) sind besondere Wochen: dort zählt die Mindest-Häufigkeit nicht
+const normalFor = (w: any) => !w.isRecoveryWeek && !w.entry && !w.reduced && !w.partial && w.phase !== 'taper' && w.phase !== 'race' && !(w.races || []).length && !(w.days || []).some((d: any) => live(d).some(isTestS));
+/* Auftrag 19: die Steigerungsregel (Umfang höchstens +10 %) geht vor: trägt der Umfang einer Sportart noch keine weitere Einheit von
+   sinnvoller Länge (Laufen/Schwimmen 25 min, Rad 30 min), zählt die Mindest-Häufigkeit erst, wenn er gewachsen ist */
+export const MIN_SESSION: Record<string, number> = { run: 25, swim: 25, bike: 30 };
+export const sportMinutes = (w: any, sport: string) => (w.days || []).flatMap((d: any) => live(d)).filter((s: any) => !s.race && s.sport === sport).reduce((a: number, s: any) => a + minOf(s), 0);
+export function freqByVolume(w: any, sport: string, need: number): number { return Math.min(need, Math.max(1, Math.floor((sportMinutes(w, sport) + 2) / (MIN_SESSION[sport] || 25)))); }
+export function countSport(w: any, sport: string): number {
+  return (w.days || []).flatMap((d: any) => live(d)).filter((s: any) => !s.race && (isBrick(s) ? sport === 'run' : s.sport === sport)).reduce((a: number, s: any) => a + (isBrick(s) ? 0.5 : 1), 0);
+}
+const teamWeek = (w: any) => (w.days || []).some((d: any) => live(d).some((s: any) => s.sport === 'football'));
 const fullWeek = (w: any, from?: string | null) => !w.partial && (w.days || []).length === 7 && (!from || w.startDate >= from);
 const cycleType = (w: any, date: string, races: RaceAt[], o: TOpts): GoalType => (w && w.cycleGoalType) || ((races.find(r => r.date >= date && r.priority !== 'C') || {}).type as GoalType) || o.goalType || 'fitness';
 const ctxOf = (s: any): W.PaceCtx | null => (s && s.spec && s.spec.ctx) || null;
@@ -124,7 +188,8 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
     const { w, d } = x; if (!inR(d.date)) return;
     const L = live(d); const nx = at(D, i, 1); const pv = at(D, i, -1);
     // höchstens 2 Sportarten (Koppellauf zählt als Laufen); Dreifach nur als Wettkampf-Simulation (spezifisch, ab 16)
-    if (sportsOf(d).size > 2) {
+    // Auftrag 19: ausdrücklich gewünschter Koppellauf (Wochenraster) nach Schwimmen + langer Ausfahrt ist eine bewusste Ausnahme
+    if (sportsOf(d).size > 2 && !L.some((s: any) => isBrick(s) && pinnedS(s))) {
       if (!raceSimDay(d)) add('maxSports', w, d.date, `${fmt(d.date)}: ${sportsOf(d).size} Sportarten an einem Tag (${L.map((s: any) => s.title).join(', ')}).`);
       else if (w.phase !== 'specific' || (ageAt(d.date) ?? 30) < 16) add('raceSim', w, d.date, `${fmt(d.date)}: Wettkampf-Simulation nur in der spezifischen Phase und ab 16.`);
     }
@@ -138,11 +203,11 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
     }
     // harte Tage nicht hintereinander (Tests zählen, zwei feste Termine kann der Plan nicht ändern)
     if (nx && hardDay(d) && hardDay(nx.d) && inR(nx.d.date)) {
-      const flex = (y: any) => live(y).filter(hardS).some((s: any) => !fixedS(s));
+      const flex = (y: any) => live(y).filter(hardS).some((s: any) => !fixedS(s) && !pinnedS(s));
       if (flex(d) || flex(nx.d)) add('hardAdjacent', nx.w, nx.d.date, `${fmt(d.date)} und ${fmt(nx.d.date)}: zwei harte Tage hintereinander (${live(d).filter(hardS).map((s: any) => s.title).join(', ')} / ${live(nx.d).filter(hardS).map((s: any) => s.title).join(', ')}).`);
     }
     // nichts Hartes am Tag vor einem Spiel oder Wettkampf
-    if (nx && eventDay(nx.d) && L.some((s: any) => !fixedS(s) && hardS(s))) add('hardBeforeEvent', w, d.date, `${fmt(d.date)}: ${L.filter((s: any) => !fixedS(s) && hardS(s)).map((s: any) => s.title).join(', ')} am Tag vor ${live(nx.d).find((s: any) => s.race || isGame(s)).title}.`);
+    if (nx && eventDay(nx.d) && L.some((s: any) => !fixedS(s) && !pinnedS(s) && hardS(s))) add('hardBeforeEvent', w, d.date, `${fmt(d.date)}: ${L.filter((s: any) => !fixedS(s) && hardS(s)).map((s: any) => s.title).join(', ')} am Tag vor ${live(nx.d).find((s: any) => s.race || isGame(s)).title}.`);
     // Tests nicht neben Spiel oder Wettkampf
     for (const s of L.filter(isTestS).filter(hardS)) if ((pv && eventDay(pv.d)) || (nx && eventDay(nx.d))) add('testLoad', w, d.date, `${fmt(d.date)}: ${s.title} direkt neben einem Spiel oder Wettkampf.`);
     // Kraft Beine nicht am oder vor Spiel, Wettkampf, langem Lauf
@@ -166,7 +231,13 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
     const own = days.flatMap((d: any) => live(d).filter((s: any) => !s.race));
     if (inW && fullWeek(w, o.from)) {
       const rest = days.filter((d: any) => !live(d).length).length; const need = 1; // der zweite Ruhetag (unter 18, Einsteiger) ist ein Ziel, keine Pflicht
-      if (rest < need) add('restDay', w, undefined, `Woche ${w.weekNumber}: ${rest} Ruhetag${rest === 1 ? '' : 'e'}, nötig ${need}.`);
+      // Auftrag 19: mit Teamsport mindestens alle 2 Wochen ein Ruhetag und in jeder Erholungswoche zwei
+      const wi = weeks.indexOf(w); const restOf = (x: any) => x ? (x.days || []).filter((d: any) => !live(d).length).length : 0;
+      const nb = [weeks[wi - 1], weeks[wi + 1]].filter(x => x && (x.days || []).length === 7);
+      if (teamWeek(w) && w.isRecoveryWeek) { if (rest < 2) add('restDay', w, undefined, `Woche ${w.weekNumber}: Erholungswoche mit Teamsport, ${rest} Ruhetag${rest === 1 ? '' : 'e'}, nötig 2.`); }
+      else if (teamWeek(w)) { if (rest < 1 && !nb.some(x => restOf(x) >= 1) && nb.length) add('restDay', w, undefined, `Woche ${w.weekNumber}: kein Ruhetag, auch nicht in der Woche davor oder danach (mit Teamsport mindestens alle 2 Wochen einer).`); }
+      else if (rest < need) add('restDay', w, undefined, `Woche ${w.weekNumber}: ${rest} Ruhetag${rest === 1 ? '' : 'e'}, nötig ${need}.`);
+      if (normalFor(w)) { const mf = minFreqOf(w, p, races, o); for (const [sp, n] of Object.entries(mf) as [string, number][]) { if ((w.freqGap || []).includes(sp)) continue; const need2 = freqByVolume(w, sp, Math.min(n, feasibleDays(w, p, sp, o))); const have = countSport(w, sp); if (have + 0.01 < need2 && !(sp === 'run' && (w.days || []).some((d: any) => live(d).some((s: any) => s.stage && s.stage.ladder === 'runwalk')))) add('minFreq', w, undefined, `Woche ${w.weekNumber}: ${String(have).replace('.', ',')}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'}, mindestens ${need2}× (Ziel des Zyklus).`); } }
       const age = ageOf(p, w.startDate);
       if (age != null && age < 18) { const tot = own.reduce((a: number, s: any) => a + minOf(s), 0); if (tot > age * 60 + 5) add('teenHours', w, undefined, `Woche ${w.weekNumber}: ${Math.round(tot / 6) / 10} h, unter 18 höchstens ${age} h (Alter).`); }
     }
@@ -201,6 +272,18 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
       if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
     }
   }
+  // Auftrag 19: Tempo im langen Lauf nur jede 2. Woche und nie in derselben Woche wie ein harter Qualitätslauf
+  { let prevLQ = false;
+    for (const w of weeks) {
+      const runs = (w.days || []).flatMap((d: any) => live(d).filter((s: any) => s.sport === 'run' && !s.race && !isBrick(s)).map((s: any) => ({ d, s })));
+      const lq = runs.filter(({ s }: any) => s.spec && s.spec.kind === 'longq' && (!!s.long || /^Lang/.test(s.title || '')));
+      const inW = !o.from || (w.endDate || addD(w.startDate, 6)) >= o.from;
+      if (inW && lq.length) {
+        if (prevLQ && !w.partial) add('longRunTempo', w, lq[0].d.date, `${fmt(lq[0].d.date)}: Tempo im langen Lauf zwei Wochen hintereinander.`);
+        if (runs.some(({ s }: any) => !lq.some((x: any) => x.s === s) && hardS(s) && !isTestS(s))) add('longRunTempo', w, lq[0].d.date, `${fmt(lq[0].d.date)}: Tempo im langen Lauf und dazu ein harter Lauf in derselben Woche.`);
+      }
+      prevLQ = lq.length > 0;
+    } }
   // Wettkämpfe: Woche davor, Tage danach, Lauf-Qualität vor Laufzielen
   for (const r of races) {
     const after = r.type ? easyAfterDays(r.type) : 3;
@@ -300,7 +383,9 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       const k = diffD(r.date, x.d.date); if (k <= 0 || k > after || !inR(x.d.date)) continue;
       const cap = k <= 2 ? 45 : 60;
       for (const s of [...live(x.d)]) {
-        if (!movable(s, x.d.date) || s.stage) continue;
+        if (!movable(s, x.d.date)) continue;
+        // Lernstufen (Kraul lernen) bleiben, werden aber kürzer (Ein-/Ausschwimmen, Brust)
+        if (s.stage) { if (s.sport === 'swim' && minOf(s) > cap) { const nx = scaled(s, cap / minOf(s) * 0.95); if (nx && nx.plannedMinutes < minOf(s)) { setS(x.d, s, { ...nx, ruleNote: `${k} Tag${k === 1 ? '' : 'e'} nach ${r.name}: kürzer.` }); fixes.push(`${x.d.date}: ${s.title} kürzer (nach ${r.name})`); } } continue; }
         if (hardS(s) || isLongS(s) || (minOf(s) > cap && s.sport !== 'strength')) {
           const nx = easyShortOf(s, Math.min(cap, minOf(s)), `${k} Tag${k === 1 ? '' : 'e'} nach ${r.name}: nur locker und kurz, der Körper erholt sich vom Wettkampf.`, x.w.phase);
           if (nx) { setS(x.d, s, nx); fixes.push(`${x.d.date}: ${s.title} → ${nx.title} (nach ${r.name})`); } else { removeS(x.d, s); fixes.push(`${x.d.date}: ${s.title} entfällt (nach ${r.name})`); }
@@ -315,7 +400,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
   }
 
   // Platzieren: darf s an Tag j liegen? (für Verschieben)
-  const canPlace = (D: DayRef[], s: any, j: number, opt: { noRest?: boolean } = {}): boolean => {
+  const canPlace = (D: DayRef[], s: any, j: number, opt: { noRest?: boolean; allowNear?: boolean } = {}): boolean => {
     const x = D[j]; const d = x.d; if (!inR(d.date)) return false;
     const L = live(d);
     if (opt.noRest && !L.length) return false;
@@ -328,7 +413,8 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     if (L.filter((y: any) => !y.race).length >= 2) return false;
     const pv = at(D, j, -1), nx = at(D, j, 1);
     const sameNear = (y: DayRef | null) => !!y && live(y.d).some((z: any) => z !== s && !isBrick(z) && (z.sport === 'strength' && s.sport === 'strength' ? (!z.area || !s.area || z.area === s.area) : z.sport === s.sport && !z.race));
-    if (s.sport !== 'football' && (sameNear(pv) || sameNear(nx))) return false;
+    if (s.sport !== 'football' && !opt.allowNear && (sameNear(pv) || sameNear(nx))) return false;
+    if (opt.allowNear && [pv, nx].some(y => !!y && live(y.d).some((z: any) => z.sport === s.sport && (hardS(z) || isLongS(z))))) return false;
     const gameDay = L.some(isGame);
     if (gameDay && (hardS(s) || isLongS(s) || legsS(s) || (s.sport === 'strength' && minOf(s) > 30))) return false;
     if (hardS(s)) { if (hardDay(d) || (pv && hardDay(pv.d)) || (nx && (hardDay(nx.d) || eventDay(nx.d)))) return false; }
@@ -355,7 +441,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     return !bigDay(x.d).big;
   };
   const goalWeek = (w: any) => o.runQualityOk !== false && races.some(r => isRunGoal(r.type) && r.priority !== 'C' && (() => { const k = Math.floor(diffD(w.startDate, r.date) / 7); return k >= 1 && k <= 7; })()) && !w.isRecoveryWeek && w.phase !== 'race';
-  const protectedS = (s: any, w: any) => isTestS(s) && hardS(s) || (s.sport === 'run' && hardS(s) && goalWeek(w) && RUN_Q.has((s.spec && s.spec.kind) || ''));
+  const protectedS = (s: any, w: any) => isTestS(s) && hardS(s) || pinnedS(s) || (s.sport === 'run' && hardS(s) && goalWeek(w) && RUN_Q.has((s.spec && s.spec.kind) || ''));
 
   // 5) Lauf-Qualität vor einem Laufziel (letzte 7 Wochen, jede normale Woche): lockerer Lauf ohne harten Nachbartag → Schwelle bzw.
   //    Wettkampftempo; geht das nicht, Qualität im langen Lauf (Tag davor dann ohne lange Ausfahrt und ohne Koppel). Das Budget harter
@@ -385,7 +471,9 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       const rq0 = K.runQualityStep(ph, r.type as GoalType, qn, minor(w.startDate), { noZ5: noZ5(w.startDate), level: levelOf(p), baseWeek: 4 });
       if (!rq0) continue;
       const fitQ = (room: number) => { const q = { ...rq0 }; while (q.reps > 1 && q.reps * q.min + (q.reps - 1) * q.rest > room) q.reps--; if (q.reps * q.min > room) q.min = Math.max(5, Math.floor(room / 5) * 5); return q; };
-      const freeAround = (i: number) => { const pv = at(D, i, -1), nx = at(D, i, 1); return !hardDay(D[i].d) && !(pv && (hardDay(pv.d) || bigDay(pv.d).big)) && !(nx && (hardDay(nx.d) || eventDay(nx.d))); };
+      // Auftrag 19: auch kein längerer Lauf (über 46 min) am Nachbartag; kurze lockere Läufe daneben werden begründet (siehe unten)
+      const runNear = (y: DayRef | null) => !!y && live(y.d).some((z: any) => z.sport === 'run' && !z.race && !isBrick(z) && !z.adjacentOk && minOf(z) > 46);
+      const freeAround = (i: number) => { const pv = at(D, i, -1), nx = at(D, i, 1); return !hardDay(D[i].d) && !(pv && (hardDay(pv.d) || bigDay(pv.d).big)) && !(nx && (hardDay(nx.d) || eventDay(nx.d))) && !runNear(pv) && !runNear(nx); };
       let placed: { d: any; s: any; nx: any } | null = null;
       // a) lockerer Lauf unter der Woche
       for (const { d, s } of runs) {
@@ -399,7 +487,9 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       }
       // b) im langen Lauf: Tag davor ohne lange Ausfahrt und Koppel, Tag danach kein Spiel/Wettkampf
       let sameDayDem: any[] = [];
-      if (!placed) for (const { d, s } of runs.filter(({ s }: any) => isLongS(s) && !hardS(s) && s.spec)) {
+      // Auftrag 19: Tempo im langen Lauf nur jede 2. Woche (nicht, wenn die Woche davor oder danach schon Tempo im langen Lauf hat)
+      const wi = weeks.indexOf(w); const lqIn = (x: any) => !!x && (x.days || []).some((d: any) => live(d).some((y: any) => y.sport === 'run' && y.spec && y.spec.kind === 'longq' && (!!y.long || /^Lang/.test(y.title || ''))));
+      if (!placed && !lqIn(weeks[wi - 1]) && !lqIn(weeks[wi + 1])) for (const { d, s } of runs.filter(({ s }: any) => isLongS(s) && !hardS(s) && s.spec)) {
         if (!movable(s, d.date)) continue;
         const i = idx(d); const pv = at(D, i, -1), nx = at(D, i, 1);
         // harte Einheit einer anderen Sportart am selben Tag (eigene, kein Test): wird locker, der Lauf geht vor
@@ -409,7 +499,8 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         sameDayDem = demOk ? hd : [];
         // lange Ausfahrt und Koppel am Tag davor verkleinern (nur eigene Einheiten)
         if (pv && bigDay(pv.d).big && !shrinkDay(pv, `morgen ist der Qualitätslauf für ${r.name}`)) continue;
-        const q = fitQ(minOf(s) - 25);
+        // im langen Lauf Wettkampftempo (kontrolliert), nie Schwelle oder VO2max
+        const q = rq0.zone > 3 ? (() => { const c = K.calmQuality(r.type as GoalType, qn, { noZ5: noZ5(w.startDate) }); const x = { ...c }; while (x.reps > 1 && x.reps * x.min + (x.reps - 1) * x.rest > minOf(s) - 25) x.reps--; return x; })() : fitQ(minOf(s) - 25);
         const b = W.build({ ...K.longRunWithQuality(s.spec.ctx, minOf(s), q), why: `${q.why} ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}: Qualität im langen Lauf, weil unter der Woche kein Lauftag ohne harten Nachbartag frei ist.` });
         if (b.plannedMinutes > minOf(s) + 1) { const b2 = W.build({ ...K.longRunWithQuality(s.spec.ctx, minOf(s) - 5, q), why: b.spec.why }); if (b2.plannedMinutes > minOf(s) + 1) continue; Object.assign(b, b2); }
         placed = { d, s, nx: { ...s, ...b, id: s.id, long: true, hard: true, ruleNote: 'Lauf-Qualität vor dem Laufziel (im langen Lauf)' } };
@@ -420,7 +511,8 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       if (!placed) for (const { d, s } of runs) {
         if (!movable(s, d.date) || isLongS(s) || hardS(s) || !s.spec || minOf(s) < 15) continue;
         const i2 = idx(d); if (i2 < 0 || !freeAround(i2)) continue;
-        const spec = K.runQuality(s.spec.ctx, fitQ(15), { short: true }); const add = W.totals(spec).min - minOf(s);
+        const q15 = qn % 2 === 0 ? { ...rq0, reps: 3, min: 3, rest: 2 } : { ...rq0, reps: 2, min: 5, rest: 2 };
+        const spec = K.runQuality(s.spec.ctx, rq0.reps * rq0.min <= 15 ? fitQ(15) : q15, { short: true }); const add = W.totals(spec).min - minOf(s);
         const other = runs.filter((x: any) => x.s !== s && movable(x.s, x.d.date) && !hardS(x.s) && !isLongS(x.s) && x.s.spec).sort((a: any, b: any) => minOf(b.s) - minOf(a.s))[0];
         if (add > 0 && !other) continue;
         placed = { d, s, nx: { ...W.build({ ...spec, why: `${spec.why} ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}: einmal pro Woche im Wettkampftempo, kurz gehalten.` }), id: s.id, ruleNote: 'Lauf-Qualität vor dem Laufziel' } };
@@ -445,6 +537,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         setS(dem.d, dem.s, { ...easyOf(dem.s, w.phase), ...(isLongS(dem.s) ? { long: true } : {}), ruleNote: `Locker, damit Platz für die Lauf-Qualität vor ${r.name} ist.` }); fixes.push(`${dem.d.date}: ${dem.s.title} locker (Lauf-Qualität vor ${r.name} geht vor)`);
       }
       setS(placed.d, placed.s, placed.nx); clearGap(w); qn++;
+      { const D2 = daysOf(weeks); const i2 = D2.findIndex(y => y.d === placed!.d); for (const y of [at(D2, i2, -1), at(D2, i2, 1)]) if (y) live(y.d).forEach((z: any) => { if (z.sport === 'run' && !z.race && !hardS(z) && minOf(z) <= 46 && !z.adjacentOk) markExcuse(z, 'kurz und locker, am Tag daneben ist die Lauf-Qualität.'); }); }
       fixes.push(`${placed.d.date}: ${placed.s.title} → ${placed.nx.title} (${k} Woche${k === 1 ? '' : 'n'} vor ${r.name})`);
       // die Woche hat jetzt einen Qualitätslauf: langer Lauf mit Tempo daneben wird locker
       for (const { d, s } of (w.days || []).flatMap((d: any) => live(d).filter((s: any) => s.sport === 'run' && s.spec && s.spec.kind === 'longq' && s !== placed!.nx).map((s: any) => ({ d, s }))))
@@ -456,8 +549,8 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
   for (let guard = 0; guard < 3; guard++) {
     const D = daysOf(weeks); let changed = false;
     for (let i = 0; i < D.length; i++) {
-      const { w, d } = D[i]; if (!inR(d.date) || sportsOf(d).size <= 2 || raceSimDay(d)) continue;
-      const cand = live(d).filter((s: any) => movable(s, d.date) && !isLongS(s) && !isBrick(s)).sort((a: any, b: any) => +hardS(a) - +hardS(b) || minOf(a) - minOf(b));
+      const { w, d } = D[i]; if (!inR(d.date) || sportsOf(d).size <= 2 || raceSimDay(d) || live(d).some((s: any) => isBrick(s) && pinnedS(s))) continue;
+      const cand = live(d).filter((s: any) => movable(s, d.date) && !pinnedS(s) && !isLongS(s) && !isBrick(s)).sort((a: any, b: any) => +hardS(a) - +hardS(b) || minOf(a) - minOf(b));
       let done = false;
       for (const s of cand) {
         const js = D.map((y, j) => ({ y, j })).filter(({ y, j }) => y.w === w && j !== i).sort((a, b) => Math.abs(a.j - i) - Math.abs(b.j - i));
@@ -506,7 +599,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         const js = D.map((y, j) => ({ y, j })).filter(({ y, j }) => y.w === w && j !== i);
         const t = js.find(({ j }) => canPlace(D, s, j, { noRest: true }));
         if (t) { moveTo(d, t.y.d, s); fixes.push(`${s.title}: ${d.date} → ${t.y.d.date} (Kraft Beine nicht vor Spiel/Wettkampf/langem Lauf)`); continue; }
-        const nx = { ...W.build({ ...W.strengthArea('core', { minutes: Math.min(30, minOf(s)), why: 'Rumpf statt Beine: am Tag davor oder danach ist ein Spiel, Wettkampf oder langer Lauf.' }) }), id: s.id };
+        const nx = { ...W.build({ ...W.strengthArea('core', { minutes: Math.min(30, minOf(s)), why: 'Rumpf statt Beine: am Tag davor oder danach ist ein Spiel, Wettkampf oder langer Lauf.' }) }), id: s.id, ...(s.adjacentOk ? { adjacentOk: s.adjacentOk } : {}) };
         setS(d, s, nx); fixes.push(`${d.date}: ${s.title} → ${nx.title} (keine Beine vor Spiel/Wettkampf/langem Lauf)`);
       }
       if (live(d).some(isGame)) for (const s of [...live(d).filter((y: any) => y.sport === 'strength')]) {
@@ -522,7 +615,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
   // 9) harte Tage: nicht hintereinander, nicht vor Spiel oder Wettkampf, Tests nicht neben Spiel/Wettkampf
   for (let guard = 0; guard < 6; guard++) {
     const D = daysOf(weeks); let changed = false;
-    const flex = (y: DayRef) => live(y.d).filter((s: any) => hardS(s) && movable(s, y.d.date) && s.spec && !s.stage);
+    const flex = (y: DayRef) => live(y.d).filter((s: any) => hardS(s) && movable(s, y.d.date) && !pinnedS(s) && s.spec && !s.stage);
     for (let i = 0; i < D.length && !changed; i++) {
       const x = D[i]; if (!inR(x.d.date) || !flex(x).length) continue;
       const nx = at(D, i, 1), pv = at(D, i, -1);
@@ -565,6 +658,76 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     for (const { d, s } of flex) { const nx = scaled(s, f); if (nx && nx.plannedMinutes < minOf(s)) setS(d, s, nx); }
     fixes.push(`Woche ${w.weekNumber}: kürzer (unter 18 höchstens ${age} h pro Woche)`);
   }
+  /* Minuten einer dazugekommenen Einheit bei den anderen Einheiten derselben Sportart der Woche abziehen (Umfang bleibt gleich): zuerst lockere,
+     dann die lange (nie unter 2/3), zuletzt lockere Einheiten anderer Sportarten */
+  const compensate = (w: any, add: any) => {
+    let left = minOf(add);
+    const pool = (w.days || []).flatMap((d: any) => live(d).map((x: any) => ({ d, x }))).filter(({ d, x }: any) => x !== add && x.id !== add.id && movable(x, d.date) && !pinnedS(x) && x.spec && !x.stage && !hardS(x) && !isTestS(x) && !isBrick(x) && !isLongS(x) && ['run', 'bike', 'swim'].includes(x.sport))
+      .sort((a: any, b: any) => +(a.x.sport !== add.sport) - +(b.x.sport !== add.sport) || +isLongS(a.x) - +isLongS(b.x) || minOf(b.x) - minOf(a.x));
+    for (const { d, x } of pool) {
+      if (left < 5) break;
+      const floor = isLongS(x) ? Math.ceil(minOf(x) * 0.67) : 25; const cut = Math.min(left, minOf(x) - floor); if (cut < 5) continue;
+      const nx = scaled(x, (minOf(x) - cut) / minOf(x)); if (!nx || nx.plannedMinutes >= minOf(x)) continue;
+      left -= minOf(x) - nx.plannedMinutes; setS(d, x, nx);
+    }
+  };
+  // 10b) Auftrag 19: Mindest-Häufigkeit je Sportart nach dem Ziel des Zyklus (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×).
+  //      Fehlt eine Einheit: lockere, kurze Einheit an einem freien Tag; geht das nicht, ersetzt sie eine Nebeneinheit (2. Kraft, kurzes Rad).
+  for (const w of weeks) {
+    if (!fullWeek(w, o.from) || !normalFor(w)) continue;
+    const mf = minFreqOf(w, p, races, o);
+    const runwalk = (w.days || []).some((d: any) => live(d).some((s: any) => s.stage && s.stage.ladder === 'runwalk'));
+    for (const [sp, n0] of Object.entries(mf) as [string, number][]) {
+      // Gehen/Laufen-Stufen: die Zahl der Läufe richtet sich nach der Stufe (eine mehr wären +50 % Laufumfang)
+      if (sp === 'run' && runwalk) continue;
+      // schon als ehrliche Lücke markiert (z. B. Ruhetag mit Teamsport): nicht wieder auffüllen
+      if ((w.freqGap || []).includes(sp)) continue;
+      const need = freqByVolume(w, sp, Math.min(n0, feasibleDays(w, p, sp, o)));
+      for (let guard = 0; guard < 3 && countSport(w, sp) + 0.01 < need; guard++) {
+        const own = (w.days || []).flatMap((d: any) => live(d)).filter((x: any) => x.sport === sp && x.spec && !x.race && !isBrick(x));
+        const near = own.length ? own : weeks.flatMap((x: any) => (x.days || []).flatMap((d: any) => live(d))).filter((x: any) => x.sport === sp && x.spec && !x.race && !isBrick(x));
+        const proto = near.filter((x: any) => !hardS(x) && !isLongS(x))[0] || near[0];
+        if (!proto) break;
+        const why = `Mindestens ${need}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'} pro Woche für dein Ziel: kurz und locker.`;
+        const mk = (min: number): any => {
+          const ctx = proto.spec.ctx; let sp0: W.Spec;
+          if (sp === 'run') sp0 = W.runEasy(ctx, min, { strides: 4 }); else if (sp === 'bike') sp0 = W.bikeEasy(ctx, min);
+          else if (proto.stage || proto.spec.stage) sp0 = W.scaleSpec(JSON.parse(JSON.stringify(proto.spec)), Math.min(1, min / Math.max(1, minOf(proto))));
+          else sp0 = W.swimNormal(ctx, 'endurance', min, w.phase, Math.max(25, ...proto.spec.steps.filter((x: any) => x.mode === 'crawl' || x.mode === 'pull').map((x: any) => x.m || 0)));
+          sp0.why = why;
+          const out = { ...W.build(sp0), id: `${proto.id || 'x'}-mf${w.weekNumber}-${guard}`, ruleNote: why }; return out;
+        };
+        const ns = mk(sp === 'bike' ? 45 : sp === 'swim' ? 40 : 35);
+        const D = daysOf(weeks);
+        const js = D.map((y, j) => ({ y, j })).filter(({ y }) => y.w === w && inR(y.d.date));
+        let near0 = false;
+        let t = js.find(({ j }) => canPlace(D, ns, j, { noRest: true })) || js.find(({ j }) => canPlace(D, ns, j)) || (() => { const x = js.find(({ j }) => canPlace(D, ns, j, { allowNear: true })); if (x) near0 = true; return x; })();
+        if (t) { if (near0) markExcuse(ns, 'kurz und locker, damit die Woche genug ' + (sp === 'run' ? 'Läufe' : sp === 'bike' ? 'Radeinheiten' : 'Schwimmeinheiten') + ' für dein Ziel hat.'); addS(t.y.d, ns); compensate(w, ns); fixes.push(`${t.y.d.date}: ${ns.title} dazu (${why})`); continue; }
+        // Nebeneinheit ersetzen: zweite Kraft, kurzes lockeres Rad (nicht die Sportart des Ziels), sonst eine dritte Einheit einer anderen Sportart
+        const all = (w.days || []).flatMap((d: any) => live(d).map((x: any) => ({ d, x })));
+        const cnt = (k: string) => all.filter(({ x }: any) => x.sport === k).length;
+        const need2 = (k: string) => Math.max(1, Math.min((mf as any)[k] || 2, feasibleDays(w, p, k, o)));
+        const side = all.filter(({ d, x }: any) => movable(x, d.date) && !pinnedS(x) && !hardS(x) && !isLongS(x) && !isTestS(x) && !isBrick(x) && (!x.stage || (cnt(x.sport) > need2(x.sport) && x.stage.ladder !== 'runwalk')) && x.sport !== sp
+          && ((x.sport === 'strength' && cnt('strength') >= 2) || (x.sport === 'bike' && minOf(x) <= 60 && !(mf as any).bike) || (x.sport !== 'strength' && cnt(x.sport) > Math.max(1, Math.min((mf as any)[x.sport] || 2, feasibleDays(w, p, x.sport, o))))))
+          .sort((a: any, b: any) => +(a.x.sport !== 'strength') - +(b.x.sport !== 'strength') || minOf(a.x) - minOf(b.x));
+        let done = false;
+        for (const { d, x } of side) {
+          const keepS = [...d.sessions]; d.sessions = d.sessions.filter((y: any) => y !== x);
+          const D2 = daysOf(weeks); const j = D2.findIndex(y => y.d === d);
+          const ns2 = mk(Math.max(30, Math.min(sp === 'run' ? 45 : 60, minOf(x))));
+          if (j >= 0 && (canPlace(D2, ns2, j) || (canPlace(D2, ns2, j, { allowNear: true }) && (markExcuse(ns2, 'kurz und locker, damit die Woche genug Einheiten für dein Ziel hat.'), true)))) { addS(d, ns2); if (minOf(ns2) > minOf(x)) compensate(w, { ...ns2, plannedMinutes: minOf(ns2) - minOf(x) }); fixes.push(`${d.date}: ${x.title} → ${ns2.title} (${why})`); done = true; break; }
+          d.sessions = keepS;
+        }
+        if (!done) {
+          // kein Platz (zu wenige Tage oder Zeit): ehrlich sagen statt die Woche zu überladen
+          w.freqGap = [...new Set([...(w.freqGap || []), sp])];
+          const t = `Diese Woche ${String(countSport(w, sp)).replace('.', ',')}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'} statt ${need}×: an deinen Tagen ist kein Platz für eine weitere Einheit.`;
+          if (!String(w.important || '').includes(t)) w.important = [w.important, t].filter(Boolean).join(' ');
+          break;
+        }
+      }
+    }
+  }
   // 11) Ruhetage: mindestens 1 (unter 18 und Einsteiger 2) – einen Tag freimachen, Einheiten verschieben, sonst lockere weglassen.
   //     Was wegfällt, kostet: Minuten (Sportart des Zyklus-Ziels 1,5-fach, Lernstufen mehr), dazu ein Aufschlag, wenn die gewünschte Häufigkeit dann fehlt.
   const goalSport = (w: any) => { const t = cycleType(w, w.startDate, races, o); return isRunGoal(t) ? 'run' : t === 'bike_event' ? 'bike' : t === 'swim_goal' ? 'swim' : ''; };
@@ -585,34 +748,60 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     }
     return got.length ? got.join(', ') : null;
   };
-  const dropCost = (w: any, s: any) => { const n = (w.days || []).reduce((a: number, d: any) => a + live(d).filter((y: any) => y.sport === s.sport && !isBrick(y)).length, 0); const f = ((p.freq || {}) as any)[s.sport];
+  const dropCost = (w: any, s: any, ignoreFreq = false) => { const n = (w.days || []).reduce((a: number, d: any) => a + live(d).filter((y: any) => y.sport === s.sport && !isBrick(y)).length, 0); const f = ((p.freq || {}) as any)[s.sport];
+    // Auftrag 19: nie unter die Mindest-Häufigkeit der Sportart des Ziels (dann lieber eine Nebeneinheit oder Ruhetag nur alle 2 Wochen)
+    if (!ignoreFreq && normalFor(w) && fullWeek(w, o.from)) { const mn = (minFreqOf(w, p, races, o) as any)[isBrick(s) ? 'run' : s.sport]; if (mn && countSport(w, isBrick(s) ? 'run' : s.sport) - (isBrick(s) ? 0.5 : 1) + 0.01 < freqByVolume(w, isBrick(s) ? 'run' : s.sport, Math.min(mn, feasibleDays(w, p, isBrick(s) ? 'run' : s.sport, o)))) return Infinity; }
     // Sportart des nächsten Ziels unter die Mindesthäufigkeit (z. B. nur noch 1 Lauf pro Woche vor dem Halbmarathon) wiegt am schwersten;
     const goal = goalSport(w) === s.sport;
     return minOf(s) * (goal ? 1.5 : 1) + (s.stage ? 200 : 0) + (f && n - 1 < f[0] ? (goal ? 250 : 60) : 0) + (n <= 1 ? 100 : 0) + (s.sport === 'run' && /Steigerung|Hügel|Fahrtspiel|Lauf-ABC/.test((s.title || '') + ' ' + (s.description || '')) ? 40 : 0); };
-  type ROpt = { d: any; cost: number; pref: number; plan: () => void; label: string };
-  const optsFor = (w: any): ROpt[] => {
+  type ROpt = { d: any; cost: number; pref: number; plan: () => void; label: string; drops: any[] };
+  /* Nebeneinheit (Auftrag 19): zweite Kraft der Woche oder kurze lockere Einheit (bis 45 min) einer Sportart, die nicht die des nächsten Ziels ist */
+  const sideS = (w: any, s: any) => { const n = (w.days || []).reduce((a: number, d: any) => a + live(d).filter((y: any) => y.sport === s.sport).length, 0);
+    return (s.sport === 'strength' && n >= 2) || (s.sport !== 'strength' && !hardS(s) && !isLongS(s) && minOf(s) <= 45 && goalSport(w) !== s.sport && !(minFreqOf(w, p, races, o) as any)[s.sport]); };
+  /* Auftrag 19 (letzter Ausweg mit Teamsport, relaxed): die harte Einheit einer Sportart, die nicht die des nächsten Ziels ist, fällt weg und ihre
+     Qualität wandert als Block in die lange Einheit derselben Sportart (z. B. Rad-Intervalle Mi → Sweet-Spot-Block in der langen Ausfahrt Sa) */
+  const moveQualityIntoLong = (w: any, s: any, apply: boolean): boolean => {
+    if (!hardS(s) || isTestS(s) || !s.spec || s.sport === 'run' || s.sport === goalSport(w)) return false;
+    for (const d of w.days || []) for (const y of live(d)) {
+      if (y === s || y.sport !== s.sport || !isLongS(y) || hardS(y) || !y.spec || !movable(y, d.date) || minOf(y) < 75) continue;
+      const D0 = daysOf(weeks); const k = D0.findIndex(x => x.d === d); const pv = at(D0, k, -1), nx = at(D0, k, 1);
+      if ((pv && hardDay(pv.d) && !live(pv.d).every((z: any) => z === s || !hardS(z))) || (nx && (hardDay(nx.d) || eventDay(nx.d)))) continue;
+      const q = qualityFor({ ...y, long: true }, (w.phase === 'base' ? 'build' : w.phase) as any, { goalType: (cycleType(w, w.startDate, races, o) || 'fitness') as GoalType, runAllowed: true }, p, 0, d.date);
+      if (!q || !hardS(q)) continue;
+      if (apply) setS(d, y, { ...q, long: true, ruleNote: `${s.title} wandert in die lange Einheit, damit ein Ruhetag frei wird.` });
+      return true;
+    }
+    return false;
+  };
+  const optsFor = (w: any, relaxed = false): ROpt[] => {
       const D = daysOf(weeks);
       const opts: ROpt[] = [];
       for (const d of w.days || []) {
-        const L = live(d); if (!L.length || L.some((s: any) => !movable(s, d.date))) continue;
+        const L = live(d); if (!L.length || L.some((s: any) => !movable(s, d.date) || pinnedS(s))) continue;
         // ausprobieren (mit Rückgängig): verschieben, was geht; was nicht geht, fällt weg (nur Lockeres)
         const snap = new Map<any, any[]>(); (w.days || []).forEach((x: any) => snap.set(x, [...x.sessions]));
-        let cost = 0; const log: string[] = [];
+        let cost = 0; const log: string[] = []; const drops: any[] = [];
         for (const s of [...L].sort((a: any, b: any) => +isLongS(b) - +isLongS(a) || +hardS(b) - +hardS(a) || minOf(b) - minOf(a))) {
           const i = D.findIndex(y => y.d === d);
           const t = D.map((y, j) => ({ y, j })).filter(({ y, j }) => y.w === w && j !== i).find(({ j }) => canPlace(D, s, j, { noRest: true }));
           if (t) { moveTo(d, t.y.d, s); log.push(`${s.title}: ${d.date} → ${t.y.d.date}`); if (isLongS(s) || hardS(s)) cost += 40; }
-          else if (!isLongS(s) && !hardS(s) && !isTestS(s)) { const c0 = dropCost(w, s); removeS(d, s); const ab = absorb(w, d, s); cost += ab ? c0 * 0.4 : c0; log.push(ab ? `${d.date}: ${s.title} entfällt, Minuten zu ${ab}` : `${d.date}: ${s.title} entfällt`); }
+          // Erholungswoche mit Teamsport: auch die (kurze, lockere) lange Einheit darf für den zweiten Ruhetag wegfallen
+          else if ((!isLongS(s) || (w.isRecoveryWeek && teamWeek(w))) && !hardS(s) && !isTestS(s) && !(relaxed && s.sport === 'bike' && dropCost(w, s) === Infinity)) { const c0 = dropCost(w, s) + (isLongS(s) ? 100 : 0); drops.push(s); removeS(d, s); const ab = isLongS(s) ? null : absorb(w, d, s); cost += ab ? c0 * 0.4 : c0; log.push(ab ? `${d.date}: ${s.title} entfällt, Minuten zu ${ab}` : `${d.date}: ${s.title} entfällt`); }
+          else if (relaxed && moveQualityIntoLong(w, s, false)) { drops.push(s); removeS(d, s); cost += 150; log.push(`${d.date}: ${s.title} entfällt, die Qualität kommt in die lange Einheit`); }
+          // sonst (z. B. lange Einheit direkt nach dem Spiel): die harte Rad-Einheit fällt diese Woche weg, ehrlich mit Hinweis
+          else if (relaxed && !isLongS(s) && !isTestS(s) && s.sport === 'bike' && goalSport(w) !== 'bike') { drops.push(s); removeS(d, s); cost += 300; log.push(`${d.date}: ${s.title} entfällt (Ruhetag)`); }
           else { cost = Infinity; break; }
         }
         const i = D.findIndex(y => y.d === d); const pv = at(D, i, -1), nx = at(D, i, 1);
         const pref = (pv && (hardDay(pv.d) || bigDay(pv.d).big) ? 2 : 0) + (nx && eventDay(nx.d) ? 2 : 0) + (nx && hardDay(nx.d) ? 1 : 0);
         (w.days || []).forEach((x: any) => { x.sessions = snap.get(x); });
-        if (cost < Infinity) opts.push({ d, cost, pref, label: log.join('; '), plan: () => {
+        if (cost < Infinity) opts.push({ d, cost, pref, drops, label: log.join('; '), plan: () => {
           for (const s of [...live(d)].sort((a: any, b: any) => +isLongS(b) - +isLongS(a) || +hardS(b) - +hardS(a) || minOf(b) - minOf(a))) {
             const D2 = daysOf(weeks); const i2 = D2.findIndex(y => y.d === d);
             const t = D2.map((y, j) => ({ y, j })).filter(({ y, j }) => y.w === w && j !== i2).find(({ j }) => canPlace(D2, s, j, { noRest: true }));
-            if (t) moveTo(d, t.y.d, s); else { removeS(d, s); absorb(w, d, s); w.restDropped = [...new Set([...(w.restDropped || []), s.sport])]; }
+            if (t) moveTo(d, t.y.d, s); else if (relaxed && hardS(s) && moveQualityIntoLong(w, s, true)) { removeS(d, s); w.restDropped = [...new Set([...(w.restDropped || []), s.sport])]; }
+            else if (relaxed && s.sport === 'bike' && !isLongS(s) && !isTestS(s)) { removeS(d, s); w.restDropped = [...new Set([...(w.restDropped || []), s.sport])]; w.freqGap = [...new Set([...(w.freqGap || []), s.sport])]; w.lightWeek = true; const t2 = `Diese Woche ist ${DOW_LONG[dowOf(d.date)]} Ruhetag statt ${s.title}: mit Teamsport gibt es mindestens alle 2 Wochen einen freien Tag.`; if (!String(w.important || '').includes(t2)) w.important = [w.important, t2].filter(Boolean).join(' '); }
+            else { removeS(d, s); absorb(w, d, s); w.restDropped = [...new Set([...(w.restDropped || []), s.sport])]; }
           } } });
       }
       return opts;
@@ -629,23 +818,39 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     for (const [g, c] of Object.entries(sum)) prefDow[g] = c.indexOf(Math.min(...c));
   }
   let restDow: number | null = null; // möglichst jede Woche derselbe Ruhetag
+  // Auftrag 19: mit Teamsport mindestens alle 2 Wochen ein Ruhetag und in jeder Erholungswoche zwei, wenn ein Ruhetag pro Woche nur mit
+  // Verlust von Schlüsseleinheiten ginge (der Coach erklärt das einmal)
+  let prevRest: number | null = null; let teamNote = false;
   for (const w of weeks) {
-    if (!fullWeek(w, o.from)) continue;
+    if (!fullWeek(w, o.from)) { prevRest = null; continue; }
+    const team = teamWeek(w);
     for (let guard = 0; guard < 3; guard++) {
-      const need = restNeed(w, p);
+      const need = team && w.isRecoveryWeek ? 2 : restNeed(w, p);
       const rd = (w.days || []).filter((d: any) => !live(d).length);
       if (rd.length >= need) { if (rd.length && restDow == null) restDow = dowOf(rd[0].date); break; }
       const opts = optsFor(w);
-      // der zweite Ruhetag nur, wenn dafür nichts wegfällt (nur verschieben)
-      if (rd.length >= 1) for (let k = opts.length - 1; k >= 0; k--) if (opts[k].cost > 0) opts.splice(k, 1);
-      if (!opts.length) break;
+      // der zweite Ruhetag nur, wenn dafür nichts wegfällt (nur verschieben) – außer in der Erholungswoche mit Teamsport
+      if (rd.length >= 1 && !(team && w.isRecoveryWeek)) for (let k = opts.length - 1; k >= 0; k--) if (opts[k].cost > 0) opts.splice(k, 1);
+      // mit Teamsport und ohne Ruhetag in der Woche davor: notfalls die harte Einheit einer Nebensportart in die lange Einheit verlegen
+      if (!opts.length && team && !rd.length && !(prevRest != null && prevRest >= 1)) opts.push(...optsFor(w, true));
+      // mit Teamsport: hatte die Woche davor einen Ruhetag, dann diese Woche nur, wenn höchstens Nebeneinheiten wegfallen
+      if (team && !w.isRecoveryWeek && !rd.length && prevRest != null && prevRest >= 1) for (let k = opts.length - 1; k >= 0; k--) if (!opts[k].drops.every(x => sideS(w, x))) opts.splice(k, 1);
+      if (!opts.length) {
+        if (team && !w.isRecoveryWeek && !rd.length && prevRest != null && prevRest >= 1) {
+          w.teamRest = true;
+          if (!teamNote) { teamNote = true; const t = 'Mit Teamsport und deinem Ausdauertraining passt nicht jede Woche ein Ruhetag, ohne Schlüsseleinheiten zu verlieren. Deshalb gibt es mindestens alle 2 Wochen einen Ruhetag und in jeder Erholungswoche zwei.'; if (!String(w.important || '').includes(t)) w.important = [w.important, t].filter(Boolean).join(' '); }
+        }
+        break;
+      }
       // möglichst wenig wegfallen lassen; bei Gleichstand der Tag zwischen/vor harten Tagen, dann der kürzeste
       opts.sort((a, b) => a.cost - b.cost || b.pref - a.pref || dayMin(a.d) - dayMin(b.d));
       const pd = rd.length ? restDow : (prefDow[goalSport(w) || '-'] ?? restDow);
-      const best = opts.find(x => pd != null && dowOf(x.d.date) === pd && x.cost <= opts[0].cost + 120) || opts[0]; best.plan(); restDow = dowOf(best.d.date);
+      // der zweite Ruhetag (Erholungswoche mit Teamsport): der günstigste Tag (lange Einheiten bleiben)
+      const best = rd.length ? opts[0] : opts.find(x => pd != null && dowOf(x.d.date) === pd && x.cost <= opts[0].cost + 120) || opts[0]; best.plan(); if (!rd.length) restDow = dowOf(best.d.date);
       w.restDays = (w.restDays || 0) + 1;
       fixes.push(`Woche ${w.weekNumber}: Ruhetag ${fmt(best.d.date)} (${best.label || 'frei'})`);
     }
+    prevRest = (w.days || []).filter((d: any) => !live(d).length).length;
   }
   return fixes;
 }
@@ -694,7 +899,7 @@ export function capLongSessions(weeks: any[], p: Profile, o: TOpts = {}): string
         let lim = Infinity;
         if (s.sport === 'run') { lim = capsFor(cycleType(w, d.date, races, o), d.date, { aGoal: o.goalType || null, age: ageOf(p, d.date) }).run; if (lastLR != null && !w.partial) lim = Math.min(lim, lastLR + 10); }
         if (s.sport === 'bike' && lastLB != null && !w.partial) lim = Math.min(lim, lastLB + 15);
-        for (let k = 0; k < 4 && minOf(s) > lim + 1; k++) { const nx = scaled(s, (lim / minOf(s)) * (1 - 0.03 * k)); if (nx && nx.plannedMinutes < minOf(s)) { Object.assign(s, nx); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } else break; }
+        for (let k = 0; k < 4 && minOf(s) > lim + 1; k++) { const nx = scaled(s, (lim / minOf(s)) * (1 - 0.03 * k)); if (nx && nx.plannedMinutes < minOf(s)) { Object.assign(s, nx); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } }
         // lange Ausfahrt mit Blöcken lässt sich nicht immer skalieren: dann gleichmäßig mit der Ziel-Dauer
         if (minOf(s) > lim + 1 && s.sport === 'bike' && hardS(s) && s.spec.ctx) {
           const hq0 = s.spec.steps.find((x: any) => x.part === 'main' && (x.zone || 0) >= 3);

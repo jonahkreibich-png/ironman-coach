@@ -68,7 +68,8 @@ describe('Besonderheiten der Personen', () => {
     expect(s.some((x: any) => x.sport === 'swim')).toBe(false);
     expect(s.some((x: any) => x.sport === 'football' || /spiel|fußball/i.test(x.title))).toBe(false);
     weeks.forEach((w: any) => { if (w.phase !== 'race') expect(w.days.flatMap((d: any) => d.sessions).filter((x: any) => x.sport === 'strength').length).toBe(2); });
-    const str = s.find((x: any) => x.sport === 'strength');
+    // Auftrag 19: die erste Krafteinheit mit Beinen (vor einem langen Lauf wird sie zu Rumpf, das ist Regel)
+    const str = s.find((x: any) => x.sport === 'strength' && x.area !== 'core');
     expect(str.description).toMatch(/Kniebeuge.*\d×\d+/);
     expect(str.description).toMatch(/schmerzfrei/);
     expect(s.filter((x: any) => x.sport === 'bike' && !x.race).some((x: any) => /Gravelbike/.test(x.title))).toBe(true);

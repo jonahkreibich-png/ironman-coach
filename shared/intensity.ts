@@ -11,12 +11,13 @@ import type { Profile } from './profile';
 import { ageOf } from './profile';
 import * as W from './workouts';
 import * as K from './keysessions';
+import { markExcuse } from './planrules';
 import type { GoalType } from './goals';
 
 export type Level = 'beginner' | 'advanced' | 'experienced';
 export type IPhase = 'base' | 'build' | 'specific' | 'taper' | 'race';
 const HARD_KINDS = new Set(['intervals', 'threshold', 'tempo', 'css', 'sweetspot', 'overunder', 'vo2', 'racepace', 'longq', 'force', 'climb', 'test', 'game', 'race']);
-const LIGHT_KINDS = new Set(['hills', 'fartlek']);
+const LIGHT_KINDS = new Set(['hills', 'fartlek', 'progression']);
 
 export function levelOf(p: Profile): Level {
   const exp = p.experienceYears;
@@ -147,7 +148,7 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
   for (let i = 1; i < D.length; i++) {
     const a = D[i - 1], b = D[i];
     if (!a.list.some(isHardSession) || !b.list.some(isHardSession)) continue;
-    if (a.list.filter(isHardSession).every(fixedHard) && b.list.filter(isHardSession).every(fixedHard)) continue;
+    if (a.list.filter(isHardSession).every((s: any) => fixedHard(s) || s.pinned) && b.list.filter(isHardSession).every((s: any) => fixedHard(s) || s.pinned)) continue;
     out.push({ rule: 'adjacent', week: b.w.weekNumber, date: b.d.date, msg: `${a.d.date} und ${b.d.date}: zwei harte Tage hintereinander (${a.list.filter(isHardSession).map((s: any) => s.title).join(', ')} / ${b.list.filter(isHardSession).map((s: any) => s.title).join(', ')}).` });
   }
   let bw = o.baseOffset || 0;
@@ -175,7 +176,9 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
     }
     // Auftrag 18: in den letzten 7 Wochen vor einem Laufziel ist jede Woche eine Lauf-Qualität richtig (auch im langen Lauf, wenn unter
     // der Woche kein Tag ohne harten Nachbartag frei ist); die Regel „nicht zwei Wochen hintereinander“ entfällt
-    prevLongQ = lq.length > 0; void prevLongQ;
+    // Auftrag 19: Tempo im langen Lauf nur jede 2. Woche (nie zwei Wochen hintereinander)
+    if (prevLongQ && lq.length && !(o.from && w.startDate < o.from)) out.push({ rule: 'longRun', week: w.weekNumber, date: lq[0].d.date, msg: `${lq[0].d.date} ${lq[0].s.title}: Tempo im langen Lauf zwei Wochen hintereinander.` });
+    prevLongQ = lq.length > 0;
   }
   // Anteil locker (Zeit im geplanten Training): mindestens 75 %
   const st = intensityStats(weeks.filter(w => !o.from || !w.endDate || w.endDate >= o.from), p);
@@ -237,6 +240,8 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
           if (hardAt(D[i - 1] && D[i - 1].d, null) || hardAt(D[i + 1] && D[i + 1].d, null) || hardAt(d, x)) return false;
           const long = !!x.long || /^Lang/.test(x.title || '');
           if (long && sport === 'run' && o.longQ && !o.longQ(d.date)) return false;
+          // Auftrag 19: Tempo im langen Lauf nie zwei Wochen hintereinander
+          if (long && sport === 'run') { const wi2 = weeks.indexOf(w); const lqW = (y: any) => !!y && (y.days || []).some((dd: any) => (dd.sessions || []).some((z: any) => z && z.sport === 'run' && z.spec && z.spec.kind === 'longq' && (z.long || /^Lang/.test(z.title || '')))); if (lqW(weeks[wi2 - 1]) || lqW(weeks[wi2 + 1])) return false; }
           // muss sich auch wirklich in eine Qualität umwandeln lassen (Dauer, Freigabe)
           if (!flexible(x, o.from, d.date) || isLightQuality(x)) return false;
           const q = qualityFor(x, seg.phase, { ...o, goalType: o.goalType || 'fitness' } as RepairOpts, p, 0, d.date);
@@ -261,7 +266,7 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
 /* ---------- Korrektur ---------- */
 export interface RepairOpts extends CheckOpts { goalType: GoalType; minor?: boolean; noZ5?: (date: string) => boolean; /** Auftrag 17: Tempo-Teil im langen Lauf erlaubt? */ longQ?: (date: string) => boolean;
   /** Auftrag 18: an diesem Tag nichts Hartes (Trainingsregeln: nach langem Tag, vor Spiel/Wettkampf, Erholungs- und Wettkampfwoche …) */ blocked?: (date: string) => boolean }
-const flexible = (s: any, from: string | null | undefined, date: string) => !!s && !!s.spec && !s.adjacentOk && !s.fixed && !s.race && !s.frozen && !s.stage && !/test/i.test(s.title || '') && !isGameOrRace(s) && (!from || date >= from) && ['run', 'bike', 'swim'].includes(s.sport);
+const flexible = (s: any, from: string | null | undefined, date: string) => !!s && !!s.spec && !s.adjacentOk && !s.pinned && !s.fixed && !s.race && !s.frozen && !s.stage && !/test/i.test(s.title || '') && !isGameOrRace(s) && (!from || date >= from) && ['run', 'bike', 'swim'].includes(s.sport);
 const swimRep = (sp: W.Spec) => Math.max(25, ...sp.steps.filter(x => x.mode === 'crawl' || x.mode === 'pull').map(x => x.m || 0));
 /* Locker statt hart (gleiche Dauer, höchstens 60 min Lauf bzw. 90 min Rad) */
 export function easyOf(s: any, phase: string): any {
@@ -329,6 +334,21 @@ export function qualityFor(s: any, phase: IPhase, o: RepairOpts, p: Profile, n: 
   return { ...s, ...W.build(q), id: s.id, checkFix: 'quality' };
 }
 
+/* Gleiche Schlüsseleinheit wie in der Woche davor: andere Form derselben Einheit (Auftrag 15; Auftrag 19 auch als letzter Schritt im Generator) */
+export function varyRepeats(weeks: any[], from?: string | null): string[] {
+  const fixes: string[] = [];
+  const setS = (d: any, s: any, nx: any) => { d.sessions = d.sessions.map((x: any) => x === s ? nx : x); };
+  let prev: Set<string> | null = null;
+  for (const w of weeks) {
+    if (!normalWeek(w)) { if (w.isRecoveryWeek) prev = null; continue; }
+    for (const d of w.days || []) for (const s of [...(d.sessions || [])]) {
+      if (!prev || !isHardSession(s) || !flexible(s, from, d.date) || !prev.has(sig(s))) continue;
+      const v = variantOf(s, prev); if (v) { setS(d, s, v); fixes.push(`${d.date}: ${s.title} → ${v.title} (Abwechslung)`); }
+    }
+    prev = new Set((w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && !isGameOrRace(s)).map(sig)));
+  }
+  return fixes;
+}
 /* Korrigiert den Plan in festen Schritten (in place) und liefert, was geändert wurde.
    Feste Termine, Tests, Wettkämpfe, Spiele, Lernstufen und Tage vor „from“ bleiben unverändert. */
 export function repairIntensity(weeks: any[], p: Profile, today: string, o0: RepairOpts): string[] {
@@ -376,17 +396,7 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o0: Rep
     prevHard = new Set((w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && !isGameOrRace(s)).map((s: any) => s.sport)));
   }
   // 3) gleiche Schlüsseleinheit wie in der Woche davor: andere Form (nach Schritt 4 noch einmal, Auftrag 15)
-  const vary = () => {
-    let prev: Set<string> | null = null;
-    for (const w of weeks) {
-      if (!normalWeek(w)) { if (w.isRecoveryWeek) prev = null; continue; }
-      for (const d of w.days || []) for (const s of [...(d.sessions || [])]) {
-        if (!prev || !isHardSession(s) || !flexible(s, o.from, d.date) || !prev.has(sig(s))) continue;
-        const v = variantOf(s, prev); if (v) { setS(d, s, v); fixes.push(`${d.date}: ${s.title} → ${v.title} (Abwechslung)`); }
-      }
-      prev = new Set((w.days || []).flatMap((d: any) => (d.sessions || []).filter((s: any) => isHardSession(s) && !isGameOrRace(s)).map(sig)));
-    }
-  };
+  const vary = () => { fixes.push(...varyRepeats(weeks, o.from)); };
   vary();
   // 4) fehlende Intensität je Phase und Sportart: eine lockere Einheit an einem freien Tag wird zur passenden Qualität
   for (let pass = 0; pass < 2; pass++) {
@@ -412,7 +422,9 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o0: Rep
             const near = [AD[i - 1], AD[i + 1]].filter(Boolean);
             if (!light && (hardExcept(d, ign) || near.some(x => hardExcept(x.d, ign)))) continue;
             if (!light && o.blocked && o.blocked(d.date)) continue;
-            const s = (d.sessions || []).find((x: any) => (m.sport ? x.sport === m.sport : !(light && x.sport === 'swim')) && flexible(x, o.from, d.date) && !isHardSession(x) && !(isLightQuality(x) && x.sport !== 'swim')
+            // Auftrag 19: kein harter Lauf neben einem längeren Lauf (über 46 min) am Nachbartag; kurze lockere Läufe daneben bekommen eine Begründung
+            const sameNext = (x: any) => !light && x.sport === 'run' && near.some((y: any) => (y.d.sessions || []).some((z: any) => z && z !== x && !z.cancelled && z.sport === 'run' && !z.race && !/^(Koppel|Wechsel)/.test(z.title || '') && ((z.plannedMinutes || 0) > 46 || isHardSession(z)) && !z.adjacentOk));
+            const s = (d.sessions || []).find((x: any) => (m.sport ? x.sport === m.sport : !(light && x.sport === 'swim')) && flexible(x, o.from, d.date) && !isHardSession(x) && !(isLightQuality(x) && x.sport !== 'swim') && !sameNext(x)
               && (allowLong ? ((x.sport === 'run' && (!o.longQ || o.longQ(d.date))) || x.sport === 'bike') && m.phase !== 'base' && (x.long || /^Lang/.test(x.title || '')) : !x.long && !/^Lang/.test(x.title || '')) && (x.plannedMinutes || 0) >= 25);
             if (!s) continue;
             // passt die nächste Stufe der Leiter nicht in die Zeit, dann die erste (kürzere)
@@ -431,7 +443,9 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o0: Rep
           if (!cand) continue;
           setS(other.d, other.s, easyOf(other.s, w.phase)); fixes.push(`${other.d.date}: ${other.s.title} locker (Tausch für ${m.sport === 'run' ? 'Laufen' : m.sport === 'bike' ? 'Rad' : 'Schwimmen'})`);
         } else cand = findCand(false) || findCand(true);
-        if (cand) { setS(cand.d, cand.s, cand.nx); n++; fixes.push(`${cand.d.date}: ${cand.s.title} → ${cand.nx.title} (${m.msg.split(':')[0]})`); }
+        if (cand) { setS(cand.d, cand.s, cand.nx); n++; fixes.push(`${cand.d.date}: ${cand.s.title} → ${cand.nx.title} (${m.msg.split(':')[0]})`);
+          // kurze lockere Läufe am Nachbartag: als Ausnahme begründen (gleiche Sportart an Folgetagen, aber kurz und locker)
+          if (cand.nx.sport === 'run' && isHardSession(cand.nx)) { const i = AD.findIndex(x => x.d === cand!.d); for (const y of [AD[i - 1], AD[i + 1]].filter(Boolean)) (y.d.sessions || []).forEach((z: any) => { if (z && z.sport === 'run' && !z.race && !isHardSession(z) && (z.plannedMinutes || 0) <= 46 && !z.adjacentOk) markExcuse(z, 'kurz und locker, am Tag daneben ist der harte Lauf.'); }); } }
         if (n >= Math.ceil(seg.length / 2) && m.phase !== 'taper') break;
       }
     }

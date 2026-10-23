@@ -12,7 +12,9 @@ import type { Goal, GoalType } from './goals';
 import { GOALS, legsOf, mainGoal } from './goals';
 import { addDays } from './core';
 import { validateWeeks, weekMinutes, ownWeekMinutes, goalAllowed, type Violation } from './rules';
-import { HR_ZONES, chosenSports } from './sports';
+import { HR_ZONES, chosenSports, requirementFor } from './sports';
+import { pickQuality, LIB } from './workoutlib';
+import { swimQuality, noFast } from './workoutbuild';
 import * as W from './workouts';
 import { speedFor, kindFromName } from './bikespeed';
 import { tipFor } from './considerations';
@@ -21,9 +23,9 @@ import { parseFor } from './ruleparse';
 import * as WP from './weekpattern';
 import * as K from './keysessions';
 import { placeholders, macroPhases, timelineOf, capsFor, easyAfterDays, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
-import { levelOf, maxHard, ownHardBudget, repairIntensity, qualityFor } from './intensity';
+import { levelOf, maxHard, ownHardBudget, repairIntensity, qualityFor, varyRepeats } from './intensity';
 import { repairSports, repairSpacing } from './planrules';
-import { repairTrainingRules, hardBlocked, capLongSessions, addRaceRehearsals } from './trainingrules';
+import { repairTrainingRules, hardBlocked, capLongSessions, addRaceRehearsals, minFreqOf, freqByVolume } from './trainingrules';
 import { addSessionNotes } from './sessionnotes';
 import { seasonHint } from './goalcheck';
 
@@ -140,6 +142,17 @@ export function weekShare(goals: Goal[], weekStart: string, sports: SportKey[]):
   return out;
 }
 
+/* Auftrag 19: Reihenfolge der Sportarten nach Rückstand zum Ziel (Schwelle heute gegen das, was das Ziel braucht); Kraul-Lernende haben im
+   Schwimmen den größten Rückstand */
+export function deficitOrder(p: Profile, g: Goal, swimLearning: boolean, only?: string[]): string[] {
+  const R = requirementFor(g, p); const th = p.thresholds || ({} as any);
+  const d: Record<string, number> = { run: 0, bike: 0, swim: 0 };
+  if (R.runThresholdSecKm && th.thresholdPaceRunSec > 0) d.run = th.thresholdPaceRunSec / R.runThresholdSecKm - 1;
+  if (R.bikeThresholdKmh && th.thresholdSpeedBikeKmh > 0) d.bike = R.bikeThresholdKmh / th.thresholdSpeedBikeKmh - 1;
+  const css = cssFor(p);
+  d.swim = swimLearning ? 0.5 : R.swimCss100 && css ? css / R.swimCss100 - 1 : 0.15;
+  return ['bike', 'run', 'swim'].filter(x => !only || only.includes(x)).sort((a, b) => d[b] - d[a]);
+}
 /* ---------- Können: längste Einheit, die zur Person passt ---------- */
 export function abilityCap(p: Profile, sport: 'run' | 'bike', weekIdx: number): number | null {
   const sk = p.skills || {};
@@ -243,6 +256,22 @@ interface Cand { s: any; long?: boolean; hard?: boolean; strength?: boolean; fix
   /** nur an diesen Wochentagen (Kraft nach Körperbereich) */ onDays?: number[]; test?: boolean; /** morgens vor der Schule oder nachmittags */ slot?: 'am' | 'pm' }
 
 export function generatePlan(inp: GenInput): GenResult {
+  // Auftrag 19: Umgebung für die Einheiten-Bibliothek (Niveau, Gelände, Ausrüstung, Beschwerden) für alle Schritte dieses Plans
+  const prevEnv = K.libEnv();
+  K.setLibEnv(libEnvOf(inp.profile, inp.rules || rulesOf(inp.profile, parseFor(inp.today))));
+  try { return generatePlanIn(inp); } finally { K.setLibEnv(prevEnv); }
+}
+/* Umgebung der Person für die Auswahl der Einheiten (Auftrag 19, Punkt 1c) */
+export function libEnvOf(p: Profile, rules: Rule[]): K.LibEnv {
+  const body = new Set<string>((rules || []).filter(r => r && r.kind === 'body').map(r => String((r as any).body || '')));
+  const eff = effectsOf(rules || []);
+  const ex: any[] = [...(body.has('achilles') || /achill/i.test(p.injuries || '') ? ['achilles'] : []), ...(body.has('knee') || eff.strengthKnee ? ['knee'] : []), ...(eff.strengthBack ? ['back'] : []), ...(eff.strengthShoulder ? ['shoulder'] : []), ...(eff.runEasyOnly ? ['runEasyOnly'] : [])];
+  const sk = p.skills || {};
+  return { level: levelOf(p), provenBase: (p.experienceYears || 0) >= 3 && (p.weeklyHours || 0) >= 6, excludes: ex,
+    terrain: { hills: p.terrain ? p.terrain.hills ?? null : null, track: p.terrain ? p.terrain.track ?? null : null, trainer: (p.bikes || []).some(b => b === 'trainer' || b === 'spin') },
+    gear: Array.isArray(sk.swimGear) ? (sk.swimGear as string[]) : [] };
+}
+function generatePlanIn(inp: GenInput): GenResult {
   const { profile, today } = inp;
   // ohne „from“ wie bisher ab nächstem Montag; mit „from“ ab dem Montag dieser Woche, die Tage vor „from“ bleiben, wie sie sind
   const from = inp.from || null;
@@ -387,6 +416,20 @@ export function generatePlan(inp: GenInput): GenResult {
       afterEntry = !!tg.entry; return;
     }
     entryWeek.push(false);
+    // Auftrag 19: fester Wochenaufbau mit Stunden je Phase (z. B. Grundlage 6,5-8 h, Aufbau 8-9 h): in jedem Block von unten nach oben,
+    // höchstens +Steigerung pro Woche; gilt auch für spätere Blöcke und Verlängerungen (vorher schrumpfte der Plan ohne Vorgabe)
+    const hp = pat && pat.hoursByPhase && (p.phase === 'base' || p.phase === 'build' || p.phase === 'specific') ? pat.hoursByPhase[p.phase] : null;
+    if (hp && !p.recovery) {
+      // über die ganze Phase von unten nach oben (Erholungswochen zählen nicht mit)
+      let a = i; while (a > 0 && phases[a - 1].phase === p.phase) a--;
+      let b = i; while (b + 1 < phases.length && phases[b + 1].phase === p.phase) b++;
+      const idx = phases.slice(a, b + 1).map((x, j) => ({ x, j: a + j })).filter(y => !y.x.recovery);
+      const k = idx.findIndex(y => y.j === i), N = idx.length;
+      const want = Math.min(hp[1], hp[0] + k * (hp[1] - hp[0]) / Math.max(1, N - 1)) * 60;
+      const v = Math.round(i === 0 ? Math.min(want, doneCap ?? Infinity, Math.max(lastNormal, hp[0] * 60)) : Math.min(want, Math.max(lastNormal * inc, hp[0] * 60)));
+      ownVols.push(v); lastNormal = v; afterEntry = false; return;
+    }
+    if (hp && p.recovery) { ownVols.push(Math.round(Math.min(lastNormal * 0.7, hp[1] * 60 * 0.7))); afterEntry = false; return; }
     if (p.phase === 'race') { const pr = segGoal(i).priority; ownVols.push(Math.round(lastNormal * (pr === 'C' ? 0.85 : pr === 'B' ? 0.6 : 0.45))); return; }
     if (p.phase === 'taper') { ownVols.push(Math.round(lastNormal * (phases[i + 1] && phases[i + 1].phase === 'taper' ? 0.75 : 0.6))); return; }
     if (p.recovery) { ownVols.push(Math.round(lastNormal * 0.65)); afterEntry = false; return; }
@@ -397,6 +440,7 @@ export function generatePlan(inp: GenInput): GenResult {
   });
   // Bisherige Form (eigenes Training + halber Teamsport) für die freie Verteilung
   const volumes = ownVols.map(v => v + teamWeekMin * 0.5);
+  const DBGF = typeof process !== "undefined" && (process as any).env && (process as any).env.DBG_FIX ? new RegExp((process as any).env.DBG_FIX) : null;
   const startMin = volumes[0];
   void startMin;
 
@@ -425,7 +469,7 @@ export function generatePlan(inp: GenInput): GenResult {
   const ks = weeksSince(keySlot && keySlot.keyFrom);
   let pst: WP.PatternState = { longRun: lastLongRun0 || 60, longBike: lastLongBike0 || 90, swim: (cont && cont.lastSwim) || 45,
     keyWeeks: ks - Math.floor(ks / 4), strideWeeks: weeksSince(strideSlot && strideSlot.stridesFrom), brickWeeks: weeksSince(brickSlot && brickSlot.from),
-    lastTestMon: pat ? ((pat.targets || []).filter(t => (t.tests || []).length && t.start < start).map(t => t.start).sort().pop() || null) : null,
+    lastTestMon: pat ? ((pat.targets || []).filter(t => (t.tests || []).length && t.start < start).map(t => t.start).sort().pop() || (pat.lastTest && pat.lastTest < start ? mondayOf(pat.lastTest) : null)) : null,
     runRef: cont && cont.lastNormalWeek ? weekMinutes(cont.lastNormalWeek, 'run') || null : null };
   const legsStrength = (x: Cand) => !!x.strength && x.s.area !== 'upper';
   let blockNo = cont ? cont.blockNo + (cont.builtSinceRecovery ? 0 : 1) : 1, blockWeek = cont && cont.builtSinceRecovery ? cont.builtSinceRecovery : 0;
@@ -494,7 +538,7 @@ export function generatePlan(inp: GenInput): GenResult {
       endurance = Math.max(0, Math.min(ownVols[0] - doneOwn, ownVols[0] * capLeft / capAll * 1.15));
     }
 
-    let patImportant = '';
+    let patImportant = ''; let lightW = false;
     if (pat) {
       // Fester Wochenaufbau: jede Einheit an ihrem Tag, Dauer aus der Vorgabe oder den Regeln; harte Regeln werden nie verletzt
       const tg = WP.targetFor(pat, mon);
@@ -520,7 +564,10 @@ export function generatePlan(inp: GenInput): GenResult {
           bikeOut: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor: cOut0.indoor }).bike, swim: capsFor(sgP.goalType, mon, { swimLearning: !!swimStage, phase: ph.phase as any }).swim },
         run: pc(false, null), bikeOut: pc(cOut.indoor, cOut.name), bikeIn: pc(cIn.indoor, cIn.name), swim: pc(false, null), swimStage: swimStage as any, inc: 1 + prog.incPct / 100,
         crawl400, repMax, strength: { knee: eff.strengthKnee, back: eff.strengthBack, shoulder: eff.strengthShoulder }, goalName: A.name,
-        level: levelOf(profile), baseWeek: baseWeekOf(wi), maxHard: maxHard(profile, ph.phase, mon, baseWeekOf(wi), slots.filter(x => x.game || x.race).length), longQOk: longRunTempoOk(allGoals, mon), noZ5: (() => { const a = ageOf(profile, mon); return a != null && (a < 18 || a >= 60); })() }, pst);
+        level: levelOf(profile), baseWeek: baseWeekOf(wi), maxHard: maxHard(profile, ph.phase, mon, baseWeekOf(wi), slots.filter(x => x.game || x.race).length), longQOk: longRunTempoOk(allGoals, mon), noZ5: (() => { const a = ageOf(profile, mon); return a != null && (a < 18 || a >= 60); })(),
+        morningLabel: profile.morning && profile.morning.label ? profile.morning.label : undefined }, pst);
+      ((items as any).unplacedTests || []).forEach((t: WP.TestSport) => { if (!carry.includes(t)) carry.push(t); tests.delete(t); });
+      if ((items as any).offWeek) lightW = true;
       for (const it of items) {
         // laufende Woche: nichts vor „from“, und nicht dieselbe Sportart neben einer schon erledigten Einheit
         if (part && (it.dow !== undefined) && (() => { const sl0 = slots.find(x => x.dow === it.dow)!; return sl0.closed || sl0.items.some(x => x.frozen && x.s.sport === it.s.sport); })()) continue;
@@ -589,13 +636,17 @@ export function generatePlan(inp: GenInput): GenResult {
     // Reihenfolge der Schlüsseleinheiten: Rad, Lauf, dann Schwimmen
     // Reihenfolge für die harten Einheiten (Auftrag 14): Laufziel zuerst Laufen, Rad-Event zuerst Rad, Triathlon im Wechsel, damit jede Sportart ihre Intensität bekommt
     const grp = GOALS[sg.goalType] ? GOALS[sg.goalType].group : '';
-    const prio0 = sg.goalType === 'bike_event' ? ['bike', 'run', 'swim'] : grp === 'run' ? ['run', 'bike', 'swim'] : grp === 'tri' ? (['bike', 'run', 'swim'] as string[]).map((_, i, a) => a[(i + wi) % 3]) : ['bike', 'run', 'swim'];
+    // Auftrag 19: Triathlon: Reihenfolge nach Rückstand zum Ziel (größter Rückstand in 3 von 4 Wochen vorn), sonst im Wechsel
+    const defo = grp === 'tri' ? deficitOrder(profile, sgGoal || (A as Goal), !!swimStage, sports as string[]) : null;
+    const prio0 = sg.goalType === 'bike_event' ? ['bike', 'run', 'swim'] : grp === 'run' ? ['run', 'bike', 'swim'] : grp === 'tri' && defo && defo.length ? (() => { const R = defo.length >= 3 ? [defo[0], defo[1], defo[0], defo[2]] : defo; const f = R[wi % R.length]; return [...[f, ...defo.filter(x => x !== f)], ...['bike', 'run', 'swim'].filter(x => !defo.includes(x))]; })() : ['bike', 'run', 'swim'];
     for (const sport of [...sports].sort((a, b) => [...prio0, 'strength'].indexOf(a) - [...prio0, 'strength'].indexOf(b))) {
       if (sport === 'strength') continue;
       const [fmin, fmax] = freqOf(profile, sport);
       let mins = endurance * (share[sport] || 0) * (sport === 'run' && eff.runVolume ? eff.runVolume : 1) * (sport === 'swim' && eff.swimVolume ? eff.swimVolume : 1);
       const typ = sport === 'run' ? 40 : sport === 'bike' ? 60 : 40;
       let n = Math.max(fmin, Math.min(fmax, Math.round(mins / typ)));
+      // Auftrag 19: Mindest-Häufigkeit nach dem Ziel des Zyklus (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×), nicht in Erholung/Tapering
+      if (!ph.recovery && ph.phase !== 'taper' && ph.phase !== 'race' && !(sport === 'run' && runStage != null)) { const mf = (minFreqOf({ startDate: mon, cycleGoalType: sg.goalType }, profile, [], { goalType: A.type }) as any)[sport]; if (mf) n = Math.max(n, Math.min(mf, (profile.freq || {} as any)[sport] ? fmax : mf, Math.max(1, Math.floor(mins / (sport === 'bike' ? 30 : 25))))); }
       // laufende Woche: was in dieser Sportart schon erledigt ist, zählt mit
       if (part) n = Math.max(0, Math.min(n, Math.round(mins / typ) || (mins > 20 ? 1 : 0)) - (doneBy[sport] || 0));
       if (!n && (share[sport] || 0) > 0.05) n = 1;
@@ -659,14 +710,23 @@ export function generatePlan(inp: GenInput): GenResult {
       if (sport === 'swim') {
         const ctx = pc(false, null);
         // Schwerpunkt je Woche (Technik, Pull Buoy, zügige Bahnen), kürzere Pausen im Block, Freiwasser in der spezifischen Phase
-        if (swimStage) { for (let k = 0; k < n; k++) add(K.swimVariant(W.swimLearn(ctx, swimStage, swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : `Kraul lernen, damit du ${target.name} entspannt schwimmen kannst.`), wi + k, blockWeekOf(wi), ph.phase)); continue; }
+        // Auftrag 19: in einer von zwei Einheiten ein kurzer harter Teil aus der Einheiten-Bibliothek (Lernende: kurze schnelle Stücke, zählen nur
+        // halb und nicht als harter Tag; ab 200 m am Stück Schwellen-Sets, ab 400 m CSS-Intervalle). Die Technik bleibt in jeder Einheit.
+        const swimQ = !ph.recovery && ph.phase !== 'race' && !entryWeek[wi] ? pickQuality('swim', gq.swimN[ph.phase] || 0, { ...K.libEnv(), phase: ph.phase, goal: sg.goalType, level: lv, noZ5, swimCont: swimStage ? (W.SWIM_STAGE_M[swimStage.n] || 25) : repMax }) : null;
+        const swimQHard = !!swimQ && LIB[swimQ.key] && LIB[swimQ.key].load === 'hart';
+        const useQ = !!swimQ && swimQ.key !== 'swim.drills' && (!swimQHard || (hardOk && hardLeft > 0));
+        const qFor = (sp: W.Spec, min: number) => swimQuality(useQ ? swimQ!.key : 'swim.fast', useQ ? swimQ!.stage : 0, sp, { repMax: swimStage ? (W.SWIM_STAGE_M[swimStage.n] || 25) : repMax, learner: !!swimStage, minutes: min });
+        if (swimStage) { for (let k = 0; k < n; k++) { const v = K.swimVariant(W.swimLearn(ctx, swimStage, swimStage.ladder === 'swimBreast' ? 'Brust bringt Ausdauer im Wasser, die Kraul-Technik kommt Schritt für Schritt dazu.' : `Kraul lernen, damit du ${target.name} entspannt schwimmen kannst.`), wi + k, blockWeekOf(wi), ph.phase); const qq = k === 0 && swimQ && !(swimStage.ladder === 'swimBreast' || swimStage.n < 2); add(qq ? qFor(v, W.totals(v).min) : swimQ && k > 0 ? K.fitSwim(noFast(v), W.totals(v).min) : v); } if (swimQ && !(swimStage.ladder === 'swimBreast' || swimStage.n < 2)) gq.swimN[ph.phase] = (gq.swimN[ph.phase] || 0) + 1; continue; }
         const per = Math.max(25, Math.min(capsW(false).swim, mins / n));
         for (let k = 0; k < n; k++) {
-          const hard = hardOk && hardLeft > 0 && k === 1 && ph.phase !== 'base';
-          const kind = k === 0 ? 'technique' : hard ? 'css' : 'endurance';
-          const sw = W.swimNormal(ctx, kind, per, ph.phase, repMax, gq.swimN[ph.phase] || 0);
-          add(kind === 'css' ? sw : K.fitSwim(K.swimVariant(sw, wi + k, blockWeekOf(wi), ph.phase), per), { hard });
-          if (hard) { hardLeft--; gq.swimN[ph.phase] = (gq.swimN[ph.phase] || 0) + 1; }
+          const q = !!swimQ && k === Math.min(1, n - 1);
+          const hard = q && useQ && swimQHard;
+          const sw = W.swimNormal(ctx, k === 0 ? 'technique' : 'endurance', per, ph.phase, repMax, gq.swimN[ph.phase] || 0);
+          let v = K.fitSwim(K.swimVariant(sw, wi + k, blockWeekOf(wi), ph.phase), per);
+          if (!q && swimQ) v = K.fitSwim(noFast(v), per);
+          add(q ? qFor(v, per) : v, { hard });
+          if (hard) hardLeft--;
+          if (q) gq.swimN[ph.phase] = (gq.swimN[ph.phase] || 0) + 1;
         }
       }
     }
@@ -766,6 +826,8 @@ export function generatePlan(inp: GenInput): GenResult {
         if (c.long && s.sport === 'run' && sl.dow === 0) sc += 50;
         if (c.long && s.sport === 'bike' && sl.dow === 6) sc += 50;
         if (c.strength) sc += sl.items.length ? 40 : 0;
+        // Auftrag 19: Kraft (Beine) nicht am Tag eines langen Laufs oder davor (sonst wird sie später zu Rumpf)
+        if (c.strength && !c.onDays && (sl.items.some(x => x.long && x.s.sport === 'run') || (i < 6 && slots[i + 1].items.some(x => x.long && x.s.sport === 'run')))) sc -= 250;
         // gleiche Sportart nicht an zwei Tagen hintereinander (z. B. Schwimmen Di und Sa statt Sa und So)
         if ((i > 0 && slots[i - 1].items.some(x => x.s.sport === s.sport)) || (i < 6 && slots[i + 1].items.some(x => x.s.sport === s.sport))) sc -= 300;
         sc -= sl.items.length * 60;
@@ -873,7 +935,7 @@ export function generatePlan(inp: GenInput): GenResult {
     weeks.push({
       weekNumber: wn, label: 'Woche ' + wn, headline, ...blk, cycleGoalType: segGoal(wi).goalType, target: { goalId: A.id, name: A.name, weeks: nTotal, n: wi + 1 }, races,
       startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: ph.recovery, reduced: otherRaces.some(r => r.priority === 'B') || dates.some(d => goals.some(g => g.date && g.type !== 'fitness' && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type))) || undefined,
-      entry: entryWeek[wi] || undefined, ...(part ? { partial: true, from } : {}), vorgabe: pat && WP.targetFor(pat, mon) ? true : undefined,
+      entry: entryWeek[wi] || undefined, ...(lightW ? { lightWeek: true } : {}), ...(part ? { partial: true, from } : {}), vorgabe: pat && WP.targetFor(pat, mon) ? true : undefined,
       phase: ph.phase, focus: ph.recovery ? 'Erholung: weniger Umfang, Körper verarbeitet das Training' : entryWeek[wi] ? 'Wiedereinstieg: locker, Umfang steigt in Stufen' : focusText(ph.phase, GOALS[A.type].group, sports.includes('strength')),
       important: patImportant || weekImportant(ph, otherRaces, wi, inp, runStage, swimStage, afterIllness), days
     });
@@ -882,7 +944,7 @@ export function generatePlan(inp: GenInput): GenResult {
   // Auftrag 15: Plan-Check nur gewählte Sportarten und Abstand gleicher Sportarten, mit Korrektur (vor den Umfangsgrenzen, damit die danach stimmen)
   const keepIds = new Set<string>((inp.frozen || []).flatMap(f => f.sessions.map((s: any) => s && s.id).filter(Boolean)));
   const ruleFixes = [...repairSports(weeks, profile, { from: from || start }),
-    ...repairSpacing(weeks, profile, { from: from || start, keep: (s: any) => keepIds.has(s.id),
+    ...repairSpacing(weeks, profile, { from: from || start, keep: (s: any) => keepIds.has(s.id) || !!s.pinned,
       quality: (s: any, date: string, phase: string, from?: any) => {
         // die Qualität der gekürzten Einheit wandert in die lange Einheit daneben (Lauf: Tempo im langen Lauf, gleiche Dauer)
         const a = ageOf(profile, date); const noZ5q = a != null && (a < 18 || a >= 60);
@@ -915,14 +977,16 @@ export function generatePlan(inp: GenInput): GenResult {
       allowed: (s: any, date: string) => !evaluate(rules, { ...s, long: !!s.long, hard: !!s.hard }, date).hard.length && dayLimit(rules, date).cap > 0 && !(s.sport === 'swim' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, date)) }) ];
   // Umfang in einem Durchgang begrenzen: jede Woche höchstens +10 % (unter 18 +8 %) gegenüber der letzten normalen Woche
   const prevRef = cont && cont.lastNormalWeek ? [cont.lastNormalWeek] : [];
+  // Auftrag 19: die Umfangsbremse lässt keine Einheit weg, die für die Mindest-Häufigkeit nötig ist
+  const keepN = (w: any, sport: string, allowMin?: number): number => { if (w.isRecoveryWeek || w.entry || w.reduced || w.partial || w.phase === 'taper' || w.phase === 'race') return 0; const n = ((minFreqOf(w, profile, [], { goalType: A.type }) as any)[sport]) || 0; const v = n ? freqByVolume(w, sport, n) : 0; return allowMin ? Math.min(v, Math.max(1, Math.floor(allowMin / (sport === 'bike' ? 30 : 25)))) : v; };
   // langer Lauf zuerst (kürzt nur), damit die Steigerung danach gegen die endgültigen Wochen geprüft wird (Auftrag 15)
   enforceLongRun(weeks, lastLongRun0);
-  enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null);
+  enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN);
   // Auftrag 15: Erholungswochen spürbar leichter als die letzte normale Woche (vorher oft gleich viel, weil das Ziel über dem lag, was die Einheiten hergeben)
   enforceRecovery(weeks, prevRef[0] || null);
   // Auftrag 17: Kürzungen oben können einen langen Lauf verkürzt haben; danach wieder höchstens +10 min pro Woche und der Umfang
   // wieder höchstens +10 % (beides kürzt nur, deshalb endet es)
-  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null); }
+  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null); }
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
     const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };
@@ -939,7 +1003,7 @@ export function generatePlan(inp: GenInput): GenResult {
   const intensityFixes = repairIntensity(weeks, profile, today, intOpts);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Ruhetage und Kürzungen können eine Woche kleiner gemacht haben: die Steigerung danach wieder höchstens +10 % (kürzt nur)
-  enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null);
+  enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Auftrag 18: Generalprobe vor Triathlons (Schwimmen, Rad, Koppellauf an einem Tag)
   trainingFixes.push(...addRaceRehearsals(weeks, profile, { ...trOpts, sports }));
@@ -947,7 +1011,10 @@ export function generatePlan(inp: GenInput): GenResult {
   intensityFixes.push(...repairIntensity(weeks, profile, today, intOpts));
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Umfangsbremse und Grenzen der langen Einheiten abwechselnd, bis beides passt (beides kürzt nur)
-  for (let k = 0; k < 3; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null); if (!capLongSessions(weeks, profile, trOpts).length) break; }
+  for (let k = 0; k < 6; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null); if (!capLongSessions(weeks, profile, trOpts).length) break; }
+  // Auftrag 19: zum Schluss noch einmal Abwechslung (spätere Schritte können dieselbe Schlüsseleinheit zwei Wochen hintereinander erzeugt haben)
+  intensityFixes.push(...varyRepeats(weeks, from || start));
+  if (DBGF) [...ruleFixes, ...trainingFixes, ...intensityFixes].filter(f => DBGF.test(f)).forEach(f => console.error("FIX", f));
   const violations = validateWeeks(weeks, { minor, maxIncPct: prog.incPct }, prevRef);
   const age2 = goalAllowed(A.type, ageAtRace);
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });
@@ -1052,9 +1119,11 @@ function keyRun(ctx: W.PaceCtx, type: GoalType, phase: Phase, wi: number): W.Spe
 const ownMin = (w: any, sport?: string) => sport ? weekMinutes(w, sport) : ownWeekMinutes(w);
 /* Auftrag 15: bei kleinem Umfang ist +10 % kleiner als eine kurze Einheit (z. B. 78 min + 15 min Kraft); dann sind bis +15 min erlaubt */
 export const SMALL_STEP = 15;
-export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev: any = null) {
+export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev: any = null, keepN: ((w: any, sport: string, allowMin?: number) => number) | null = null) {
   const scaleWeek = (w: any, sport: string | undefined, f: number) => w.days.forEach((d: any) => { d.sessions = d.sessions.map((s: any) => {
     if (s.fixed || s.race || !s.plannedMinutes || (sport && s.sport !== sport) || s.sport === 'rest' || (s.spec && s.spec.title)) return s;
+    // Auftrag 19: Kraft aus dem festen Wochenaufbau bleibt so lang wie gewünscht (z. B. Ganzkörper 30 min)
+    if (s.sport === 'strength' && s.pattern) return s;
     if (s.spec && (!s.stage || (s.sport === 'swim' && f < 1))) { const r = W.rebuildScaled(s, f); return r ? { ...s, ...r, plannedKm: r.plannedKm ?? undefined } : s; }
     return s;
   }); });
@@ -1066,16 +1135,22 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
     // Wochen mit eigener Vorgabe bleiben, wie sie vorgegeben sind
     if (all[i].vorgabe) continue;
     // Bezug: letzte normale Woche (nicht Erholung, Wiedereinstieg oder Woche mit Wettkampf)
-    let j0 = i - 1; while (j0 > 0 && (all[j0].isRecoveryWeek || all[j0].reduced || all[j0].entry || all[j0].partial || all[j0].phase === 'taper' || all[j0].phase === 'race' || (all[j0].races || []).length)) j0--;
+    let j0 = i - 1; while (j0 > 0 && (all[j0].isRecoveryWeek || all[j0].lightWeek || all[j0].reduced || all[j0].entry || all[j0].partial || all[j0].phase === 'taper' || all[j0].phase === 'race' || (all[j0].races || []).length)) j0--;
     // angebrochene Woche (Plan ab heute) ist kein Bezug für die Steigerung
     if (all[j0].partial || all[i].partial) continue;
     for (const sport of [undefined, 'run'] as (string | undefined)[]) {
       // Auftrag 18: Laufumfang nie gegen eine Woche mit Lauftest messen (der Test ersetzt den langen Lauf), sondern gegen die normale Woche davor
       const runTestWeek = (w: any) => (w.days || []).some((d: any) => (d.sessions || []).some((s: any) => s && s.sport === 'run' && s.spec && s.spec.kind === 'test'));
-      let j = j0; if (sport === 'run') while (j > 0 && (runTestWeek(all[j]) || all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
+      let j = j0; if (sport === 'run') while (j > 0 && (runTestWeek(all[j]) || all[j].isRecoveryWeek || all[j].lightWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
+      // Auftrag 19: Bezug ist die größere der letzten zwei normalen Wochen (bei festem Wechsel, z. B. jede 2. Woche ein Ruhetag, sonst
+      // würde die leichtere Woche die nächste bremsen und der Plan Woche für Woche schrumpfen)
+      let j1 = j - 1; const bad = (w: any) => runTestWeek(w) || w.isRecoveryWeek || w.lightWeek || w.reduced || w.entry || w.partial || w.phase === 'taper' || w.phase === 'race' || (w.races || []).length;
+      while (j1 > 0 && bad(all[j1])) j1--;
       for (let guard = 0; guard < 6; guard++) {
-        const ref = ownMin(all[j], sport), cur = ownMin(all[i], sport);
-        const allow = sport ? ref * maxInc : Math.max(ref * maxInc, ref + SMALL_STEP);
+        const ref = Math.max(ownMin(all[j], sport), j1 >= 0 && j1 < j && !bad(all[j1]) && i - j1 <= 3 ? ownMin(all[j1], sport) : 0), cur = ownMin(all[i], sport);
+        const stepsL = all.slice(j + 1, i).length && all.slice(j + 1, i).every((x: any) => x.lightWeek && !x.isRecoveryWeek) ? i - j : 1;
+        const incL = Math.pow(maxInc, stepsL);
+        const allow = sport ? ref * incL : Math.max(ref * incL, ref + SMALL_STEP);
         if (ref < (sport ? 40 : 60) || cur <= allow) break;
         const fixed = all[i].days.reduce((a: number, d: any) => a + d.sessions.filter((s: any) => (s.fixed || s.stage) && !s.race && s.sport !== 'football' && !s.cancelled && (!sport || s.sport === sport)).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
         const f = Math.max(0.3, (allow - fixed) / Math.max(1, cur - fixed) * 0.98);
@@ -1092,7 +1167,7 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
           // ganz zuletzt: die kürzeste lockere Einheit dieser Sportart fällt weg (lockere Einheiten verfallen eher als die Steigerung zu brechen)
           if (!did) { const pool = all[i].days.flatMap((d: any) => (d.sessions || []).filter((x: any) => x.spec && !x.stage && !x.fixed && !x.frozen && !x.race && !x.hard && !x.long && !/test/i.test(x.title || '') && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport)).map((x: any) => ({ d, x }))).sort((a: any, b: any) => a.x.plannedMinutes - b.x.plannedMinutes);
             const same = (sp: string) => all[i].days.reduce((n: number, d: any) => n + (d.sessions || []).filter((x: any) => x.sport === sp && !x.cancelled).length, 0);
-            const pick = pool.find((p: any) => same(p.x.sport) > 1);
+            const pick = pool.find((p: any) => same(p.x.sport) > Math.max(1, keepN ? keepN(all[i], p.x.sport, sport ? ref * maxInc : undefined) : 0));
             if (pick) { pick.d.sessions = pick.d.sessions.filter((x: any) => x !== pick.x); if (!pick.d.sessions.length) pick.d.sessions.push({ id: pick.x.id + '-rest', sport: 'rest', title: 'Ruhetag' }); did = true; } }
           if (!did) break;
         }
@@ -1132,7 +1207,7 @@ function enforceLongRun(weeks: any[], start: number | null) {
     const runs = w.days.flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.race && !s.stage && (s.long || /^Langer Lauf/.test(s.title || ''))));
     for (const s of runs) {
       // Rundung auf 5 min kann knapp darüber landen: in kleinen Schritten nachkürzen (Auftrag 17)
-      for (let k = 0; k < 4 && last != null && s.plannedMinutes > last + 10 && s.spec; k++) { const rb = W.rebuildScaled(s, (last + 10) / s.plannedMinutes * (1 - 0.03 * k)); if (rb && rb.plannedMinutes < s.plannedMinutes) Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); else break; }
+      for (let k = 0; k < 4 && last != null && s.plannedMinutes > last + 10 && s.spec; k++) { const rb = W.rebuildScaled(s, (last + 10) / s.plannedMinutes * (1 - 0.03 * k)); if (rb && rb.plannedMinutes < s.plannedMinutes) Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); }
     }
     const lr = Math.max(0, ...runs.map((s: any) => s.plannedMinutes || 0));
     if (lr && !w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') last = lr;
@@ -1197,7 +1272,12 @@ export function transitionPlan(oldPlan: any, newPlan: any, today: string, from?:
   if (om.blockName && keep.length && !history.some((h: any) => h.blockName === om.blockName)) history.push({ blockName: om.blockName, from: keep[0].startDate, to: weekEnd(keep[keep.length - 1]) });
   const seeds: any = {};
   SEED_KEYS.forEach(k => { if (oldPlan && oldPlan[k] !== undefined && newPlan[k] === undefined) seeds[k] = oldPlan[k]; });
-  return { ...seeds, ...newPlan, weeks, meta: { ...om, ...newPlan.meta, previousBlock: om.blockName || null, history } };
+  // Auftrag 19: Prüf-Angaben (erlaubte Wochen für Tempo im langen Lauf, gesperrte Tage) für die bleibenden Wochen behalten (vorher galten nach
+  // einer Verlängerung nur die neuen Wochen, und die Prüfung meldete frühere Wochen fälschlich)
+  const io0 = om.intensityOpts || {}, io1 = (newPlan.meta && newPlan.meta.intensityOpts) || {};
+  const keptIn = (m: string) => keep.some((w: any) => w.startDate <= m && weekEnd(w) >= m);
+  const intensityOpts = newPlan.meta && newPlan.meta.intensityOpts ? { ...io1, longQWeeks: [...new Set([...(io0.longQWeeks || []).filter(keptIn), ...(io1.longQWeeks || [])])], hardBlocked: [...new Set([...(io0.hardBlocked || []).filter(keptIn), ...(io1.hardBlocked || [])])] } : io0;
+  return { ...seeds, ...newPlan, weeks, meta: { ...om, ...newPlan.meta, intensityOpts, previousBlock: om.blockName || null, history } };
 }
 /* Wo steht ein vorhandener Plan? Letzte Woche vor dem nächsten Montag, Block, Aufbauwochen seit der letzten Erholung, Umfang der letzten normalen Woche */
 export function continuationOf(oldPlan: any, today: string, state?: any, from?: string | null): GenInput['continueFrom'] {

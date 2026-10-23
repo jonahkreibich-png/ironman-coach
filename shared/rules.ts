@@ -48,19 +48,29 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
     const w = all[i];
     // Auftrag 17: eine Woche mit Lauftest (statt langem Lauf) ist auch für den Gesamtumfang kein Bezug
     const runTest = (x: any) => (x.days || []).some((d: any) => (d.sessions || []).some((s: any) => s && s.sport === 'run' && /^Lauftest/.test(s.title || '')));
-    let j = i - 1; while (j > 0 && (runTest(all[j]) || all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
+    // Auftrag 19: Wochen mit dem abwechselnden Ruhetag (lightWeek) sind bewusst leichter und wie Erholungswochen kein Bezug
+    let j = i - 1; while (j > 0 && (runTest(all[j]) || all[j].isRecoveryWeek || all[j].lightWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race' || (all[j].races || []).length)) j--;
     // Wiedereinstieg nach Krankheit: niedriger als die Woche davor, keine Steigerung zu prüfen; angebrochene Woche (Plan ab heute) ebenso
     if (w.entry || w.partial || all[j].partial) continue;
     const ref = all[j];
+    // Auftrag 19: Bezug ist die größere der letzten zwei normalen Wochen (innerhalb von 3 Wochen): bei festem Wechsel (z. B. jede 2. Woche ein
+    // Ruhetag) ist die leichtere Woche kein neues Niveau, von dem aus nur +10 % gingen
+    const skip = (x: any) => runTest(x) || x.isRecoveryWeek || x.lightWeek || x.reduced || x.entry || x.partial || x.phase === 'taper' || x.phase === 'race' || (x.races || []).length;
+    let j1 = j - 1; while (j1 > 0 && skip(all[j1])) j1--;
+    const ref2 = j1 >= 0 && j1 < j && i - j1 <= 3 && !skip(all[j1]) ? all[j1] : null;
     // eigenes Training (Teamsport ist ein fester Termin und steigt nicht)
-    const refMin = ownWeekMinutes(ref), cur = ownWeekMinutes(w);
+    const refMin = Math.max(ownWeekMinutes(ref), ref2 ? ownWeekMinutes(ref2) : 0), cur = ownWeekMinutes(w);
     // Auftrag 15: bei kleinem Umfang bis +15 min (eine kurze Einheit mehr), sonst +10 % (unter 18 +8 %)
-    if (refMin >= 60 && cur > Math.max(refMin * maxInc, refMin + 15) + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
+    // liegen dazwischen nur Wochen mit dem abwechselnden Ruhetag (lightWeek), wächst das Niveau trotzdem Woche für Woche
+    const steps = all.slice(j + 1, i).length && all.slice(j + 1, i).every((x: any) => x.lightWeek && !x.isRecoveryWeek) ? i - j : 1;
+    const inc = Math.pow(maxInc, steps);
+    if (refMin >= 60 && cur > Math.max(refMin * inc, refMin + 15) + 5) out.push({ rule: 'volume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Umfang ${Math.round(cur)} min, das sind ${Math.round((cur / refMin - 1) * 100)} % mehr als ${Math.round(refMin)} min. Erlaubt sind höchstens +${Math.round((maxInc - 1) * 100)} %.` });
     // Laufumfang ohne Wettkampf (der Wettkampf selbst ist keine Steigerung)
     const runOf = (x: any) => (x.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && s.sport === 'run' && !s.race && !s.cancelled).reduce((b: number, s: any) => b + (s.plannedMinutes || 0), 0), 0);
-    let jr = j; while (jr > 0 && (runTest(all[jr]) || all[jr].isRecoveryWeek || all[jr].reduced || all[jr].entry || all[jr].phase === 'taper' || all[jr].phase === 'race' || (all[jr].races || []).length)) jr--;
-    const refRun = runOf(all[jr]), curRun = runOf(w);
-    if (refRun >= 40 && curRun > refRun * maxInc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });
+    let jr = j; while (jr > 0 && (runTest(all[jr]) || all[jr].isRecoveryWeek || all[jr].lightWeek || all[jr].reduced || all[jr].entry || all[jr].phase === 'taper' || all[jr].phase === 'race' || (all[jr].races || []).length)) jr--;
+    let jr1 = jr - 1; while (jr1 > 0 && skip(all[jr1])) jr1--;
+    const refRun = Math.max(runOf(all[jr]), jr1 >= 0 && jr1 < jr && i - jr1 <= 3 && !skip(all[jr1]) ? runOf(all[jr1]) : 0), curRun = runOf(w);
+    if (refRun >= 40 && curRun > refRun * inc + 5) out.push({ rule: 'runVolume', week: w.weekNumber, msg: `Woche ${w.weekNumber}: Laufumfang steigt um ${Math.round((curRun / refRun - 1) * 100)} %. Laufen verträgt höchstens +${Math.round((maxInc - 1) * 100)} % pro Woche.` });
   }
   // Harte Tage
   const days = all.flatMap(w => (w.days || []).map((d: any) => ({ ...d, weekNumber: w.weekNumber }))).sort((a: any, b: any) => a.date.localeCompare(b.date));

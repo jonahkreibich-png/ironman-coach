@@ -8,6 +8,15 @@
 import * as W from './workouts';
 import { DIST_RANK } from './periodize';
 import type { GoalType } from './goals';
+import { pickQuality, type PickOpts, type LLevel } from './workoutlib';
+import { runMain, bikeQualitySpec, runEasyForm } from './workoutbuild';
+
+/* Auftrag 19: Umgebung der Person für die Auswahl aus der Einheiten-Bibliothek (Gelände, Ausrüstung, Beschwerden). Der Generator setzt sie
+   zu Beginn (setLibEnv) – so nutzen alle Korrekturen dieselbe Umgebung, ohne sie überall durchzureichen. */
+export type LibEnv = Omit<PickOpts, 'phase' | 'goal' | 'level'> & { level?: LLevel };
+let ENV: LibEnv = {};
+export function setLibEnv(e: LibEnv | null): void { ENV = e || {}; }
+export function libEnv(): LibEnv { return ENV; }
 
 type Ph = 'base' | 'build' | 'specific' | 'taper' | 'race';
 const S = (part: W.Step['part'], o: Omit<W.Step, 'part'>): W.Step => ({ part, ...o });
@@ -29,7 +38,14 @@ const BIKE_LADDER: Record<string, [number, number][]> = {
 export function ladderStep<T>(lad: T[], lvl: number): T { const n = lad.length; if (lvl < n) return lad[Math.max(0, lvl)]; const k = Math.min(3, n); return lad[n - k + ((lvl - n) % k + 1) % k]; }
 /* n: wie viele Schlüsseleinheiten Rad es in dieser Phase schon gab. total: gewünschte Dauer (Ein-/Ausrollen füllen auf).
    o.noZ5: unter 18 und ab 60 kein Zone-5-Block (statt VO2max die Schwelle). */
-export function bikeKey(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, total?: number, o: { noZ5?: boolean } = {}): W.Spec {
+export function bikeKey(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, total?: number, o: { noZ5?: boolean; level?: LLevel } = {}): W.Spec {
+  // Auftrag 19: Form und Stufe aus der Einheiten-Bibliothek (Sweet Spot → Schwelle → Over-Unders → VO2max, niedrige Kadenz am Berg/Rolle)
+  const lp = phase === 'race' ? 'taper' : phase;
+  const pk = pickQuality('bike', n, { ...ENV, phase: lp, goal, level: o.level || ENV.level || 'advanced', noZ5: !!o.noZ5 || !!ENV.noZ5 });
+  if (pk) { const sp = bikeQualitySpec(pk.key, phase === 'taper' ? Math.min(1, pk.stage) : pk.stage, ctx, goal, { total, noZ5: o.noZ5 }); if (sp) return sp; }
+  return bikeKeyOld(ctx, phase, goal, n, total, o);
+}
+function bikeKeyOld(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, total?: number, o: { noZ5?: boolean } = {}): W.Spec {
   const ph = phase === 'taper' || phase === 'race' ? 'build' : phase;
   const ev = goal === 'bike_event';
   const order = ph === 'specific' ? BIKE_ORDER[ev ? 'specEvent' : short(goal) ? 'specShort' : 'specLong'] : ph === 'build' && ev ? BIKE_ORDER.buildEvent : BIKE_ORDER[ph] || BIKE_ORDER.base;
@@ -57,7 +73,8 @@ export function bikeKey(ctx: W.PaceCtx, phase: Ph, goal: GoalType, n: number, to
 /* Lauf: Qualität je Phase. n: Anzahl Qualitätsläufe in dieser Phase. minor: unter 18 (nie Zone 5). */
 const RUN_LADDER: Record<string, [number, number][]> = { thr: [[3, 8], [3, 10], [2, 12], [2, 15], [3, 12], [4, 10], [2, 20]], rp10: [[5, 4], [4, 6], [5, 5], [3, 8], [4, 8]], rpHalf: [[2, 15], [2, 20], [3, 15], [2, 25]], rpLong: [[2, 20], [3, 20], [2, 30], [3, 25]],
   vo2: [[5, 3], [6, 3], [5, 4], [6, 4], [4, 5]], tempo: [[2, 8], [3, 8], [2, 12], [3, 10], [2, 15], [1, 25]] };
-export interface RunQ { reps: number; min: number; zone: number; rest: number; label: string; why: string; kind?: 'threshold' | 'racepace' | 'vo2' | 'tempo' }
+export interface RunQ { reps: number; min: number; zone: number; rest: number; label: string; why: string; kind?: 'threshold' | 'racepace' | 'vo2' | 'tempo' | 'intervals' | 'fartlek';
+  /** Auftrag 19: Form der Bibliothek (Stufe), Hinweis zum Hauptteil, besondere Schritte (z. B. Pyramide), Strecke je Stück */ lib?: { key: string; stage: number; label?: string }; note?: string; steps?: W.Step[]; distM?: number }
 /* Lauf-Qualität je Phase, Ziel und Niveau (Auftrag 14):
    Grundlage: ab der 5. Grundlagenwoche ein Tempolauf (Zone 3, Erfahrene jede Woche, Fortgeschrittene jede zweite), sonst nichts Hartes
    (dafür Hügelsprints, Fahrtspiel, Steigerungen); Aufbau: Schwelle (3×8 → 2×15 min), für 5/10 km im Wechsel mit VO2max (5×3 min);
@@ -67,6 +84,21 @@ export function runQualityStep(phase: Ph, goal: GoalType, n: number, minor: bool
   const noZ5 = minor || !!o.noZ5;
   const fast = goal === 'run_5k' || goal === 'run_10k';
   if (phase === 'race') return null;
+  // Auftrag 19: Aufbau, spezifisch und Tapering aus der Einheiten-Bibliothek (Schwelle 3×8 → 3×10 → 2×15 → 20-25 min am Stück, alle 2-3 Wochen
+  // kurze Intervalle; spezifisch Wettkampftempo der Zieldistanz). Jede Form steigt mit jeder Wiederholung eine Stufe.
+  if (phase !== 'base') {
+    const lv = o.level || ENV.level || 'advanced';
+    const pk = pickQuality('run', n, { ...ENV, phase, goal, level: lv, noZ5 });
+    if (pk) {
+      const m = runMain(pk.key, pk.stage, { runThrSec: 300 }, goal, { noZ5, taper: phase === 'taper' });
+      if (m) {
+        const kind: RunQ['kind'] = m.kind === 'vo2' ? 'vo2' : m.kind === 'racepace' ? 'racepace' : m.kind === 'fartlek' ? 'fartlek' : m.kind === 'intervals' ? 'intervals' : m.kind === 'tempo' ? 'tempo' : 'threshold';
+        const distM = /^(\d+) m /.exec(m.steps[0].note || '');
+        return { reps: m.reps, min: m.min, zone: m.zone, rest: m.rest, label: m.label, why: m.why, kind, lib: { key: pk.key, stage: pk.stage, label: m.label }, note: m.steps[0].note,
+          ...(m.steps.length > 1 ? { steps: m.steps } : {}), ...(distM ? { distM: +distM[1] } : {}) };
+      }
+    }
+  }
   if (phase === 'base') {
     const bw = o.baseWeek ?? 0;
     // Erfahrene jede Woche, Fortgeschrittene jede zweite Woche
@@ -87,10 +119,22 @@ export function runQualityStep(phase: Ph, goal: GoalType, n: number, minor: bool
   const zone = kind === 'rp10' ? 4 : 3;
   return { reps, min, zone: noZ5 ? Math.min(zone, 4) : zone, rest: kind === 'rp10' ? 2 : 3, label: kind === 'rp10' ? (goal === 'run_5k' ? '5-km-Tempo' : '10-km-Tempo') : kind === 'rpHalf' ? 'Halbmarathon-Tempo' : 'Marathon-Tempo', kind: 'racepace', why: 'Wettkampftempo üben: so fühlt sich das Rennen an.' };
 }
+/* Auftrag 19: kontrollierte Lauf-Qualität (Zone 3) für einen ausdrücklich gewünschten Lauf am Tag vor einem Spiel: Wettkampftempo-Blöcke
+   wie im Halbmarathon (3×10 → 2×15 → 2×20 min), nie Schwelle oder härter */
+export function calmQuality(goal: GoalType, n: number, o: { noZ5?: boolean } = {}): RunQ {
+  const g = /half|marathon|middle|long/.test(goal) ? goal : 'run_half';
+  const m = runMain('run.racepace', Math.max(0, n), { runThrSec: 300 }, g, { noZ5: o.noZ5 })!;
+  return { reps: m.reps, min: m.min, zone: Math.min(3, m.zone), rest: m.rest, label: m.label, why: m.why + ' Kontrolliert (Zone 3), weil am nächsten Tag ein Spiel ist.', kind: 'racepace', lib: { key: 'run.racepace', stage: Math.max(0, n), label: m.label }, note: m.label };
+}
 /* Qualitätslauf als eigene Einheit (Ein-/Auslaufen dazu) */
 export function runQuality(ctx: W.PaceCtx, q: NonNullable<ReturnType<typeof runQualityStep>>, o: { short?: boolean } = {}): W.Spec {
-  const kind: W.Kind = q.kind === 'vo2' ? 'vo2' : q.kind === 'tempo' ? 'tempo' : q.kind === 'racepace' ? 'racepace' : q.zone >= 4 ? 'threshold' : 'racepace';
-  return { sport: 'run', kind, ctx, why: q.why, steps: [S('warm', { min: o.short ? 10 : 15, zone: 1, note: 'mit 3 Steigerungen' }), S('main', { reps: q.reps, min: q.min, zone: q.zone, restMin: q.rest, note: q.label }), S('cool', { min: o.short ? 5 : 10, zone: 1 })] };
+  const kind: W.Kind = q.kind === 'vo2' ? 'vo2' : q.kind === 'tempo' ? 'tempo' : q.kind === 'racepace' ? 'racepace' : q.kind === 'intervals' ? 'intervals' : q.kind === 'fartlek' ? 'fartlek' : q.zone >= 4 ? 'threshold' : 'racepace';
+  // Strecken-Stücke (400 m, 200 m …) mit der eigenen Pace in Minuten (Auftrag 19)
+  const min = q.distM ? Math.round(q.distM / 1000 * W.runPace(ctx, q.zone) / 60 * 10) / 10 : q.min;
+  // Auftrag 19: unter 8 min Qualität ist keine sinnvolle Einheit: dann mindestens 2 Stücke
+  const reps = !q.steps && !q.distM && q.reps * min < 8 ? Math.max(2, Math.ceil(8 / Math.max(1, min))) : q.reps;
+  const main = q.steps && q.steps.length ? q.steps.map(x => ({ ...x })) : [S('main', { reps, min, zone: q.zone, restMin: reps > 1 ? (q.rest || 2) : undefined, note: q.note || q.label })];
+  return { sport: 'run', kind, ctx, why: q.why, ...(q.lib ? { lib: { ...q.lib } } : {}), steps: [S('warm', { min: o.short ? 10 : 15, zone: 1, note: 'mit 3 Steigerungen' }), ...main, S('cool', { min: o.short ? 5 : 10, zone: 1 })] };
 }
 /* Qualität im langen Lauf (wenn unter der Woche kein Tag zwischen zwei harten Tagen frei ist) */
 export function longRunWithQuality(ctx: W.PaceCtx, min: number, q: NonNullable<ReturnType<typeof runQualityStep>>): W.Spec {
@@ -103,6 +147,13 @@ export function longRunWithQuality(ctx: W.PaceCtx, min: number, q: NonNullable<R
 }
 /* Grundlage: lockerer Lauf mit Hügelsprints, Fahrtspiel oder Steigerungen (zählt nicht als harte Einheit) */
 export function runBaseVariant(ctx: W.PaceCtx, min: number, k: number): W.Spec {
+  // Auftrag 19: Grundlage im Wechsel Steigerungen, Hügelsprints (nur mit Hügeln, nicht bei Achillessehnen-Beschwerden), Tempowechsel-Lauf,
+  // Lauf-ABC, Progressionslauf – aus der Einheiten-Bibliothek, jede Form mit ihrer Stufe
+  const pk = pickQuality('run', k, { ...ENV, phase: 'base', goal: null, level: ENV.level || 'advanced' });
+  if (pk) { const sp = runEasyForm(pk.key, pk.stage, ctx, min); if (sp) return sp; }
+  return runBaseVariantOld(ctx, min, k);
+}
+function runBaseVariantOld(ctx: W.PaceCtx, min: number, k: number): W.Spec {
   const v = k % 3;
   // Auftrag 17: mit Einlaufen und Auslaufen
   if (v === 0) {

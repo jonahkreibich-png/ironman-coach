@@ -239,6 +239,8 @@ function isIntervals(s) {
   // Der sichtbare Name darf kurze kontrollierte Tempowechsel nicht nachträglich
   // zu einer harten Einheit machen. Die strukturierten Schritte sind maßgeblich.
   if (s?.spec?.kind === 'fartlek' && !s.hard && (s.spec.steps || []).every(x => (x.zone || 0) <= 3)) return false;
+  // Auftrag 19: lockere Formen der Einheiten-Bibliothek (Progressionslauf, Hügelsprints, kurze schnelle Schwimm-Stücke) sind keine Intervall-Einheit
+  if (!s?.hard && (['progression', 'hills'].includes(s?.spec?.kind) || s?.spec?.lib?.key === 'swim.fast')) return false;
   return !!s && ['run', 'bike', 'swim'].includes(s.sport) && !EASED_RE.test(s.title || '') && HARD_RE.test((s.title || '') + ' ' + (s.zone || ''));
 }
 function isLong(s) {

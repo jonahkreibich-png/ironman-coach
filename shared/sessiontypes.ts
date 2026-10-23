@@ -93,7 +93,8 @@ export function nameIssues(s: any): string[] {
   const hardBits = main.filter((x: any) => (x.zone || 0) >= 3 && (sp.sport === 'swim' ? (x.m || 0) >= 50 && (x.zone || 0) >= 4 : (x.min || 0) > 1));
   if (/(^|\s)locker/i.test(t) && hardBits.length && sp.sport !== 'swim') out.push(`„${t}“: „locker“ im Namen, aber Abschnitte in Zone ${Math.max(...hardBits.map((x: any) => x.zone))}.`);
   const structured = main.some((x: any) => (x.reps || 1) > 1 && (x.zone || 0) >= 3 && (sp.sport === 'swim' ? (x.zone || 0) >= 4 : (x.min || 0) >= 1));
-  if (structured && !/Intervalle|mit \d|Test|Kraul-Check|Koppel|zügigen Blöcken/.test(t) && !['longq', 'test', 'swimlearn', 'technique', 'endurance', 'openwater'].includes(sp.kind)) out.push(`„${t}“: strukturierte Intervalle, aber „Intervalle“ fehlt im Namen.`);
+  // Auftrag 19: Formen aus der Einheiten-Bibliothek haben feste, klare Namen (z. B. „Tempowechsel-Lauf“, „Lange Hügel“, „Schnelligkeit“)
+  if (structured && !(sp.lib && sp.lib.key) && !/Intervalle|mit \d|Test|Kraul-Check|Koppel|zügigen Blöcken/.test(t) && !['longq', 'test', 'swimlearn', 'technique', 'endurance', 'openwater'].includes(sp.kind)) out.push(`„${t}“: strukturierte Intervalle, aber „Intervalle“ fehlt im Namen.`);
   if (['run', 'bike'].includes(sp.sport) && (s.plannedMinutes || 0) >= 30 && !sp.stage && !/^(Koppel|Wechsel)/.test(t) && sp.kind !== 'test') {
     if (!sp.steps.some((x: any) => x.part === 'warm')) out.push(`„${t}“: kein Aufwärmen.`);
     if (!sp.steps.some((x: any) => x.part === 'cool') && !['longq', 'hills'].includes(sp.kind) && !main.some((x: any) => /auslaufen|ausrollen|zu Ende/.test(x.note || ''))) out.push(`„${t}“: kein Auslaufen.`);

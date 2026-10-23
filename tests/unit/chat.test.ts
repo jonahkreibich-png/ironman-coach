@@ -103,8 +103,9 @@ describe('D6: Gespräche (alle Test-Personen × alle Abläufe)', () => {
 });
 
 test('D2: genau der Beispiel-Dialog: „Ich hab Mittwoch keine Zeit“ → „Donnerstag oder Samstag?“ → „Samstag“', () => {
-  const W = world('jugend-langdistanz', '2026-10-26'); // Montag; Mittwoch hat eine Einheit
-  const wed = W.sessions('2026-10-28', '2026-10-28');
+  // Auftrag 19: in der Erholungswoche (26.10.) hat die Person mit Teamsport jetzt zwei Ruhetage (Mi, Do), deshalb die Woche danach
+  const W = world('jugend-langdistanz', '2026-11-02'); // Montag; Mittwoch hat eine Einheit
+  const wed = W.sessions('2026-11-04', '2026-11-04');
   expect(wed.length).toBeGreaterThan(0);
   const r = W.say('Ich hab Mittwoch keine Zeit');
   expect(r.text).toMatch(/^(Soll ich .* legen\?|Vorschlag für Mittwoch)/);

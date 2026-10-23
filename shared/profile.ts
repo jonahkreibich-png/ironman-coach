@@ -42,15 +42,25 @@ export interface StrengthPlan { lower: number[]; upper: number[]; core?: number[
 export interface MorningSlot { days: number[]; maxMin: number; noPool: boolean; /** z. B. „vor der Schule“ */ label?: string }
 /** Fester Wochenaufbau (Auftrag 8): an diesen Tagen diese Einheiten. role: long = lange Einheit, key = ab keyFrom Schlüsseleinheit
     (Sweet Spot), easy = locker, swim = Kraul-Technik + Brust-Ausdauer, lower/upper = Kraft, brick = Koppellauf nach der langen Ausfahrt. */
-export interface PatternSlot { dow: number; sport: 'swim' | 'bike' | 'run' | 'strength'; role: 'long' | 'key' | 'easy' | 'swim' | 'lower' | 'upper' | 'brick';
-  /** Minuten von … bis */ min?: [number, number]; /** erst ab diesem Datum */ from?: string; /** Schlüsseleinheit ab */ keyFrom?: string; /** Steigerungsläufe ab */ stridesFrom?: string }
+export interface PatternSlot { dow: number; sport: 'swim' | 'bike' | 'run' | 'strength'; role: 'long' | 'key' | 'easy' | 'swim' | 'lower' | 'upper' | 'brick' | 'full';
+  /** Minuten von … bis */ min?: [number, number]; /** erst ab diesem Datum */ from?: string; /** Schlüsseleinheit ab */ keyFrom?: string; /** Steigerungsläufe ab */ stridesFrom?: string;
+  /** Auftrag 19: ausdrücklicher Wunsch der Person (bleibt so; nur kontrolliert, nie drei harte Tage hintereinander) */ pin?: boolean;
+  /** jede n-te Woche (im Block) frei: der Tag wird Ruhetag, die Qualität wandert an qualityTo (Wochentag) */ restEvery?: number; qualityTo?: number;
+  /** Lauf unter der Woche: ab diesem Datum Qualität (Schwelle bzw. Wettkampftempo) */ qualityFrom?: string;
+  /** langer Lauf: Tempo-Teil ab diesem Datum, jede n-te Woche */ tempoFrom?: string; tempoEvery?: number;
+  /** nur jede n-te Woche (z. B. Koppellauf jede 3. Woche) */ every?: number;
+  /** morgens (z. B. vor der Schule, auf der Rolle) */ am?: boolean }
 /** Vorgabe für eine Woche (Montag): eigenes Training ohne Teamsport in Stunden, lange Einheiten und Schwimmen in Minuten */
 export interface WeekTarget { start: string; hours: number; longRun?: [number, number]; longBike?: [number, number]; swim?: [number, number];
   recovery?: boolean; /** Wiedereinstieg (zählt nicht als Bezug für die Steigerung) */ entry?: boolean; tests?: ('run' | 'swim' | 'bike')[] }
 export interface WeekPattern { slots: PatternSlot[]; targets?: WeekTarget[];
   /** langer Lauf: höchstens so lang und höchstens so viel länger pro Woche */ longRunMax?: number; longRunStep?: number;
   /** Tests nach der letzten Vorgabe alle so viele Wochen (in der Erholungswoche) */ testEveryWeeks?: number;
-  /** Sweet-Spot-Leiter [Wiederholungen, Minuten] */ ssLadder?: [number, number][] }
+  /** Sweet-Spot-Leiter [Wiederholungen, Minuten] */ ssLadder?: [number, number][];
+  /** Auftrag 19: eigenes Training je Phase in Stunden [von, bis] (gilt, wo keine Wochenvorgabe steht, auch für spätere Blöcke) */
+  hoursByPhase?: Partial<Record<'base' | 'build' | 'specific', [number, number]>>;
+  /** Auftrag 19: Ruhetage in Erholungswochen (Wochentage, 0 = So) */ recoveryRest?: number[];
+  /** Auftrag 19: Datum des letzten Tests (Bezug für testEveryWeeks, wenn keine Wochenvorgabe Tests nennt) */ lastTest?: string }
 /** Zeit pro Wochentag: 0 kein Training, 1 kurz (bis 45 min), 2 mittel (bis 90 min), 3 lang (mehr als 90 min) */
 export type DayLoad = 0 | 1 | 2 | 3;
 export const DAYLOAD_MIN: Record<DayLoad, number> = { 0: 0, 1: 45, 2: 90, 3: 180 };
@@ -152,6 +162,10 @@ export interface Profile {
   appliedTests?: string[];
   /** Antworten aus dem Onboarding (frei) */
   answers?: Record<string, any>;
+  /** Auftrag 19: Gelände in der Nähe (für Hügel- und Bahn-Einheiten; ohne Angabe gibt es Ersatz wie Laufband oder Rolle) */
+  terrain?: { hills?: boolean | null; track?: boolean | null } | null;
+  /** Auftrag 19: lockeres Rad am Spieltag morgens (30-40 min, Zone 1-2) erlaubt; zählt nicht als hart */
+  gameDayBike?: boolean;
   updatedAt?: number;
 }
 

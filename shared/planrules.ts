@@ -92,6 +92,17 @@ export function repairSports(weeks: any[], p: Profile, o: { from?: string | null
   return fixes;
 }
 
+/* Auftrag 19: kurze lockere Einheit als Ausnahme neben derselben Sportart markieren (Grund steht in der Einheit) */
+const SPORT_NAME_DE: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', strength: 'Kraft' };
+export function markExcuse(s: any, why: string): void {
+  if (!s || s.adjacentOk) return;
+  const note = `Ausnahme: zwei Tage hintereinander ${SPORT_NAME_DE[s.sport] || s.sport}, ${why}`;
+  s.adjacentOk = why;
+  if (s.spec) s.spec = { ...s.spec, why: `${note} ${s.spec.why || ''}`.trim() };
+  const d = String(s.description || '');
+  s.description = d.includes('Warum: ') ? d.replace('Warum: ', `Warum: ${note} `) : `${d}
+Warum: ${note}`.trim();
+}
 /* Locker und kurz machen, mit Begründung in der Einheit */
 export function easyShort(s: any, reason: string, maxMin = SHORT_MIN): any {
   const SHORT = Math.max(15, Math.min(SHORT_MIN, maxMin));

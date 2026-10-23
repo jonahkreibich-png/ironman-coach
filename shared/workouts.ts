@@ -49,7 +49,7 @@ export interface PaceCtx {
   crawl100?: number | null;
 }
 export type Kind = 'easy' | 'long' | 'intervals' | 'tempo' | 'threshold' | 'steady' | 'runwalk' | 'swimlearn' | 'technique' | 'css' | 'endurance' | 'strength' | 'team' | 'game' | 'test' | 'race' | 'brick' | 'recovery'
-  | 'sweetspot' | 'overunder' | 'vo2' | 'racepace' | 'hills' | 'fartlek' | 'longq' | 'force' | 'openwater' | 'climb';
+  | 'sweetspot' | 'overunder' | 'vo2' | 'racepace' | 'hills' | 'fartlek' | 'longq' | 'force' | 'openwater' | 'climb' | 'progression';
 export interface Spec {
   sport: WSport; kind: Kind;
   steps: Step[];
@@ -72,6 +72,8 @@ export interface Spec {
   variant?: string;
   /** Auftrag 18: kurze Hinweise (Verpflegung, Hitze, Technik …), je eine Zeile */
   notes?: string[];
+  /** Auftrag 19: Form aus der Einheiten-Bibliothek (shared/workoutlib.ts) und Stufe der Leiter; label z. B. „Halbmarathon-Tempo“ */
+  lib?: { key: string; stage: number; label?: string } | null;
 }
 
 /* ---------- Tempo je Zone ---------- */
@@ -304,12 +306,45 @@ export function describe(spec: Spec): string {
   // Auftrag 15: Fachbegriffe (Sweet Spot, Schwelle, CSS, VO2max …) mit kurzer Erklärung
   return L.join('\n');
 }
+/* Auftrag 19: Titel der Formen aus der Einheiten-Bibliothek (klar und einheitlich, Zahlen aus den Schritten) */
+const secTxt = (m: number | undefined) => { const v = m || 0; return v < 1 ? `${Math.round(v * 60)} s` : minTxt(v); };
+function libTitle(spec: Spec, min: number, main: Step[], where: string): string | null {
+  const k = spec.lib!.key; const q = main.find(x => (x.zone || 0) >= 3 && (x.reps || 1) > 1) || main.find(x => (x.zone || 0) >= 3) || main[0] || ({} as Step);
+  const n = q.reps || 1; const dist = (q.note || '').match(/^(\d+) m\b/);
+  const piece = dist ? `${dist[1]} m` : secTxt(q.min);
+  switch (k) {
+    case 'run.strides': return `Lockerer Lauf ${min} min mit Steigerungen`;
+    case 'run.abc': return `Lockerer Lauf ${min} min mit Lauf-ABC`;
+    case 'run.hillreps': return `Berg-Intervalle ${n}×${piece}`;
+    case 'run.longhills': return `Lange Hügel ${n}×${piece}`;
+    case 'run.fartlek': return `Tempowechsel-Lauf ${n}×${piece} zügig`;
+    case 'run.progression': return `Progressionslauf ${min} min`;
+    case 'run.tempo': return `Tempodauerlauf ${minTxt(q.min)} an der Schwelle`;
+    case 'run.threshold': return n > 1 ? `Schwellen-Intervalle ${n}×${piece}` : `Tempodauerlauf ${minTxt(q.min)} an der Schwelle`;
+    case 'run.vo2': return `Lauf-Intervalle ${n}×${piece} sehr hart`;
+    case 'run.pyramid': return `Lauf-Pyramide ${main.filter(x => (x.zone || 0) >= 4).map(x => Math.round(x.min || 0)).join('-')} min`;
+    case 'run.3030': return `Lauf-Intervalle ${n}×30 s schnell (30/30)`;
+    case 'run.speed': return `Schnelligkeit ${n}×${piece}`;
+    case 'run.racepace': return `${n > 1 ? `Lauf-Intervalle ${n}×${piece}` : `Lauf ${piece}`} im ${spec.lib!.label || 'Wettkampftempo'}`;
+    case 'run.longfinish': return `Langer Lauf ${min} min mit ${minTxt(q.min)} Endbeschleunigung`;
+    case 'bike.cadence': return `Lockere Ausfahrt ${min} min mit Kadenz-Übungen${where}`;
+    case 'bike.sprints': return `Lockere Ausfahrt ${min} min mit ${n} Sprints${where}`;
+    case 'bike.3015': return `Rad-Intervalle ${main.filter(x => (x.zone || 0) >= 5).length}×${n}×30/15 s${where}`;
+    case 'bike.tempolong': return `Rad im Renntempo ${n}×${minTxt(q.min)}${where}`;
+    case 'bike.racepaceblocks': return `Lange Ausfahrt ${min} min mit ${n > 1 ? `${n}×${minTxt(q.min)}` : minTxt(q.min)} im Renntempo${where}`;
+    case 'bike.tt': return `Zeitfahr-Simulation ${minTxt(q.min)}${where}`;
+    case 'bike.morning': return `Lockeres Rad am Morgen ${min} min${where}`;
+    case 'strength.full': return `Kraft Ganzkörper ${min} min`;
+    default: return null;
+  }
+}
 export function title(spec: Spec): string {
   if (spec.title) return spec.title;
   const t = totals(spec);
   const main = spec.steps.filter(s => s.part === 'main');
   const m0 = main[0] || ({} as Step);
   const where = spec.sport === 'bike' && spec.ctx.indoor ? ' (Rolle)' : spec.sport === 'bike' && spec.ctx.bikeName ? ` (${spec.ctx.bikeName})` : '';
+  if (spec.lib) { const lt = libTitle(spec, t.min, main, where); if (lt) return lt; }
   switch (spec.kind) {
     case 'runwalk': return `Lauf-Geh-Wechsel ${m0.reps}× (${m0.min} + ${m0.walkMin} min)`;
     case 'swimlearn': return spec.stage && spec.stage.ladder === 'swimBreast' ? `Schwimmen: Brust und Kraul-Technik${spec.variant ? ' · ' + spec.variant : ''} (${thousands((t.km || 0) * 1000)} m)` : `Schwimmen: Kraul lernen, Stufe ${(spec.stage?.n ?? 0) + 1}: ${SWIM_LADDER[Math.min(spec.stage?.n ?? 0, SWIM_LADDER.length - 1)].label}${spec.variant ? ' · ' + spec.variant : ''} (${thousands((t.km || 0) * 1000)} m)`;
@@ -332,6 +367,7 @@ export function title(spec: Spec): string {
     case 'climb': return `Rad-Intervalle ${m0.reps}×${m0.min} min am Anstieg${where}`;
     case 'racepace': return m0.reps && m0.reps > 1 ? `${spec.sport === 'run' ? 'Lauf' : 'Rad'}-Intervalle ${m0.reps}×${m0.min} min im Wettkampftempo${where}` : `${spec.sport === 'run' ? 'Lauf' : 'Rad'} ${m0.min} min im Wettkampftempo${where}`;
     case 'hills': return `Lockerer Lauf ${t.min} min mit Hügelsprints`;
+    case 'progression': return `Progressionslauf ${t.min} min`;
     case 'fartlek': { const q = main.find(s => (s.reps || 0) > 1) || m0; return `Lauf-Intervalle ${q.reps}×${q.min} min zügig`; }
     case 'longq': { const q = spec.steps.find(x => x.part === 'main' && (x.zone || 2) >= 3) || m0; if (spec.sport === 'bike') return `${t.min >= 75 ? 'Lange Ausfahrt' : 'Ausfahrt'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${(q.zone || 3) >= 5 ? 'VO2max' : (q.zone || 3) >= 4 ? 'Schwelle' : 'Sweet Spot'}${where}`; return `${t.min >= 60 ? 'Langer Lauf' : 'Lauf'} ${t.min} min mit ${q.reps && q.reps > 1 ? `${q.reps}×${q.min}` : q.min} min ${/^(Tempo|Schwelle|VO2max|\d+-km-Tempo|Halbmarathon-Tempo|Marathon-Tempo)$/.test(q.note || '') ? q.note : (q.zone || 3) >= 4 ? 'Schwelle' : 'Wettkampftempo'}`; }
     case 'brick': return `Koppeltraining Rad + Lauf ${t.min} min`;
@@ -445,7 +481,8 @@ export function scaleSpec(spec: Spec, f: number): Spec {
   for (const s of mains) {
     const reps = s.reps || 1;
     if (out.sport === 'swim') {
-      if (reps > 1) s.reps = Math.max(2, Math.round(reps * g)); else s.m = Math.max(100, Math.round((s.m || 0) * g / 50) * 50);
+      // Auftrag 19: ein einzelnes Kraul-Stück wird nie länger als vorher (Können), auch nicht beim Runden auf 100 m
+      if (reps > 1) s.reps = Math.max(2, Math.round(reps * g)); else { const lim = s.mode === 'crawl' || s.mode === 'pull' ? (s.m || 0) : Infinity; s.m = Math.min(lim, Math.max(Math.min(100, s.m || 0), Math.round((s.m || 0) * g / 50) * 50)); }
     } else if (reps > 1 && !s.walkMin && (out.kind === 'intervals' || out.kind === 'threshold' || out.kind === 'tempo')) s.reps = Math.max(2, Math.round(reps * g));
     else if (reps > 1) s.reps = Math.max(1, Math.round(reps * g));
     else s.min = Math.max(5, Math.round((s.min || 0) * g / 5) * 5);
