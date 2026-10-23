@@ -2,12 +2,13 @@
    Ziele mit Platzhalter-Termin sind gestrichelt und als „Platzhalter“ markiert. */
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
+import { more } from '../kit';
 
 const DAY = 86400000;
 const ms = (d: string) => +new Date(d + 'T12:00:00Z');
 const dm = (d: string) => `${+d.slice(8)}.${+d.slice(5, 7)}.${d.slice(2, 4)}`;
 
-export function renderTimeline(tl: any, today: string): string {
+export function renderTimeline(tl: any, today: string, sel?: { from: string; to: string }): string {
   if (!tl || !Array.isArray(tl.segments) || !tl.segments.length) return '';
   const from = tl.segments[0].from, to = tl.segments[tl.segments.length - 1].to;
   const span = Math.max(1, ms(to) - ms(from) + DAY);
@@ -16,6 +17,8 @@ export function renderTimeline(tl: any, today: string): string {
   const segs = tl.segments.map((s: any) => `<span class="tl-seg tl-${esc(s.phase)}" style="left:${pct(s.from).toFixed(2)}%;width:${Math.max(0.4, pct(s.to) - pct(s.from) + 100 * DAY / span).toFixed(2)}%" title="${esc(t('tl.' + s.phase))}: ${dm(s.from)} – ${dm(s.to)}"></span>`).join('');
   const marks = (tl.goals || []).map((g: any) => `<span class="tl-goal ${g.placeholder ? 'ph' : ''} ${g.priority === 'A' ? 'a' : ''}" style="left:${pct(g.date).toFixed(2)}%" title="${esc(g.name)} ${dm(g.date)}"></span>`).join('');
   const now = today >= from && today <= to ? `<span class="tl-now" style="left:${pct(today).toFixed(2)}%" aria-hidden="true"></span>` : '';
+  // gewählte Woche als Rahmen: so sieht man, wo die angezeigte Woche auf dem Weg liegt
+  const selM = sel && sel.to >= from && sel.from <= to ? `<span class="tl-sel" style="left:${pct(sel.from).toFixed(2)}%;width:${Math.max(0.8, pct(sel.to) - pct(sel.from) + 100 * DAY / span).toFixed(2)}%" title="${esc(t('tl.sel'))}"></span>` : '';
   const years: string[] = [];
   for (let y = +from.slice(0, 4) + 1; y <= +to.slice(0, 4); y++) years.push(`<span class="tl-year" style="left:${pct(`${y}-01-01`).toFixed(2)}%">${y}</span>`);
   // wo stehe ich: aktuelle Phase und die nächste
@@ -29,10 +32,8 @@ export function renderTimeline(tl: any, today: string): string {
   return `<div class="card tl" data-timeline style="margin-bottom:var(--s3)">
     <div class="lbl">${esc(t('tl.title'))}</div>
     <div class="t" data-tl-now>${esc(t('tl.now', { p: t('tl.' + cur.phase), d: dm(cur.to) }))}${curGoal ? esc(t('tl.toward', { g: curGoal.name })) : ''}${nxt ? esc(t('tl.next', { p: t('tl.' + nxt.phase) })) : ''}</div>
-    <div class="tl-bar" role="img" aria-label="${esc(t('tl.aria'))}">${segs}${marks}${now}</div>
+    <div class="tl-bar" role="img" aria-label="${esc(t('tl.aria'))}">${segs}${selM}${marks}${now}</div>
     <div class="tl-years">${years.join('')}</div>
-    <div class="tl-legend">${legend}</div>
-    <ul class="tl-goals">${goals}</ul>
-    ${(tl.goals || []).some((g: any) => g.placeholder) ? `<div class="xs muted">${esc(t('tl.phHint'))}</div>` : ''}
+    ${more(t('tl.more'), `<div class="tl-legend">${legend}</div><ul class="tl-goals">${goals}</ul>${(tl.goals || []).some((g: any) => g.placeholder) ? `<div class="xs muted">${esc(t('tl.phHint'))}</div>` : ''}`)}
   </div>`;
 }

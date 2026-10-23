@@ -418,6 +418,7 @@ export const de: Record<string, string> = {
   'ob.understoodTitle': 'Das habe ich verstanden', 'ob.understoodHint': 'Stimmt alles? Mit „Ändern“ springst du zur passenden Frage. Erst danach wird dein Plan gebaut.',
   'ob.change': 'Ändern', 'ob.buildPlan': 'Stimmt so, Plan erstellen', 'ob.dropped': 'Nicht alles passte in deine Zeit: {list}',
   'plan.explain': 'So ist dein Plan aufgebaut', 'plan.thisWeek': 'Diese Woche wichtig',
+  'plan.todayBtn': 'Heute', 'plan.weekMore': 'Mehr zu dieser Woche', 'plan.hard': 'hart', 'plan.weekBar': 'Wochen', 'plan.symRecovery': 'Erholungswoche', 'plan.symTest': 'Test', 'plan.symRace': 'Wettkampf', 'plan.restDay': 'Ruhetag', 'tl.more': 'Ziele und Phasen', 'tl.sel': 'gewählte Woche',
   'tl.title': 'Dein Weg', 'tl.now': 'Jetzt: {p} bis {d}', 'tl.toward': ' → {g}', 'tl.next': ', danach {p}', 'tl.placeholder': 'Platzhalter', 'tl.aria': 'Zeitleiste mit Phasen und Zielen',
   'tl.base': 'Grundlage', 'tl.build': 'Aufbau', 'tl.specific': 'Wettkampfspezifisch', 'tl.taper': 'Tapering', 'tl.race': 'Wettkampf',
   'tl.phHint': 'Platzhalter-Termine richten sich nach Reihenfolge, Saison und deiner Form. Trag das echte Datum beim Ziel ein (Mehr → Profil und Ziele), dann plant die App neu.',

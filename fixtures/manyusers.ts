@@ -115,3 +115,24 @@ export function manyUsers17(): ManyUser17[] {
   out.push({ ...bad, id: 'n65-widerspruechlich' });
   return out;
 }
+
+/* Auftrag 18, Punkt 4: zusätzlich die vier verlangten Fälle */
+export function manyUsers18(): ManyUser17[] {
+  const out = manyUsers17();
+  // Jugendlicher mit Teamsport (Mo Training, Fr Spiel) und Halbmarathon, Laufen nur Do/Sa/So (wie Jonah)
+  const teen = build(65, { type: 'run_half', name: 'Halbmarathon', weeks: 24, sports: ['run', 'bike', 'swim', 'strength'] }, ['run', 'bike', 'swim', 'strength'], { age: 17, exp: 2, crawl: 'yes', team: 0, time: 3, inj: 'keine', ill: false });
+  Object.assign(teen.answers, { teamYes: true, teamName: 'Fußball', teamTrainingDays: [1], teamTrainingMinutes: 90, teamGames: true, teamGameDays: [5], teamGameMinutes: 90, notes: ['Laufen nur donnerstags, samstags und sonntags'] });
+  out.push({ ...teen, id: 'n66-teen-fussball-hm', teen: true });
+  // Triathlet mit Koppel-Wochen (Mitteldistanz, viel Zeit)
+  const tri = build(66, { type: 'tri_middle', name: 'Mitteldistanz', weeks: 34, sports: ['swim', 'bike', 'run', 'strength'] }, ['swim', 'bike', 'run', 'strength'], { age: 34, exp: 5, crawl: 'yes', team: 0, time: 3, inj: 'keine', ill: false });
+  Object.assign(tri.answers, { swimCrawlM: 1500, weeklyHoursNow: 9, bikeLongestMin: 180, runContinuousMin: 90 });
+  out.push({ ...tri, id: 'n67-tri-koppel' });
+  // Läufer: 10 km in 6 Wochen
+  const r10 = build(67, { type: 'run_10k', name: '10 km', weeks: 6, sports: ['run', 'strength'] }, ['run', 'strength'], { age: 29, exp: 3, team: 0, time: 1, inj: 'keine', ill: false });
+  Object.assign(r10.answers, { runContinuousMin: 60, weeklyHoursNow: 4 });
+  out.push({ ...r10, id: 'n68-10k-6-wochen' });
+  // Wettkampf direkt nach einem Spiel (Spiel Samstag, Lauf Sonntag)
+  const gm = build(68, { type: 'run_10k', name: '10-km-Stadtlauf', weeks: 12, sports: ['run', 'bike', 'strength'] }, ['run', 'bike', 'strength'], { age: 24, exp: 2, team: 2, time: 2, inj: 'keine', ill: false });
+  out.push({ ...gm, id: 'n69-wettkampf-nach-spiel' });
+  return out;
+}

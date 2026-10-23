@@ -7,7 +7,7 @@ test('Mehr öffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben err
   await page.locator('[data-sub="lexikon"]').click();
   await expect(page.locator('.top-title')).toHaveText('Begriffe / Lexikon');
   const cards = page.locator('[data-lexicon-term]');
-  await expect(page.locator('.lexicon-topic')).toHaveCount(6);
+  await expect(page.locator('.lexicon-topic')).toHaveCount(7);
   await expect(page.locator('[data-lexicon-term="Lauf-Intervalle"]')).toBeVisible();
   await page.getByLabel('Begriff suchen').fill('functional power');
   await expect(cards).toHaveCount(1); await expect(cards).toContainText('FTP');

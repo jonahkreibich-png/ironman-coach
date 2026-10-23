@@ -6,7 +6,7 @@
 import { STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData } from './store';
 import { esc, fmtDate, ymd } from './util';
 import { toast } from './toast';
-import { STORAGE, API_BASE, APP_VERSION } from './config';
+import { STORAGE, API_BASE, APP_VERSION, APP_RELEASE } from './config';
 import { nav } from './nav';
 import { t } from '../../shared/i18n';
 
@@ -145,7 +145,7 @@ function applyRecord(rec) {
 async function api(method, path, body?, noAuth?) {
   const res = await fetch(API + path, {
     method, cache: 'no-store',
-    headers: Object.assign({ 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION }, (!noAuth && AUTH) ? { Authorization: 'Bearer ' + AUTH.token } : {}),
+    headers: Object.assign({ 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, 'X-App-Release': APP_RELEASE }, (!noAuth && AUTH) ? { Authorization: 'Bearer ' + AUTH.token } : {}),
     body: body ? JSON.stringify(body) : undefined
   });
   let data = null; try { data = await res.json(); } catch (e) {}
@@ -157,7 +157,7 @@ async function api(method, path, body?, noAuth?) {
 /* Antwort als Strom lesen (Auftrag 12, KI-Coach): jede Zeile ist ein JSON-Objekt. Liefert das letzte Objekt („done“ oder „error“). */
 export async function apiStream(path: string, body: any, onLine: (o: any) => void): Promise<any> {
   if (!AUTH) throw Object.assign(new Error(t('sync.notConnected')), { status: 0 });
-  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, Authorization: 'Bearer ' + AUTH.token }, body: JSON.stringify(body) });
+  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, 'X-App-Release': APP_RELEASE, Authorization: 'Bearer ' + AUTH.token }, body: JSON.stringify(body) });
   if (!res.ok || !res.body) { let d: any = null; try { d = await res.json(); } catch (e) {} throw Object.assign(new Error((d && d.error) || ('Fehler ' + res.status)), { status: res.status }); }
   const rd = res.body.getReader(); const dec = new TextDecoder(); let buf = ''; let last: any = null;
   for (;;) {

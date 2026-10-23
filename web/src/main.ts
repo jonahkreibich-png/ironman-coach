@@ -11,7 +11,7 @@ import { effStatus } from './domain';
 import { D, invalidate } from './data';
 import './sync';
 import { renderHeute } from './views/heute';
-import { renderPlan, scrollToPlanDay } from './views/plan';
+import { renderPlan, scrollToPlanDay, centerWeekBar } from './views/plan';
 import { renderCoach, scrollCoachBottom } from './views/coach';
 import { renderFortschritt } from './views/fortschritt';
 import { renderMehr } from './views/mehr';
@@ -106,6 +106,7 @@ function render() {
   // Letzte Bildschirme (für „Fehler melden“)
   const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');
   const trail: string[] = UI.trail || []; if (trail[trail.length - 1] !== here && here !== 'feedback') { UI.trail = [...trail, here].slice(-6); saveUi(); }
+  if (HAS_PLAN && UI.tab === 'plan' && !UI.sub) centerWeekBar();
   renderTop(); renderTabs(); updateBadge();
 }
 function go(target: string, scroll?: string | null) {

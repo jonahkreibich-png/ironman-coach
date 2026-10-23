@@ -186,7 +186,7 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     if (bad) throw new HttpError(400, 'Ungültiger Datensatz: ' + String(bad && (bad as any).kind) + '/' + String(bad && (bad as any).key));
     // Auftrag 18: nach einem Einspielen überschreibt ein Gerät mit alter App-Version Plan und Profil nicht mehr
     if (changes.length) {
-      const g = gateChanges(changes, await getMeta(env, uid, 'min_client_version'), String(req.headers.get('X-App-Version') || ''));
+      const g = gateChanges(changes, await getMeta(env, uid, 'min_client_version'), String(req.headers.get('X-App-Release') || ''));
       for (const c of g.dropped) await touchRecord(env, uid, c.kind, c.key);
       changes.splice(0, changes.length, ...g.keep);
     }

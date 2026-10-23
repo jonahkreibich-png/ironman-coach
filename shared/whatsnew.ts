@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.5.0', items: [
+    'Plan nach festen Trainingsregeln: mindestens ein Ruhetag pro Woche, nach einem langen Tag kein langer oder harter Lauf, vor einem Laufziel jede Woche ein Lauf im Wettkampftempo, in der Wettkampfwoche keine Kraft und nach dem Wettkampf erst mal locker. Frag den Coach „Warum habe ich heute frei?“.',
+    'Plan-Tab aufgeräumt: Die Wochenleiste bleibt bei der gewählten Woche, „Heute“ springt zurück. Jede Woche zeigt eine Zeile (Phase, Ziel, Stunden) und die 7 Tage mit Ruhetagen; Details beim Antippen.',
+    'Der Coach nennt Ursachen nur noch, wenn deine Daten sie zeigen. Neu im Lexikon: „Training verstehen“ (Schmerz, Pause, Krankheit, Schlaf, Hitze, Technik-Übungen).'
+  ] },
   { version: '3.4.0', items: [
     'Ehrlich gezählt: Fortschritt, Bestwerte und Schwimm-Stufen kommen nur noch aus dem, was du eingetragen hast oder die Uhr gemessen hat, nie aus dem Plan. Korrigierst du einen Wert, rechnet die App alles neu und sagt „Korrigiert: …“. Die nächste Kraul-Stufe kommt, wenn du sie in 2 Einheiten geschafft hast.',
     'Plan in Balance: höchstens 2 harte Einheiten pro Woche plus Spiel, keine drei Termine an einem Tag, der lange Lauf bleibt locker und wächst von dem, was du wirklich gemacht hast. Einheiten haben klare Namen (z. B. „Lauf-Intervalle 6×1 min zügig“).',

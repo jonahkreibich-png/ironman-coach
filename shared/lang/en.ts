@@ -1,6 +1,16 @@
 /* Englische Texte (vorbereitet). Fehlende Schlüssel fallen auf Deutsch zurück. Vollständig übersetzen: siehe SPAETER.md. */
 export const en: Record<string, string> = {
   "sub.lexikon": "Terms / Glossary",
+  "plan.todayBtn": "Today",
+  "plan.weekMore": "More about this week",
+  "plan.hard": "hard",
+  "plan.weekBar": "Weeks",
+  "plan.symRecovery": "Recovery week",
+  "plan.symTest": "Test",
+  "plan.symRace": "Race",
+  "plan.restDay": "Rest day",
+  "tl.more": "Goals and phases",
+  "tl.sel": "selected week",
   "mehr.lexikon": "Look up training terminology",
   "set.care": "Running shoes and cycle (optional)",
   "set.careHint": "Only if you want: the app counts your running shoe kilometres and gives gentle hints for a logged cycle instead of fixed rules.",

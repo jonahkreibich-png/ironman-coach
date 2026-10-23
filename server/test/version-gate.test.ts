@@ -7,7 +7,7 @@ import { makeEnv } from './multiuser.test';
 import { cmpVersion, gateChanges } from '../src/store';
 
 async function callV(env: any, p: string, body: any, token: string, ver: string) {
-  const res = await worker.fetch(new Request('http://x' + p, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'X-App-Version': ver }, body: JSON.stringify(body) }), env, { waitUntil() {} } as any);
+  const res = await worker.fetch(new Request('http://x' + p, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'X-App-Version': '202610230930', 'X-App-Release': ver }, body: JSON.stringify(body) }), env, { waitUntil() {} } as any);
   return { status: res.status, data: await res.json().catch(() => null) as any };
 }
 
