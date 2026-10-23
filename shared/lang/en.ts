@@ -5,6 +5,7 @@ export const en: Record<string, string> = {
   "plan.weekMore": "More about this week",
   "plan.hard": "hard",
   "plan.weekBar": "Weeks",
+  "plan.viewSwitch": "View", "plan.viewA": "A List", "plan.viewB": "B Grid", "plan.viewC": "C Mix",
   "plan.symRecovery": "Recovery week",
   "plan.symTest": "Test",
   "plan.symRace": "Race",

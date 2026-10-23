@@ -6,7 +6,8 @@ import { on, sec, ic, pill, empty, more } from '../kit';
 import { metaLine, statusIcon } from './session';
 import { editBar, editing } from './planedit';
 import { sportIc } from '../kit';
-import { SPORT_COLOR } from '../icons';
+import { SPORT_COLOR, sportIcon } from '../icons';
+import { APP_ENV } from '../config';
 import { duration } from '../../../shared/i18n';
 import { isHardSession } from '../../../shared/intensity';
 import { dayStats, sessState, effStatus } from '../domain';
@@ -73,24 +74,98 @@ export function renderPlan(): string {
     ${w.important ? `<div class="hint" style="margin-top:6px"><b>${esc(t('plan.thisWeek'))}:</b> ${esc(w.important)}</div>` : ''}
     ${w.focus ? more(t('plan.weekMore'), `<p class="small">${esc(w.focus)}</p>`) : ''}</div>`;
   h += editBar(w);
-  h += `<div class="list pdays">`;
-  for (const d of w.days) {
-    const isToday = d.date === today;
-    const list = d.sessions.map((s: any) => ({ ...s, date: d.date })).filter((s: any) => s.sport !== 'rest' && !s.removed);
-    const customs = (STATE.customWorkouts || {})[d.date] || [];
-    const before = d.sessions.some((s: any) => s.sport === 'rest' && s.title === 'Vor dem Planstart');
-    const rows = list.map((s: any) => editing() && d.date >= today && !s.race ? editRow(s) : planRow(s)).join('')
-      + customs.map((c: any) => `<div class="pr"><button class="pr-b" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}">${sportIc(c.sport || 'multi')}<span class="pr-t"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')}</span>${c.metrics && c.metrics.min ? `<span class="pr-m">${esc(duration(+String(c.metrics.min).replace(',', '.') || 0))}</span>` : ''}</button></div>`).join('')
-      + (d.moved || []).map((m: any) => `<div class="pr-x">${esc(t('plan.movedTo', { t: m.title, d: `${dowShort(m.to)} ${fmtDate(m.to)}` }))}</div>`).join('');
-    const rest = !list.length && !customs.length;
-    h += `<div class="pday ${isToday ? 'today' : ''} ${rest ? 'rest' : ''}" id="day-${d.date}" data-day="${d.date}"><div class="pday-d"><b>${esc(dowShort(d.date))}</b><span>${esc(shortDate(d.date))}</span></div>
-      <div class="pday-s">${rest ? `<div class="pr pr-rest" data-rest-day><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="pr-t muted">${esc(before ? t('plan.beforeStart') : t('plan.restDay'))}</span></div>` : ''}${rows}</div></div>`;
-  }
-  h += `</div>`;
+  // Auftrag 19, Punkt 3: drei Ansichten zum Vergleichen (nur in der Testumgebung umschaltbar)
+  const v = planView();
+  if (APP_ENV !== 'production') h += `<div class="seg pv-switch" role="group" aria-label="${esc(t('plan.viewSwitch'))}">${(['A', 'B', 'C'] as const).map(x => `<button class="seg-b ${v === x ? 'on' : ''}" data-act="plan-view" data-v="${x}" aria-pressed="${v === x}">${esc(t('plan.view' + x))}</button>`).join('')}</div>`;
+  h += v === 'B' ? weekGrid(w, today) : v === 'C' ? weekMix(w, today) : dayList(w, today);
   h += `<button class="btn ghost block" data-act="custom-add" data-date="${UI.planDate && w.days.some((d: any) => d.date === UI.planDate) ? UI.planDate : (w.days.some((d: any) => d.date === today) ? today : w.startDate)}" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('plan.addExtra'))}</button>`;
   h += sec(t('plan.adjustments'), adjustmentsList(), t('plan.last30'));
   return h;
 }
+/* ---------- Auftrag 19, Punkt 3: Ansichten ---------- */
+export type PlanView = 'A' | 'B' | 'C';
+export function planView(): PlanView {
+  if (APP_ENV === 'production') return 'A';
+  try { const q = new URLSearchParams(location.search).get('planv'); if (q === 'A' || q === 'B' || q === 'C') { UI.planView = q; saveUi(); } } catch (e) {}
+  return UI.planView === 'B' || UI.planView === 'C' ? UI.planView : 'A';
+}
+interface DayInfo { d: any; list: any[]; customs: any[]; rest: boolean; before: boolean; min: number; hard: boolean; race: boolean }
+function dayInfo(d: any): DayInfo {
+  const list = d.sessions.map((s: any) => ({ ...s, date: d.date })).filter((s: any) => s.sport !== 'rest' && !s.removed);
+  const customs = (STATE.customWorkouts || {})[d.date] || [];
+  const before = d.sessions.some((s: any) => s.sport === 'rest' && s.title === 'Vor dem Planstart');
+  const live = list.filter((s: any) => !s.cancelled);
+  return { d, list, customs, rest: !list.length && !customs.length, before, min: live.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0),
+    hard: live.some((s: any) => isHardSession(s) && !s.race && s.sport !== 'football'), race: live.some((s: any) => s.race) };
+}
+function dayRows(x: DayInfo, today: string): string {
+  const { d, list, customs } = x;
+  return list.map((s: any) => editing() && d.date >= today && !s.race ? editRow(s) : planRow(s)).join('')
+    + customs.map((c: any) => `<div class="pr"><button class="pr-b" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}">${sportIc(c.sport || 'multi')}<span class="pr-t"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')}</span>${c.metrics && c.metrics.min ? `<span class="pr-m">${esc(duration(+String(c.metrics.min).replace(',', '.') || 0))}</span>` : ''}</button></div>`).join('')
+    + (d.moved || []).map((m: any) => `<div class="pr-x">${esc(t('plan.movedTo', { t: m.title, d: `${dowShort(m.to)} ${fmtDate(m.to)}` }))}</div>`).join('');
+}
+const restRow = (x: DayInfo) => `<div class="pr pr-rest" data-rest-day><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="pr-t muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span></div>`;
+/* A: klassische Tagesliste (wie bisher) */
+function dayList(w: any, today: string): string {
+  let h = `<div class="list pdays">`;
+  for (const d of w.days) {
+    const x = dayInfo(d);
+    h += `<div class="pday ${d.date === today ? 'today' : ''} ${x.rest ? 'rest' : ''}" id="day-${d.date}" data-day="${d.date}"><div class="pday-d"><b>${esc(dowShort(d.date))}</b><span>${esc(shortDate(d.date))}</span></div>
+      <div class="pday-s">${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div></div>`;
+  }
+  return h + `</div>`;
+}
+/* gewählter Tag der Woche: angetippt, sonst heute, sonst der erste Tag mit Training */
+function selDay(w: any, today: string, fallbackFirst = true): string | null {
+  if (UI.planDate && w.days.some((d: any) => d.date === UI.planDate)) return UI.planDate;
+  if (UI.planDate === '') return null;
+  if (w.days.some((d: any) => d.date === today)) return today;
+  if (!fallbackFirst) return null;
+  const f = w.days.find((d: any) => !dayInfo(d).rest); return f ? f.date : w.days[0].date;
+}
+const mins = (m: number) => m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : `${m}′`;
+/* B: Wochenraster, 7 Spalten; Antippen zeigt den Tag darunter */
+function weekGrid(w: any, today: string): string {
+  const sel = selDay(w, today);
+  const cells = w.days.map((d: any) => {
+    const x = dayInfo(d);
+    const icons = x.list.filter((s: any) => !s.cancelled).slice(0, 4).map((s: any) => `<span class="pg-i" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('');
+    const lbl = `${dowLong(d.date)} ${fmtDate(d.date)}: ${x.rest ? t('plan.restDay') : x.list.map((s: any) => s.title).join(', ')}`;
+    return `<button class="pg-d ${d.date === today ? 'today' : ''} ${d.date === sel ? 'on' : ''} ${x.rest ? 'rest' : ''}" data-act="plan-pick" data-date="${d.date}" aria-pressed="${d.date === sel}" aria-label="${esc(lbl)}">
+      <span class="pg-h"><b>${esc(dowShort(d.date))}</b><span>${+d.date.slice(8)}</span></span>
+      <span class="pg-s">${x.rest ? `<span class="pg-i" style="--c:var(--rest)">${ic('moon')}</span>` : icons}</span>
+      <span class="pg-m">${x.rest ? '' : x.race ? ic('flag') : esc(mins(x.min))}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span></button>`;
+  }).join('');
+  const sd = w.days.find((d: any) => d.date === sel);
+  let det = '';
+  if (sd) { const x = dayInfo(sd); det = `<div class="card pg-det" id="day-${sd.date}" data-day="${sd.date}"><div class="lbl">${esc(dowLong(sd.date))}, ${esc(fmtDate(sd.date))}${x.min ? ' · ' + esc(duration(x.min)) : ''}</div>${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div>`; }
+  return `<div class="pgrid" data-plan-grid>${cells}</div>${det}`;
+}
+/* C: Wochenüberblick (Balken je Tag) und aufklappbare Tage */
+function weekMix(w: any, today: string): string {
+  const sel = selDay(w, today, false);
+  const infos = w.days.map(dayInfo);
+  const max = Math.max(60, ...infos.map((x: DayInfo) => x.min));
+  const bars = infos.map((x: DayInfo) => {
+    const segs = x.list.filter((s: any) => !s.cancelled).map((s: any) => `<i style="height:${((s.plannedMinutes || 0) / max * 100).toFixed(1)}%;background:${SPORT_COLOR[s.sport] || 'var(--rest)'}"></i>`).join('');
+    return `<button class="pm-c ${x.d.date === today ? 'today' : ''} ${x.d.date === sel ? 'on' : ''}" data-act="plan-pick" data-date="${x.d.date}" aria-label="${esc(dowLong(x.d.date) + ' ' + fmtDate(x.d.date))}"><span class="pm-b">${x.rest ? `<span class="pm-rest">${ic('moon')}</span>` : segs}</span>${x.hard ? `<span class="pm-hard">${ic('bolt')}</span>` : ''}<span class="pm-l">${esc(dowShort(x.d.date).slice(0, 2))}</span></button>`;
+  }).join('');
+  const days = infos.map((x: DayInfo) => {
+    const open = x.d.date === sel;
+    const sum = x.rest ? `<span class="muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span>`
+      : x.list.map((s: any) => `<span class="pm-si" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('') + `<span class="pm-st">${esc(shortTitles(x))}</span>`;
+    return `<div class="cday ${x.d.date === today ? 'today' : ''} ${open ? 'open' : ''} ${x.rest ? 'rest' : ''}" id="day-${x.d.date}" data-day="${x.d.date}">
+      <button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m">${x.min ? esc(mins(x.min)) : ''}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span><span class="chev">${ic('down')}</span></button>
+      ${open ? `<div class="cday-b">${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div>` : ''}</div>`;
+  }).join('');
+  return `<div class="card pmix" data-plan-mix><div class="pm-bars">${bars}</div></div><div class="list cdays">${days}</div>`;
+}
+/* kurze Namen für die eingeklappte Zeile: „Lauf · Rad“ */
+function shortTitles(x: DayInfo): string {
+  const nm: Record<string, string> = { run: t('sport.run'), bike: t('sport.bike'), swim: t('sport.swim'), strength: t('sport.strength'), football: t('sport.football') };
+  return x.list.map((s: any) => s.race ? s.title : (nm[s.sport] || s.title)).join(' · ');
+}
+
 /* gewählte Woche in der Leiste mittig halten, ohne die Seite zu bewegen */
 export function centerWeekBar(): void {
   const bar = document.getElementById('wkbar'); if (!bar) return;
@@ -116,6 +191,9 @@ function adjustmentsList(): string {
   }).join('')}</div>`;
 }
 
+on('plan-view', el => { UI.planView = el.dataset.v; saveUi(); nav.rerender(); });
+// Tag antippen: B zeigt ihn darunter, C klappt ihn auf (nochmal antippen klappt zu)
+on('plan-pick', el => { const d = el.dataset.date!; UI.planDate = planView() === 'C' && UI.planDate === d ? '' : d; saveUi(); nav.rerender(); });
 on('plan-week', el => { UI.planWeek = +el.dataset.i!; UI.planDate = null; saveUi(); nav.rerender(); });
 on('plan-today', () => { UI.planWeek = currentWeekIdx(); UI.planDate = todayStr(); saveUi(); nav.rerender(); scrollToPlanDay(); });
 on('adj-undo', el => {
