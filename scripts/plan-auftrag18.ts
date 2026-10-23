@@ -87,8 +87,8 @@ const rulesBefore = ruleCount(plan0.weeks), rulesAfter = ruleCount(plan.weeks);
 const hm = goals.find((g: any) => g.type === 'run_half');
 const lines = [
   `Ich habe deinen Plan nach festen Trainingsregeln neu berechnet. Er gilt ab ${from === today ? 'heute' : 'morgen'}, Vergangenes und Erledigtes bleibt.`,
-  'Neu: Donnerstag ist Ruhetag (zwischen Rad-Qualität am Mittwoch und dem Spiel am Freitag). Nach einem langen Samstag (lange Ausfahrt mit Koppellauf) ist der Sonntag kurz und locker, ohne Tempo. Höchstens zwei Sportarten an einem Tag.',
-  hm ? `Vor dem Halbmarathon (${hm.date.slice(8, 10)}.${hm.date.slice(5, 7)}.): in den letzten 7 Wochen jede normale Woche ein Lauf im Wettkampftempo, in diesen Wochen kein Koppellauf. Wettkampfwoche ohne Kraft und leichter, weil am Freitag davor das Spiel ist – dort am besten nur kurz spielen. Danach eine Woche locker und kurz, keine lange Ausfahrt.` : '',
+  'Neu: Donnerstag ist Ruhetag (Tag vor dem Spiel, nach der Rad-Qualität am Mittwoch). Samstag Schwimmen und lange Ausfahrt ohne Koppellauf, damit der lange Lauf am Sonntag gut geht. Höchstens zwei Sportarten an einem Tag.',
+  hm ? `Vor dem Halbmarathon (${+hm.date.slice(8, 10)}.${+hm.date.slice(5, 7)}.): ab Februar jede normale Woche Abschnitte im Halbmarathon-Tempo im langen Lauf, dann ist die Ausfahrt am Samstag kürzer und locker. Wettkampfwoche ohne Kraft und leichter; am Freitag davor ist Spiel, dort am besten nur kurz spielen. Danach eine Woche locker und kurz. Weil Laufen bei dir nur Do, Sa und So geht, bleibt neben dem Fußball ein Lauf pro Woche. Willst du zweimal laufen, gib einen weiteren Lauftag frei.` : '',
   'Frag den Coach „Warum habe ich heute frei?“, dann sagt er dir den Grund. Die Regeln stehen im Lexikon unter „Training verstehen“.'
 ].filter(Boolean);
 const out: { kind: string; key: string; data: any }[] = [

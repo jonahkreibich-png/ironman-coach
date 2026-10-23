@@ -1,5 +1,72 @@
 # Ergebnis
 
+## Auftrag 18: Trainingsregeln, ehrlicher Coach, Plan-Tab, großer Test (23.10.)
+
+**Stand:** fertig auf `entwicklung`, Version 3.5.0. Veröffentlichung: siehe Abschnitt „Veröffentlicht“ unten.
+
+**1. Coach nennt Ursachen nur mit Daten.** „Wenig Schlaf erklärt den höheren Puls“ kommt nur noch, wenn Schlaf und Puls für diesen Tag da sind und der Puls bei gleichem Tempo mindestens 5 Schläge über deinem 6-Wochen-Schnitt liegt (Hitze nur mit gemessenen ab 25 °C). Sonst neutral: „Du hast nur 5,5 h geschlafen, mach heute lieber locker.“ Ein Prüfer streicht unbelegte Ursachen vor jeder Anzeige (Regel-Coach und KI). 15 feste Tests (wenig Schlaf ohne Puls, mit normalem, mit erhöhtem Puls, Hitze ohne Temperatur, Müdigkeit ohne Belastungsgefühl …).
+
+**2. Trainingswissen als feste Regeln** (Generator und Plan-Check, Quellen in [docs/TRAININGSREGELN.md](docs/TRAININGSREGELN.md)): Ruhetag (unter 18/Einsteiger 2), nach langem Tag kein langer/harter Lauf, höchstens 2 Sportarten pro Tag, harte Tage nie nebeneinander und nicht vor Spiel/Wettkampf, Lauf-Qualität in den 7 Wochen vor einem Laufziel, Wettkampfwoche ohne Kraft (Spiel kurz davor → Woche leichter + Hinweis), danach locker, lange Einheiten passend zum Ziel und +10 min/Woche, Beine-Kraft nie vor Spiel/Wettkampf/langem Lauf.
+
+**3. Plan-Tab:** Wochenleiste bleibt bei der gewählten Woche (mittig), öffnet bei der aktuellen, Knopf „Heute“. Kurze Chips (Woche, Datum, Phasen-Punkt, Symbole Erholung/Test/Wettkampf). Pro Woche eine Zeile (Phase, Ziel, Stunden) und 7 Tage als Liste mit Symbol, Titel, Dauer, Blitz für hart, „Ruhetag“; Details beim Antippen. Zeitleiste zeigt die gewählte Woche. Geprüft: alle Wochen bei 320-430 px, hell und dunkel, Chromium und WebKit.
+
+**4. Großer Test:** 69 Nutzer (14-75 J., alle Ziele und Sportarten, mit/ohne Teamsport, wenig/viel Zeit, dazu: Jugendlicher mit Fußball + Halbmarathon, Triathlet mit Koppel-Wochen, 10 km in 6 Wochen, Wettkampf am Tag nach dem Spiel). Jeder ganze Plan gegen alle Regeln, Coach-Texte gegen Punkt 1. Bleibt als Test.
+
+| Regel | Verstöße vorher (Nutzer) | nachher |
+|---|---|---|
+| Ruhetag | 292 (14) | 0 |
+| Kraft Beine nicht vor Spiel/Wettkampf/langem Lauf | 168 (20) | 0 |
+| Wettkampfwoche ohne Kraft und Hartes | 35 (28) | 0 |
+| Lange Einheit höchstens +10 min/Woche | 22 (11) | 0 |
+| Nach langem Tag kein langer/harter Lauf | 15 (6) | 0 |
+| Lauf-Qualität vor dem Laufziel | 14 (7) | 0 |
+| Harte Einheit mit Ein-/Auslaufen | 7 (4) | 0 |
+| Locker nach dem Wettkampf | 2 (1) | 0 |
+| Erholungswoche ohne Intervalle | 2 (1) | 0 |
+| übrige Regeln (Jugend-Stunden, 2 Sportarten, harte Einheiten, Abstand, Spieltag-Kraft, Tests, Dreifach-Tage) | 0 | 0 |
+| **Summe** | **557 (43 von 69 Nutzern)** | **0** |
+
+„Vorher“ = Stand Auftrag 17 (gleiche Nutzer, neue Prüfung). Gefunden und behoben: Generalprobe vor Triathlons war nie aktiv (Fehler), doppelter Spiel-Hinweis, Ruhetag wechselte von Woche zu Woche, kein Platz für Tempolauf (jetzt ehrlicher Hinweis), die Sperre gegen alte App-Versionen hätte nie gegriffen (App schickte einen Zeitstempel statt der Version).
+
+**5. Kraft und Erholungswochen:** Kraft am Spieltag nur Oberkörper/Rumpf, höchstens 30 min, nicht direkt vor dem Spiel; keine in der Wettkampfwoche. Erholungswochen ohne Intervalle (Tests erlaubt), Test nicht am Tag nach einem Spiel.
+
+**6. Zusätzliches Wissen** (nur Fehlendes, markiert in TRAININGSREGELN.md): Schmerz-Skala (ab 4/10 Lauf → lockeres Rad, Arzt/Physio), Wiedereinstieg nach Pause, Hals-Regel bei Erkältung, verpasste Woche wird wiederholt, Hinweise in Einheiten (Verpflegung ab 80 min, Essen danach, Hitze/Kälte/Regen, Lauf-ABC), Schlaf 8-10 h unter 18, Saison-Hinweis, Generalprobe vor Triathlon, freiwillig Laufschuh-km und Zyklus, Lexikon „Training verstehen“ (Übungen wie 6-3-6, Abschlag), Coach beantwortet „Warum habe ich heute frei?“, KI bekommt die Regeln als Kontext.
+
+**Dein Plan** (ab heute, Vergangenes bleibt): vorher 79 Regelverstöße (u. a. 25 Wochen ohne Ruhetag, 17× langer Lauf nach langem Tag, 15 Tage mit 3 Sportarten), nachher 0. Neu: Donnerstag Ruhetag; Samstag Schwimmen + lange Ausfahrt ohne Koppel; Sonntag langer Lauf, ab Februar mit Halbmarathon-Tempo (dann Samstag kürzer); Wettkampfwoche ohne Kraft, leichter, Hinweis zum Spiel am Freitag; danach eine Woche locker. Weil Laufen nur Do/Sa/So geht, bleibt bis zum Halbmarathon ein eigener Lauf pro Woche (plus 2× Fußball).
+
+| Woche | Phase | eigene h | Einheiten | hart (eigene+Spiel) | Ruhetage | Doppel/Dreifach | langer Lauf | lange Ausfahrt |
+|---|---|---|---|---|---|---|---|---|
+| 6 (19.10.) | Grundlage | 6.4 → 6.3 | 8 → 8 | 1+1 → 0+1 | 0 → 0 | 3/0 → 3/0 | 55 → 75 | 75 → 50 |
+| 7 (26.10.) | Grundlage | 7.4 → 6.2 | 8 → 7 | 1+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 65 → 75 | 105 → 70 |
+| 8 (02.11.) | Grundlage | 8.3 → 6.8 | 8 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 75 → 85 | 115 → 85 |
+| 9 (09.11.) | Grundlage (Erh.) | 5.8 → 4.7 | 8 → 7 | 0+1 → 0+1 | 0 → 1 | 3/0 → 3/0 | 50 → 55 | 75 → 40 |
+| 10 (16.11.) | Grundlage | 8.9 → 7.2 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 85 → 95 | 135 → 90 |
+| 11 (23.11.) | Grundlage | 9.5 → 7.7 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 90 → 105 | 145 → 95 |
+| 12 (30.11.) | Grundlage | 9.6 → 7.9 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 95 → 105 | 150 → 110 |
+| 13 (07.12.) | Grundlage (Erh.) | 6.5 → 5.9 | 8 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 55 → 70 | 90 → 70 |
+| 14 (14.12.) | Grundlage | 9.9 → 6.5 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 105 → 55 | 150 → 90 |
+| 15 (21.12.) | Grundlage | 10 → 7.9 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 115 → 105 | 150 → 125 |
+| 16 (28.12.) | Aufbau | 10.1 → 7.9 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 150 → 130 |
+| 17 (04.01.) | Aufbau (Erh.) | 6.7 → 5.6 | 8 → 7 | 0+1 → 0+1 | 0 → 1 | 3/0 → 3/0 | 80 → 70 | 90 → 80 |
+| 18 (11.01.) | Aufbau | 10.1 → 8.3 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 150 → 140 |
+| 19 (18.01.) | Aufbau | 10.1 → 8.6 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 150 → 150 |
+| 20 (25.01.) | Aufbau | 10.1 → 8.6 | 9 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 150 → 150 |
+| 21 (01.02.) | Aufbau (Erh.) | 6.6 → 6.3 | 8 → 7 | 2+1 → 1+1 | 0 → 1 | 3/0 → 3/0 | 55 → 70 | 90 → 90 |
+| 22 (08.02.) | spezifisch | 10.2 → 6.5 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 120 → 55 | 150 → 90 |
+| 23 (15.02.) | spezifisch | 10.2 → 7.3 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 150 → 90 |
+| 24 (22.02.) | spezifisch | 10.2 → 7.3 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 150 → 90 |
+| 25 (01.03.) | spezifisch (Erh.) | 6.8 → 5.9 | 8 → 7 | 0+1 → 0+1 | 0 → 1 | 3/0 → 3/0 | 80 → 70 | 90 → 90 |
+| 26 (08.03.) | spezifisch | 10.5 → 7.3 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 165 → 90 |
+| 27 (15.03.) | spezifisch | 10.7 → 7 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 120 → 105 | 180 → 75 |
+| 28 (22.03.) | Tapering | 7.4 → 5.4 | 8 → 7 | 1+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 70 → 65 | 110 → 70 |
+| 29 (29.03.) | Wettkampf | 5.3 → 2.3 | 8 → 4 | 0+2 → 0+2 | 0 → 2 | 3/0 → 1/0 | 40 → 0 | 70 → 50 |
+| 30 (05.04.) | Grundlage (Erh.) | 6.9 → 5 | 8 → 7 | 2+1 → 0+1 | 0 → 1 | 3/0 → 3/0 | 55 → 40 | 110 → 60 |
+| 31 (12.04.) | Aufbau | 10.3 → 5.9 | 9 → 7 | 2+1 → 2+1 | 0 → 1 | 3/0 → 3/0 | 100 → 55 | 180 → 75 |
+
+„Doppel/Dreifach“ zählt Koppeltraining als einen Termin; Tage mit 3 Sportarten: vorher 15, nachher 0.
+
+**Getestet:** typecheck, Unit-Tests, Build, Browser-Tests (Chromium + WebKit). **Nicht getestet:** echte KI-Antworten mit dem neuen Ursachen-Prüfer (nur nachgebaute), dein iPhone selbst.
+
 ## Auftrag 17: Soll/Ist, Schwimmen, Plan-Balance, Übersicht, großer Test (22.10.)
 
 **Live in der echten App (Version 3.4.0)**, vorher in stamio-test mit einer Kopie deiner Daten geprüft. Sicherungen: `data-export/prod-vor-release17.sql`, `prod-2026-10-22.sql`, `test-vor-kopie-2026-10-22-*.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Kraul 50 m), Einstellungen, eine Coach-Nachricht „Plan angepasst“ und alte Schwimm-Anpassungen (als rückgängig markiert). Alle 286 Datensätze sind erhalten; dein Lauf von heute früh bleibt, wie er ist.

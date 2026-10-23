@@ -2,6 +2,12 @@
 
 Nur das, was du selbst tun musst.
 
+## Neu am 23.10. (Auftrag 18)
+
+- **App einmal neu öffnen** (bei „Neue Version“ neu laden). Wichtig: Erst mit der neuen Version (3.5.0) kann das Handy Plan und Profil wieder ändern. Ein Gerät mit alter Version bekommt automatisch den neuen Plan vom Server.
+- **Ruhetag ist jetzt Donnerstag.** Willst du lieber zweimal pro Woche laufen, gib unter Berücksichtigungen einen weiteren Lauftag frei (z. B. Dienstag) oder sag Claude Bescheid.
+- **Freiwillig:** Unter Mehr → Einstellungen → „Laufschuhe und Zyklus“ kannst du deine Laufschuh-km zählen lassen.
+
 ## Neu am 22.10. (Auftrag 17)
 
 Nichts Pflicht. App einmal neu öffnen (bei „Neue Version“ neu laden).

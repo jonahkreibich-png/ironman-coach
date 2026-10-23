@@ -953,10 +953,10 @@ export function generatePlan(inp: GenInput): GenResult {
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });
   inBlock.forEach(g => { const a = goalAllowed(g.type, profile.birthYear ? +g.date!.slice(0, 4) - profile.birthYear : null); if (!a.ok) violations.push({ rule: 'age', msg: `${g.name}: ${a.msg}` }); });
 
-  // Auftrag 17: Spiel kurz vor einem wichtigen Wettkampf: Hinweis statt stiller Überlastung
+  // Auftrag 17: Spiel kurz vor einem wichtigen Wettkampf: Hinweis statt stiller Überlastung (Auftrag 18: meist schon von den Trainingsregeln gesetzt)
   for (const w of weeks) for (const r of (w.races || []).filter((x: any) => x.priority !== 'C')) {
     const g = w.days.find((d: any) => d.date < r.date && daysBetween(d.date, r.date) <= 2 && d.sessions.some((x: any) => x.sport === 'football' && /spiel/i.test(x.title || '')));
-    if (g) { const t = `Spiel am ${DOW_LONG[dowOf(g.date)]} vor ${r.name}: nur kurz spielen oder aussetzen, damit du frisch an den Start gehst.`; w.important = [w.important, t].filter(Boolean).join(' '); }
+    if (g && !/nur kurz spielen oder aussetzen/.test(w.important || '')) { const t = `Spiel am ${DOW_LONG[dowOf(g.date)]} vor ${r.name}: nur kurz spielen oder aussetzen, damit du frisch an den Start gehst.`; w.important = [w.important, t].filter(Boolean).join(' '); }
   }
   // Auftrag 17: ist ein Ziel mit Zeit und Stand nicht realistisch, keine Überlastung erzwingen, sondern Hinweis und Zwischenziel
   const goalHints: string[] = [];
