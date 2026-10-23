@@ -32,7 +32,7 @@ test('Wochenleiste: öffnet mittig bei der aktuellen Woche und bleibt bei der ge
   s = await barState(page);
   expect(String(s.i)).toBe(cur);
   expect(centered(s)).toBe(true);
-  await expect(page.locator(`.pday.today[data-day="${TODAY}"]`)).toBeVisible();
+  await expect(page.locator(`.cday.today[data-day="${TODAY}"]`)).toBeVisible();
 });
 
 test('Woche kompakt: eine Zeile oben, 7 Tage, Ruhetag sichtbar, Details beim Antippen', async ({ page }) => {
@@ -44,11 +44,14 @@ test('Woche kompakt: eine Zeile oben, 7 Tage, Ruhetag sichtbar, Details beim Ant
   await open(page, '/?go=plan');
   await expect(page.locator('[data-week-head]')).toBeVisible();
   await expect(page.locator('[data-week-count]')).toContainText(/\d+\/\d+/);
-  await expect(page.locator('.pday')).toHaveCount(7);
-  await expect(page.locator('[data-rest-day]').first()).toContainText('Ruhetag');
+  await expect(page.locator('.cday')).toHaveCount(7);
+  await expect(page.locator('.cday.rest').first()).toContainText('Ruhetag');
   // jede Einheit: Symbol, Titel; Dauer steht im Titel oder daneben
-  const rows = page.locator('.pr.wo');
-  expect(await rows.count()).toBeGreaterThan(2);
+  // Auftrag 19: nur der aufgeklappte Tag zeigt seine Einheiten: einen Tag mit Training öffnen
+  const td = page.locator('.cday.open:not(.rest)');
+  if (!(await td.count())) await page.locator('.cday:not(.rest) .cday-h').first().click();
+  const rows = page.locator('.cday.open .pr.wo');
+  expect(await rows.count()).toBeGreaterThan(0);
   const first = rows.first();
   await expect(first.locator('.ic')).toBeVisible();
   await first.locator('[data-act="sess-open"]').click();

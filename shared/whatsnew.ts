@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.6.1', items: [
+    'Plan-Tab neu: oben ein Balken pro Tag, darunter jeder Tag als Zeile. Heute ist aufgeklappt, andere Tage klappst du mit einem Tipp auf; unter jeder Einheit steht kurz, was du machen sollst.',
+    'Auf Heute: „Ich bin krank“ und „Schmerzen / verletzt“ direkt sichtbar. Krank pausiert den Plan sofort, bei Schmerzen fragt der Coach wo und wie stark und plant danach schonender.'
+  ] },
   { version: '3.6.0', items: [
     'Scores neu: Jeder Wert ist jetzt eine laufende Schätzung mit Bereich (z. B. ± 3). Tests und harte Einheiten zählen am meisten, fehlende Werte sind unbekannt statt schlecht, und nach einer Pause sinkt der Wert nur langsam. „Warum?“ zeigt die letzten Einheiten mit + und −.',
     'Mehr Abwechslung und Steigerung: Einheiten kommen aus einer Bibliothek (Mehr → Lexikon → Einheiten, mit Bild), werden nur schwerer, wenn die letzte geklappt hat, und jede Sportart bekommt regelmäßig Qualität – auch Schwimmen.',

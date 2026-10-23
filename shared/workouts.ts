@@ -269,6 +269,32 @@ export function swimSumLine(spec: Spec): string {
 export const minTxt = (m: number | undefined) => { const v = m || 0; return v > 0 && v < 1 ? `${Math.round(v * 60)} s` : `${String(Math.round(v * 10) / 10).replace('.', ',')} min`; };
 const PART: Record<Step['part'], string> = { warm: 'Aufwärmen', main: 'Hauptteil', cool: 'Ausklang' };
 
+/* Auftrag 19: eine kurze Zeile, was man tun soll (Plan-Tab, aufgeklappter Tag), z. B.
+   „15 min einlaufen · 3×8 min an der Schwelle, 2 min locker dazwischen · 10 min auslaufen“ */
+const ZWORD: Record<number, string> = { 1: 'ganz locker', 2: 'locker', 3: 'zügig', 4: 'an der Schwelle', 5: 'sehr hart' };
+const SWIM_WORD: Record<string, string> = { drill: 'Technik-Übungen', kick: 'Beinschlag', breast: 'Brust', pull: 'Kraul mit Pull Buoy', easy: 'locker', crawl: 'Kraul' };
+export function shortPlan(spec: Spec | null | undefined): string {
+  if (!spec || !Array.isArray(spec.steps)) return '';
+  if (spec.sport === 'strength') { const ex = (spec.exercises || []).map(e => e.name); return ex.length ? ex.slice(0, 4).join(', ') + (ex.length > 4 ? ' …' : '') : ''; }
+  if (spec.sport === 'swim') {
+    const main = spec.steps.filter(s => s.part === 'main').map(s => {
+      const z = s.zone || 2; const hard = z >= 3 && s.mode !== 'drill' && s.mode !== 'kick';
+      return `${(s.reps || 1) > 1 ? `${s.reps}×${s.m} m` : `${s.m} m`} ${SWIM_WORD[s.mode || 'crawl'] || 'Kraul'}${hard ? ' ' + ZWORD[z] : ''}`;
+    });
+    return [`${thousands(swimSums(spec).meters)} m`, ...main].join(' · ');
+  }
+  const run = spec.sport === 'run';
+  return spec.steps.map(s => {
+    const reps = s.reps || 1; const z = s.zone || 2;
+    if (s.part === 'warm') return `${minTxt(s.min)} ${run ? 'einlaufen' : 'einrollen'}`;
+    if (s.part === 'cool') return `${minTxt(s.min)} ${run ? 'auslaufen' : 'ausrollen'}`;
+    if (s.walkOnly) return `${minTxt(s.min)} gehen`;
+    if (s.walkMin) return `${reps}× (${minTxt(s.min)} laufen + ${minTxt(s.walkMin)} gehen)`;
+    const rest = reps > 1 && s.restMin ? `, ${minTxt(s.restMin)} locker dazwischen` : '';
+    return `${reps > 1 ? `${reps}×${minTxt(s.min)}` : minTxt(s.min)} ${ZWORD[z] || 'locker'}${rest}`;
+  }).join(' · ');
+}
+
 export function describe(spec: Spec): string {
   const L: string[] = spec.when ? [spec.when] : [];
   if (spec.sport === 'strength') {

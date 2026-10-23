@@ -24,7 +24,7 @@ import { parseSwimSkill, swimSkillUpdate } from '../swimskill';
 import { reviewAnswer } from './review';
 
 export interface Opt { label: string; say: string; go?: string }
-export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
+export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'pain-where' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
 export interface DialogState { pending?: Pending | null; focus?: { sid: string; date: string } | null }
 export interface Reply { intent: string; text: string; options?: Opt[]; apply?: Op[]; pending?: Pending | null; suggestions?: string[] }
 type Extra = { scores?: any[]; prognosis?: any };
@@ -311,6 +311,12 @@ function resolve(ctx: EngineCtx, d: DialogState, p: Pending, toks: string[], raw
     if (isNo(toks)) return { intent: 'cancelled', text: 'Okay. Sag einfach Bescheid, wenn die Daten feststehen.', pending: null };
     return null;
   }
+  // Auftrag 19: Schmerzen ohne Körperteil (z. B. über den Knopf auf Heute): erst „Wo?“, dann „Wie stark?“
+  if (p.kind === 'pain-where') {
+    const b = bodyIn(toks) || (has(toks, ['woanders', 'anders', 'andere', 'sonst']) ? 'Beschwerden' : null);
+    if (b) return painStrength(b);
+    return null;
+  }
   if (p.kind === 'pain') {
     const lvl = has(toks, ['stark', 'sehr', 'schlimm', 'heftig']) || /\b([7-9]|10)\b/.test(raw) ? 3 : has(toks, ['mittel', 'maessig']) || /\b[4-6]\b/.test(raw) ? 2 : has(toks, ['leicht', 'wenig', 'bisschen', 'kaum']) || /\b[1-3]\b/.test(raw) ? 1 : 0;
     if (lvl) return painOps(ctx, p.data.body, lvl);
@@ -389,10 +395,10 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
   }
   // Schmerzen / Verletzung
   const body = bodyIn(toks);
-  if ((body && has(toks, ['schmerz', 'schmerzen', 'weh', 'zwickt', 'zieht', 'tut', 'verletzt', 'probleme', 'beschwerden', 'entzuendet', 'umgeknickt', 'gezerrt', 'zerrung'])) || has(toks, ['verletzt', 'verletzung', 'umgeknickt', 'zerrung', 'gezerrt'])) {
-    const b = body || 'Verletzung';
-    return { intent: 'pain', text: `Danke, dass du es sagst. Wie stark sind die Schmerzen (${b})?`, pending: { kind: 'pain', at: Date.now(), data: { body: b } },
-      options: [{ label: 'Leicht (1-3)', say: 'leicht' }, { label: 'Mittel (4-6)', say: 'mittel' }, { label: 'Stark (7-10)', say: 'stark' }] };
+  if ((body && has(toks, ['schmerz', 'schmerzen', 'weh', 'zwickt', 'zieht', 'tut', 'verletzt', 'probleme', 'beschwerden', 'entzuendet', 'umgeknickt', 'gezerrt', 'zerrung'])) || has(toks, ['verletzt', 'verletzung', 'umgeknickt', 'zerrung', 'gezerrt', 'schmerzen', 'schmerz'])) {
+    if (!body) return { intent: 'pain', text: 'Danke, dass du es sagst. Wo tut es weh?', pending: { kind: 'pain-where', at: Date.now() },
+      options: PAIN_WHERE.map(x => ({ label: x, say: x })) };
+    return painStrength(body);
   }
   // Urlaub, Prüfungen, Reise: Zeitraum
   const periodWord = /\b(urlaub|ferien|verreist|reise|dienstreise|pruefung|pruefungen|klausur|klausuren|examen|abi|lernphase)\b/.exec(j);
@@ -576,6 +582,11 @@ function weekLittle(ctx: EngineCtx): Reply {
   const ops: Op[] = [scaleOp(ctx, keys, 0.75, 'Woche mit wenig Zeit')];
   if (rest.length) ops.push({ op: 'adjust', adj: rest.map(x => { const m = Math.min(30, x.s.plannedMinutes || 30); const g = gid(ctx); const rb = !x.s.stage ? W.rebuildScaled(x.s, m / (x.s.plannedMinutes || m)) : null; return { id: `${g}-${x.s.id}`, group: g, type: 'modify', sessionId: x.s.id, set: rb || { plannedMinutes: m }, what: `${x.s.title} (${fmtD(x.date)}): nur ${(rb && rb.plannedMinutes) || m} min`, reason: 'Woche mit wenig Zeit' }; }) });
   return propose('week-little', `Woche mit wenig Zeit: die wichtigsten Einheiten bleiben (etwas kürzer), alles andere wird zu kurzen Einheiten von höchstens 30 min. Übernehmen?`, ops);
+}
+const PAIN_WHERE = ['Knie', 'Achillessehne', 'Wade', 'Schienbein', 'Fuß', 'Hüfte', 'Rücken', 'Schulter', 'Woanders'];
+function painStrength(b: string): Reply {
+  return { intent: 'pain', text: `Wie stark sind die Schmerzen (${b})? 0 = keine, 10 = sehr stark.`, pending: { kind: 'pain', at: Date.now(), data: { body: b } },
+    options: [{ label: 'Leicht (1-3)', say: 'leicht' }, { label: 'Mittel (4-6)', say: 'mittel' }, { label: 'Stark (7-10)', say: 'stark' }] };
 }
 function painOps(ctx: EngineCtx, body: string, lvl: number): Reply {
   const pr = parseRules(`${body}: Schmerzen`, ctx.today).rules.filter(r => r.kind === 'body');

@@ -140,13 +140,13 @@ describe('Neue Verbindung ändert nichts Vergangenes', () => {
       { kind: 'session', key: 'run-1', data: { completed: true, metrics: { min: '50', hr: '150', pace: '5:40' }, metricsSrc: { min: 'intervals', hr: 'intervals', pace: 'manual' } }, updatedAt: 2 }
     ] }, token);
     const before = Object.fromEntries((await records(env, token)).map((r: any) => [r.kind + '|' + r.key, JSON.stringify(r.data)]));
-    // Oura liefert die letzten 4 Wochen, Dropbox eine alte Datei von gestern
+    // Oura liefert die letzten 4 Wochen, Dropbox eine alte Datei von gestern früh (gestern Abend läge kurz nach Mitternacht noch im 6-h-Fenster vor dem Verbinden)
     routes.push([/usercollection\/sleep/, () => ({ data: [old, yday, today].map(day => ({ day, type: 'long_sleep', total_sleep_duration: 28800, average_hrv: 40, lowest_heart_rate: 60 })) })]);
     routes.push([/usercollection/, () => ({ data: [] })]);
     await connectViaOAuth(env, token, 'oura', { access_token: 'AT', expires_in: 86400 }, null);
-    const yFit = intervalFit(`${yday}T16:00:00Z`, 'run', { warm: 300, reps: [{ sec: 120, speed: 4, hr: 170, restSec: 60, restHr: 130 }], cool: 300, easySpeed: 3, easyHr: 140 });
+    const yFit = intervalFit(`${yday}T06:00:00Z`, 'run', { warm: 300, reps: [{ sec: 120, speed: 4, hr: 170, restSec: 60, restHr: 130 }], cool: 300, easySpeed: 3, easyHr: 140 });
     routes.push([/files\/get_metadata/, () => ({ '.tag': 'folder', path_display: '/Apps/HealthFit' })]);
-    routes.push([/files\/list_folder$/, () => ({ entries: [{ '.tag': 'file', name: 'Lauf.fit', path_lower: '/apps/healthfit/lauf.fit', client_modified: `${yday}T17:00:00Z` }], cursor: 'C1', has_more: false })]);
+    routes.push([/files\/list_folder$/, () => ({ entries: [{ '.tag': 'file', name: 'Lauf.fit', path_lower: '/apps/healthfit/lauf.fit', client_modified: `${yday}T07:00:00Z` }], cursor: 'C1', has_more: false })]);
     routes.push([/files\/download/, () => new Response(yFit)]);
     await connectViaOAuth(env, token, 'dropbox', { access_token: 'DT', expires_in: 14400, account_id: 'dbid:B' }, null);
     let recs = await records(env, token);

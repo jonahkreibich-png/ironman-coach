@@ -77,7 +77,7 @@ function answerCard(): string {
     ${noValues && !d.ill ? `<button class="btn soft block" data-act="checkin-open" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('heute.enterValues'))}</button>` : ''}
     <details class="more" style="margin-top:var(--s3)"><summary>${esc(t('heute.why'))}<span class="chev">${ic('down')}</span></summary><div class="body">${critTiles()}${historyBars()}
       ${d.readiness.point && !d.readiness.personal ? `<div class="hint">${esc(t('heute.fixedLimits', { n: C.MIN_DAYS }))}</div>` : ''}
-      <div class="row wrap">${d.ill ? '' : `<button class="btn ghost sm" data-act="ill-start">${ic('sick')} ${esc(t('heute.imSick'))}</button>`}<button class="btn ghost sm" data-act="checkin-open">${ic('edit')} ${esc(t('heute.editValues'))}</button></div></div></details>
+      <div class="row wrap"><button class="btn ghost sm" data-act="checkin-open">${ic('edit')} ${esc(t('heute.editValues'))}</button></div></div></details>
   </div>`;
 }
 
@@ -90,7 +90,8 @@ function illnessBlock(): string {
       <button class="btn block" data-act="ill-end">${esc(t('heute.healthy'))}</button></div>`;
   }
   if (d.ret) return `<div class="card" style="margin-top:var(--s3)"><b>${esc(t('heute.returnDay', { n: d.ret.day }))}</b><div class="hint">${esc(t(RETURN_STAGES[d.ret.stage]))}</div><button class="link" data-act="ill-reopen">${esc(t('heute.stillSick'))}</button></div>`;
-  return '';
+  // Auftrag 19: sichtbar statt versteckt – krank (Plan pausiert, danach Wiedereinstieg in Stufen) oder Schmerzen (Coach fragt wo und wie stark)
+  return `<div class="health-row" data-health><span class="xs muted">${esc(t('heute.sickOrHurt'))}</span><div class="row wrap"><button class="btn ghost sm" data-act="ill-start">${ic('sick')} ${esc(t('heute.imSick'))}</button><button class="btn ghost sm" data-act="coach-ask" data-text="${esc(t('heute.painSay'))}">${ic('pulse')} ${esc(t('heute.pain'))}</button></div></div>`;
 }
 
 function weekStrip(): string {

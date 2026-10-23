@@ -2,7 +2,7 @@
 
 ## Auftrag 19: Plan-Regeln, Einheiten-Bibliothek, neue Scores, großer Test (23.10.)
 
-**Stand:** Alles fertig und getestet bis auf **Punkt 3 (Plan-Tab): wartet auf deine Wahl** (A, B oder C). Live-Stand siehe unten unter „Veröffentlicht“.
+**Stand:** Alles fertig, getestet und live (Plan-Tab nach deiner Wahl C, Version 3.6.1).
 
 ### 1. Dein Plan vorher/nachher (gilt ab 24.10.)
 Wochenraster wie gewünscht (Mo Fußball · Di Schwimmen + Kraft Ganzkörper 30 min · Mi Rad-Intervalle, jede 2. Woche Ruhetag mit Sweet Spot in der Samstags-Ausfahrt · Do Lauf, ab Februar Schwelle/HM-Tempo · Fr früh lockeres Rad auf der Rolle, abends Spiel · Sa Schwimmen + lange Ausfahrt, Koppel jede 3. Woche · So langer Lauf, Tempo-Teil jede 2. Woche ab Februar · Erholungswoche Mi und So frei). Geprüft bis zum Ende (Ironman 2029, 196 Wochen inkl. Server-Verlängerung): **Regelverstöße vorher 22 (13× zu wenig Läufe, 6× kein Ruhetag, 3× Tempo im langen Lauf zu oft), nachher 0**; Umfang und Intensität ohne Fehler.
@@ -91,11 +91,13 @@ Unter 18 (Halbmarathon, Aufbau): Schwellen-Intervalle, Tempowechsel-Lauf (Fahrts
 ### 2. Scores neu (5 Sätze)
 Jeder Score ist jetzt eine laufende Schätzung wie bei einem Kalman-Filter: jede Einheit ist eine Messung mit eigener Genauigkeit (Test am genauesten, dann harte Einheit mit Puls/Watt, dann lockere mit Puls, am ungenauesten nur Gefühl). Fehlende Werte ändern nichts am Wert, nur die Unsicherheit wächst; ohne Training sinkt der Wert langsam (ab 10 Tagen etwa 1 % pro Woche, mit anderem Ausdauertraining halb so viel), Krankheit macht Messungen unsicherer. Neben dem Score steht der Bereich („± 2, gut belegt“ oder „± 6, wenig Daten“), und „Warum?“ zeigt die letzten 3-5 Einheiten mit + oder − und Grund. Die feste Skala und die drei Marken (nötig, Etappenziel, Wunschzeit) bleiben; der Verlauf ist mit der neuen Rechnung berechnet, und 4 Wochen lang steht dabei, was die alte ergeben hätte. **Beispiel:** 14 lockere Läufe mit Puls ergeben 48 (± 2); ein 30-min-Lauftest danach hebt auf 51 („+3 … Test, zählt stark“), ein gleich schneller lockerer Lauf bewegt ihn kaum („±0 … wie erwartet“), 4 Wochen Pause senken auf 45.
 
-### 3. Plan-Tab: wartet auf deine Wahl
-Drei Ansichten als Bilder (iPhone, hell/dunkel; aktuelle Woche, Erholungswoche, Wettkampfwoche): **https://claude.ai/artifact/V9wkXfjE88v4yEL6g8Sdwm** (Datei: plan-varianten.html). In stamio-test oben im Plan-Tab umschaltbar.
-- **A Liste:** alle 7 Tage untereinander mit Titel, Dauer und Haken; alles ohne Tippen sichtbar, volle Wochen sind lang.
-- **B Raster:** Kalender mit 7 Spalten (Symbole, Minuten, Blitz für hart); Antippen zeigt den Tag darunter.
-- **C Mix:** Balken je Tag oben (Höhe = Minuten, Farbe = Sportart), darunter jeder Tag als Zeile, heute aufgeklappt.
+### 3. Plan-Tab: Variante C (deine Wahl, 24.10.)
+Oben ein Balken pro Tag (Höhe = Minuten, Farbe = Sportart, Blitz = hart), darunter jeder Tag als Zeile. Heute ist aufgeklappt, ein Tipp klappt einen anderen Tag auf, nochmal zu. **Unter jeder Einheit steht kurz, was du machen sollst**, z. B. „15 min einlaufen · 3×8 min an der Schwelle, 2 min locker dazwischen · 10 min auslaufen“ (Schwimmen mit Metern, Kraft mit Übungen). Liste und Raster sind entfernt. Getestet auf 320/390/430 px, hell und dunkel.
+
+### Krank oder verletzt (deine Frage, 24.10.)
+Gab es schon, aber versteckt: „Ich bin krank“ lag auf Heute unter „Warum?“, Schmerzen gingen nur per Chat. Jetzt steht auf Heute sichtbar **„Krank oder verletzt?“** mit zwei Knöpfen:
+- **Ich bin krank:** Krankheitsphase ab heute, alle Einheiten fallen aus, bis du „Wieder gesund“ tippst; danach Wiedereinstieg in Stufen (wie bei deiner Erkältung).
+- **Schmerzen / verletzt:** Der Coach fragt „Wo?“ (Knie, Achillessehne, Wade, Schienbein, Fuß, Hüfte, Rücken, Schulter, woanders) und „Wie stark?“. Leicht: weiter, aber schonender planen. Mittel (4-6): statt Laufen Rad oder Schwimmen gleich lang, schonender planen. Stark (7-10): Läufe und Hartes der nächsten Tage fallen weg, ärztlich anschauen lassen. Du bestätigst mit einem Tipp, rückgängig geht auch.
 
 ### 4. Großer Test
 54 neue Test-Nutzer (alle Ziele; Uhr, von Hand, Watt, nur Puls; mit/ohne Teamsport; wenig/viel Zeit; 14-70 J.; dazu „wie Jonah“ und zwei Laufziele hintereinander), komplett: Fragebogen → Plan → 3 Wochen mit erledigten, abweichenden, ausgelassenen und Extra-Einheiten und Korrekturen → Coach → Scores/Trend/Prognose → Profil ändern → Verlängerung bis zum Ende. Dazu in der App (Chromium + WebKit): kein seitliches Scrollen, keine Konsolen-Fehler, keine Betreiber-Infos, nur gewählte Sportarten, Bereich beim Score. Alles dauerhafte Tests.
@@ -123,7 +125,7 @@ Dabei gefunden und an der Ursache behoben: Hügelsprints wurden beim mehrfachen 
 7. Offen: Coach-Karte auf Heute schneidet den Text ab, ohne „mehr“.
 8. Offen: Bild der Einheit (Lexikon/Einheit) ohne Beschriftung der Zonen.
 9. Offen: „Neu berechnet …“ steht 4 Wochen ganz oben im „Warum?“ – reicht vielleicht einmal.
-10. Offen: Plan-Tab-Ansicht (Punkt 3, deine Wahl).
+10. ✓ Plan-Tab: Variante C mit Kurzbeschreibung; Krank/verletzt sichtbar auf Heute.
 
 ### Veröffentlicht
 **Live in der echten App (Version 3.6.0)** seit 24.10., 0:20 Uhr, vorher in stamio-test mit einer frischen Kopie deiner Daten geprüft. Sicherung: `data-export/prod-vor-auftrag19-final.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Wochenraster), eine Coach-Nachricht „Plan angepasst“ und die Sperre gegen alte App-Versionen (Plan/Profil erst ab 3.6.0). Alle 357 Datensätze sind erhalten. Tests: Typen, 1974 Unit-Tests, Build, 350 Browser-Tests (Chromium + WebKit) grün. Die Plan-Tab-Ansicht bleibt in der echten App bei A, bis du wählst.

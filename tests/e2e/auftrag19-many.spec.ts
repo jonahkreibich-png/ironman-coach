@@ -1,6 +1,6 @@
 /* Auftrag 19, Punkt 4: neue Test-Nutzer (fixtures/users19.ts) nach 3 Wochen mit Abweichungen, Messdaten passend zur Ausstattung
    (Uhr, von Hand, Watt, nur Puls) und Verlängerung des Plans in der App: nichts ragt heraus, keine Konsolen-Fehler, keine Betreiber-Infos,
-   nur gewählte Sportarten, Scores mit Bereich (±), Plan-Ansichten A/B/C. Jeder vierte Nutzer und die zwei Sonderfälle. */
+   nur gewählte Sportarten, Scores mit Bereich (±), Plan-Tab mit aufklappbaren Tagen. Jeder vierte Nutzer und die zwei Sonderfälle. */
 import { test, expect, type Page } from '@playwright/test';
 import { manyUsers19, MANY19_TODAY } from '../../fixtures/users19';
 import { simulate19 } from '../helpers/many19';
@@ -63,8 +63,6 @@ for (const [i, u] of USERS.entries()) {
       }
       if (sc === 'fortschritt') { const r = await page.locator('[data-range]').count(); if (!r) found.push('Fortschritt: kein Bereich (±) beim Score'); }
       if (sc === 'plan') {
-        for (const v of ['B', 'C']) { await page.goto('/?go=plan&planv=' + v); await expect(page.locator('#app')).not.toBeEmpty(); (await problems(page)).forEach(p => found.push(`Plan ${v}: ${p}`)); }
-        await page.goto('/?go=plan&planv=A');
         const b = page.locator('[data-act="sess-open"]').first();
         if (await b.count()) { await b.click(); await page.waitForTimeout(60); (await problems(page)).forEach(p => found.push(`Einheit: ${p}`)); const t = await page.locator('#sheetPanel').innerText().catch(() => ''); const tech2 = TECH.exec(t); if (tech2) found.push(`Einheit: „${tech2[0]}“`); await page.keyboard.press('Escape'); }
       }

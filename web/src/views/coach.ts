@@ -164,7 +164,7 @@ function addMsgs(list: any[]) { list.forEach(m => { STATE.coachMsgs[m.id] = m; }
 /* Frage beantworten: mit aktivem KI-Coach über den Server, sonst lokal mit der Gesprächsführung */
 let busy = false;
 let FELL_BACK = false;
-export async function ask(text: string, el?: HTMLButtonElement) {
+export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boolean } = {}) {
   text = text.trim(); if (!text || busy) return;
   busy = true;
   try {
@@ -172,7 +172,7 @@ export async function ask(text: string, el?: HTMLButtonElement) {
     // alte Knöpfe sind beantwortet
     const last = lastMsgId(); if (last && STATE.coachMsgs[last] && STATE.coachMsgs[last].options) STATE.coachMsgs[last] = { ...STATE.coachMsgs[last], answered: true, pendingOpen: false };
     const userMsg = { id: `msg-u-${now}`, at: now, date: todayStr(), kind: 'user', from: 'user', text };
-    if (aiState().chatActive && !(STATE.chatDialog && STATE.chatDialog.pending)) {
+    if (!o.local && aiState().chatActive && !(STATE.chatDialog && STATE.chatDialog.pending)) {
       if (el) el.disabled = true;
       // Frage sofort zeigen, Antwort als Strom (Auftrag 12); ohne Strom die bisherige Anfrage
       STATE.coachMsgs[userMsg.id] = userMsg; STREAM = { text: '' }; nav.rerender(); toBottom();
@@ -205,6 +205,8 @@ on('coach-send', async el => {
   await ask(text, el as HTMLButtonElement);
 });
 on('chat-say', el => ask(el.dataset.text || ''));
+// Auftrag 19: von anderen Ansichten (z. B. „Schmerzen / verletzt“ auf Heute) direkt in den Coach, mit der Gesprächsführung der App
+on('coach-ask', el => { const text = el.dataset.text || ''; nav.go('coach'); ask(text, undefined, { local: true }); });
 on('chat-opt', el => {
   const m = STATE.coachMsgs[el.dataset.id!]; const o: any = m && (m.options || [])[+el.dataset.i!]; if (!o) return;
   if (o.go) { STATE.coachMsgs[m.id] = { ...m, answered: true }; saveState(); const g = String(o.go); if (g.startsWith('session:')) { openSession(g.slice(8)); return; } nav.go(g); return; }

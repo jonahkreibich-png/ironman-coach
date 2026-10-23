@@ -564,24 +564,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .tl-sel { position: absolute; top: -1px; bottom: -1px; border: 2px solid var(--ink); border-radius: 4px; box-sizing: border-box; min-width: 4px; }
 .tl .more { margin-top: 4px; }
 
-/* Auftrag 19, Punkt 3: Plan-Ansichten B (Raster) und C (Mix) */
-.pv-switch { margin-top: var(--s3); }
-.pgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: var(--s3); }
-.pg-d { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; min-height: 96px; padding: 6px 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; }
-.pg-d.today { border-color: var(--accent); }
-.pg-d.on { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-color: var(--accent); }
-.pg-d.rest { background: var(--surface-2); }
-.pg-h { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
-.pg-h b { font-size: var(--t-xs); }
-.pg-h span { font-size: var(--t-xs); color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.pg-d.today .pg-h b { color: var(--accent); }
-.pg-s { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1 1 auto; }
-.pg-i { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); }
-.pg-i svg { width: 14px; height: 14px; }
-.pg-m { font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 1px; white-space: nowrap; }
-.pg-m svg, .pg-hard svg { width: 11px; height: 11px; }
+/* Auftrag 19, Punkt 3: Plan-Tab (Variante C): Balken je Tag, aufklappbare Tage mit Kurzbeschreibung */
 .pg-hard { color: var(--warn); display: inline-flex; font-style: normal; }
-.pg-det { margin-top: var(--s2); }
+.pg-hard svg { width: 11px; height: 11px; }
 .pmix { margin-top: var(--s3); padding: var(--s2) var(--s3); }
 .pm-bars { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; }
 .pm-c { display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: none; color: inherit; padding: 2px 0; min-width: 0; min-height: 44px; position: relative; }
@@ -610,3 +595,5 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .cday.open .chev { transform: rotate(180deg); }
 .cday-b { padding: 0 var(--s3) var(--s2) calc(66px + var(--s3) + var(--s2)); }
 @media (max-width: 360px) { .cday-b { padding-left: var(--s3); } .cday-d { flex-basis: 58px; } }
+.pr-what { font-size: var(--t-xs); color: var(--ink-2); line-height: 1.35; padding: 0 0 6px 38px; margin-top: -4px; }
+.health-row { margin-top: var(--s3); display: flex; flex-direction: column; gap: 6px; }
