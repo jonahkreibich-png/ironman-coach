@@ -447,7 +447,9 @@ export function scaleSpec(spec: Spec, f: number): Spec {
     else s.min = Math.max(5, Math.round((s.min || 0) * g / 5) * 5);
   }
   // Ein-/Ausrollen kürzen, wenn der Hauptteil schon minimal ist
-  if (f < 1 && totals(out).min > target + 5) out.steps.forEach(s => { if (s.part !== 'main' && s.min && s.min > 5) s.min = Math.max(5, Math.round(s.min * f / 5) * 5); });
+  // Auftrag 18: harte Einheiten behalten mindestens 10 min Aufwärmen
+  const hardSpec = mains.some(m => (m.zone || 0) >= 3 && (m.reps || 1) * (m.min || 0) >= 5);
+  if (f < 1 && totals(out).min > target + 5) out.steps.forEach(s => { if (s.part !== 'main' && s.min && s.min > 5) s.min = Math.max(s.part === 'warm' && hardSpec ? 10 : 5, Math.round(s.min * f / 5) * 5); });
   // Schwimmen (Auftrag 15): Ein-/Ausschwimmen in Metern und Technik-Serien mitkürzen
   if (out.sport === 'swim' && f < 1 && totals(out).min > target + 3) {
     out.steps.forEach(s => { if (s.part !== 'main' && s.m) s.m = Math.max(s.part === 'warm' ? 100 : 50, Math.floor(s.m * f / 50) * 50); });

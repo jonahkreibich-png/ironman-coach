@@ -23,7 +23,7 @@ import * as K from './keysessions';
 import { placeholders, macroPhases, timelineOf, capsFor, easyAfterDays, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
 import { levelOf, maxHard, ownHardBudget, repairIntensity, qualityFor } from './intensity';
 import { repairSports, repairSpacing } from './planrules';
-import { repairTrainingRules, hardBlocked } from './trainingrules';
+import { repairTrainingRules, hardBlocked, capLongSessions } from './trainingrules';
 
 export type Phase = 'base' | 'build' | 'specific' | 'taper' | 'race';
 export interface GenInput {
@@ -935,7 +935,8 @@ export function generatePlan(inp: GenInput): GenResult {
   // noch einmal Intensität (fehlende Qualität, Abwechslung) auf den nun gültigen Plan – nur an Tagen, die die Regeln erlauben – und Regeln
   intensityFixes.push(...repairIntensity(weeks, profile, today, intOpts));
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
-  enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null);
+  // Umfangsbremse und Grenzen der langen Einheiten abwechselnd, bis beides passt (beides kürzt nur)
+  for (let k = 0; k < 3; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null); enforceRecovery(weeks, prevRef[0] || null); if (!capLongSessions(weeks, profile, trOpts).length) break; }
   const violations = validateWeeks(weeks, { minor, maxIncPct: prog.incPct }, prevRef);
   const age2 = goalAllowed(A.type, ageAtRace);
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });
@@ -1073,6 +1074,11 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
           // zuletzt: kurze lockere Einheiten (ab 20 min) um 5 min, sonst den Koppellauf weglassen (er ist freiwillig)
           if (!did) for (const cand of all[i].days.flatMap((d: any) => d.sessions).filter((x: any) => x.spec && !x.stage && !x.fixed && !x.race && !x.hard && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport) && x.plannedMinutes >= 20 && !/^(Koppellauf|Wechsel-Lauf)/.test(x.title || ''))) { const rb = W.rebuildScaled(cand, (cand.plannedMinutes - 5) / cand.plannedMinutes); if (rb && rb.plannedMinutes < cand.plannedMinutes) { Object.assign(cand, rb, { plannedKm: rb.plannedKm ?? undefined }); did = true; break; } }
           if (!did) for (const d of all[i].days) { const b = (d.sessions || []).find((x: any) => /^(Koppellauf|Wechsel-Lauf)/.test(x.title || '') && !x.fixed && !x.frozen && (!sport || x.sport === sport)); if (b) { d.sessions = d.sessions.filter((x: any) => x !== b); did = true; break; } }
+          // ganz zuletzt: die kürzeste lockere Einheit dieser Sportart fällt weg (lockere Einheiten verfallen eher als die Steigerung zu brechen)
+          if (!did) { const pool = all[i].days.flatMap((d: any) => (d.sessions || []).filter((x: any) => x.spec && !x.stage && !x.fixed && !x.frozen && !x.race && !x.hard && !x.long && !/test/i.test(x.title || '') && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport)).map((x: any) => ({ d, x }))).sort((a: any, b: any) => a.x.plannedMinutes - b.x.plannedMinutes);
+            const same = (sp: string) => all[i].days.reduce((n: number, d: any) => n + (d.sessions || []).filter((x: any) => x.sport === sp && !x.cancelled).length, 0);
+            const pick = pool.find((p: any) => same(p.x.sport) > 1);
+            if (pick) { pick.d.sessions = pick.d.sessions.filter((x: any) => x !== pick.x); if (!pick.d.sessions.length) pick.d.sessions.push({ id: pick.x.id + '-rest', sport: 'rest', title: 'Ruhetag' }); did = true; } }
           if (!did) break;
         }
       }
@@ -1204,7 +1210,7 @@ export function continuationOf(oldPlan: any, today: string, state?: any, from?: 
     const extra = Object.entries(state.customWorkouts || {}).filter(([d]) => d >= normal.startDate && d <= weekEnd(normal)).flatMap(([, l]: any) => l || []).filter((c: any) => c && c.sport !== 'football');
     doneMin += extra.reduce((a: number, c: any) => a + (+((c.metrics || {}).min) || c.plannedMinutes || 0), 0);
   }
-  const maxOf = (sport: string) => normal ? Math.max(0, ...list(normal).filter((s: any) => s.sport === sport).map((s: any) => s.plannedMinutes || 0)) || null : null;
+  const maxOf = (sport: string) => normal ? Math.max(0, ...list(normal).filter((s: any) => s.sport === sport && !/test|Kraul-Check/i.test(s.title || '')).map((s: any) => s.plannedMinutes || 0)) || null : null;
   const swims = normal ? list(normal).filter((s: any) => s.sport === 'swim').map((s: any) => s.plannedMinutes || 0) : [];
   return { weekNo: keep.reduce((mx: number, w: any) => Math.max(mx, +w.weekNumber || 0), 0), blockNo, builtSinceRecovery: built, lastNormalMin: normal ? own(normal) || null : null, blockName: (oldPlan.meta || {}).blockName || null,
     lastNormalDoneMin: doneMin, lastNormalTracked: tracked, lastNormalWeek: normal || null, lastLongRun: maxOf('run'), lastLongBike: maxOf('bike'), lastSwim: swims.length ? Math.round(swims.reduce((a: number, b: number) => a + b, 0) / swims.length) : null, curRecovery: !!(cur && cur.isRecoveryWeek) };

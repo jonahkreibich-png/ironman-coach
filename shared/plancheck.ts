@@ -6,6 +6,7 @@
 import type { Profile, SportKey } from './profile';
 import { isMinor, progressionOf } from './profile';
 import type { Goal } from './goals';
+import { mainGoal } from './goals';
 import { addDays } from './core';
 import { validateWeeks, isIntense } from './rules';
 import * as W from './workouts';
@@ -14,8 +15,9 @@ import { rulesOf, effectsOf, hardViolations, allowedHard, dayLimit } from './con
 import { parseFor } from './ruleparse';
 import { checkPlanRules } from './planrules';
 import { nameIssues } from './sessiontypes';
+import { checkTrainingRules, type TRuleId } from './trainingrules';
 
-export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup' | 'names' | 'tripleDay';
+export type CheckRule = 'ability' | 'frequency' | 'dayTime' | 'teamSport' | 'strength' | 'goals' | 'distance' | 'volume' | 'hardDays' | 'runVolume' | 'hardCount' | 'illness' | 'age' | 'format' | 'constraint' | 'sport' | 'sameSport' | 'strengthGroup' | 'names' | 'tripleDay' | TRuleId;
 export interface CheckIssue { rule: CheckRule; week?: number; date?: string; msg: string }
 
 const dowOf = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
@@ -114,6 +116,8 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
   hardViolations(weeks, rules).forEach(v => out.push({ rule: 'constraint', date: v.date, msg: v.msg }));
   // Auftrag 15: nur gewählte Sportarten, gleiche Sportart nicht an zwei Tagen hintereinander (auch So → Mo)
   checkPlanRules(weeks, profile, { from: o.fromDate || null }).forEach(v => out.push({ rule: v.rule, week: v.week, date: v.date, msg: v.msg }));
+  // Auftrag 18: Trainingsregeln (Ruhetage, lange Tage, Wettkampfwoche, nach dem Wettkampf, Lauf-Qualität vor dem Laufziel …)
+  checkTrainingRules(weeks, profile, { from: o.fromDate || null, goals, today, goalType: (mainGoal(goals, today) || {} as any).type || null }).forEach(v => out.push({ rule: v.rule, week: v.week, date: v.date, msg: v.msg }));
   // Umfang und harte Tage
   validateWeeks(weeks, { minor, maxIncPct: progressionOf(profile, today).incPct }).forEach(v => out.push({ rule: v.rule as CheckRule, week: v.week, date: v.date, msg: v.msg }));
   return out;

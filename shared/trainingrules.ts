@@ -55,6 +55,9 @@ const sportsOf = (d: any) => new Set<string>(live(d).filter((s: any) => !s.race)
 const hardDay = (d: any) => !!d && live(d).some(hardS);
 const eventDay = (d: any) => !!d && live(d).some((s: any) => s.race || isGame(s));
 const raceSimDay = (d: any) => live(d).length > 0 && live(d).filter((s: any) => !s.race).every((s: any) => s.raceSim);
+const testIn = (w0: any, sp: string) => (w0.days || []).some((d: any) => live(d).some((s: any) => s.sport === sp && isTestS(s)));
+/* Bezug für „+10 min“: die längste Einheit der Sportart in der Woche (ohne Tests, Koppel, Wettkampf) */
+const refOf = (w0: any, sp: string) => Math.max(0, ...(w0.days || []).flatMap((d: any) => live(d)).filter((s: any) => s.sport === sp && !s.race && !isTestS(s) && !isBrick(s)).map(minOf));
 const RUN_Q = new Set(['threshold', 'tempo', 'racepace', 'intervals', 'longq', 'vo2', 'test']);
 
 interface DayRef { w: any; d: any }
@@ -190,12 +193,12 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
         if (lastLR != null && lr > lastLR + 11 && !w.partial) add('longStep', w, ref.date, `${fmt(ref.date)}: langer Lauf ${lr} min nach ${lastLR} min (höchstens +10 min).`);
       }
       if (lb && lastLB != null && lb > lastLB + 16 && !w.partial) add('longStep', w, undefined, `Woche ${w.weekNumber}: lange Ausfahrt ${lb} min nach ${lastLB} min (höchstens +15 min).`);
-      if (!w.isRecoveryWeek && ph !== 'taper' && ph !== 'race' && !w.entry && !w.reduced) { if (lr) lastLR = lr; if (lb) lastLB = lb; }
+      if (!w.isRecoveryWeek && ph !== 'taper' && ph !== 'race' && !w.entry && !w.reduced) { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
       // Wettkampf-Simulationen: höchstens 3 pro Saison (Kalenderjahr)
       for (const d of days) if (raceSimDay(d) && sportsOf(d).size > 2) { const y = d.date.slice(0, 4); simCount[y] = (simCount[y] || 0) + 1; if (simCount[y] > 3) add('raceSim', w, d.date, `${fmt(d.date)}: mehr als 3 Wettkampf-Simulationen in ${y}.`); }
     } else {
       const lr = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && isLongS(s)).map(minOf)); const lb = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && isLongS(s)).map(minOf));
-      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') { if (lr) lastLR = lr; if (lb) lastLB = lb; }
+      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
     }
   }
   // Wettkämpfe: Woche davor, Tage danach, Lauf-Qualität vor Laufzielen
@@ -406,6 +409,18 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         placed = { d, s, nx: { ...s, ...b, id: s.id, long: true, hard: true, ruleNote: 'Lauf-Qualität vor dem Laufziel (im langen Lauf)' } };
         break;
       }
+      // c) wenig Umfang (nur kurze Läufe): ein kurzer Lauf wird zur kurzen Qualität (etwa 30 min), ein anderer lockerer Lauf der Woche
+      //    wird um die Differenz kürzer oder fällt weg (Umfang bleibt gleich)
+      if (!placed) for (const { d, s } of runs) {
+        if (!movable(s, d.date) || isLongS(s) || hardS(s) || !s.spec || minOf(s) < 15) continue;
+        const i2 = idx(d); if (i2 < 0 || !freeAround(i2)) continue;
+        const spec = K.runQuality(s.spec.ctx, fitQ(15), { short: true }); const add = W.totals(spec).min - minOf(s);
+        const other = runs.filter((x: any) => x.s !== s && movable(x.s, x.d.date) && !hardS(x.s) && !isLongS(x.s) && x.s.spec).sort((a: any, b: any) => minOf(b.s) - minOf(a.s))[0];
+        if (add > 0 && !other) continue;
+        placed = { d, s, nx: { ...W.build({ ...spec, why: `${spec.why} ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}: einmal pro Woche im Wettkampftempo, kurz gehalten.` }), id: s.id, ruleNote: 'Lauf-Qualität vor dem Laufziel' } };
+        if (add > 0 && other) { if (minOf(other.s) - add >= 15) { const nx2 = scaled(other.s, (minOf(other.s) - add) / minOf(other.s)); if (nx2) setS(other.d, other.s, nx2); } else { removeS(other.d, other.s); fixes.push(`${other.d.date}: ${other.s.title} entfällt (Minuten für die Lauf-Qualität)`); } }
+        break;
+      }
       if (!placed) continue;
       // Budget harter Einheiten: notfalls eine harte Einheit einer anderen Sportart locker
       const fixedHard = (w.days || []).filter((d: any) => live(d).some((s: any) => isGame(s) || (s.race && s.priority === 'C'))).length;
@@ -467,28 +482,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     }
   }
   // 7) lange Einheiten: passend zum Ziel, höchstens +10 min (Rad +15 min) pro Woche
-  { let lastLR: number | null = o.prevLongRun ?? null, lastLB: number | null = o.prevLongBike ?? null;
-    for (const w of weeks) {
-      for (const d of w.days || []) for (const s of [...live(d)]) {
-        if (!isLongS(s) || !s.spec || s.stage || !movable(s, d.date)) continue;
-        let lim = Infinity;
-        if (s.sport === 'run') { lim = capsFor(cycleType(w, d.date, races, o), d.date, { aGoal: o.goalType || null, age: ageOf(p, d.date) }).run; if (lastLR != null && !w.partial) lim = Math.min(lim, lastLR + 10); }
-        if (s.sport === 'bike' && lastLB != null && !w.partial) lim = Math.min(lim, lastLB + 15);
-        for (let k = 0; k < 4 && minOf(s) > lim + 1; k++) { const nx = scaled(s, (lim / minOf(s)) * (1 - 0.03 * k)); if (nx && nx.plannedMinutes < minOf(s)) { Object.assign(s, nx); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } else break; }
-        // Qualität im langen Lauf lässt sich nicht immer skalieren: dann mit der Ziel-Dauer neu bauen (gleicher Qualitätsteil, weniger locker)
-        if (minOf(s) > lim + 1 && s.sport === 'run' && s.spec.kind === 'longq') {
-          const st = s.spec.steps.find((x: any) => x.part === 'main' && (x.zone || 0) >= 3);
-          if (st) { const q = { reps: st.reps || 1, min: st.min || 10, zone: st.zone, rest: st.restMin || 2, label: st.note || 'Tempo', why: s.spec.why || '' } as any;
-            while (q.reps > 1 && q.reps * q.min + (q.reps - 1) * q.rest > lim - 25) q.reps--;
-            const b = W.build({ ...K.longRunWithQuality(s.spec.ctx, r5(lim) > lim ? r5(lim) - 5 : r5(lim), q), why: s.spec.why });
-            if (b.plannedMinutes <= lim + 1) { Object.assign(s, b); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } }
-        }
-      }
-      const own = (w.days || []).flatMap((d: any) => live(d));
-      const lr = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && isLongS(s)).map(minOf)), lb = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && isLongS(s)).map(minOf));
-      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race' && !w.entry && !w.reduced) { if (lr) lastLR = lr; if (lb) lastLB = lb; }
-    }
-  }
+  fixes.push(...capLongSessions(weeks, p, o));
   // 8) Kraft: Beine nie am oder vor Spiel, Wettkampf, langem Lauf (verschieben, sonst Rumpf statt Beine); am Spieltag höchstens 30 min
   { const D = daysOf(weeks);
     for (let i = 0; i < D.length; i++) {
@@ -651,4 +645,49 @@ export function restDayReason(weeks: any[], date: string, p: Profile | null = nu
   const minor = p ? (ageOf(p, date) ?? 30) < 18 : false;
   const head = `Am ${fmt(date)} ist Ruhetag${why.length ? ': ' + why.slice(0, 3).join(', ') : ''}.`;
   return `${head} Mindestens ein freier Tag pro Woche gehört fest in den Plan: In der Pause passt sich der Körper an das Training an und wird stärker.${minor ? ' Für Jugendliche sind 1-2 freie Tage pro Woche empfohlen.' : ''} Lockeres Bewegen (Spaziergang, Mobility) ist okay.`;
+}
+
+
+/* Lange Einheiten: passend zum nächsten Ziel, höchstens +10 min (Rad +15 min) pro Woche – kürzt nur (auch nach anderen Kürzungen nutzbar) */
+export function capLongSessions(weeks: any[], p: Profile, o: TOpts = {}): string[] {
+  const fixes: string[] = [];
+  const inR = (date: string) => !o.from || date >= o.from; void inR;
+  const keep = (s: any) => !!(o.keep && o.keep(s));
+  const movable = (s: any, date: string) => !!s && !fixedS(s) && !keep(s) && (!o.from || date >= o.from);
+  const races = racesOf(weeks, o.goals || []);
+  { let lastLR: number | null = o.prevLongRun ?? null, lastLB: number | null = o.prevLongBike ?? null;
+    for (const w of weeks) {
+      for (const d of w.days || []) for (const s of [...live(d)]) {
+        if (!isLongS(s) || !s.spec || s.stage || !movable(s, d.date)) continue;
+        let lim = Infinity;
+        if (s.sport === 'run') { lim = capsFor(cycleType(w, d.date, races, o), d.date, { aGoal: o.goalType || null, age: ageOf(p, d.date) }).run; if (lastLR != null && !w.partial) lim = Math.min(lim, lastLR + 10); }
+        if (s.sport === 'bike' && lastLB != null && !w.partial) lim = Math.min(lim, lastLB + 15);
+        for (let k = 0; k < 4 && minOf(s) > lim + 1; k++) { const nx = scaled(s, (lim / minOf(s)) * (1 - 0.03 * k)); if (nx && nx.plannedMinutes < minOf(s)) { Object.assign(s, nx); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } else break; }
+        // lange Ausfahrt mit Blöcken lässt sich nicht immer skalieren: dann gleichmäßig mit der Ziel-Dauer
+        if (minOf(s) > lim + 1 && s.sport === 'bike' && hardS(s) && s.spec.ctx) {
+          const hq0 = s.spec.steps.find((x: any) => x.part === 'main' && (x.zone || 0) >= 3);
+          if (hq0) { const total = Math.floor(lim / 5) * 5; const hq: any = { ...hq0, reps: hq0.reps || 1 };
+            while (hq.reps > 1 && hq.reps * (hq.min || 10) + (hq.reps - 1) * (hq.restMin || 3) > total - 35) hq.reps--;
+            if ((hq.min || 10) * hq.reps > total - 35) hq.min = Math.max(5, Math.floor((total - 35) / 5) * 5);
+            const qMin = hq.reps * (hq.min || 10) + (hq.reps - 1) * (hq.restMin || 3); const easy = Math.max(10, total - 15 - qMin);
+            const before = Math.max(10, Math.round(easy * 0.4 / 5) * 5), after = Math.max(5, easy - before);
+            const b = W.build({ sport: 'bike', kind: 'longq', ctx: s.spec.ctx, noDistance: s.spec.noDistance, why: s.spec.why, steps: [{ part: 'warm', min: 15, zone: 1 }, { part: 'main', min: before, zone: 2 }, hq, { part: 'main', min: after, zone: 2, note: 'locker zu Ende fahren, essen und trinken' }] } as any);
+            if (b.plannedMinutes <= lim + 1) { Object.assign(s, b, { long: true, hard: true }); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } }
+        }
+        if (minOf(s) > lim + 1 && s.sport === 'bike' && !hardS(s) && s.spec.ctx) { const b = W.build({ ...W.bikeLong(s.spec.ctx, Math.floor(lim / 5) * 5), why: s.spec.why }); if (b.plannedMinutes <= lim + 1) { Object.assign(s, b, { long: true }); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } }
+        // Qualität im langen Lauf lässt sich nicht immer skalieren: dann mit der Ziel-Dauer neu bauen (gleicher Qualitätsteil, weniger locker)
+        if (minOf(s) > lim + 1 && s.sport === 'run' && s.spec.kind === 'longq') {
+          const st = s.spec.steps.find((x: any) => x.part === 'main' && (x.zone || 0) >= 3);
+          if (st) { const q = { reps: st.reps || 1, min: st.min || 10, zone: st.zone, rest: st.restMin || 2, label: st.note || 'Tempo', why: s.spec.why || '' } as any;
+            while (q.reps > 1 && q.reps * q.min + (q.reps - 1) * q.rest > lim - 25) q.reps--;
+            const b = W.build({ ...K.longRunWithQuality(s.spec.ctx, r5(lim) > lim ? r5(lim) - 5 : r5(lim), q), why: s.spec.why });
+            if (b.plannedMinutes <= lim + 1) { Object.assign(s, b); fixes.push(`${d.date}: ${s.title} (lange Einheit höchstens ${Math.round(lim)} min)`); } }
+        }
+      }
+      const own = (w.days || []).flatMap((d: any) => live(d));
+      const lr = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && isLongS(s)).map(minOf)), lb = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && isLongS(s)).map(minOf));
+      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race' && !w.entry && !w.reduced) { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
+    }
+  }
+  return fixes;
 }
