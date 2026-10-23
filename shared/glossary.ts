@@ -4,9 +4,12 @@
 import { SESSION_TYPES } from './sessiontypes';
 import { KNOWLEDGE } from './trainingknowledge';
 import { DRILLS } from './workouts';
+import { WORKOUTS } from './workoutlib';
+import { exampleSpec, diagramSvg } from './workoutdiagram';
 
 export type GlossaryTopic = 'understand' | 'load' | 'values' | 'intensity' | 'planning' | 'technique' | 'sessions';
-export interface Term { term: string; topic: GlossaryTopic; aliases: string; text: string; re: RegExp; ok?: RegExp }
+export interface Term { term: string; topic: GlossaryTopic; aliases: string; text: string; re: RegExp; ok?: RegExp;
+  /** Auftrag 19: Formen der Einheiten-Bibliothek mit Ablaufbild und Steckbrief */ diagram?: string; facts?: string[] }
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const entry = (term: string, topic: GlossaryTopic, aliases: string, text: string): Term => ({ term, topic, aliases, text, re: new RegExp(esc(term), 'i') });
 
@@ -72,8 +75,22 @@ const BASE: Term[] = [
   entry('Freiwasser', 'technique', 'Open Water See', 'Schwimmen im See oder Meer: alle paar Züge nach vorn schauen (Sichten). Nie allein schwimmen.'),
   entry('Rolle', 'technique', 'Indoor Trainer Smarttrainer Rollentrainer', 'Fahrrad-Trainer für drinnen. Gut für Intervalle und im Winter; die Geschwindigkeit dort ist nur virtuell.')
 ];
+/* Auftrag 19: alle Formen der Einheiten-Bibliothek mit kurzer Erklärung, Steckbrief und Ablaufbild (Mehr → Lexikon → Einheiten) */
+const LV_TXT: Record<string, string> = { beginner: 'alle', advanced: 'ab Fortgeschritten', experienced: 'Erfahrene' };
+const NEED_TXT: Record<string, string> = { hills: 'Hügel', track: 'Laufbahn', trainer: 'Rolle', buoy: 'Pull Buoy', board: 'Kickbrett', paddles: 'Paddles', openwater: 'Freiwasser' };
+const EX_TXT: Record<string, string> = { achilles: 'Achillessehnen-Beschwerden', knee: 'Kniebeschwerden', back: 'Rückenbeschwerden', shoulder: 'Schulterbeschwerden', runEasyOnly: 'Lauf nur locker (Beschwerden)' };
+const SPORT_TXT: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', tri: 'Triathlon' };
+const LIB_ALL: Term[] = WORKOUTS.map(d => {
+  const sp = exampleSpec(d.key);
+  const facts = [`${SPORT_TXT[d.sport]} · ${d.load} · ${LV_TXT[d.level]}`, `Beispiel: ${d.example}`, `Aufbau: ${d.structure}`, `Steigerung: ${d.stages.join(' → ')}`,
+    ...(d.needs && d.needs.length ? [`Braucht: ${d.needs.map(n => NEED_TXT[n] || n).join(', ')}${d.altText ? '. ' + d.altText : ''}`] : []), ...(d.excludes && d.excludes.length ? [`Nicht bei: ${d.excludes.map(x => EX_TXT[x] || x).join(', ')}`] : []), ...(d.swimMin ? [`Ab ${d.swimMin} m Kraul am Stück`] : [])];
+  return { term: d.name, topic: 'sessions' as GlossaryTopic, aliases: `Einheit ${d.key} ${d.load} ${SPORT_TXT[d.sport]} ${d.example}`, text: d.purpose, re: new RegExp(esc(d.name), 'i'), facts, ...(sp ? { diagram: diagramSvg(sp, { label: 'Ablauf: ' + d.name }) } : {}) };
+});
+// Begriffe, die es schon gibt (z. B. Sweet Spot, Over-Unders, Freiwasser), bekommen Steckbrief und Ablaufbild dazu
+for (const b of BASE) { const l = LIB_ALL.find(x => x.term === b.term); if (l) { b.facts = l.facts; b.diagram = l.diagram; } }
+const LIB_TERMS = LIB_ALL.filter(l => !BASE.some(b => b.term === l.term));
 /* Einheiten aus der zentralen Liste: Name, Zweck und Aufbau */
-const SESSIONS: Term[] = SESSION_TYPES.filter(t => !BASE.some(b => b.term === t.name)).map(t => entry(t.name, 'sessions', `Einheit ${t.key} ${t.intensity}`, `${t.purpose} Aufbau: ${t.structure}`));
+const SESSIONS: Term[] = [...LIB_TERMS, ...SESSION_TYPES.filter(t => !BASE.some(b => b.term === t.name) && !LIB_TERMS.some(l => l.term === t.name)).map(t => entry(t.name, 'sessions', `Einheit ${t.key} ${t.intensity}`, `${t.purpose} Aufbau: ${t.structure}`))];
 /* Auftrag 18: Technik-Übungen im Wasser (Übungs-Katalog) und „Training verstehen“ (die Trainingsregeln mit Begründung). Beide werden nur
    im Lexikon gezeigt, nicht in Texten gesucht. */
 const NEVER = /(?!)/;

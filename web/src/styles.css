@@ -514,6 +514,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .term { all:unset; cursor:pointer; color:inherit; text-decoration:underline dotted; text-decoration-color:var(--muted, currentColor); text-underline-offset:3px; }
 .term:focus-visible { outline:2px solid var(--accent, currentColor); outline-offset:2px; border-radius:2px; }
 .lexicon-entry p { margin:var(--s2) 0 0; }
+.wo-diagram-wrap { margin:var(--s2) 0 0; color:var(--accent); line-height:0; }
+.wo-diagram { display:block; max-width:100%; }
+.wo-facts { margin:var(--s2) 0 0; padding-left:18px; font-size:13px; color:var(--muted, inherit); }
+.wo-facts li { margin:2px 0; overflow-wrap:anywhere; }
 
 /* Plan-Tab (Auftrag 18, Punkt 3): kompakte Wochenleiste, Wochenzeile, 7 Tage als Liste */
 .wkbar { display: flex; align-items: center; gap: var(--s2); min-width: 0; }

@@ -6,7 +6,8 @@ import { esc } from '../util';
 const topics: GlossaryTopic[] = ['understand', 'load', 'values', 'intensity', 'planning', 'technique', 'sessions'];
 let preset = '';
 export function setLexiconQuery(q: string): void { const j = findTerm(q); preset = j ? j.term : q; }
-const card = (j: Term) => `<article class="card lexicon-entry" data-lexicon-term="${esc(j.term)}"><h3>${esc(j.term)}</h3><p>${esc(j.text)}</p></article>`;
+/* Auftrag 19: Formen der Einheiten-Bibliothek mit Steckbrief und Ablaufbild (SVG aus den Bausteinen, keine Nutzerdaten) */
+const card = (j: Term) => `<article class="card lexicon-entry" data-lexicon-term="${esc(j.term)}"><h3>${esc(j.term)}</h3><p>${esc(j.text)}</p>${j.diagram ? `<div class="wo-diagram-wrap">${j.diagram}</div>` : ''}${j.facts && j.facts.length ? `<ul class="wo-facts">${j.facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}</article>`;
 function results(query = '', topic: GlossaryTopic | '' = ''): string {
   const terms = searchGlossary(query, topic);
   const count = `<p class="muted xs" role="status">${esc(t('lexicon.count', { n: terms.length }))}</p>`;

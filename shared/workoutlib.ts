@@ -41,13 +41,13 @@ export const WORKOUTS: WorkoutDef[] = [
   { key: 'run.hillsprints', sport: 'run', name: 'Hügelsprints', purpose: 'Kraft und Laufökonomie durch kurze, steile Sprints, ohne müde zu machen.', level: 'advanced', phases: ['base', 'build'], goals: A,
     example: '6-10×10-15 s steil, voll erholen', structure: '15 min einlaufen, 6-10 × 10-15 s zügig einen steilen Hügel hinauf, langsam zurückgehen (voll erholen), locker auslaufen.', stages: ['6×10 s', '8×12 s', '8×15 s', '10×15 s'],
     load: 'locker', zone: 'kurz Z5, sonst Z2', needs: ['hills'], alt: 'run.strides', altText: 'Ohne Hügel: Laufband mit Steigung oder Steigerungen in der Ebene.', excludes: ['achilles'], quality: true },
-  { key: 'run.hillreps', sport: 'run', name: 'Berg-Intervalle', purpose: 'Kraft und Tempo bergauf: hebt die Sauerstoffaufnahme mit wenig Stoß auf die Beine.', level: 'advanced', phases: ['build'], goals: ['5k', '10k', 'sprint', 'olympic', 'fitness'],
+  { key: 'run.hillreps', sport: 'run', name: 'Berg-Intervalle (Laufen)', purpose: 'Kraft und Tempo bergauf: hebt die Sauerstoffaufnahme mit wenig Stoß auf die Beine.', level: 'advanced', phases: ['build'], goals: ['5k', '10k', 'sprint', 'olympic', 'fitness'],
     example: '6-10×60-90 s bergauf, Traben zurück', structure: '15 min einlaufen mit Steigerungen, Wiederholungen hart bergauf, im Traben zurück, 10 min auslaufen.', stages: ['6×60 s', '8×60 s', '6×90 s', '8×90 s', '10×90 s'],
     load: 'hart', zone: 'Z4-5', needs: ['hills'], alt: 'run.vo2', altText: 'Ohne Hügel: Laufband mit 4-6 % Steigung oder die gleichen Stücke in der Ebene.', excludes: ['achilles'], z5: true, quality: true },
   { key: 'run.longhills', sport: 'run', name: 'Lange Hügel', purpose: 'Kraftausdauer für lange Rennen: lange Anstiege knapp unter der Schwelle.', level: 'advanced', phases: ['build'], goals: ['half', 'marathon', 'middle', 'long', 'fitness'],
     example: '4-6×3 min bergauf', structure: '15 min einlaufen, 4-6 × 3 min gleichmäßig bergauf (Zone 4), locker zurück, 10 min auslaufen.', stages: ['4×3 min', '5×3 min', '6×3 min'],
     load: 'hart', zone: 'Z4', needs: ['hills'], alt: 'run.threshold', altText: 'Ohne Hügel: Laufband mit Steigung oder Schwellen-Intervalle.', excludes: ['achilles'], quality: true },
-  { key: 'run.fartlek', sport: 'run', name: 'Tempowechsel-Lauf (Fahrtspiel)', purpose: 'Abwechslung und erstes Tempo: zügige Minuten im Wechsel mit lockeren.', level: 'beginner', phases: ['base', 'build'], goals: A,
+  { key: 'run.fartlek', sport: 'run', name: 'Tempowechsel-Lauf (Fahrtspiel)', purpose: 'Abwechslung und erstes Tempo: zügige Minuten im Wechsel mit lockeren.', level: 'beginner', phases: ['base', 'build', 'specific'], goals: A,
     example: '8×1 min zügig / 1 min locker', structure: '10 min einlaufen, dann im Wechsel 1 min zügig (Zone 3) und 1 min locker, 10 min auslaufen.', stages: ['6×1 min / 2 min', '8×1 min / 1 min', '10×1 min / 1 min', '6×2 min / 1 min'],
     load: 'mittel', zone: 'Z3 / Z2', quality: true },
   { key: 'run.progression', sport: 'run', name: 'Progressionslauf', purpose: 'Locker beginnen und im letzten Drittel bis zur Schwelle steigern: Tempogefühl und Ausdauer.', level: 'beginner', phases: ['base', 'build', 'specific'], goals: A,
@@ -93,7 +93,7 @@ export const WORKOUTS: WorkoutDef[] = [
   { key: 'bike.cadence', sport: 'bike', name: 'Kadenz-Übungen', purpose: 'Runder, ökonomischer Tritt: hohe Trittfrequenz und Einbeinfahren.', level: 'beginner', phases: ['base', 'build', 'recovery'], goals: A,
     example: 'Spin-ups 5×1 min 100-120 rpm, Einbeinfahren (Rolle)', structure: '15 min einrollen, 5 × 1 min mit 100-120 Umdrehungen (Spin-ups), auf der Rolle 4 × 30 s je Bein einbeinig, locker Zone 2, ausrollen.', stages: ['4×1 min', '5×1 min', '6×1 min'],
     load: 'locker', zone: 'Z2', quality: true },
-  { key: 'bike.force', sport: 'bike', name: 'Kraftausdauer (niedrige Kadenz)', purpose: 'Kraft für Anstiege und lange Strecken: niedrige Trittfrequenz im Sitzen.', level: 'advanced', phases: ['base', 'build'], goals: A,
+  { key: 'bike.force', sport: 'bike', name: 'Kraftausdauer (niedrige Kadenz)', purpose: 'Kraft für Anstiege und lange Strecken: niedrige Trittfrequenz im Sitzen.', level: 'advanced', phases: ['base', 'build', 'specific'], goals: A,
     example: '4-6×5-10 min, 55-65 rpm, Zone 3', structure: '15 min einrollen, Abschnitte mit 55-65 Umdrehungen in Zone 3 im Sitzen (am Berg oder auf der Rolle), locker dazwischen, ausrollen.', stages: ['4×5 min', '5×6 min', '4×8 min', '5×8 min', '4×10 min', '6×8 min'],
     load: 'mittel', zone: 'Z3', excludes: ['knee'], quality: true },
   { key: 'bike.sweetspot', sport: 'bike', name: 'Sweet Spot', purpose: 'Die Schwelle heben, ohne so müde zu machen wie Schwellen-Intervalle.', level: 'beginner', phases: ['base', 'build', 'specific'], goals: A,
@@ -120,7 +120,7 @@ export const WORKOUTS: WorkoutDef[] = [
   { key: 'bike.racepaceblocks', sport: 'bike', name: 'Lange Ausfahrt mit Renntempo-Blöcken', purpose: 'Renntempo und Ausdauer in einer Einheit, mit Wettkampf-Verpflegung.', level: 'advanced', phases: ['specific'], goals: ['olympic', 'middle', 'long', 'bike'],
     example: 'z. B. 3×20 min im Renntempo', structure: 'Erst locker, dann die Blöcke im Renntempo mit 10 min locker dazwischen, locker zu Ende fahren, Verpflegung wie im Rennen.', stages: ['2×15 min', '3×15 min', '3×20 min', '2×30 min'],
     load: 'hart', zone: 'Z3', quality: true },
-  { key: 'bike.climb', sport: 'bike', name: 'Berg-Intervalle', purpose: 'Lange Anstiege knapp unter der Schwelle üben, so wie am Berg im Rennen.', level: 'advanced', phases: ['build', 'specific'], goals: A,
+  { key: 'bike.climb', sport: 'bike', name: 'Berg-Intervalle (Rad)', purpose: 'Lange Anstiege knapp unter der Schwelle üben, so wie am Berg im Rennen.', level: 'advanced', phases: ['build', 'specific'], goals: A,
     example: '5-8×3-5 min Anstieg', structure: '15 min einrollen, Anstiege knapp unter der Schwelle, Trittfrequenz 70-80 im Sitzen, bergab locker, ausrollen.', stages: ['5×3 min', '6×4 min', '5×5 min', '8×4 min'],
     load: 'hart', zone: 'Z4', needs: ['hills'], alt: 'bike.force', altText: 'Ohne Berge: auf der Rolle mit hohem Widerstand und 60-70 Umdrehungen.', quality: true },
   { key: 'bike.tt', sport: 'bike', name: 'Zeitfahr-Simulation', purpose: 'Renntempo in der Wettkampf-Position, Verpflegung und Gefühl für das Tempo.', level: 'advanced', phases: ['specific'], goals: ['sprint', 'olympic', 'middle', 'duathlon'],
@@ -150,7 +150,7 @@ export const WORKOUTS: WorkoutDef[] = [
   { key: 'swim.css', sport: 'swim', name: 'CSS-Intervalle', purpose: 'Training an der Schwimm-Schwelle (CSS) – der wichtigste Reiz für Ausdauer-Tempo im Wasser.', level: 'beginner', phases: ['build', 'specific'], goals: A,
     example: '10×100, 5×200, 3×300 m @ CSS, 10-20 s Pause', structure: 'Einschwimmen, Technik, Stücke genau im CSS-Tempo mit kurzer Pause, locker ausschwimmen.', stages: ['8×100 m', '10×100 m', '5×200 m', '3×300 m'],
     load: 'hart', zone: 'Z4 (CSS)', swimMin: 400, quality: true },
-  { key: 'swim.pyramid', sport: 'swim', name: 'Pyramide', purpose: 'Abwechslung und Tempogefühl über verschiedene Strecken.', level: 'advanced', phases: ['build', 'specific'], goals: A,
+  { key: 'swim.pyramid', sport: 'swim', name: 'Pyramide', purpose: 'Abwechslung und Tempogefühl über verschiedene Strecken.', level: 'advanced', phases: ['base', 'build', 'specific'], goals: A,
     example: '100-200-300-200-100 m', structure: 'Einschwimmen, Technik, Stücke 100-200-300-200-100 m zügig (Zone 3), 20 s Pause, ausschwimmen.', stages: ['100-200-100 m', '100-200-300-200-100 m'], load: 'hart', zone: 'Z3', swimMin: 300, quality: true },
   { key: 'swim.descend', sport: 'swim', name: 'Absteigend / negativ', purpose: 'Pacing lernen: jedes Stück schneller, die zweite Hälfte schneller als die erste.', level: 'advanced', phases: ['build', 'specific'], goals: A,
     example: '4×100 m jede schneller, 400 m 2. Hälfte schneller', structure: 'Einschwimmen, Technik, 4 × 100 m jede Wiederholung schneller, dann 400 m mit schnellerer zweiter Hälfte, ausschwimmen.', stages: ['4×100 m', '2×(4×100 m)', '4×100 m + 400 m'], load: 'hart', zone: 'Z2 → Z4', swimMin: 400, quality: true },
@@ -217,24 +217,25 @@ export function resolve(key: string, o: PickOpts, depth = 0): string | null {
 /* Reihenfolge der Qualitätsformen je Sportart, Phase und Ziel. Ein Eintrag mit „|“ ist eine Untergruppe, die selbst reihum geht
    (z. B. kurze Intervalle: VO2max, 30/30, Pyramide, Berg-Intervalle). So wechseln sich die Formen ab: höchstens 2 gleiche Wochen hintereinander,
    2-3 Formen je Block, und jede Form steigt mit jeder Wiederholung eine Stufe. */
-const SHORT = 'run.vo2|run.3030|run.pyramid|run.hillreps';
+// kurze Intervalle; unter 18 und ab 60 (keine Zone 5) dafür Tempowechsel oder Progression
+const SHORT = 'run.vo2|run.3030|run.pyramid|run.hillreps|run.fartlek|run.progression';
 export function rotation(sport: 'run' | 'bike' | 'swim', phase: LPhase, goal: LGoal): string[] {
   if (sport === 'run') {
     if (phase === 'recovery') return ['run.strides', 'run.abc'];
     if (phase === 'base') return ['run.strides', 'run.hillsprints', 'run.fartlek', 'run.abc', 'run.progression'];
     if (phase === 'taper') return ['run.racepace'];
     if (phase === 'build') {
-      if (goal === '5k') return ['run.vo2', 'run.threshold', 'run.speed|run.3030', 'run.vo2', 'run.hillreps|run.pyramid'];
-      if (goal === '10k') return ['run.threshold', 'run.vo2', 'run.threshold', 'run.pyramid|run.hillreps|run.3030'];
-      if (goal === 'sprint' || goal === 'aquathlon') return ['run.vo2', 'run.threshold', 'run.3030|run.hillreps'];
+      if (goal === '5k') return ['run.vo2|run.fartlek', 'run.threshold', 'run.speed|run.3030|run.progression', 'run.vo2|run.fartlek', 'run.hillreps|run.pyramid|run.progression'];
+      if (goal === '10k') return ['run.threshold', 'run.vo2|run.fartlek', 'run.threshold', 'run.pyramid|run.hillreps|run.3030|run.progression'];
+      if (goal === 'sprint' || goal === 'aquathlon') return ['run.vo2|run.fartlek', 'run.threshold', 'run.3030|run.hillreps|run.progression'];
       if (goal === 'fitness') return ['run.fartlek', 'run.progression', 'run.3030|run.pyramid', 'run.threshold'];
       if (goal === 'marathon' || goal === 'long') return ['run.threshold', 'run.tempo', 'run.longhills|' + SHORT];
       // Halbmarathon, Olympisch, Mitteldistanz, Duathlon: Schwellenläufe (3×8 → 3×10 → 2×15 → 20-25 min am Stück), alle 2-3 Wochen kurze Intervalle
       return ['run.threshold', 'run.threshold', SHORT + '|run.longhills'];
     }
     // spezifisch: Wettkampftempo der Zieldistanz
-    if (goal === '5k') return ['run.vo2', 'run.speed|run.3030', 'run.racepace'];
-    if (goal === '10k' || goal === 'sprint' || goal === 'olympic' || goal === 'duathlon' || goal === 'aquathlon') return ['run.racepace', 'run.vo2', 'run.racepace', 'run.threshold'];
+    if (goal === '5k') return ['run.vo2|run.threshold', 'run.speed|run.3030|run.fartlek', 'run.racepace'];
+    if (goal === '10k' || goal === 'sprint' || goal === 'olympic' || goal === 'duathlon' || goal === 'aquathlon') return ['run.racepace', 'run.vo2|run.fartlek', 'run.racepace', 'run.threshold'];
     if (goal === 'fitness') return ['run.progression', 'run.threshold', 'run.fartlek'];
     return ['run.racepace', 'run.racepace', 'run.threshold'];
   }
@@ -247,9 +248,9 @@ export function rotation(sport: 'run' | 'bike' | 'swim', phase: LPhase, goal: LG
       // Sweet Spot → Schwelle → Over-Unders → VO2max kurz und niedrige Kadenz am Berg/Rolle, im Wechsel
       return ['bike.sweetspot', 'bike.threshold', 'bike.overunder', 'bike.vo2', 'bike.force|bike.climb'];
     }
-    if (goal === 'bike') return ['bike.climb', 'bike.racepaceblocks', 'bike.threshold', 'bike.vo2'];
-    if (goal === 'middle' || goal === 'long') return ['bike.tempolong|bike.racepaceblocks', 'bike.sweetspot', 'bike.threshold'];
-    return ['bike.vo2', 'bike.threshold', 'bike.overunder', 'bike.tt|bike.3015'];
+    if (goal === 'bike') return ['bike.climb', 'bike.racepaceblocks', 'bike.threshold', 'bike.vo2|bike.sweetspot'];
+    if (goal === 'middle' || goal === 'long') return ['bike.tempolong|bike.racepaceblocks', 'bike.sweetspot', 'bike.threshold', 'bike.overunder|bike.force'];
+    return ['bike.vo2|bike.sweetspot', 'bike.threshold', 'bike.overunder', 'bike.tt|bike.3015|bike.sweetspot'];
   }
   // Schwimmen: in einer von zwei Einheiten pro Woche ein kurzer harter Teil (passend zur Strecke am Stück)
   if (phase === 'recovery') return ['swim.drills'];
@@ -276,11 +277,13 @@ export function pickQuality(sport: 'run' | 'bike' | 'swim', n: number, o: PickOp
   if (!key) return null;
   let stage = 0; for (let i = 0; i < idx - 1; i++) if (at(i) === key) stage++;
   const d = LIB[key];
-  // Einsteiger: kürzeste Stufe; unter 18/ab 60: höchstens die Mitte der Leiter
+  // Einsteiger: beginnen mit der kürzesten Stufe und steigen langsamer (höchstens bis zur dritten); unter 18/ab 60: höchstens die Mitte der Leiter.
+  // Oben angekommen wechseln sich die obersten zwei erlaubten Stufen ab (nie zweimal genau dieselbe Einheit hintereinander)
   const top = d.stages.length - 1;
-  if (o.level === 'beginner') stage = Math.min(stage, 1);
-  if (o.noZ5) stage = Math.min(stage, Math.max(0, Math.floor(top / 2)));
-  return { key, stage: ladderIndex(top + 1, stage) };
+  let raw = o.level === 'beginner' ? Math.floor(stage / 2) : stage;
+  const cap = Math.min(top, o.level === 'beginner' ? 2 : top, o.noZ5 ? Math.max(0, Math.floor(top / 2)) : top);
+  if (cap < top && raw > cap) raw = cap > 0 && (raw - cap) % 2 === 1 ? cap - 1 : cap;
+  return { key, stage: cap < top ? raw : ladderIndex(top + 1, raw) };
 }
 /* Stufe einer Leiter: steigt mit jeder Einheit; oben angekommen wechseln sich die letzten Stufen ab (nie zweimal genau gleich) */
 export function ladderIndex(n: number, lvl: number): number { if (lvl < n) return Math.max(0, lvl); const k = Math.min(3, n); return n - k + ((lvl - n) % k + 1) % k; }

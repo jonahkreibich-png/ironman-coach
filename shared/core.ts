@@ -7,6 +7,8 @@ import * as K from './keysessions';
 import { rulesOf, evaluate, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
 import { actualMetrics, effectiveActivity } from './results';
+import { LIB } from './workoutlib';
+import { runQualitySpec, bikeQualitySpec } from './workoutbuild';
 /* ---------- Datum ---------- */
 function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
@@ -494,7 +496,7 @@ function ladderVerdict(s, st, act, lthrBike): { result: 'up' | 'stay' | 'fail'; 
   }
   return { result: 'stay', why: 'keine Messdaten und keine RPE' };
 }
-function isSweetSpot(s) { return !!s && s.sport === 'bike' && !s.pattern && !/^(Zone 2|Locker) statt/.test(s.title || '') && /sweet/i.test((s.title || '') + ' ' + (s.zone || '')); }
+function isSweetSpot(s) { return !!s && s.sport === 'bike' && !s.pattern && !(s.spec && s.spec.lib) && !/^(Zone 2|Locker) statt/.test(s.title || '') && /sweet/i.test((s.title || '') + ' ' + (s.zone || '')); }
 const round5 = x => Math.max(5, Math.round(x / 5) * 5);
 const r1 = x => Math.round(x * 10) / 10;
 const DOW_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -924,6 +926,29 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
         push({ id: `${group}-ladder-${s.id}`, type: 'modify', sessionId: s.id,
           set: { title: newTitle, description: `Sweet Spot ${a}×${b} min. ${s.description || ''}`.trim() },
           what: `${curTitle} → ${newTitle}`, reason: 'Intervall-Leiter Rad: ' + ladderWhy });
+      });
+    }
+  }
+
+  // Auftrag 19: Leitern der Einheiten-Bibliothek: die nächste Stufe einer Form nur, wenn die letzte erledigt war und laut Messdaten bzw.
+  // Anstrengung (RPE) passte. Nicht erledigt oder nicht ganz geschafft: Stufe wiederholen; zweimal nicht geschafft: eine Stufe leichter.
+  {
+    const lthrBike = (thrOf(state).lthrBike) || LTHR_DEFAULT.bike;
+    const libDone = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -28)).flatMap(d => d.sessions.filter(x => x && x.spec && x.spec.lib && LIB[x.spec.lib.key] && LIB[x.spec.lib.key].quality && ['run', 'bike'].includes(x.sport) && !x.cancelled).map(x => ({ s: x, st: (state.sessions || {})[x.id] || {}, date: d.date })))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const keys = [...new Set(libDone.map(x => x.s.spec.lib.key))];
+    for (const key of keys) {
+      const list = libDone.filter(x => x.s.spec.lib.key === key); const last = list[list.length - 1]; const prev = list[list.length - 2];
+      const verdictOf = (x) => x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], lthrBike) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
+      const v = verdictOf(last); if (!v || v.result === 'up') continue;
+      const pv = prev ? verdictOf(prev) : null;
+      const target = v.result === 'fail' && pv && pv.result === 'fail' ? Math.max(0, last.s.spec.lib.stage - 1) : last.s.spec.lib.stage;
+      const why = v.result === 'fail' && pv && pv.result === 'fail' ? `zweimal nicht geschafft (${v.why}): eine Stufe leichter` : `${v.why}: Stufe wiederholen`;
+      nextSessions.filter(x => x.spec && x.spec.lib && x.spec.lib.key === key && x.spec.lib.stage > target && !x.cancelled && !x.locked).forEach(x => {
+        const sp = x.sport === 'run' ? runQualitySpec(key, target, x.spec.ctx, ({ 'Halbmarathon-Tempo': 'run_half', 'Marathon-Tempo': 'run_marathon', '10-km-Tempo': 'run_10k', '5-km-Tempo': 'run_5k' } as Record<string, string>)[x.spec.lib.label || ''] || null, {}) : bikeQualitySpec(key, target, x.spec.ctx, null, { total: x.plannedMinutes });
+        if (!sp) return; sp.why = x.spec.why; const b = W.build(sp); if (b.title === x.title) return;
+        push({ id: `${group}-lib-${x.id}`, type: 'modify', sessionId: x.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec },
+          what: `${x.title} → ${b.title}`, reason: `${LIB[key].name}: ${why}` });
       });
     }
   }

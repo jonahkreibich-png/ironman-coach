@@ -331,7 +331,7 @@ function libTitle(spec: Spec, min: number, main: Step[], where: string): string 
     case 'bike.sprints': return `Lockere Ausfahrt ${min} min mit ${n} Sprints${where}`;
     case 'bike.3015': return `Rad-Intervalle ${main.filter(x => (x.zone || 0) >= 5).length}×${n}×30/15 s${where}`;
     case 'bike.tempolong': return `Rad im Renntempo ${n}×${minTxt(q.min)}${where}`;
-    case 'bike.racepaceblocks': return `Lange Ausfahrt ${min} min mit ${n > 1 ? `${n}×${minTxt(q.min)}` : minTxt(q.min)} im Renntempo${where}`;
+    case 'bike.racepaceblocks': return spec.kind === 'longq' ? `Lange Ausfahrt ${min} min mit ${n > 1 ? `${n}×${minTxt(q.min)}` : minTxt(q.min)} im Renntempo${where}` : `Rad im Renntempo ${n > 1 ? `${n}×${minTxt(q.min)}` : minTxt(q.min)}${where}`;
     case 'bike.tt': return `Zeitfahr-Simulation ${minTxt(q.min)}${where}`;
     case 'bike.morning': return `Lockeres Rad am Morgen ${min} min${where}`;
     case 'strength.full': return `Kraft Ganzkörper ${min} min`;

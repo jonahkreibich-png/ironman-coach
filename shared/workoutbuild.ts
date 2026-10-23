@@ -146,6 +146,7 @@ export function bikeQualitySpec(key: string, stage: number, ctx: W.PaceCtx, goal
     case 'bike.force': [reps, min] = pick<[number, number]>([[4, 5], [5, 6], [4, 8], [5, 8], [4, 10], [6, 8]], stage); zone = 3; rest = 3; note = 'niedrige Trittfrequenz 55-65 im Sitzen, Oberkörper ruhig (am Berg oder auf der Rolle)'; kind = 'force'; break;
     case 'bike.climb': [reps, min] = pick<[number, number]>([[5, 3], [6, 4], [5, 5], [8, 4]], stage); zone = 4; rest = min; note = 'am Anstieg knapp unter der Schwelle, Trittfrequenz 70-80 im Sitzen; bergab locker zurück'; kind = 'climb'; break;
     case 'bike.tempolong': [reps, min] = pick<[number, number]>([[2, 30], [2, 40], [2, 50], [2, 60]], stage); zone = 3; rest = 10; note = 'Renntempo der langen Distanz, gleichmäßig, essen und trinken wie im Rennen'; kind = 'racepace'; break;
+    case 'bike.racepaceblocks': [reps, min] = pick<[number, number]>([[2, 15], [3, 15], [3, 20], [2, 30]], stage); zone = 3; rest = 10; note = 'Renntempo, Verpflegung wie im Rennen'; kind = 'racepace'; break;
     case 'bike.tt': min = pick([20, 30, 40], stage); reps = 1; zone = shortG ? 4 : 3; rest = 0; note = 'Renntempo in der Wettkampf-Position (Aero), gleichmäßig'; kind = 'racepace'; break;
     case 'bike.3015': {
       const [sets, n] = pick<[number, number]>([[2, 10], [2, 13], [3, 10], [3, 13]], stage);

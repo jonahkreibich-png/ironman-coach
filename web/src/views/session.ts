@@ -10,6 +10,7 @@ import { duration, dist, num, pace, swimPace, speed, mmss } from '../../../share
 import { on, onChange, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
 import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
+import { diagramSvg } from '../../../shared/workoutdiagram';
 import { nav } from '../nav';
 import { fieldsBlock } from './fieldsui';
 import { checkTestResult, checkSwimSkill } from '../testupdate';
@@ -96,7 +97,9 @@ export function structureHtml(s: any): string {
   const x = s.sport !== 'rest' ? structureOf(s, profile(), todayStr()) : null;
   if (!x || !x.parts.length) return s.description ? `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>` : '';
   const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
-  return `<div class="card flat tight structure" data-structure>${when}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${p.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>
+  // Auftrag 19: Ablaufbild aus den Bausteinen (Höhe = Anstrengung)
+  const dia = s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length > 1 && s.sport !== 'strength' ? `<div class="wo-diagram-wrap" data-diagram>${diagramSvg(s.spec, { label: t('sess.diagram') })}</div>` : '';
+  return `<div class="card flat tight structure" data-structure>${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${p.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>
     ${x.drills && x.drills.length ? `<div class="small" data-drills><b>${esc(t('sess.drills'))}:</b><ul>${x.drills.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : ''}${x.sum ? `<div class="small" data-swimsum><b>${esc(x.sum)}</b></div>` : ''}
     ${x.how ? `<div class="small"><b>${esc(t('sess.how'))}:</b> ${esc(x.how)}</div>` : ''}${x.tip ? `<div class="small"><b>${esc(t('sess.tip'))}:</b> ${esc(x.tip)}</div>` : ''}${x.why ? `<div class="small muted"><b>${esc(t('sess.why'))}:</b> ${esc(x.why)}</div>` : ''}
     ${x.derived && s.description ? more(t('sess.original'), `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>`) : ''}</div>`;

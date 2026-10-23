@@ -71,6 +71,8 @@ export interface GenInput {
   recentLong?: { run?: number | null; bike?: number | null } | null;
   /** Auftrag 18: Tage ohne Training (ohne Krankheit) vor „from“: ab 8 Tagen Wiedereinstieg in Stufen */
   pauseDays?: number | null;
+  /** Auftrag 19: kurz vorher gelaufene Wettkämpfe (z. B. bei der Verlängerung nach dem Hauptziel): die Tage danach bleiben locker */
+  pastGoals?: Goal[] | null;
 }
 /* CTL ist etwa die tägliche Belastung (TSS) der letzten 6 Wochen. Lockeres Ausdauertraining bringt etwa 50 TSS pro Stunde. */
 export const TSS_PER_HOUR = 50;
@@ -440,7 +442,6 @@ function generatePlanIn(inp: GenInput): GenResult {
   });
   // Bisherige Form (eigenes Training + halber Teamsport) für die freie Verteilung
   const volumes = ownVols.map(v => v + teamWeekMin * 0.5);
-  const DBGF = typeof process !== "undefined" && (process as any).env && (process as any).env.DBG_FIX ? new RegExp((process as any).env.DBG_FIX) : null;
   const startMin = volumes[0];
   void startMin;
 
@@ -993,7 +994,7 @@ function generatePlanIn(inp: GenInput): GenResult {
     weeks[0].days.forEach((d: any) => { const f = (inp.frozen || []).find(x => x.date === d.date); d.sessions = d.date < from! && f && f.sessions.length ? f.sessions.map(strip) : d.sessions.map((s: any) => orig[s.id] || s); }); }
   // Auftrag 18: Trainingswissen als feste Regeln (Ruhetage, lange Tage, Wettkampfwoche, nach dem Wettkampf, Lauf-Qualität vor dem Laufziel …),
   // vor und nach der Intensitäts-Korrektur; die Intensität setzt nichts Hartes an Tage, die die Regeln sperren
-  const trOpts = { from: from || start, today, goals, goalType: A.type as GoalType, keep: (s: any) => keepIds.has(s.id), runQualityOk: runAllowed && !eff.runEasyOnly && runStage == null,
+  const trOpts = { from: from || start, today, goals: [...goals, ...(inp.pastGoals || []).filter(g => g && g.date && !goals.some(x => x.id === g.id))], goalType: A.type as GoalType, keep: (s: any) => keepIds.has(s.id), runQualityOk: runAllowed && !eff.runEasyOnly && runStage == null,
     prevLongRun: lastLongRun0, prevLongBike: lastLongBike0, dayCap: (date: string) => Math.min(dayCap(profile, dowOf(date)), dayLimit(rules, date).cap),
     allowed: (s: any, date: string) => !evaluate(rules, { ...s, long: !!s.long, hard: !!s.hard }, date).hard.length && dayLimit(rules, date).cap > 0 && !(s.sport === 'swim' && s.place !== 'outdoor' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, date)) };
   const trainingFixes = repairTrainingRules(weeks, profile, trOpts);
@@ -1014,7 +1015,6 @@ function generatePlanIn(inp: GenInput): GenResult {
   for (let k = 0; k < 6; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null); if (!capLongSessions(weeks, profile, trOpts).length) break; }
   // Auftrag 19: zum Schluss noch einmal Abwechslung (spätere Schritte können dieselbe Schlüsseleinheit zwei Wochen hintereinander erzeugt haben)
   intensityFixes.push(...varyRepeats(weeks, from || start));
-  if (DBGF) [...ruleFixes, ...trainingFixes, ...intensityFixes].filter(f => DBGF.test(f)).forEach(f => console.error("FIX", f));
   const violations = validateWeeks(weeks, { minor, maxIncPct: prog.incPct }, prevRef);
   const age2 = goalAllowed(A.type, ageAtRace);
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });

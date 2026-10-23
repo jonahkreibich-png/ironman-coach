@@ -76,7 +76,8 @@ export function validateWeeks(weeks: any[], ctx: RuleCtx = {}, prevWeeks: any[] 
   const days = all.flatMap(w => (w.days || []).map((d: any) => ({ ...d, weekNumber: w.weekNumber }))).sort((a: any, b: any) => a.date.localeCompare(b.date));
   const hard = new Set(days.filter((d: any) => (d.sessions || []).some((s: any) => isIntense(s))).map((d: any) => d.date));
   // feste Termine (Spiel, Wettkampf) liegen nicht in der Hand des Plans: zwei feste harte Tage hintereinander sind kein Planungsfehler
-  const onlyFixed = (date: string) => { const d = days.find((x: any) => x.date === date); return !!d && (d.sessions || []).filter((s: any) => isIntense(s)).every((s: any) => s.fixed || s.race); };
+  // Auftrag 19: ausdrücklich gewünschte Einheiten aus dem Wochenraster (pinned) zählen wie feste Termine (bewusste Ausnahme)
+  const onlyFixed = (date: string) => { const d = days.find((x: any) => x.date === date); return !!d && (d.sessions || []).filter((s: any) => isIntense(s)).every((s: any) => s.fixed || s.race || s.pinned); };
   const newDates = new Set(weeks.flatMap(w => (w.days || []).map((d: any) => d.date)));
   for (const d of days) {
     if (!newDates.has(d.date) || !hard.has(d.date)) continue;

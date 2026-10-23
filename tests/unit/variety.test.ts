@@ -82,7 +82,7 @@ describe('Rad und Lauf: Fortschritt der Schlüsseleinheiten', () => {
     expect(titles(ol, 'base').join(' ')).toMatch(/Sweet Spot/);
     expect(titles(ol, 'build').join(' ')).toMatch(/an der Schwelle|Over-Unders/);
     expect(titles(ol, 'specific').join(' ')).toMatch(/sehr hart/);
-    expect(titles(ld, 'specific').join(' ')).toMatch(/Wettkampftempo/);
+    expect(titles(ld, 'specific').join(' ')).toMatch(/Wettkampftempo|Renntempo/);
   });
   test('Lauf: Aufbau Schwelle, spezifisch Wettkampftempo (Halbmarathon-Tempo vor Mittel-, 10-km-Tempo vor Olympisch)', () => {
     const ol = applyOnboarding(PERSONAS.find(p => p.id === 'olympisch-erfahren')!.answers, today).gen!.plan;

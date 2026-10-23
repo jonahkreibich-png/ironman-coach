@@ -72,7 +72,9 @@ export function extendPlan(plan: any, profile: Profile, goals: Goal[], today: st
   const lastEnd = weeks[weeks.length - 1].endDate || C.addDays(weeks[weeks.length - 1].startDate, 6);
   const gl = (goals || []).filter(g => g && !g.result && (!g.date || g.date > lastEnd));
   if (!gl.length || lastEnd > C.addDays(today, 42)) return null;
-  const gen = generatePlan({ profile, goals: gl, today: lastEnd, continueFrom: continuationOf(plan, lastEnd), load: null });
+  // Auftrag 19: Wettkämpfe kurz vor dem Ende des Plans: die Tage danach bleiben auch im neuen Abschnitt locker
+  const past = (goals || []).filter(g => g && g.date && g.date <= lastEnd && g.date > C.addDays(lastEnd, -21));
+  const gen = generatePlan({ profile, goals: gl, today: lastEnd, continueFrom: continuationOf(plan, lastEnd), load: null, pastGoals: past });
   const next = transitionPlan(plan, gen.plan, lastEnd);
   next.meta = { ...next.meta, explain: (plan.meta && plan.meta.explain) || gen.plan.meta.explain, extendedAt: today };
   return next.weeks.length > weeks.length ? next : null;

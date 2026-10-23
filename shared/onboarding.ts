@@ -18,6 +18,8 @@ export interface Block { id: string; title: string; intro: string; questions: Qu
 export type Answers = Record<string, any>;
 
 export const SPORT_OPTIONS: [string, string][] = [['swim', 'Schwimmen'], ['bike', 'Rad'], ['run', 'Laufen'], ['strength', 'Kraft']];
+/* Auftrag 19: Gelände in der Nähe (Hügel-, Bahn- und Laufband-Einheiten; ohne Angabe gibt es Ersatz) */
+export const TERRAIN_OPTIONS: [string, string][] = [['hills', 'Hügel oder Berge'], ['track', 'Laufbahn'], ['treadmill', 'Laufband']];
 export const SWIM_GEAR_OPTIONS: [string, string][] = [['board', 'Kickbrett'], ['buoy', 'Pull Buoy'], ['fins', 'Flossen'], ['paddles', 'Paddles'], ['snorkel', 'Frontschnorchel']];
 export const BIKE_OPTIONS: [string, string][] = [['road', 'Rennrad'], ['gravel', 'Gravelbike'], ['mtb', 'Mountainbike'], ['tt', 'Triathlon-/Zeitfahrrad'], ['trekking', 'Trekking-/Stadtrad'], ['ebike', 'E-Bike'], ['trainer', 'Rollentrainer/Smarttrainer'], ['spin', 'Indoor-Bike/Spinning']];
 export const DAYLOAD_OPTIONS: [DayLoad, string][] = [[0, 'kein Training'], [1, 'kurz (bis 45 min)'], [2, 'mittel (bis 90 min)'], [3, 'lang (mehr als 90 min)']];
@@ -58,7 +60,8 @@ export const BLOCKS: Block[] = [
     { id: 'runContinuousMin', label: 'Laufen: Wie lange kannst du am Stück locker laufen?', type: 'number', unit: 'min', min: 0, max: 400, show: a => has(a, 'run') },
     { id: 'bikeLongestMin', label: 'Rad: Längste Fahrt in letzter Zeit?', type: 'number', unit: 'min', min: 0, max: 900, show: a => has(a, 'bike') },
     { id: 'bikes', label: 'Welche Räder hast du?', type: 'multi', options: BIKE_OPTIONS, show: a => has(a, 'bike') },
-    { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', hint: 'Powermeter am Rad oder ein Smarttrainer, der Watt anzeigt. Im Zweifel: Nein.', show: a => has(a, 'bike') }
+    { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', hint: 'Powermeter am Rad oder ein Smarttrainer, der Watt anzeigt. Im Zweifel: Nein.', show: a => has(a, 'bike') },
+    { id: 'terrain', label: 'Was hast du in der Nähe?', type: 'multi', options: TERRAIN_OPTIONS, show: a => has(a, 'run') || has(a, 'bike'), hint: 'Für Berg- und Bahn-Einheiten. Ohne Angabe gibt es Ersatz (z. B. Steigerungen in der Ebene, Rolle mit hohem Widerstand). Die Rolle wählst du oben bei den Rädern.' }
   ] },
   { id: 'team', title: 'Teamsport', intro: 'Fußball, Handball, Basketball oder feste Gruppentermine (z. B. Lauftreff): zählen im Plan als feste Termine und Belastung.', questions: [
     { id: 'teamYes', label: 'Machst du Teamsport oder hast du feste Gruppentermine?', type: 'yesno' },
@@ -214,6 +217,8 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
     ...(a.swimPullM != null ? { swimPullM: num(a.swimPullM) } : {})
   };
   if (Array.isArray(a.bikes)) p.bikes = a.bikes;
+  // Auftrag 19: Gelände (Laufband zählt für Berg-Einheiten mit Steigung)
+  if (Array.isArray(a.terrain)) p.terrain = { hills: a.terrain.includes('hills') || a.terrain.includes('treadmill'), track: a.terrain.includes('track') };
   if (Array.isArray(a.bikeSetup)) { p.bikes = [...new Set([...(p.bikes || []), ...a.bikeSetup.filter((x: string) => x !== 'power' && x !== 'clip' && x !== 'group')])]; if (a.bikeSetup.includes('power')) p.powerMeter = true; }
   if (a.powerMeter != null) p.powerMeter = !!a.powerMeter;
   if (a.bests && typeof a.bests === 'object') { const b: any = {}; Object.entries(a.bests).forEach(([k, v]) => { const s = parseDur(v, k === 'runHalf' || k === 'runMarathon' ? 'hm' : 'ms'); if (s) b[k] = s; }); p.bests = b; }
@@ -294,6 +299,7 @@ export function understood(a: Answers, today: string): Understood[] {
   if (p.sports.includes('run') && sk.runContinuousMin != null) can.push(`${sk.runContinuousMin} min am Stück laufen`);
   if (p.sports.includes('bike') && sk.bikeLongestMin != null) can.push(`längste Radfahrt ${sk.bikeLongestMin} min`);
   if ((p.bikes || []).length) can.push('Räder: ' + p.bikes.map(b => (BIKE_OPTIONS.find(x => x[0] === b) || [b, b])[1]).join(', ') + (p.powerMeter ? ', mit Wattmessung' : ''));
+  if (p.terrain && (p.terrain.hills || p.terrain.track)) can.push('in der Nähe: ' + [p.terrain.hills ? 'Hügel (oder Laufband)' : '', p.terrain.track ? 'Laufbahn' : ''].filter(Boolean).join(', '));
   out.push({ block: 'skills', label: 'Können', text: can.join('; ') || 'keine Angaben' });
   const rs = rulesOf(p, parseFor(today)).filter(r => !r.hidden && r.kind !== 'info');
   out.push({ block: 'notes', label: 'Einschränkungen', text: [...new Set(rs.map(ruleText))].join('; ') || [p.injuries, ...(p.notes || [])].filter(Boolean).join('; ') || 'keine' });
