@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { seed, open, stored, TODAY } from './helpers';
+import { seed, open, stored, TODAY, openPlanSession } from './helpers';
 
 test('Kraftvorlage erstellen, bearbeiten, starten und unabhängig abschließen', async ({ page }) => {
   await seed(page); await open(page, '/?go=strength');
@@ -59,8 +59,7 @@ test('Vorlage validieren und in geplanter Krafteinheit übernehmen und speichern
   await page.getByRole('dialog').getByRole('button', { name: 'Schließen', exact: true }).click();
   await page.locator('.tab[data-tab="plan"]').click();
   const target = await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('ec_plan')!); for (let i = 0; i < p.weeks.length; i++) { const s = p.weeks[i].days.flatMap((d: any) => d.sessions).find((s: any) => s.sport === 'strength'); if (s) return { week: i, sid: s.id }; } throw new Error('Keine geplante Krafteinheit'); });
-  await page.locator(`[data-act="plan-week"][data-i="${target.week}"]`).click();
-  await page.locator(`[data-act="sess-open"][data-sid="${target.sid}"]`).first().click();
+  await openPlanSession(page, target.sid);
   await page.selectOption('[data-template-select]', 't1');
   await page.locator('[data-act="fd-template-apply"]').click();
   await expect(page.locator('[data-ch="fd-ex"][data-f="name"]').first()).toHaveValue('Bankdrücken');

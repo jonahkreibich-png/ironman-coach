@@ -1,7 +1,7 @@
 /* Auftrag 7 in der App: Felder statt Notizfeld, Ablauf in Schritten, Coach erklärt den Tag, „Was der Coach gerade sieht“,
    Fragebogen setzt den Plan fort, Umfang pro Woche passt auf den Bildschirm. */
 import { test, expect } from '@playwright/test';
-import { seed, open, stored, TODAY } from './helpers';
+import { seed, open, stored, TODAY, openPlanSession } from './helpers';
 
 test('Einheit: Felder je Sportart, RPE und Gefühl, Pulszone automatisch, Notiz wird in Felder übertragen', async ({ page }) => {
   const demo = await seed(page, { extra: d => {
@@ -11,10 +11,7 @@ test('Einheit: Felder je Sportart, RPE und Gefühl, Pulszone automatisch, Notiz 
   } });
   const run = (demo as any).__run;
   await open(page, `/?go=plan`);
-  await page.evaluate(id => { (document.querySelector(`[data-act="sess-open"][data-sid="${id}"]`) as HTMLElement | null)?.scrollIntoView(); }, run.id);
-  const btn = page.locator(`[data-act="sess-open"][data-sid="${run.id}"]`);
-  if (!(await btn.count())) await page.locator('[data-act="plan-week"]').first().click();
-  await page.locator(`[data-act="sess-open"][data-sid="${run.id}"]`).click();
+  await openPlanSession(page, run.id);
   const sheet = page.locator('#sheetPanel');
   await expect(sheet.locator('[data-fields="run"]')).toBeVisible();
   await expect(sheet.locator('#fd-km')).toHaveValue('5.07');

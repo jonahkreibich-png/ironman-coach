@@ -1,6 +1,6 @@
 /* Auftrag 8 in der App: unter jeder Woche Umfang und Steigerung zur letzten Aufbauwoche, Testfelder nur bei Tests. */
 import { test, expect } from '@playwright/test';
-import { seed, open, TODAY } from './helpers';
+import { seed, open, TODAY, openPlanSession } from './helpers';
 
 test('Plan: Wochenkopf rechts kurz „erledigt/geplant · Stunden“, Steigerung als eigene Zeile links', async ({ page }) => {
   await seed(page);
@@ -26,8 +26,7 @@ test('Testfelder erscheinen nur beim Test (Radtest: Ø-Puls und Ø-Watt der 20 m
   const [testId, otherId] = (demo as any).__ids;
   const openSess = async (id: string) => {
     await open(page, '/?go=plan');
-    for (let i = 0; i < 12 && !(await page.locator(`[data-act="sess-open"][data-sid="${id}"]`).count()); i++) await page.locator('[data-act="plan-week"]').nth(i).click();
-    await page.locator(`[data-act="sess-open"][data-sid="${id}"]`).click();
+    await openPlanSession(page, id);
   };
   await openSess(testId);
   await expect(page.locator('#sheetPanel #fd-testHr')).toBeVisible();

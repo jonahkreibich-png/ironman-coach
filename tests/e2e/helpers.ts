@@ -31,3 +31,16 @@ export async function open(page: Page, path = '/') {
 export async function stored(page: Page): Promise<any> {
   return page.evaluate(() => JSON.parse(localStorage.getItem('ec_state_v2') || 'null'));
 }
+/* Auftrag 19 (Plan-Tab C): Einheit im Plan öffnen – Woche wählen und den Tag aufklappen, falls er zu ist */
+export async function openPlanSession(page: Page, sid: string) {
+  const at = await page.evaluate(id => {
+    const p = JSON.parse(localStorage.getItem('ec_plan') || '{"weeks":[]}');
+    for (let i = 0; i < p.weeks.length; i++) for (const d of p.weeks[i].days) if ((d.sessions || []).some((s: any) => s.id === id)) return { week: i, date: d.date };
+    return null;
+  }, sid);
+  if (!at) throw new Error('Einheit nicht im Plan: ' + sid);
+  const btn = page.locator(`[data-act="sess-open"][data-sid="${sid}"]`);
+  if (!(await btn.count())) await page.locator(`[data-act="plan-week"][data-i="${at.week}"]`).click();
+  if (!(await btn.count())) await page.locator(`.cday-h[data-date="${at.date}"]`).click();
+  await btn.first().click();
+}

@@ -1,6 +1,6 @@
 /* Auftrag 4: Fehler aus dem ersten Test, nachgestellt auf iPhone-Breite (Chromium und WebKit). Diese Tests bleiben im Paket. */
 import { test, expect, type Page } from '@playwright/test';
-import { seed, open, stored, TODAY } from './helpers';
+import { seed, open, stored, TODAY, openPlanSession } from './helpers';
 
 const tab = (page: Page, id: string) => page.locator(`.tab[data-tab="${id}"]`);
 const next = (page: Page) => page.locator('[data-act="ob-next"]').click();
@@ -107,9 +107,9 @@ test('A7: Pace bei einer Einheit mit getrennten Feldern', async ({ page }) => {
   await seed(page);
   await open(page);
   await tab(page, 'plan').click();
-  const run = page.locator('[data-act="sess-open"]').filter({ hasText: /Lauf/ }).first();
-  const sid = await run.getAttribute('data-sid');
-  await run.click();
+  // Auftrag 19: erste Laufeinheit ab heute (Tage sind zugeklappt)
+  const sid = await page.evaluate((today) => { const p = JSON.parse(localStorage.getItem('ec_plan')!); for (const w of p.weeks) for (const d of w.days) if (d.date >= today) { const s = d.sessions.find((x: any) => x.sport === 'run' && !x.race); if (s) return s.id; } return null; }, TODAY);
+  await openPlanSession(page, sid!);
   if (!(await page.locator('#fd-pace-m').count())) await page.locator('#sheetPanel [data-act="sess-toggle"]').first().click();
   await fill(page, '#fd-pace-m', '5'); await fill(page, '#fd-pace-s', '30');
   await expect.poll(async () => ((await stored(page)).sessions[sid!] || {}).metrics?.pace).toBe('5:30');

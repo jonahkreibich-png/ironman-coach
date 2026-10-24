@@ -119,7 +119,8 @@ function weekMix(w: any, today: string): string {
     return `<button class="pm-c ${x.d.date === today ? 'today' : ''} ${x.d.date === sel ? 'on' : ''}" data-act="plan-pick" data-date="${x.d.date}" aria-label="${esc(dowLong(x.d.date) + ' ' + fmtDate(x.d.date))}"><span class="pm-b">${x.rest ? `<span class="pm-rest">${ic('moon')}</span>` : segs}</span>${x.hard ? `<span class="pm-hard">${ic('bolt')}</span>` : ''}<span class="pm-l">${esc(dowShort(x.d.date).slice(0, 2))}</span></button>`;
   }).join('');
   const days = infos.map((x: DayInfo) => {
-    const open = x.d.date === sel;
+    // beim Bearbeiten sind alle Tage offen (man will die ganze Woche sehen)
+    const open = editing() || x.d.date === sel;
     const sum = x.rest ? `<span class="muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span>`
       : x.list.map((s: any) => `<span class="pm-si" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('') + `<span class="pm-st">${esc(shortTitles(x))}</span>`;
     return `<div class="cday ${x.d.date === today ? 'today' : ''} ${open ? 'open' : ''} ${x.rest ? 'rest' : ''}" id="day-${x.d.date}" data-day="${x.d.date}">

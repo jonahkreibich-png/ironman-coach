@@ -128,7 +128,7 @@ Dabei gefunden und an der Ursache behoben: Hügelsprints wurden beim mehrfachen 
 10. ✓ Plan-Tab: Variante C mit Kurzbeschreibung; Krank/verletzt sichtbar auf Heute.
 
 ### Veröffentlicht
-**Live in der echten App (Version 3.6.0)** seit 24.10., 0:20 Uhr, vorher in stamio-test mit einer frischen Kopie deiner Daten geprüft. Sicherung: `data-export/prod-vor-auftrag19-final.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Wochenraster), eine Coach-Nachricht „Plan angepasst“ und die Sperre gegen alte App-Versionen (Plan/Profil erst ab 3.6.0). Alle 357 Datensätze sind erhalten. Tests: Typen, 1974 Unit-Tests, Build, 350 Browser-Tests (Chromium + WebKit) grün. Die Plan-Tab-Ansicht bleibt in der echten App bei A, bis du wählst.
+**Live in der echten App (Version 3.6.0)** seit 24.10., 0:20 Uhr, vorher in stamio-test mit einer frischen Kopie deiner Daten geprüft. Sicherung: `data-export/prod-vor-auftrag19-final.sql`. In der echten App geändert: nur dein Plan ab heute, Profil (Wochenraster), eine Coach-Nachricht „Plan angepasst“ und die Sperre gegen alte App-Versionen (Plan/Profil erst ab 3.6.0). Alle 357 Datensätze sind erhalten. Tests: Typen, 1974 Unit-Tests, Build, 350 Browser-Tests (Chromium + WebKit) grün. **Update 3.6.1 (24.10.):** Plan-Tab C mit Kurzbeschreibung und „Krank oder verletzt?“ auf Heute, erst in stamio-test, dann in der echten App; keine Daten verändert. Beim Bearbeiten des Plans sind alle Tage aufgeklappt.
 
 ## Auftrag 18: Trainingsregeln, ehrlicher Coach, Plan-Tab, großer Test (23.10.)
 
