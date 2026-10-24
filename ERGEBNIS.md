@@ -2,7 +2,7 @@
 
 ## Auftrag 20: Scores zuverlässig, kleine Plan-Korrekturen (24.10.)
 
-**Stand:** Fertig und getestet (Version 3.7.0). Veröffentlichung: siehe unten.
+**Stand:** Fertig, getestet und live (Version 3.7.0): erst Test-Umgebung mit deinen Daten geprüft, dann echte App (Sicherung vorher in data-export). Dein Plan gilt ab morgen (25.10.). Tests: alle Unit-Tests grün, Browser-Tests 359 bestanden (Chromium und WebKit).
 
 ### 1. Scores
 **Ursache Rad-Score 82:** Deine Rolle (Kuipers, ohne Wattmessung) zeigte geschätzte Watt (204-215 W bei Puls ~130). Daraus rechnete die App eine FTP von 381 W (5,2 W/kg). Jetzt zählen Watt nur von Wattmesser oder Smart-Trainer, die Rollen-Geschwindigkeit nie. In deinem Profil steht „einfache Rolle“.
