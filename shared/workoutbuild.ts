@@ -92,6 +92,8 @@ function runEasyForm0(key: string, stage: number, ctx: W.PaceCtx, minutes: numbe
   const why = WHY[key] || '';
   if (key === 'run.strides') { const sp = W.runEasy(ctx, min, { strides: pick([4, 6, 8], stage) }); return { ...sp, why, lib: { key, stage } }; }
   if (key === 'run.hillsprints') {
+    // Auftrag 20: in kurzen Läufen (unter 30 min) wären die Sprints ein zu großer Teil (dann „locker“ mit Zone 3): Steigerungen statt Hügel
+    if (min < 30) return null;
     const [reps, sec] = pick<[number, number]>([[6, 10], [8, 12], [8, 15], [10, 15]], stage);
     const hills = S('main', { reps, min: sec / 60, zone: 3, restMin: 1, note: `${sec} s zügig einen steilen Hügel hinauf, langsam zurückgehen (voll erholen)` });
     const wu = min >= 40 ? 10 : 5; const fill = Math.max(10, r5(min - wu - 5 - reps * (sec / 60 + 1)));

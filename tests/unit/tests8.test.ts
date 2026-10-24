@@ -11,9 +11,13 @@ describe('Radtest', () => {
   const s = { id: 'bt', sport: 'bike', title: 'Radtest 20 min', plannedMinutes: 70 };
   test('Werte von Hand (Testfelder): Schwellenpuls Rad = Ø-Puls der 20 min, FTP = 95 % der Ø-Watt', () => {
     const st = { sessions: { bt: { completed: true, metrics: { hr: '150', testHr: '175', testPower: '240' } } } };
-    const u = runTestUpdate(st, weekWith('2026-10-28', s), prof, '2026-10-29')!;
+    // Auftrag 20: Watt zählen nur mit Wattmesser; ohne (z. B. einfache Rolle) nur der Puls
+    const noPm = runTestUpdate(st, weekWith('2026-10-28', s), prof, '2026-10-29')!;
+    expect(noPm.thresholds.ftp).toBeUndefined();
+    const pm = { ...prof, powerMeter: true };
+    const u = runTestUpdate(st, weekWith('2026-10-28', s), pm, '2026-10-29')!;
     expect(u).toMatchObject({ sport: 'bike', title: 'Rad-Zonen aktualisiert', thresholds: { lthrBike: 175, ftp: 228 }, settings: { lthrBike: 175 } });
-    const p = applyTestUpdate(prof, u);
+    const p = applyTestUpdate(pm, u);
     expect(p.thresholds).toMatchObject({ lthrBike: 175, ftp: 228, lthrRun: 170 });
     expect(p.thresholds.estimated).not.toContain('ftp');
     expect(p.appliedTests).toEqual(['bt']);

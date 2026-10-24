@@ -88,8 +88,8 @@ const isRunGoal = (t: GoalType | null) => !!t && /^run_/.test(t);
 export function bigDay(d: any): { big: boolean; longRideOnly: boolean; longSport: string | null } {
   const l = live(d).filter((s: any) => !s.race);
   const brick = l.some(isBrick); const longs = l.filter(isLongS);
-  // lange Einheit plus Koppel zählt ab 90 min am Tag (eine „lange“ Ausfahrt von 30 min mit 15 min Koppellauf ist kein langer Tag)
-  const big = (longs.length > 0 && brick && dayMin(d) >= 90) || dayMin(d) > 150 || l.some((s: any) => s.raceSim);
+  // Auftrag 20: lange Ausfahrt plus Koppellauf ist immer ein großer Tag: der Tag danach wird locker und kürzer (Koppellauf nur so)
+  const big = (longs.length > 0 && brick) || dayMin(d) > 150 || l.some((s: any) => s.raceSim);
   // nur eine lange Einheit einer Sportart (ohne Koppel, ohne weitere harte Einheit außer Schwimmen): am Tag danach darf die lange Einheit
   // einer anderen Sportart locker folgen (z. B. lange Ausfahrt Sa, langer lockerer Lauf So)
   const sp = longs.length && longs.every((s: any) => s.sport === longs[0].sport) ? longs[0].sport : null;
@@ -120,14 +120,26 @@ export function restNeed(w: any, p: Profile): number {
    Triathlon: jede Sportart mindestens 2×. Ein Koppellauf zählt halb. Nur normale Wochen (keine Erholung, kein Tapering, keine Wettkampfwoche,
    keine lockeren Tage nach einem Wettkampf). Lassen die Regeln der Person weniger Tage zu, gilt die Zahl der erlaubten Tage. */
 const RUN_GOAL10 = new Set(['run_10k', 'run_half', 'run_marathon']);
+/* Auftrag 20: Teamsport mit viel Laufen (Fußball, Handball, Basketball, Hockey, Rugby …) zählt bei der Mindest-Häufigkeit Laufen halb mit:
+   je Training oder Spiel 0,5 Läufe, höchstens 1 pro Woche. Vor einem Laufziel bleiben mindestens 2 eigene Läufe, sonst mindestens 1. */
+export const RUN_TEAM_RE = /fu(ß|ss)ball|soccer|futsal|handball|basketball|hockey|rugby|lacrosse|ultimate|frisbee|floorball|unihockey|football/i;
+export function teamRunCredit(w: any, p: Profile): number {
+  const ts = p.teamSport;
+  let n = 0;
+  if (w && Array.isArray(w.days) && w.days.length) n = w.days.flatMap((d: any) => live(d)).filter((s: any) => s.sport === 'football' && !s.race && RUN_TEAM_RE.test(`${s.title || ''} ${(ts && ts.name) || ''}`)).length;
+  else if (ts && RUN_TEAM_RE.test(ts.name || '') && w && w.startDate && (!ts.seasonFrom || w.startDate >= ts.seasonFrom) && (!ts.seasonTo || w.startDate <= ts.seasonTo)) n = (ts.trainingDays || []).length + (ts.gameDays || []).length;
+  return Math.min(1, 0.5 * n);
+}
+const fmtN = (n: number) => String(n).replace('.', ',');
 export function lowTime(p: Profile, date: string): boolean {
   const ts = p.teamSport; const on = !!ts && (!ts.seasonFrom || date >= ts.seasonFrom) && (!ts.seasonTo || date <= ts.seasonTo);
   const team = on ? (ts!.trainingDays || []).length + (ts!.gameDays || []).length : 0;
   const teamMin = on ? (ts!.trainingDays || []).length * (ts!.trainingMinutes || 90) + (ts!.gameDays || []).length * (ts!.gameMinutes || 90) : 0;
   const own = (p.weeklyHours || 5) * 60 - (p.budgetInclTeam ? teamMin : 0);
-  return own < 360 || team >= 2;
+  // Auftrag 20: Teamsport mit viel Laufen zählt stattdessen halb als Lauf (teamRunCredit)
+  return own < 360 || (team >= 2 && !RUN_TEAM_RE.test((ts && ts.name) || ''));
 }
-export function minFreqOf(w: any, p: Profile, races: RaceAt[], o: TOpts): Partial<Record<'run' | 'bike' | 'swim', number>> {
+export function minFreqOf(w: any, p: Profile, races: RaceAt[], o: TOpts, noCredit = false): Partial<Record<'run' | 'bike' | 'swim', number>> {
   const t = cycleType(w, w.startDate, races, o);
   const chosen = new Set<string>(p.sports || []);
   // Plätze in der Woche: je Tag mit Zeit höchstens 2 Einheiten (an Teamsport-Tagen 1); verteilt auf die Ausdauer-Sportarten
@@ -136,12 +148,15 @@ export function minFreqOf(w: any, p: Profile, races: RaceAt[], o: TOpts): Partia
   const team = (d: number) => !!ts && ((ts.trainingDays || []).includes(d) || (ts.gameDays || []).includes(d));
   const slots = Object.keys(dl).length ? [0, 1, 2, 3, 4, 5, 6].reduce((a, d) => { const v = (dl as any)[d] || 0; return a + Math.max(0, (v >= 2 ? 2 : v >= 1 ? 1 : 0) - (team(d) ? 1 : 0)); }, 0) - (ts ? 1 : 0) : 14;
   const cap = (n: number, k: number) => Math.max(1, Math.min(n, Math.floor(slots / Math.max(1, k))));
-  if (RUN_GOAL10.has(t)) return chosen.has('run') ? { run: cap(lowTime(p, w.startDate) ? 2 : 3, 1) } : {};
+  // Auftrag 20: die Gutschrift erspart zusätzliche Läufe, nimmt aber keinen vorhandenen weg (Ruhetag: noCredit)
+  const credit = chosen.has('run') && !noCredit ? teamRunCredit(w, p) : 0;
+  // vor einem Laufziel bleiben mindestens 2 eigene Läufe (der Teamsport ersetzt höchstens den dritten)
+  if (RUN_GOAL10.has(t)) return chosen.has('run') ? { run: Math.min(cap(lowTime(p, w.startDate) ? 2 : 3, 1), Math.max(2, cap(lowTime(p, w.startDate) ? 2 : 3, 1) - credit)) } : {};
   if (GOALS[t] && GOALS[t].group === 'tri') {
     const legs = new Set(legsOf({ id: 'x', type: t, name: '', date: null, priority: 'A' } as any).map(l => l.sport));
     const out: Partial<Record<'run' | 'bike' | 'swim', number>> = {};
     const list = (['swim', 'bike', 'run'] as const).filter(sp => legs.has(sp) && chosen.has(sp));
-    list.forEach(sp => { out[sp] = cap(2, list.length); });
+    list.forEach(sp => { out[sp] = sp === 'run' ? Math.max(1, cap(2, list.length) - credit) : cap(2, list.length); });
     return out;
   }
   return {};
@@ -237,7 +252,7 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
       if (teamWeek(w) && w.isRecoveryWeek) { if (rest < 2) add('restDay', w, undefined, `Woche ${w.weekNumber}: Erholungswoche mit Teamsport, ${rest} Ruhetag${rest === 1 ? '' : 'e'}, nötig 2.`); }
       else if (teamWeek(w)) { if (rest < 1 && !nb.some(x => restOf(x) >= 1) && nb.length) add('restDay', w, undefined, `Woche ${w.weekNumber}: kein Ruhetag, auch nicht in der Woche davor oder danach (mit Teamsport mindestens alle 2 Wochen einer).`); }
       else if (rest < need) add('restDay', w, undefined, `Woche ${w.weekNumber}: ${rest} Ruhetag${rest === 1 ? '' : 'e'}, nötig ${need}.`);
-      if (normalFor(w)) { const mf = minFreqOf(w, p, races, o); for (const [sp, n] of Object.entries(mf) as [string, number][]) { if ((w.freqGap || []).includes(sp)) continue; const need2 = freqByVolume(w, sp, Math.min(n, feasibleDays(w, p, sp, o))); const have = countSport(w, sp); if (have + 0.01 < need2 && !(sp === 'run' && (w.days || []).some((d: any) => live(d).some((s: any) => s.stage && s.stage.ladder === 'runwalk')))) add('minFreq', w, undefined, `Woche ${w.weekNumber}: ${String(have).replace('.', ',')}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'}, mindestens ${need2}× (Ziel des Zyklus).`); } }
+      if (normalFor(w)) { const mf = minFreqOf(w, p, races, o); for (const [sp, n] of Object.entries(mf) as [string, number][]) { if ((w.freqGap || []).includes(sp)) continue; const need2 = freqByVolume(w, sp, Math.min(n, feasibleDays(w, p, sp, o))); const have = countSport(w, sp); if (have + 0.01 < need2 && !(sp === 'run' && (w.days || []).some((d: any) => live(d).some((s: any) => s.stage && s.stage.ladder === 'runwalk')))) add('minFreq', w, undefined, `Woche ${w.weekNumber}: ${String(have).replace('.', ',')}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'}, mindestens ${fmtN(need2)}× (Ziel des Zyklus${sp === 'run' && teamRunCredit(w, p) ? ', Teamsport zählt halb' : ''}).`); } }
       const age = ageOf(p, w.startDate);
       if (age != null && age < 18) { const tot = own.reduce((a: number, s: any) => a + minOf(s), 0); if (tot > age * 60 + 5) add('teenHours', w, undefined, `Woche ${w.weekNumber}: ${Math.round(tot / 6) / 10} h, unter 18 höchstens ${age} h (Alter).`); }
     }
@@ -385,7 +400,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       for (const s of [...live(x.d)]) {
         if (!movable(s, x.d.date)) continue;
         // Lernstufen (Kraul lernen) bleiben, werden aber kürzer (Ein-/Ausschwimmen, Brust)
-        if (s.stage) { if (s.sport === 'swim' && minOf(s) > cap) { const nx = scaled(s, cap / minOf(s) * 0.95); if (nx && nx.plannedMinutes < minOf(s)) { setS(x.d, s, { ...nx, ruleNote: `${k} Tag${k === 1 ? '' : 'e'} nach ${r.name}: kürzer.` }); fixes.push(`${x.d.date}: ${s.title} kürzer (nach ${r.name})`); } } continue; }
+        if (s.stage) { if (s.sport === 'swim' && minOf(s) > cap) { let nx = scaled(s, cap / minOf(s) * 0.95); for (let g = 0; g < 4 && nx && nx.plannedMinutes > cap; g++) nx = scaled(nx, cap / nx.plannedMinutes * (0.88 - 0.05 * g)) || nx; /* Auftrag 20: Pausen skalieren nicht ganz mit, bis unter die Grenze */ if (nx && nx.plannedMinutes < minOf(s)) { setS(x.d, s, { ...nx, ruleNote: `${k} Tag${k === 1 ? '' : 'e'} nach ${r.name}: kürzer.` }); fixes.push(`${x.d.date}: ${s.title} kürzer (nach ${r.name})`); } } continue; }
         if (hardS(s) || isLongS(s) || (minOf(s) > cap && s.sport !== 'strength')) {
           const nx = easyShortOf(s, Math.min(cap, minOf(s)), `${k} Tag${k === 1 ? '' : 'e'} nach ${r.name}: nur locker und kurz, der Körper erholt sich vom Wettkampf.`, x.w.phase);
           if (nx) { setS(x.d, s, nx); fixes.push(`${x.d.date}: ${s.title} → ${nx.title} (nach ${r.name})`); } else { removeS(x.d, s); fixes.push(`${x.d.date}: ${s.title} entfällt (nach ${r.name})`); }
@@ -719,7 +734,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         const near = own.length ? own : weeks.flatMap((x: any) => (x.days || []).flatMap((d: any) => live(d))).filter((x: any) => x.sport === sp && x.spec && !x.race && !isBrick(x));
         const proto = near.filter((x: any) => !hardS(x) && !isLongS(x))[0] || near[0];
         if (!proto) break;
-        const why = `Mindestens ${need}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'} pro Woche für dein Ziel: kurz und locker.`;
+        const why = `Mindestens ${Math.ceil(need)}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'} pro Woche für dein Ziel: kurz und locker.`;
         const mk = (min: number): any => {
           const ctx = proto.spec.ctx; let sp0: W.Spec;
           if (sp === 'run') sp0 = W.runEasy(ctx, min, { strides: 4 }); else if (sp === 'bike') sp0 = W.bikeEasy(ctx, min);
@@ -752,7 +767,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         if (!done) {
           // kein Platz (zu wenige Tage oder Zeit): ehrlich sagen statt die Woche zu überladen
           w.freqGap = [...new Set([...(w.freqGap || []), sp])];
-          const t = `Diese Woche ${String(countSport(w, sp)).replace('.', ',')}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'} statt ${need}×: an deinen Tagen ist kein Platz für eine weitere Einheit.`;
+          const t = `Diese Woche ${String(countSport(w, sp)).replace('.', ',')}× ${sp === 'run' ? 'Laufen' : sp === 'bike' ? 'Rad' : 'Schwimmen'} statt ${fmtN(need)}×${sp === 'run' && teamRunCredit(w, p) ? ' (Teamsport zählt halb)' : ''}: an deinen Tagen ist kein Platz für eine weitere Einheit.`;
           if (!String(w.important || '').includes(t)) w.important = [w.important, t].filter(Boolean).join(' ');
           break;
         }
@@ -781,14 +796,14 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
   };
   const dropCost = (w: any, s: any, ignoreFreq = false) => { const n = (w.days || []).reduce((a: number, d: any) => a + live(d).filter((y: any) => y.sport === s.sport && !isBrick(y)).length, 0); const f = ((p.freq || {}) as any)[s.sport];
     // Auftrag 19: nie unter die Mindest-Häufigkeit der Sportart des Ziels (dann lieber eine Nebeneinheit oder Ruhetag nur alle 2 Wochen)
-    if (!ignoreFreq && normalFor(w) && fullWeek(w, o.from)) { const mn = (minFreqOf(w, p, races, o) as any)[isBrick(s) ? 'run' : s.sport]; if (mn && countSport(w, isBrick(s) ? 'run' : s.sport) - (isBrick(s) ? 0.5 : 1) + 0.01 < freqByVolume(w, isBrick(s) ? 'run' : s.sport, Math.min(mn, feasibleDays(w, p, isBrick(s) ? 'run' : s.sport, o)))) return Infinity; }
+    if (!ignoreFreq && normalFor(w) && fullWeek(w, o.from)) { const mn = (minFreqOf(w, p, races, o, true) as any)[isBrick(s) ? 'run' : s.sport]; if (mn && countSport(w, isBrick(s) ? 'run' : s.sport) - (isBrick(s) ? 0.5 : 1) + 0.01 < freqByVolume(w, isBrick(s) ? 'run' : s.sport, Math.min(mn, feasibleDays(w, p, isBrick(s) ? 'run' : s.sport, o)))) return Infinity; }
     // Sportart des nächsten Ziels unter die Mindesthäufigkeit (z. B. nur noch 1 Lauf pro Woche vor dem Halbmarathon) wiegt am schwersten;
     const goal = goalSport(w) === s.sport;
     return minOf(s) * (goal ? 1.5 : 1) + (s.stage ? 200 : 0) + (f && n - 1 < f[0] ? (goal ? 250 : 60) : 0) + (n <= 1 ? 100 : 0) + (s.sport === 'run' && /Steigerung|Hügel|Fahrtspiel|Lauf-ABC/.test((s.title || '') + ' ' + (s.description || '')) ? 40 : 0); };
   type ROpt = { d: any; cost: number; pref: number; plan: () => void; label: string; drops: any[] };
   /* Nebeneinheit (Auftrag 19): zweite Kraft der Woche oder kurze lockere Einheit (bis 45 min) einer Sportart, die nicht die des nächsten Ziels ist */
   const sideS = (w: any, s: any) => { const n = (w.days || []).reduce((a: number, d: any) => a + live(d).filter((y: any) => y.sport === s.sport).length, 0);
-    return (s.sport === 'strength' && n >= 2) || (s.sport !== 'strength' && !hardS(s) && !isLongS(s) && minOf(s) <= 45 && goalSport(w) !== s.sport && !(minFreqOf(w, p, races, o) as any)[s.sport]); };
+    return (s.sport === 'strength' && n >= 2) || (s.sport !== 'strength' && !hardS(s) && !isLongS(s) && minOf(s) <= 45 && goalSport(w) !== s.sport && !(minFreqOf(w, p, races, o, true) as any)[s.sport]); };
   /* Auftrag 19 (letzter Ausweg mit Teamsport, relaxed): die harte Einheit einer Sportart, die nicht die des nächsten Ziels ist, fällt weg und ihre
      Qualität wandert als Block in die lange Einheit derselben Sportart (z. B. Rad-Intervalle Mi → Sweet-Spot-Block in der langen Ausfahrt Sa) */
   const moveQualityIntoLong = (w: any, s: any, apply: boolean): boolean => {

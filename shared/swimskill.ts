@@ -29,6 +29,21 @@ export function swimRateUpdate(profile: any, state: any, weeks: any[], today: st
   return rate;
 }
 
+/* Auftrag 20: eigenes Tempo ohne Pausen (s/100 m) ins Profil, wenn es sich um mehr als 4 s ändert. Rückgabe: neuer Wert oder undefined. */
+export function swimPaceUpdate(profile: any, state: any, weeks: any[], today: string): number | undefined {
+  const cur = num((profile.skills || {}).swimPace100);
+  const pace = C.swimPace100(state, weeks, today);
+  if (pace == null || (cur && Math.abs(pace - cur) <= 4)) return undefined;
+  return pace;
+}
+
+/* Coach-Text zur Anpassung an das eigene Tempo */
+export function swimRateText(rate: number | null, pace: number | null): string {
+  const mm = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+  const bits = [pace ? `Du schwimmst etwa ${mm(pace)} min pro 100 m (ohne Pausen)` : '', rate ? `${pace ? 'und ' : 'Du schwimmst '}im Schnitt etwa ${String(rate).replace('.', ',')} m pro Minute (mit Pausen)` : ''].filter(Boolean);
+  return `${bits.join(' ')}. Die kommenden Schwimmeinheiten rechnen damit: Meter × dein Tempo je Lage, dazu die Pausen und die Technik.`;
+}
+
 /* Stufe aus den Strecken (Kraul-Weg; null = normales Schwimmen: ab 200 m am Stück, bei „kann kraulen“ ab 50 m) */
 export function stageFor(crawlM: number, breast: boolean, canCrawl = false): { ladder: 'swim' | 'swimBreast'; n: number } | null {
   if (crawlM >= W.SWIM_NORMAL_M || (canCrawl && crawlM >= 50)) return null;

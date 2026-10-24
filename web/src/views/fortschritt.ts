@@ -22,8 +22,8 @@ export function renderFortschritt(): string {
   h += sec(t('prog.scores'), `<div class="score-grid">${d.scores.map(s => {
     const first = s.trend[0].score, last = s.score; const delta = last - first;
     return `<button class="score" data-act="score-open" data-sport="${s.sport}" style="--c:${SPORT_COLOR[s.sport]}"><div class="top-l"><span style="color:var(--c);width:20px;height:20px;display:inline-block">${sportIcon(s.sport)}</span><span class="nm">${esc(sportLabel(s.sport))}</span></div>
-      <div class="spread"><span class="val">${s.score}<small class="xs muted rng" data-range> ±${s.range}</small><small class="xs muted lvl"> ${esc(s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
-      ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.confidence < 0.3 ? t('prog.lowData') : (s.gains[0] && s.gains[0].delta ? s.gains[0].text : t('prog.scale')))}</div></button>`;
+      <div class="spread"><span class="val">${s.score}<small class="xs muted rng" data-range> ±${s.range}${s.provisional ? ' ' + esc(t('prog.provisional')) : ''}</small><small class="xs muted lvl"> ${esc(s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
+      ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.provisional ? t('prog.provisionalHint') : s.confidence < 0.3 ? t('prog.lowData') : (s.gains[0] && s.gains[0].delta ? s.gains[0].text : t('prog.scale')))}</div></button>`;
   }).join('')}</div><div class="xs muted">${termLink('Score', t('prog.scaleLink'))}</div>`, t('prog.tapWhy'));
   // Auftrag 13: Trends (Erholung, Fitness, Effizienz, Intensität, Schwimmen, Bestwerte, lange Einheiten, Zusammenhänge)
   h += renderTrends();

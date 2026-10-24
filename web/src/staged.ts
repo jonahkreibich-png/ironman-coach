@@ -16,8 +16,8 @@ import type { Profile } from '../../shared/profile';
 import type { Goal } from '../../shared/goals';
 
 /* Felder, die den Plan bestimmen. Alles andere (Name, Gewicht, Sprache …) wird weiter sofort gespeichert. */
-export const PLAN_FIELDS = ['rules', 'notes', 'skills', 'bikes', 'freq', 'sports', 'dayLoad', 'teamSport', 'weeklyHoursSet', 'weeklyHours', 'maxDayHours', 'experienceYears', 'planStyle', 'likesIntensity', 'injuries', 'medicalCaution', 'teamSportName'] as const;
-const FIELD_LABEL: Record<string, string> = { sports: 'prof.sports', weeklyHours: 'prof.weeklyHours', maxDayHours: 'prof.maxDayHours', experienceYears: 'prof.experience', planStyle: 'prof.planStyle', likesIntensity: 'prof.likes', injuries: 'prof.injuries', medicalCaution: 'prof.medical', teamSportName: 'prof.teamSport', skills: 'cons.skills', bikes: 'cons.bikes', dayLoad: 'week.timeChanged', teamSport: 'cons.team' };
+export const PLAN_FIELDS = ['rules', 'notes', 'skills', 'bikes', 'freq', 'sports', 'dayLoad', 'teamSport', 'weeklyHoursSet', 'weeklyHours', 'maxDayHours', 'experienceYears', 'planStyle', 'likesIntensity', 'injuries', 'medicalCaution', 'teamSportName', 'powerMeter', 'trainerType'] as const;
+const FIELD_LABEL: Record<string, string> = { sports: 'prof.sports', weeklyHours: 'prof.weeklyHours', maxDayHours: 'prof.maxDayHours', experienceYears: 'prof.experience', planStyle: 'prof.planStyle', likesIntensity: 'prof.likes', injuries: 'prof.injuries', medicalCaution: 'prof.medical', teamSportName: 'prof.teamSport', skills: 'cons.skills', bikes: 'cons.bikes', powerMeter: 'cons.powerMeter', trainerType: 'cons.trainer', dayLoad: 'week.timeChanged', teamSport: 'cons.team' };
 
 interface Draft { screen: string; profile: Profile; goals: Record<string, Goal> }
 let DR: Draft | null = null;

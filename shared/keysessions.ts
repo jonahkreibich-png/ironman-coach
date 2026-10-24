@@ -159,13 +159,29 @@ export function runBaseVariant(ctx: W.PaceCtx, min: number, k: number): W.Spec {
   if (pk) { const sp = runEasyForm(pk.key, pk.stage, ctx, min); if (sp) return sp; }
   return runBaseVariantOld(ctx, min, k);
 }
+/* Auftrag 20: lockerer Lauf in der Grundlage mit klar benanntem kurzem Reiz, im Wechsel: Steigerungen und Hügelsprints (auch zwischen
+   zwei harten Tagen, beides macht nicht müde). Ohne Hügel (ausdrücklich angegeben): Lauf-ABC + Steigerungen; Hügel unbekannt: Hügelsprints
+   mit Ersatz in der Ebene. Bei Achillessehnen-Beschwerden nur Steigerungen. */
+export function runStridesHills(ctx: W.PaceCtx, min: number, k: number, strides: number): W.Spec {
+  const t = ENV.terrain || {}; const ach = (ENV.excludes || []).includes('achilles');
+  if (k % 2 === 1 && !ach) {
+    if (t.hills !== false) {
+      const sp = runEasyForm('run.hillsprints', Math.min(2, Math.floor(k / 4)), ctx, min);
+      if (sp && sp.kind === 'hills') { if (t.hills == null) sp.notes = [...(sp.notes || []), 'Kein steiler Hügel in der Nähe? Dann 8 Steigerungen in der Ebene.']; return sp; }
+    } else {
+      const sp = runEasyForm('run.abc', 1, ctx, min);
+      if (sp && sp.lib && sp.lib.key === 'run.abc') return sp;
+    }
+  }
+  return { ...W.runEasy(ctx, min, { strides }), lib: { key: 'run.strides', stage: 0 } };
+}
 function runBaseVariantOld(ctx: W.PaceCtx, min: number, k: number): W.Spec {
   const v = k % 3;
   // Auftrag 17: mit Einlaufen und Auslaufen
   if (v === 0) {
     const hills = S('main', { reps: 8, min: 0.25, zone: 3, restMin: 0.75, note: '10-15 s zügig bergauf, langsam zurückgehen' });
     const why = 'Hügelsprints machen kräftig und ökonomisch, ohne müde zu machen.';
-    if (min < 30) return { sport: 'run', kind: 'hills', ctx, why, steps: [S('main', { min: r5(min - 8), zone: 2 }), hills] };
+    if (min < 30) return W.runEasy(ctx, min, { strides: 4 }); // Auftrag 20: kurze Läufe mit Steigerungen statt Hügelsprints
     const wu = min >= 40 ? 10 : 5;
     return { sport: 'run', kind: 'hills', ctx, why, steps: [S('warm', { min: wu, zone: 1, note: 'ganz locker einlaufen' }), S('main', { min: Math.max(10, r5(min - 13 - wu)), zone: 2 }), hills, S('cool', { min: 5, zone: 1, note: 'locker auslaufen' })] };
   }

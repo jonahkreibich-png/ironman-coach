@@ -60,7 +60,9 @@ export const BLOCKS: Block[] = [
     { id: 'runContinuousMin', label: 'Laufen: Wie lange kannst du am Stück locker laufen?', type: 'number', unit: 'min', min: 0, max: 400, show: a => has(a, 'run') },
     { id: 'bikeLongestMin', label: 'Rad: Längste Fahrt in letzter Zeit?', type: 'number', unit: 'min', min: 0, max: 900, show: a => has(a, 'bike') },
     { id: 'bikes', label: 'Welche Räder hast du?', type: 'multi', options: BIKE_OPTIONS, show: a => has(a, 'bike') },
-    { id: 'powerMeter', label: 'Hast du eine Wattmessung?', type: 'yesno', hint: 'Powermeter am Rad oder ein Smarttrainer, der Watt anzeigt. Im Zweifel: Nein.', show: a => has(a, 'bike') },
+    { id: 'powerMeter', label: 'Hast du einen Wattmesser am Rad?', type: 'yesno', hint: 'Pedale, Kurbel oder Nabe mit Wattmessung. Die Rolle fragen wir extra. Im Zweifel: Nein.', show: a => has(a, 'bike') },
+    // Auftrag 20: Watt von der Rolle zählen nur beim Smart-Trainer; bei der einfachen Rolle sind Watt und Geschwindigkeit geschätzt
+    { id: 'trainerType', label: 'Rolle: Smart-Trainer mit Watt oder einfache Rolle?', type: 'select', options: [['smart', 'Smart-Trainer mit Watt'], ['basic', 'einfache Rolle (ohne Watt)']], show: a => has(a, 'bike') && Array.isArray(a.bikes) && (a.bikes.includes('trainer') || a.bikes.includes('spin')), hint: 'Bei einer einfachen Rolle schätzt die App Watt und Geschwindigkeit nur. Dann zählen für den Score Puls, Dauer und Gefühl.' },
     { id: 'terrain', label: 'Was hast du in der Nähe?', type: 'multi', options: TERRAIN_OPTIONS, show: a => has(a, 'run') || has(a, 'bike'), hint: 'Für Berg- und Bahn-Einheiten. Ohne Angabe gibt es Ersatz (z. B. Steigerungen in der Ebene, Rolle mit hohem Widerstand). Die Rolle wählst du oben bei den Rädern.' }
   ] },
   { id: 'team', title: 'Teamsport', intro: 'Fußball, Handball, Basketball oder feste Gruppentermine (z. B. Lauftreff): zählen im Plan als feste Termine und Belastung.', questions: [
@@ -221,6 +223,7 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   if (Array.isArray(a.terrain)) p.terrain = { hills: a.terrain.includes('hills') || a.terrain.includes('treadmill'), track: a.terrain.includes('track') };
   if (Array.isArray(a.bikeSetup)) { p.bikes = [...new Set([...(p.bikes || []), ...a.bikeSetup.filter((x: string) => x !== 'power' && x !== 'clip' && x !== 'group')])]; if (a.bikeSetup.includes('power')) p.powerMeter = true; }
   if (a.powerMeter != null) p.powerMeter = !!a.powerMeter;
+  if (a.trainerType === 'smart' || a.trainerType === 'basic') p.trainerType = a.trainerType;
   if (a.bests && typeof a.bests === 'object') { const b: any = {}; Object.entries(a.bests).forEach(([k, v]) => { const s = parseDur(v, k === 'runHalf' || k === 'runMarathon' ? 'hm' : 'ms'); if (s) b[k] = s; }); p.bests = b; }
   const notes = Array.isArray(a.notes) ? a.notes : String(a.notes || '').split(/\n+/);
   p.notes = notes.map((x: string) => String(x).trim()).filter(Boolean);

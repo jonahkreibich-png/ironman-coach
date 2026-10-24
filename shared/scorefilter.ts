@@ -6,9 +6,13 @@
 import { addDays, illnessAt } from './core';
 
 export type ObsKind = 'test' | 'effort' | 'laps' | 'hr' | 'rpe' | 'titled' | 'swimset' | 'swimpace';
-export interface FObs { id: string; date: string; z: number; sd: number; kind: ObsKind; title: string; value: string; ill?: boolean; manual?: boolean }
-export interface FStep { date: string; kind: ObsKind | 'pause'; title: string; value: string; before: number; after: number; days?: number; ill?: boolean; manual?: boolean }
-export interface FResult { z: number; sd: number; steps: FStep[]; n: number }
+export interface FObs { id: string; date: string; z: number; sd: number; kind: ObsKind; title: string; value: string; ill?: boolean; manual?: boolean; /** Auftrag 20: Zusatz zur Genauigkeit („Laufband, zählt weniger“) */ extra?: string }
+/** Auftrag 20: was mit der Messung passiert ist (gezählt, gedämpft, bestätigt, begrenzt auf ±3 Punkte pro Woche, gedeckelt) */
+export type FStatus = 'counted' | 'damped' | 'confirmed' | 'limited' | 'capped' | 'step';
+export interface FStep { date: string; kind: ObsKind | 'pause'; title: string; value: string; before: number; after: number; days?: number; ill?: boolean; manual?: boolean; status?: FStatus; note?: string; extra?: string }
+export interface FResult { z: number; sd: number; steps: FStep[]; n: number; /** Auftrag 20: brauchbare (nicht gedämpfte) Messungen und ob ein Test dabei war */ usable?: number; tested?: boolean }
+/** Auftrag 20: Punkte des Hauptteils je Zustand, Wochengrenze ohne Test, Obergrenze ohne Test */
+export interface FOpts20 { pts: (z: number) => number; weekPts: number; capZ: number | null }
 
 /* Unsicherheit wächst um 0,35 % pro Tag (Standardabweichung, über die Wurzel der Tage) */
 const Q = 0.0035 * 0.0035;
@@ -30,11 +34,13 @@ export interface FilterIn {
   cross: string[];
   illness: any[];
   end: string;
-  /** Startwert aus dem Profil, nur wenn es noch keine Messung gibt */
+  /** Startwert aus dem Profil: bis Auftrag 19 nur ohne Messung, ab Auftrag 20 (mit v20) immer der Ausgangspunkt */
   prior: { z: number; sd: number } | null;
+  v20?: FOpts20 | null;
 }
 
 export function runFilter(o: FilterIn): FResult | null {
+  if (o.v20 && o.prior) return runFilter20(o);
   const obs = [...o.obs].filter(x => x.date <= o.end && Number.isFinite(x.z) && x.sd > 0).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   if (!obs.length) return o.prior ? { z: o.prior.z, sd: o.prior.sd, steps: [], n: 0 } : null;
   const trained = new Set(o.trained.filter(d => d <= o.end));
@@ -104,3 +110,99 @@ export function rpeFrac(rpe: number): number | null {
   if (!Number.isFinite(rpe) || rpe < 2 || rpe > 9) return null;
   return Math.min(1.02, 0.6 + rpe * 0.05);
 }
+
+/* ---------- Auftrag 20: zuverlässige Schätzung ----------
+   Start: vorsichtiger Startwert aus dem Profil (Fragebogen, Bestzeiten, Alter, Erfahrung) mit großer Unsicherheit; jede Messung verschiebt
+   ihn nach ihrer Genauigkeit, wenig Daten = kleiner Schritt.
+   Ausreißer: weicht eine Messung stark von der Erwartung ab (mehr als 2,5 Standardabweichungen), zählt sie stark gedämpft, bis eine zweite
+   ähnliche Messung sie bestätigt. Tests (gesund) zählen immer voll und heben die Obergrenze auf.
+   Ohne Test (sobald belegt) höchstens ±weekPts Punkte im Hauptteil in 7 Tagen; Hochrechnungen aus lockeren Einheiten nie über die Obergrenze
+   (Niveau der anderen Sportarten, Erfahrung). */
+const SIMILAR = 0.03;
+const STEP_PTS = 8;
+function runFilter20(o: FilterIn): FResult {
+  const v = o.v20!; const prior = o.prior!;
+  const obs = [...o.obs].filter(x => x.date <= o.end && Number.isFinite(x.z) && x.sd > 0).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const trained = new Set(o.trained.filter(d => d <= o.end));
+  const cross = new Set(o.cross.filter(d => d <= o.end));
+  const steps: FStep[] = [];
+  let x = prior.z, P = prior.sd * prior.sd;
+  let at = obs.length ? obs[0].date : o.end, peak = x, lastTrain = at;
+  let cap = v.capZ; let tested = false; let usable = 0;
+  // Startwert über der Obergrenze (z. B. alter Profilwert aus falschen Watt): auf die Grenze
+  if (cap != null && x > cap) { x = cap; peak = x; }
+  const hist: { date: string; x: number }[] = [{ date: '0000-00-00', x }];
+  const pending: FObs[] = [];
+  const advance = (to: string) => {
+    const n = days(at, to);
+    if (n <= 0) return;
+    let loss = 0, gapMax = 0;
+    for (let k = 1; k <= n; k++) {
+      const d = addDays(at, k);
+      if (trained.has(d)) { lastTrain = d; continue; }
+      const gap = days(lastTrain, d);
+      if (gap > 10) {
+        let cr = false; for (let j = 0; j < 7 && !cr; j++) cr = cross.has(addDays(d, -j));
+        loss += decayPerDay(gap, cr);
+        gapMax = Math.max(gapMax, gap);
+      }
+    }
+    P += Q * n;
+    if (loss > 0) {
+      const nx = Math.max(peak - MAX_LOSS, x - loss);
+      if (nx < x - 0.003) steps.push({ date: to, kind: 'pause', title: '', value: '', before: x, after: nx, days: gapMax });
+      x = nx; hist.push({ date: to, x });
+    }
+    at = to;
+  };
+  // Wert vor 7 Tagen (Bezug für die Wochengrenze)
+  const ref = (date: string) => { const lim = addDays(date, -7); let r = hist[0].x; for (const h of hist) if (h.date <= lim) r = h.x; return r; };
+  for (const m of obs) {
+    advance(m.date);
+    let R = m.sd * m.sd;
+    const isTest = m.kind === 'test' && !m.ill;
+    if (STRONG.has(m.kind)) P = Math.max(P, 0.03 * 0.03);
+    P = Math.max(P, 0.012 * 0.012);
+    const e = m.z - x; const S = P + R;
+    let status: FStatus = 'counted'; let note = '';
+    if (!isTest && e * e > 6.25 * S) {
+      // eine zweite ähnliche Messung bestätigt den Ausreißer: beide zählen jetzt
+      const pi = pending.findIndex(p => Math.abs(p.z - m.z) <= Math.max(SIMILAR, 1.5 * m.sd) && days(p.date, m.date) <= 42);
+      if (pi >= 0) { status = 'confirmed'; R = R / 2; note = `bestätigt den Wert vom ${pending[pi].date.slice(8)}.${pending[pi].date.slice(5, 7)}.`; pending.splice(pi, 1); }
+      else { status = 'damped'; R *= 4 * e * e / (6.25 * S); pending.push(m); }
+    }
+    const K = P / (P + R);
+    const before = x;
+    let nx = x + K * e;
+    P = (1 - K) * P;
+    if (isTest) { tested = true; cap = null; }
+    else {
+      // höchstens ±weekPts Punkte in 7 Tagen (ein schon erreichter Wert wird dabei nie zurückgenommen). Gilt, sobald der Wert belegt ist
+      // (5 brauchbare Messungen oder ein genauer Startwert); vorher findet die Schätzung erst ihr Niveau (dafür steht „vorläufig“ dabei).
+      const limitOn = usable >= 5 || prior.sd <= 0.05;
+      const r0 = v.pts(ref(m.date)), b0 = v.pts(before), n0 = v.pts(nx);
+      const lo = Math.min(b0, r0 - v.weekPts), hi = Math.max(b0, r0 + v.weekPts);
+      if (limitOn && (n0 > hi + 0.05 || n0 < lo - 0.05)) { nx = invert(v.pts, Math.max(lo, Math.min(hi, n0)), before, nx); if (status === 'counted') status = 'limited'; }
+      // solange vorläufig: eine einzelne Einheit verschiebt den Hauptteil höchstens um STEP_PTS Punkte (wenig Daten = kleiner Schritt)
+      if (!limitOn && Math.abs(n0 - b0) > STEP_PTS) { nx = invert(v.pts, b0 + Math.sign(n0 - b0) * STEP_PTS, before, nx); if (status === 'counted') status = 'step'; }
+      // Obergrenze nur für Hochrechnungen aus lockeren Einheiten (Puls-Modell, Gefühl, Titel); harte Einheiten an der Schwelle messen direkt
+      if (cap != null && !STRONG.has(m.kind) && nx > cap && nx > before) { nx = Math.max(before, cap); if (status !== 'damped') status = 'capped'; }
+    }
+    x = nx;
+    if (status !== 'damped') usable++;
+    if (m.date > lastTrain) lastTrain = m.date;
+    peak = x; hist.push({ date: m.date, x });
+    steps.push({ date: m.date, kind: m.kind, title: m.title, value: m.value, before, after: x, ill: m.ill, manual: m.manual, status, note: note || undefined, extra: m.extra });
+  }
+  advance(o.end);
+  return { z: x, sd: Math.sqrt(P), steps, n: obs.length, usable, tested };
+}
+/* z zwischen a und b, bei dem pts(z) = target (pts ist monoton) */
+function invert(pts: (z: number) => number, target: number, a: number, b: number): number {
+  let lo = Math.min(a, b), hi = Math.max(a, b);
+  const up = pts(hi) >= pts(lo);
+  for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; const val = pts(mid); if ((val < target) === up) lo = mid; else hi = mid; }
+  return (lo + hi) / 2;
+}
+/* z, bei dem pts(z) = target (für die Obergrenze in Punkten); Suche ±2 um z0 */
+export function zForPts(pts: (z: number) => number, target: number, z0: number): number { return invert(pts, target, z0 - 2, z0 + 2); }

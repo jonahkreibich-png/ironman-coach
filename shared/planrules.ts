@@ -73,6 +73,7 @@ export interface RepairCtx {
   /** darf die Einheit an diesem Tag liegen (harte Regeln, Schwimmbad)? */ allowed?: (s: any, date: string) => boolean;
   /** Einheiten, die bleiben müssen (z. B. heute schon erledigt) */ keep?: (s: any) => boolean;
   /** passende Qualität für eine (lange) Einheit dieser Phase, z. B. Tempo im langen Lauf */ quality?: (s: any, date: string, phase: string, from?: any) => any | null;
+  /** Auftrag 20: nur kürzen und begründen, nichts verschieben (Schluss-Durchgang nach den Trainingsregeln, Ruhetage bleiben) */ noMove?: boolean;
 }
 let KEEP: ((s: any) => boolean) | undefined;
 const isTest = (s: any) => !!s && (!!s.test || /test|Kraul-Check/i.test(s.title || ''));
@@ -184,7 +185,7 @@ export function repairSpacing(weeks: any[], p: Profile, o: RepairCtx = {}): stri
         // 1) verschieben: lieber die lockere Einheit, nie die lange, an einen Tag derselben Woche ohne Nachbarn derselben Sportart
         const pick = [{ s, x: b }, { s: other, x: a }].filter(c => movable(c.s, c.x.d.date, o.from, true) && !longOf(c.s)).sort((u, v) => +isTest(v.s) - +isTest(u.s) || +hardOf(u.s) - +hardOf(v.s));
         let done = false;
-        for (const c of pick) {
+        if (!o.noMove) for (const c of pick) {
           const idx = D.indexOf(c.x);
           const js = D.map((y, j) => ({ y, j })).filter(({ y }) => y.w === c.x.w && y !== c.x).sort((u, v) => Math.abs(u.j - idx) - Math.abs(v.j - idx));
           const t = js.find(({ j }) => fitsDay(D, c.s, j, [c.s]));
@@ -207,7 +208,14 @@ export function repairSpacing(weeks: any[], p: Profile, o: RepairCtx = {}): stri
         const both = [{ s, x: b }, { s: other, x: a }];
         // neben einem Test darf auch die lange Einheit locker und kurz werden (der Test lässt sich nicht kürzen)
         const cands = both.filter(c => (!longOf(c.s) || both.some(y => y !== c && isTest(y.s))) && !isTest(c.s) && (movable(c.s, c.x.d.date, o.from) || (c.s.stage && (!o.from || c.x.d.date >= o.from) && !c.s.frozen && !c.s.fixed && !(KEEP && KEEP(c.s)))));
-        if (!cands.length) continue;
+        if (!cands.length) {
+          // Auftrag 20: zwei kurze lockere „lange“ Einheiten an Folgetagen (z. B. So/Mo über die Wochengrenze, an kurzen Tagen): nicht ändern, aber begründen
+          const sh = both.filter(c => !hardOf(c.s) && !isTest(c.s) && (c.s.plannedMinutes || 0) <= SHORT_MIN + 1 && (movable(c.s, c.x.d.date, o.from) || !!c.s.stage)).sort((u, v) => (u.s.plannedMinutes || 0) - (v.s.plannedMinutes || 0))[0];
+          if (!sh || both.some(c => hardOf(c.s))) continue;
+          markExcuse(sh.s, `weil an den anderen Tagen keine Zeit oder schon etwas anderes geplant ist. Beides locker und kurz.`);
+          fixes.push(`${sh.x.d.date}: ${sh.s.title} bleibt neben ${SPORT_DE[sh.s.sport]} am Vortag/Folgetag (locker und kurz, mit Grund)`);
+          changed = true; break;
+        }
         cands.sort((u, v) => (+hardOf(u.s) - +hardOf(v.s)) || (+longOf(u.s) - +longOf(v.s)) || (+isLightQuality(u.s) - +isLightQuality(v.s)) || ((u.s.plannedMinutes || 0) - (v.s.plannedMinutes || 0)));
         const c = cands[0];
         const fixedNear = [a, b].some(x => live(x.d).some((y: any) => y.fixed && y.sport !== 'football' && sameGroup(y, c.s)));

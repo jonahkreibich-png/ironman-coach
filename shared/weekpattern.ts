@@ -216,8 +216,9 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
     } else if (sl.sport === 'run' && sl.role === 'brick') {
       // Auftrag 17: Koppel nur gezielt: im Aufbau jede 3., in der spezifischen Phase jede 2. Woche, kurz; nie in Grundlage, Erholung, Tapering
       if (rec || inp.entry || ph === 'taper' || ph === 'race' || ph === 'base' || easyDay(date) || /^run_/.test(goal)) continue; // Auftrag 18: vor einem Laufziel kein Koppellauf
-      if (st.sinceBrick != null && st.sinceBrick < (ph === 'specific' ? 1 : 2)) continue;
-      const min = sl.min ? (st.brickWeeks > 0 ? sl.min[1] : sl.min[0]) : ph === 'specific' ? 20 : st.brickWeeks > 0 ? 15 : 10;
+      // Auftrag 20: ab dem Aufbau etwa jede 3. Woche, 10-15 min
+      if (st.sinceBrick != null && st.sinceBrick < 2) continue;
+      const min = sl.min ? (st.brickWeeks > 0 ? sl.min[1] : sl.min[0]) : st.brickWeeks > 0 ? 15 : 10;
       out.push({ dow: sl.dow, slot: sl, s: null, pin: !!sl.pin, make: () => { const sp = W.runEasy(inp.run, min); if (ph === 'specific') sp.steps[0].note = 'die mittleren 10 min im Wettkampftempo'; sp.title = `Koppellauf ${min} min (direkt nach dem Rad)`; sp.why = 'gewöhnt die Beine an den Wechsel vom Rad zum Laufen.'; sp.tip = 'Nur wenn du gut erholt bist (Ampel grün). Sonst weglassen, das ist kein Problem.'; return sp; } } as any);
     } else if (sl.sport === 'run') {
       const range = sl.min || [40, 50];
@@ -229,7 +230,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       // gewünschter Qualitätslauf am Tag vor einem Spiel: nur kontrolliert (Zone 3, Wettkampftempo wie Halbmarathon), nie Schwelle oder härter
       const beforeHard = (inp.hardDows || []).includes((sl.dow + 1) % 7);
       const rq = q && sl.pin && beforeHard && runQ!.zone > 3 ? K.calmQuality(goal, (st.runQN || {})[ph] || 0, { noZ5: inp.noZ5 }) : runQ;
-      out.push({ dow: sl.dow, slot: sl, s: null, hard: q || undefined, pin: q && !!sl.pin, make: (min) => q ? K.runQuality(inp.run, rq!) : variant ? K.runBaseVariant(inp.run, min, st.weekN || 0) : W.runEasy(inp.run, min, { strides: easyDay(date) ? 0 : strides }), min: q ? W.totals(K.runQuality(inp.run, rq!)).min : rec ? Math.max(30, range[0] - 10) : r5(mid(range)), adj: q ? undefined : rec ? [Math.max(30, range[0] - 10), range[0]] : [range[0], range[1]] } as any);
+      out.push({ dow: sl.dow, slot: sl, s: null, hard: q || undefined, pin: q && !!sl.pin, make: (min) => q ? K.runQuality(inp.run, rq!) : variant ? K.runBaseVariant(inp.run, min, st.weekN || 0) : ph === 'base' && strides && !easyDay(date) ? K.runStridesHills(inp.run, min, st.weekN || 0, strides) : W.runEasy(inp.run, min, { strides: easyDay(date) ? 0 : strides }), min: q ? W.totals(K.runQuality(inp.run, rq!)).min : rec ? Math.max(30, range[0] - 10) : r5(mid(range)), adj: q ? undefined : rec ? [Math.max(30, range[0] - 10), range[0]] : [range[0], range[1]] } as any);
     }
   }
   void why;

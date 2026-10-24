@@ -52,7 +52,9 @@ export function replanPlan(old: any, profile: Profile, goals: Goal[], today: str
   const recentLong = st0 ? { run: C.recentLongest(st0, old.weeks || [], from, 'run'), bike: C.recentLongest(st0, old.weeks || [], from, 'bike') } : null;
   // Auftrag 18: Pause ohne Krankheit (Urlaub, Prüfungen …) → Wiedereinstieg je nach Länge
   const pauseDays = st0 ? C.trainingGap(st0, old.weeks || [], from) : null;
-  const gen = generatePlan({ profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, from, frozen: frozenDays(old, o.adjustments, o.state, from), measuredStartMin: o.measuredStartMin ?? null, recentOwnMin, recentLong, pauseDays,
+  // Auftrag 20: Lauf-Geh-Einheiten pro Woche bisher (letzte 2 normale Wochen vor dem Neuplanen): nicht sprunghaft mehr (eine mehr = +50-100 % Laufumfang)
+  const rwN = (() => { const ws = eff.filter((w: any) => w.endDate < from && !w.isRecoveryWeek && !w.partial).slice(-2); const n = ws.map((w: any) => (w.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && !s.cancelled && s.stage && s.stage.ladder === 'runwalk').length, 0)); return n.length && n.every(x => x > 0) ? Math.max(...n) : null; })();
+  const gen = generatePlan({ recentRunWalkN: rwN, profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, from, frozen: frozenDays(old, o.adjustments, o.state, from), measuredStartMin: o.measuredStartMin ?? null, recentOwnMin, recentLong, pauseDays,
     continueFrom: continuationOf(old, today, o.state ? { ...o.state, adjustments: o.adjustments || o.state.adjustments } : undefined, from), needTests: o.needTests,
     stages: { swim: stages.swim === undefined ? undefined as any : stages.swim, runwalk: stages.runwalk === undefined ? undefined as any : stages.runwalk } });
   const next = transitionPlan(old, gen.plan, today, from);

@@ -87,6 +87,8 @@ export interface Skills {
   swimBreast?: boolean;
   /** Auftrag 17: tatsächliche Meter pro Minute mit Pausen aus den eigenen Schwimmeinheiten (automatisch, für realistische Meter) */
   swimMPerMin?: number | null;
+  /** Auftrag 20: eigenes Schwimm-Tempo ohne Pausen (s/100 m, Median der letzten 6 Wochen), solange es keine CSS gibt */
+  swimPace100?: number | null;
   /** so lange am Stück locker laufen (min) */
   runContinuousMin?: number | null;
   /** längste Radfahrt in letzter Zeit (min) */
@@ -128,6 +130,8 @@ export interface Profile {
   skills: Skills;
   bikes: string[];
   powerMeter: boolean;
+  /** Auftrag 20: Rolle: smart = Smart-Trainer mit Watt, basic = einfache Rolle ohne Watt (Watt und Geschwindigkeit sind dann nur geschätzt) */
+  trainerType?: 'smart' | 'basic' | null;
   bests: Bests;
   /** freie Berücksichtigungen (eine pro Eintrag): Verletzungen, Vorlieben, Ausrüstung, Schwimmbad-Zeiten … */
   notes: string[];

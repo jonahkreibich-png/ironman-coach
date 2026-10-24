@@ -2,6 +2,13 @@
 
 Nur das, was du selbst tun musst.
 
+## Neu am 24.10. (Auftrag 20)
+
+- **App einmal neu öffnen** (bei „Neue Version“ neu laden). Erst ab Version 3.7.0 kann das Handy Plan und Profil wieder ändern.
+- **Radtest am 28.10. draußen auf flacher Strecke machen** (Puls mitlaufen lassen). Auf deiner Rolle zählt für den Score nur der Puls, nicht die Geschwindigkeit. Erst danach ist dein Rad-Score nicht mehr „vorläufig“.
+- **Krank-Eintrag beenden:** In der App stehst du seit 07.10. als „krank“. Wenn du wieder fit bist, auf Heute „Ich bin wieder gesund“ tippen. Solange ist der Plan pausiert und deine Einheiten zählen für die Scores weniger.
+- **Falls du doch einen Smart-Trainer bekommst:** unter Mehr → Berücksichtigungen bei „Rolle“ umstellen, dann zählen die Watt.
+
 ## Neu am 24.10. (Auftrag 19)
 
 - **Plan-Tab:** Deine Wahl C ist drin. Tag antippen klappt ihn auf, darunter steht kurz, was zu tun ist.

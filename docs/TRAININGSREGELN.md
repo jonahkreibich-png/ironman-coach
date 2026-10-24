@@ -24,7 +24,7 @@ Unter 18 nie mehr Stunden Training pro Woche als das Alter in Jahren (Teamsport 
 
 ### Lange Tage nicht hintereinander (neu)
 
-Nach einem Tag mit langer Einheit plus Koppellauf oder mit über 2,5 h Training folgt kein langer oder harter Lauf, sondern Ruhe, Lockeres und Kurzes oder Schwimmen. Lange Ausfahrt am Samstag und langer Lauf am Sonntag ist erlaubt – dann ohne Koppel am Samstag und ohne Tempo am Sonntag. In Koppel-Wochen ist der Sonntag locker und kürzer (etwa 2/3 des langen Laufs). Steht am Tag danach ein Test oder der Qualitätslauf vor dem Laufziel, wird der große Tag kleiner.
+Nach einem Tag mit langer Einheit plus Koppellauf oder mit über 2,5 h Training folgt kein langer oder harter Lauf, sondern Ruhe, Lockeres und Kurzes oder Schwimmen. Lange Ausfahrt am Samstag und langer Lauf am Sonntag ist erlaubt – dann ohne Koppel am Samstag und ohne Tempo am Sonntag. In Koppel-Wochen ist der Sonntag locker und kürzer (etwa 2/3 des langen Laufs). Koppellauf bei Triathlon-Zielen ab dem Aufbau etwa jede 3. Woche, 10-15 min (Auftrag 20). Steht am Tag danach ein Test oder der Qualitätslauf vor dem Laufziel, wird der große Tag kleiner.
 
 - Warum: Zwei lange oder harte Tage hintereinander summieren die Ermüdung; der Lauf am zweiten Tag hat das höchste Verletzungsrisiko.
 - Quelle: Trainingslehre Ausdauer (Belastung–Erholung), Triathlon-Trainingspraxis
@@ -48,7 +48,7 @@ Höchstens 2 eigene harte Einheiten pro Woche plus Teamsport-Spiel (Einsteiger 0
 
 ### Mindest-Häufigkeit je Sportart (neu)
 
-Laufziel ab 10 km: mindestens 3 Läufe pro Woche (wenig Zeit: 2; ein Koppellauf zählt halb). Triathlon: jede Sportart mindestens 2× pro Woche. Muss für den Ruhetag etwas weg, fällt zuerst eine Nebeneinheit (zweite Kraft, kurzes Rad), nie die Hauptsportart des nächsten Ziels. Passt es nicht, steht es ehrlich in der Woche.
+Laufziel ab 10 km: mindestens 3 Läufe pro Woche (wenig Zeit: 2; ein Koppellauf zählt halb; Teamsport mit viel Laufen wie Fußball oder Handball zählt je Termin halb, höchstens ein Lauf pro Woche, Auftrag 20). Triathlon: jede Sportart mindestens 2× pro Woche. Muss für den Ruhetag etwas weg, fällt zuerst eine Nebeneinheit (zweite Kraft, kurzes Rad), nie die Hauptsportart des nächsten Ziels. Passt es nicht, steht es ehrlich in der Woche.
 
 - Warum: Für Anpassungen von Sehnen, Laufökonomie und Technik zählt die Häufigkeit mehr als einzelne lange Einheiten.
 - Quelle: Trainingspraxis Lauf und Triathlon (Daniels, Friel); Auftrag 19

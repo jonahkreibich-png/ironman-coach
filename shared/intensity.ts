@@ -252,7 +252,10 @@ export function checkIntensity(weeks: any[], p: Profile, today: string, o0: Chec
       if (seg.phase === 'base') {
         if (sport === 'bike' && levelOf(p) === 'beginner') continue;
         const have = sport === 'bike' ? hard : sport === 'run' ? light + hard : light;
-        const need = sport === 'bike' ? needHard : half;
+        // Auftrag 20: Steigerungen/Hügelsprints brauchen einen Lauf neben dem langen: in mindestens der Hälfte der Wochen, in denen es so einen
+        // Lauf gibt (Wochen mit nur dem langen Lauf, z. B. weil Teamsport halb zählt, zählen nicht)
+        const roomRun = sport === 'run' ? per.filter(l => l.some((s: any) => !s.long && !/^Lang/.test(s.title || '') && !s.stage && (s.plannedMinutes || 0) >= 25)).length : half;
+        const need = sport === 'bike' ? needHard : sport === 'run' ? Math.min(half, Math.ceil(roomRun / 2)) : half;
         if (have < need) out.push({ rule: 'missing', sport, phase: 'base', msg: `Grundlage ab ${seg.weeks[0].startDate}: ${sport === 'run' ? 'Steigerungen, Hügelsprints oder Fahrtspiel' : sport === 'bike' ? 'Sweet Spot' : 'Technik-Sets'} fehlen (${have} von ${need} Wochen).` });
       } else if (!(sport === 'run' && o.runAllowed === false) && !(sport === 'run' && levelOf(p) === 'beginner' && ((p.skills || {}).runContinuousMin || 0) < 30)) {
         const have = learning ? light : hard; const need = learning ? half : needHard;

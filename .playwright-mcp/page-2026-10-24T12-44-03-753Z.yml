@@ -1,0 +1,40 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - heading "Stamio" [level=1] [ref=e4]:
+      - generic [aria-hidden] [ref=e5]: S
+      - text: Stamio
+  - main [ref=e6]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - heading "Stamio" [level=1] [ref=e10]
+        - generic [ref=e11]: Training, Erholung und Essen – ein Coach, der sich nach deinen Werten richtet.
+      - generic [ref=e12]:
+        - generic [ref=e13]: Neu hier?
+        - generic [ref=e14]: Ein paar Fragen zu Ziel, Zeit und Gesundheit. Danach steht dein Plan. Dauert etwa 10 Minuten, alles lässt sich überspringen.
+        - button "Los geht’s" [ref=e15] [cursor=pointer]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Schon dabei?
+        - generic [ref=e20]:
+          - group [ref=e21]:
+            - generic [ref=e22] [cursor=pointer]
+            - generic [ref=e26]:
+              - generic [ref=e27]: "Auf dem anderen Gerät: Mehr → Daten und Geräte → „Gerät hinzufügen“. Den Code hier eingeben."
+              - generic [ref=e28]:
+                - textbox "Kopplungscode" [ref=e29]:
+                  - /placeholder: ABCD-EFGH
+                - button "Koppeln" [ref=e30] [cursor=pointer]
+          - group [ref=e31]:
+            - generic [ref=e32] [cursor=pointer]
+          - group [ref=e36]:
+            - generic [ref=e37] [cursor=pointer]
+          - group [ref=e41]:
+            - generic [active] [ref=e42] [cursor=pointer]
+            - generic [ref=e54]:
+              - generic [ref=e55]: Nur, wenn du die App selbst betreibst und einen Einrichtungscode hast.
+              - generic [ref=e56]:
+                - textbox "Einrichtungscode" [ref=e57]
+                - button "Einrichten" [ref=e58] [cursor=pointer]
+      - group [ref=e47]:
+        - generic [ref=e48] [cursor=pointer]
+      - generic [ref=e52]: Deine Daten bleiben auf deinem Gerät und in deinem privaten Konto.
+      - button "Fehler melden / Idee" [ref=e53] [cursor=pointer]

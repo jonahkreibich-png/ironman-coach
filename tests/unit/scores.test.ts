@@ -96,7 +96,7 @@ describe('Laufen', () => {
 describe('Rad, Schwimmen, Kraft, Form', () => {
   test('Rad mit Leistungsmessung nutzt FTP in W/kg', () => {
     const rides = [3, 6, 9, 12, 15, 18].map(d => ({ ...run(d), sport: 'bike', speedKmh: 30, avgHr: 152, avgPower: 220, min: 40, efficiency: 2 } as Activity));
-    const [s] = sportScores({ ...base, activities: rides }, ['bike']);
+    const [s] = sportScores({ ...base, profile: { ...base.profile, powerMeter: true }, activities: rides }, ['bike']);
     expect(s.parts[0].label).toBe('FTP');
     expect(s.parts[0].value).toMatch(/W\/kg/);
   });
@@ -111,7 +111,8 @@ describe('Rad, Schwimmen, Kraft, Form', () => {
     const swims = [2, 5, 8, 11, 14, 17].map(d => ({ ...run(d), sport: 'swim', km: 1.6, speedKmh: null, avgHr: null, efficiency: null,
       swim: { poolLengthM: 25, lengths: 64, activeLengths: 64, strokesPerLength: 18, metersPerStroke: 1.39, pace100: 125, byStroke: {}, longestContinuousM: 600, strokeRate: 30 } } as unknown as Activity));
     const [s] = sportScores({ ...base, activities: swims }, ['swim']);
-    expect(s.parts.find(p => p.key === 'css')!.value).toBe('2:08/100 m');
+    // Auftrag 20: der vorsichtige Startwert zieht anfangs noch eine Sekunde mit
+    expect(s.parts.find(p => p.key === 'css')!.value).toMatch(/^2:0[89]\/100 m$/);
     expect(s.parts.find(p => p.key === 'tech')!.value).toMatch(/1,11 m \(18 Züge\/Bahn\)/);
     expect(s.parts.find(p => p.key === 'cont')!.value).toBe('600 m');
   });

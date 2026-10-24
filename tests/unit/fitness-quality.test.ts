@@ -42,12 +42,18 @@ describe('Qualität der Fitness-Schätzung', () => {
   });
   test('bekannt später aktualisierte Profil-Schwellen fließen nicht in historische Schätzungen ein', () => {
     const future = { ...profile, thresholds: { ...profile.thresholds, thresholdPaceRunSec: 200, trendAt: today } };
-    expect(estimatesAt({ ...base, profile: future, activities: [] }, addDays(today, -10)).runThrSpeed).toBeNull();
+    // Auftrag 20: ohne Messung gibt es einen vorsichtigen Startwert, aber nie den erst später bekannten Profilwert
+    const v = estimatesAt({ ...base, profile: future, activities: [] }, addDays(today, -10)).runThrSpeed;
+    expect(v == null || Math.abs(v - 1000 / 200) > 0.5).toBe(true);
   });
-  test('ein schlechter oder besserer Profilwert überstimmt neue gemessene Läufe nicht', () => {
-    const activities = [run('a', 1, { speedKmh: 15 })];
-    const result = estimatesAt({ ...base, activities }, today);
-    expect(result.runThrSpeed).toBeCloseTo(15 / 3.6);
+  test('ein schlechter oder besserer Profilwert überstimmt neue gemessene Läufe nicht (Auftrag 20: wenige Daten = kleiner Schritt)', () => {
+    const one = estimatesAt({ ...base, activities: [run('a', 1, { speedKmh: 15 })] }, today).runThrSpeed!;
+    // ein Lauf zieht deutlich in seine Richtung, übernimmt aber nicht ganz (vorläufig)
+    expect(one).toBeGreaterThan(1000 / 300 + 0.15);
+    expect(one).toBeLessThan(15 / 3.6);
+    // mehrere übereinstimmende Läufe setzen sich durch
+    const many = estimatesAt({ ...base, activities: [1, 4, 7, 10, 13, 16, 19].map(d => run('a' + d, d, { speedKmh: 15 })) }, today).runThrSpeed!;
+    expect(Math.abs(many / (15 / 3.6) - 1)).toBeLessThan(0.05);
   });
   test('gleiche Pulstempo-Daten zählen nicht nochmals als eigener Fitness-Anteil', () => {
     const s = score([run('easy', 1, { avgHr: 140 })]);

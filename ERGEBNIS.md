@@ -1,5 +1,31 @@
 # Ergebnis
 
+## Auftrag 20: Scores zuverlässig, kleine Plan-Korrekturen (24.10.)
+
+**Stand:** Fertig und getestet (Version 3.7.0). Veröffentlichung: siehe unten.
+
+### 1. Scores
+**Ursache Rad-Score 82:** Deine Rolle (Kuipers, ohne Wattmessung) zeigte geschätzte Watt (204-215 W bei Puls ~130). Daraus rechnete die App eine FTP von 381 W (5,2 W/kg). Jetzt zählen Watt nur von Wattmesser oder Smart-Trainer, die Rollen-Geschwindigkeit nie. In deinem Profil steht „einfache Rolle“.
+
+**Dein Rad-Score: 82 → 44** (± 7, vorläufig, also etwa 37-51). Er stützt sich auf deinen Startwert und die zwei Fahrten draußen (23,4-23,5 km/h Gravel bei Puls 135-142). Mehr geben die Daten nicht her. Der Radtest am 28.10. macht ihn genau. Laufen 40, Schwimmen 28 (vorläufig), Kraft 55.
+
+Neu für alle:
+- Jede Einheit zählt nach Qualität: Rolle ohne Watt nur Dauer/Puls, Laufband weniger, GPS-Fehler gar nicht, sehr niedriger Puls nur vorsichtig.
+- Jeder Score startet vorsichtig und heißt „vorläufig“, bis 5 brauchbare Einheiten oder ein Test da sind.
+- Ausreißer zählen erst voll, wenn ein zweiter ähnlicher Wert kommt. Ohne Test höchstens etwa ±3 Punkte pro Woche, Tests dürfen mehr.
+- Ohne Test kein Score weit über deinem Niveau (kein Rad-Score 80 für Rad-Neulinge).
+- „Warum?“ sagt je Einheit: gezählt, gedämpft, begrenzt oder ignoriert (mit Grund). Der Coach meldet einmal: „Rad-Score neu berechnet: Rollen-Speed zählt nicht mehr“.
+
+### 2. Plan-Korrekturen (für alle)
+- **Schwimmen:** Dauer = Meter × dein Tempo (Uhr: etwa 2:25/100 m) + Pausen + Technik. Deine 1.200 m: **51-53 min statt 73-75 min**.
+- **Donnerstag (Grundlage):** im Wechsel „Lauf mit Steigerungen“ und „Lauf mit Hügelsprints“.
+- **Koppellauf:** ab Aufbau etwa jede 3. Woche, 10-15 min, Sonntag danach locker und kürzer.
+- **Fußball & Co.** zählen bei der Lauf-Häufigkeit halb (Lexikon: „Mindest-Häufigkeit“).
+- Dein Plan bis 2029 geprüft: 0 Regelverstöße, Umfang und Intensität ohne Fehler.
+
+### 3. Fehlerjagd
+50 neue Test-Nutzer (Rolle ohne Watt, Smart-Trainer, wenige Daten, Ausreißer, Pause, Test, Laufband, GPS-Fehler, ohne Puls, Wattmesser × 5 Ziele). Die alte Rechnung hatte dort 165 Score-Funde, die neue 0. Dazu behoben: gleiche Sportart So/Mo nach dem Ruhetag, Lauf-Geh-Einheiten verdoppelten sich beim Neuplanen, Hügelsprints in 20-min-Läufen, Umfangsbremse nach Test-Wochen, Schwimmen nach Wettkampf 1 min zu lang, falsche Aussage „34 Schläge weniger Puls“. Alles als dauerhafte Tests.
+
 ## Auftrag 19: Plan-Regeln, Einheiten-Bibliothek, neue Scores, großer Test (23.10.)
 
 **Stand:** Alles fertig, getestet und live (Plan-Tab nach deiner Wahl C, Version 3.6.1).

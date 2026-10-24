@@ -108,7 +108,8 @@ describe('Besonderheiten der Personen', () => {
     expect(s.find((x: any) => x.race && x.date === '2027-04-11').title).toBe('Frühjahrsmarathon');
     expect(s.find((x: any) => x.race && x.date === '2027-06-27').title).toBe('Mitteldistanz');
     expect(r.goals[0].targetTimeSec).toBe(2100 + 9600 + 6300 + 240);
-    expect(s.filter((x: any) => x.sport === 'bike' && isIntense(x) && !x.race).every((x: any) => /Rolle/.test(x.title))).toBe(true);
+    // Auftrag 20: lange Ausfahrt mit Sweet-Spot-Teil (vor der Mitteldistanz) bleibt draußen, drinnen höchstens etwa 2 h
+    expect(s.filter((x: any) => x.sport === 'bike' && isIntense(x) && !x.race && !(x.spec && x.spec.kind === 'longq')).every((x: any) => /Rolle/.test(x.title))).toBe(true);
     expect(checkPlan(weeks, r.profile, r.goals, today).filter(i => i.rule === 'goals')).toEqual([]);
   });
 });

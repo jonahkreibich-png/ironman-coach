@@ -4,7 +4,7 @@ import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon 
 import { todayStr } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
 import { mainGoal, type Goal } from '../../shared/goals';
-import { sportScores, formScore, legacyActivities, estimatesAt, type SportSport } from './data-types';
+import { sportScores, formScore, legacyActivities, namedFromPlan, estimatesAt, rescoreNotes, SCORE_MODEL, type SportSport } from './data-types';
 import { prognosis, correctionFromGoals, type Prognosis, type PlanFacts } from '../../shared/prognosis';
 import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
@@ -46,6 +46,16 @@ function afterCompute(d: Derived) {
       STATE.coachMsgs[id] = { id, at: Date.now(), date: d.today, kind: 'info', from: 'coach', title: 'Etappenziel erreicht 🎉', unread: true, important: true, text: r.text + (nx && mark ? ' ' + mark.text + '.' : '') };
       changed = true;
     });
+    // Auftrag 20: neue Score-Rechnung einmal im Coach erklären (nur wer schon vorher Einheiten hatte, nur in den ersten 4 Wochen)
+    if (S.scoreModel !== SCORE_MODEL && lastInp && d.activities.length) {
+      const had = d.activities.some((a: any) => a.date < '2026-10-24');
+      if (had && d.today <= '2026-11-21') rescoreNotes(lastInp, d.scores).forEach(n => {
+        const id = `msg-rescore${SCORE_MODEL}-${n.sport}`; if (STATE.coachMsgs[id]) return;
+        STATE.coachMsgs[id] = { id, at: Date.now(), date: d.today, kind: 'info', from: 'coach', title: 'Score neu berechnet', unread: true, text: n.text };
+      });
+      // erst merken, wenn Daten da sind (beim ersten Öffnen vor dem Abgleich ist der Stand noch leer)
+      if (had || d.today > '2026-11-21') { S.scoreModel = SCORE_MODEL; changed = true; }
+    }
     if (changed) saveSoon();
   } catch (e) { /* Anzeige geht vor */ }
 }
@@ -78,7 +88,7 @@ function compute(): Derived {
   const history = C.readinessHistory(STATE.trend, STATE.illnessPeriods, today, 14, fallback);
   const ill = C.illnessAt(STATE.illnessPeriods, today);
   const ret = returnPhase(today);
-  const acts: Activity[] = [...C.recordedActivities(STATE), ...legacyActivities(STATE, BASE_WEEKS.length ? PLAN.weeks : [], prof)];
+  const acts: Activity[] = [...namedFromPlan(STATE, PLAN.weeks || [], C.recordedActivities(STATE)), ...legacyActivities(STATE, BASE_WEEKS.length ? PLAN.weeks : [], prof)];
   // Belastung je Sport (für die Gesamt-Form)
   const loadsBySport: Record<string, Record<string, number>> = {};
   C.dailyLoadEntries({ ...STATE, profile: prof }, PLAN.weeks).forEach(e => { const m = (loadsBySport[e.sport] = loadsBySport[e.sport] || {}); m[e.date] = (m[e.date] || 0) + e.load; });

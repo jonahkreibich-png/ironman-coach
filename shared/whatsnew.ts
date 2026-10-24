@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.7.0', items: [
+    'Scores zuverlässiger: Watt zählen nur von Wattmesser oder Smart-Trainer, die Geschwindigkeit von der Rolle zählt nie, Laufband weniger, GPS-Fehler gar nicht. Jeder Score startet vorsichtig, steht als „vorläufig“ da, bis 5 brauchbare Einheiten oder ein Test da sind, und bewegt sich ohne Test höchstens etwa 3 Punkte pro Woche. „Warum?“ zeigt je Einheit, ob sie gezählt hat.',
+    'Neue Frage unter Mehr → Berücksichtigungen: Rolle mit Watt (Smart-Trainer) oder einfache Rolle.',
+    'Schwimmen dauert im Plan so lange wie bei dir wirklich (dein Tempo, Pausen, Technik). In der Grundlage wechseln sich Steigerungen und Hügelsprints ab, Koppelläufe sind kurz (10-15 min) und Teamsport wie Fußball zählt bei den Läufen halb.'
+  ] },
   { version: '3.6.1', items: [
     'Plan-Tab neu: oben ein Balken pro Tag, darunter jeder Tag als Zeile. Heute ist aufgeklappt, andere Tage klappst du mit einem Tipp auf; unter jeder Einheit steht kurz, was du machen sollst.',
     'Auf Heute: „Ich bin krank“ und „Schmerzen / verletzt“ direkt sichtbar. Krank pausiert den Plan sofort, bei Schmerzen fragt der Coach wo und wie stark und plant danach schonender.'

@@ -697,6 +697,21 @@ function swimRate(state, weeks, date) {
   Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
   return n >= 2 ? Math.round(m / min * 10) / 10 : null;
 }
+/* Auftrag 20: eigenes Schwimm-Tempo ohne Pausen (s/100 m, von der Uhr oder eingetragen) aus erledigten Schwimmeinheiten der letzten 6 Wochen,
+   Median, mindestens 2 Einheiten. Damit rechnet die App Kraul und Brust, solange es keine Schwimm-Schwelle (CSS) gibt. */
+function swimPace100(state, weeks, date) {
+  const vals = []; const from = addDays(date, -42);
+  const sec = v => (typeof v === 'number' ? v : paceSec(v));
+  const used = new Set();
+  const look = (st, act) => { if (act && act.id) used.add(act.id); const p = sec(actualMetrics(st, act).pace100); if (p && p >= 70 && p <= 240) vals.push(p); };
+  planDays(weeks).filter(d => d.date <= date && d.date > from).forEach(d => d.sessions.filter(s => s.sport === 'swim').forEach(s => {
+    const st = (state.sessions || {})[s.id]; if (st && st.completed) look(st, st.activityId ? (state.activities || {})[st.activityId] : null);
+  }));
+  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
+  recordedActivities(state).filter(a => a.sport === 'swim' && !a.sessionId && !used.has(a.id) && a.date <= date && a.date > from).forEach(a => look(null, a));
+  if (vals.length < 2) return null;
+  vals.sort((a, b) => a - b); return Math.round(vals[Math.floor((vals.length - 1) / 2)]);
+}
 /* Bestätigt = in mindestens 2 verschiedenen Einheiten geschafft (der zweitbeste Wert). Ein einzelner Wert ist ein Bestwert, keine neue Stufe. */
 function confirmedOf(values) { const v = (values || []).filter(x => x != null && x > 0).sort((a, b) => b - a); return v.length >= 2 ? v[1] : 0; }
 const swimCtxOf = state => { const sk = (state.profile || {}).skills || {}; return { gear: Array.isArray(sk.swimGear) ? [...sk.swimGear] : [], pool: sk.poolM === 50 ? 50 : 25 }; };
@@ -1085,5 +1100,5 @@ export {
   addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
-  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, ownDoneMinutes, recentOwnMinutes, recentLongest
+  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

@@ -178,9 +178,10 @@ export function swimSums(spec: Spec): { meters: number; swimMin: number; restMin
     rest += Math.max(0, reps - 1) * (s.restSec || 0) / 60;
   }
   rest += Math.max(0, spec.steps.filter(s => s.m).length - 1) * SWIM_SET_CHANGE_SEC / 60;
-  // eigene Pace mit Pausen (Auftrag 17): nie schneller planen, als die Person bisher wirklich geschwommen ist (höchstens 2,5-mal so viel Pause wie im Modell)
+  // eigene Pace mit Pausen (Auftrag 17): wer bisher mehr Pause brauchte, bekommt etwas mehr Pause. Auftrag 20: höchstens ein Viertel mehr
+  // als die geplanten Pausen plus 2 min (vorher bis zum 2,5-Fachen: 1.200 m standen dann mit 75 min im Plan statt etwa 50).
   const real = spec.ctx && spec.ctx.swimMPerMin && spec.ctx.swimMPerMin > 0 ? m / spec.ctx.swimMPerMin : 0;
-  if (real > swim + rest) rest = Math.min(real - swim, rest * 2.5 + 2);
+  if (real > swim + rest) rest = Math.min(real - swim, rest * 1.25 + 2);
   return { meters: m, swimMin: swim, restMin: rest, min: swim + rest };
 }
 export function totals(spec: Spec): { min: number; km: number | null } {
@@ -422,6 +423,8 @@ const zoneLabel = (spec: Spec) => { const z = mainZone(spec); return z ? `Zone $
 /* Einheit im Plan-Format. id und Extras (fixed, race …) setzt der Aufrufer. */
 export function build(spec: Spec): any {
   spec = gearFit(poolFit(spec));
+  // Auftrag 20: Hügelsprints in einem Lauf unter 30 min (z. B. nach dem Kürzen) wären ein zu großer Teil: dann lockerer Lauf mit Steigerungen
+  if (spec.sport === 'run' && spec.kind === 'hills' && totals(spec).min < 30) spec = { ...runEasy(spec.ctx, totals(spec).min, { strides: 4 }), why: 'Kurze Steigerungen halten die Beine schnell, ohne müde zu machen.', ...(spec.notes ? { notes: spec.notes.filter(n => !/Hügel/.test(n)) } : {}) };
   const t = totals(spec);
   const s: any = { sport: spec.sport, title: title(spec), plannedMinutes: t.min, description: describe(spec), spec };
   if (t.km != null && t.km > 0) s.plannedKm = t.km;
@@ -538,7 +541,8 @@ export function rebuildScaled(session: any, f: number): any {
   if (b.hard && session.spec.kind !== 'test' && session.sport !== 'swim' && b.plannedMinutes < 25 && (session.plannedMinutes || 0) >= 25) {
     for (let g = f; g < 1 && b.plannedMinutes < 25; g = Math.min(1, g + 0.05)) b = build(scaleSpec(session.spec, g));
   }
-  return { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec };
+  // Auftrag 20: die Zone kommt mit (sonst bleibt nach dem Kürzen die alte Zone stehen, z. B. „Zone 3“ bei einem lockeren Lauf)
+  return { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, ...(b.zone ? { zone: b.zone } : {}) };
 }
 
 /* ---------- Bausteine ---------- */

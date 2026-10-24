@@ -1,0 +1,21 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "Stamio" [level=1] [ref=e59]:
+      - generic [aria-hidden] [ref=e60]: S
+      - text: Stamio
+  - main [ref=e6]:
+    - generic [ref=e62]:
+      - generic [ref=e63]:
+        - heading "Stamio" [level=1] [ref=e64]
+        - generic [ref=e65]: Training, Erholung und Essen – ein Coach, der sich nach deinen Werten richtet.
+      - generic [ref=e66]:
+        - generic [ref=e67]: Neu hier?
+        - generic [ref=e68]: Ein paar Fragen zu Ziel, Zeit und Gesundheit. Danach steht dein Plan. Dauert etwa 10 Minuten, alles lässt sich überspringen.
+        - button "Los geht’s" [ref=e69] [cursor=pointer]
+      - generic [ref=e72]: Verbunden – aber in deinem Konto ist noch kein Trainingsplan.Beantworte den Fragebogen, dann baut die App deinen Plan.
+      - button "Nochmal nachsehen" [ref=e73] [cursor=pointer]
+      - group [ref=e78]:
+        - generic [ref=e79] [cursor=pointer]
+      - generic [ref=e83]: Deine Daten bleiben auf deinem Gerät und in deinem privaten Konto.
+      - button "Fehler melden / Idee" [ref=e84] [cursor=pointer]
+  - status [ref=e85]: Verbunden. Deine Daten sind jetzt in deinem Konto.

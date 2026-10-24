@@ -35,3 +35,11 @@ Kraft hat bislang keine verlässlich zugeordneten Übungen, Wiederholungen und L
 ## Automatische Prüfung
 
 `tests/unit/fitness-quality.test.ts` prüft Runden-Doppelzählung, stabile Fähigkeit bei Pause mit sinkender Sicherheit, unbekannte Schwimmdaten, leere Einträge, historische Profilgrenzen, Profil-Startwerte, fehlende Effizienz-Doppelzählung, ungültige Dauer und unerledigte Kraftvorlagen. Die vorhandenen Score- und Planfortsetzungs-Tests bleiben maßgeblich für Skalen, Marken und Erhalt bei Planwechsel.
+
+## Auftrag 20: Datenqualität, Startwert, Grenzen
+
+- Datenqualität je Wert: Watt zählen nur von einem Wattmesser (draußen, `powerMeter`) oder einem Smart-Trainer (drinnen, `trainerType: 'smart'`). Die Geschwindigkeit von der Rolle zählt nie. Laufband-Pace hat 1,6-fache Unsicherheit. GPS-Fehler (Lauf über 23 km/h, Rad über 52 km/h im Schnitt, unmögliche Strecke/Zeit) zählen nicht, auch nicht für das Messfenster. Unter 80 % der Schwelle wächst die Unsicherheit der Puls-Hochrechnung, unter 60 % zählt die Einheit nicht. Ein nur geschätzter Schwellenpuls macht alle Puls-Werte 1,3-mal unsicherer.
+- Startwert: Profilwert (Test, Trend, Bestzeit) oder vorsichtige Schätzung aus Erfahrung und Alter, immer mit eigener Unsicherheit (laufende Schätzung in `shared/scorefilter.ts`, `runFilter20`). Bis 5 brauchbare Einheiten oder ein Test da sind, ist der Wert „vorläufig“ (Bereich mindestens ±5) und eine Einheit verschiebt den Hauptwert höchstens um 8 Punkte.
+- Ausreißer (über 2,5 Standardabweichungen) zählen gedämpft, bis ein zweiter ähnlicher Wert (±3 %, innerhalb 6 Wochen) kommt. Ohne Test bewegt sich ein belegter Hauptwert höchstens ±4 Punkte (Score etwa ±3) in 7 Tagen. Tests und Wettkämpfe (gesund) zählen voll.
+- Obergrenze ohne Test für Hochrechnungen aus lockeren Einheiten: unter 15 Einheiten in der Sportart Lauf-Niveau + 12 (mindestens 50), 15-39 Einheiten + 25 (mindestens 65), ab 40 keine.
+- „Warum?“ nennt je Einheit gezählt, gedämpft, bestätigt, begrenzt, gedeckelt oder ignoriert mit Grund. Die Rechnung von Auftrag 19 bleibt 4 Wochen zum Vergleich (`legacy`).

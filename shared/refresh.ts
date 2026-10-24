@@ -5,7 +5,7 @@ import * as C from './core';
 import * as W from './workouts';
 import * as K from './keysessions';
 import { paceCtx } from './plangen';
-import { estimatesAt, legacyActivities } from './scores';
+import { estimatesAt, legacyActivities, namedFromPlan } from './scores';
 import { speedTrend, bikeSpeedsOf, mainKind, BIKE_KIND_LABEL, type BikeKind } from './bikespeed';
 
 const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
@@ -40,7 +40,7 @@ export function refreshFuture(weeks: any[], profile: any, today: string): { week
 export function trendThresholds(state: any, weeks: any[], profile: any, goal: any, today: string): { thresholds: Record<string, any>; settings: Record<string, any>; text: string } | null {
   const th = profile.thresholds || {};
   if (th.trendAt && th.trendAt > C.addDays(today, -21)) return null;
-  const acts = [...C.recordedActivities(state), ...legacyActivities(state, weeks, profile)] as any[];
+  const acts = [...namedFromPlan(state, weeks, C.recordedActivities(state)), ...legacyActivities(state, weeks, profile)] as any[];
   if (!acts.length) return null;
   let est: any;
   try { est = estimatesAt({ today, activities: acts, trend: state.trend || [], illness: state.illnessPeriods || [], profile, goal }, today); } catch (e) { return null; }

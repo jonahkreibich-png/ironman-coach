@@ -252,7 +252,10 @@ export function runTestUpdate(state: any, weeks: any[], profile: any, today: str
         if (num(m.testSpeed)) kmh = num(m.testSpeed);
         if (!hr) continue;
         if (th.lthrBike && (hr < th.lthrBike * 0.85 || hr > th.lthrBike * 1.1)) continue;
-        const ftp = watt && watt > 50 && watt < 600 ? Math.round(watt * 0.95) : null;
+        // Auftrag 20: Watt nur von Wattmesser (draußen) oder Smart-Trainer (drinnen); die einfache Rolle schätzt sie nur
+        const indoorT = !!((act && act.indoor) || m.indoor === 'in' || /rolle|trainer|indoor|zwift/i.test(`${(act && act.name) || ''} ${s.title || ''}`));
+        const trusted = indoorT ? (profile.trainerType === 'smart' || (profile.trainerType == null && !!profile.powerMeter)) : !!profile.powerMeter;
+        const ftp = trusted && watt && watt > 50 && watt < 600 ? Math.round(watt * 0.95) : null;
         // Auftrag 12: Schwellen-Geschwindigkeit des benutzten Rads (20 min → 1 Stunde etwa 3 % langsamer); nur flach (unter 8 Höhenmeter pro km)
         const hilly = act && act.km && act.ascentM && act.ascentM / act.km > 8;
         const kind = kindOf({ indoor: (act && act.indoor) || m.indoor === 'in', bikeType: m.bikeType || (act && act.bikeType), name: act && act.name, title: s.title }, profile);

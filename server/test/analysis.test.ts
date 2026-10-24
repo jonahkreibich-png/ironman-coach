@@ -74,7 +74,7 @@ test('Radtest erledigt (Testfelder) → Server übernimmt Schwellenpuls Rad und 
   const day = add(today, -1);
   await call(env, 'POST', '/api/sync', { since: 0, changes: [
     { kind: 'plan', key: 'main', data: { meta: {}, weeks: [{ weekNumber: 1, startDate: day, days: [{ date: day, sessions: [{ id: 'bt1', sport: 'bike', title: 'Radtest 20 min', plannedMinutes: 70 }] }] }] }, updatedAt: 1 },
-    { kind: 'profile', key: 'main', data: { birthYear: 2009, sports: ['bike'], thresholds: { lthrRun: 170, lthrBike: 169, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28 } }, updatedAt: 1 }] }, T);
+    { kind: 'profile', key: 'main', data: { birthYear: 2009, sports: ['bike'], powerMeter: true, thresholds: { lthrRun: 170, lthrBike: 169, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28 } }, updatedAt: 1 }] }, T);
   await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'session', key: 'bt1', data: { completed: true, metrics: { testHr: '174', testPower: '250' } }, updatedAt: Date.now() }] }, T);
   const recs = await records(env, T);
   expect(recs.find((r: any) => r.kind === 'profile').data.thresholds).toMatchObject({ lthrBike: 174, ftp: 238 });

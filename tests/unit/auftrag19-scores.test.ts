@@ -46,7 +46,7 @@ describe('Auftrag 19: laufende Schätzung', () => {
     const noW = sc('bike', weekly('bike', 40, 1, 4));
     expect(noW.parts[0].label).toBe('Schwellen-Tempo');
     expect(noW.measured).not.toBeNull();
-    const withW = sc('bike', weekly('bike', 40, 1, 4, () => ({ avgPower: 170 })));
+    const withW = sc('bike', weekly('bike', 40, 1, 4, () => ({ avgPower: 170 })), { profile: { ...profile, powerMeter: true } });
     expect(withW.parts[0].label).toBe('FTP');
   });
   test('nur von Hand eingetragen: zählt, aber unsicherer als von der Uhr', () => {
