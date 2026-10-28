@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.9.0', items: [
+    'Neu: „Jetzt abrufen“ bei jeder Verbindung und in jeder Einheit – mit klarer Rückmeldung, ob eine Aufzeichnung gefunden und eingetragen wurde. Frühere Workouts (bis 12 Monate) kommen einmalig dazu und machen die Scores genauer.',
+    'Mehr Werte unter „Weitere Werte“ (z. B. Höhenmeter, Temperatur, Schuh, Normalized Power, Verpflegung, Puls und Brust-Tempo beim Schwimmen, Sprints). Scores zählen jetzt alle Einheiten des letzten Jahres, ältere mit weniger Gewicht; von Hand Eingetragenes zählt wie von der Uhr.',
+    'Schwimmen: Hilfsmittel stehen an jeder Einheit, Kickbrett und Pull Buoy im Wechsel, Tempo-Vorgaben aus deinem echten Tempo je Lage. Kraul und Pull Buoy werden gleich bewertet, jede Coach-Meldung kommt nur noch einmal, und Vorschläge zeigen klar, was von wann nach wann geht.'
+  ] },
   { version: '3.8.0', items: [
     'Plan mit Trainingsdashboard zum Einklappen. Einheiten bleiben direkt abhakbar; Verschieben und Tauschen funktionieren ueber mehrere Wochen.',
     'Trainingsvorlagen fuer Schwimmen, Rad, Laufen und Kraft: Vorschau, Ersetzen oder Ergaenzen bestehender Einheiten und neue Einheiten aus Vorlagen.',

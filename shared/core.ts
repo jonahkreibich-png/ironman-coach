@@ -333,6 +333,9 @@ function applyAdjustments(weeks, adjustments) {
     // bewusste Ausnahme von einer harten Regel: gilt nur für diese eine Einheit (Auftrag 5 A4)
     if (a.override) s.ruleOverride = true;
     if (a.type === 'modify') Object.assign(s, a.set || {});
+    // Auftrag 21: vom Coach gekürzte Woche (weniger Umfang nach Krankheit/verpassten Einheiten) gilt als reduzierte Woche: die Woche danach
+    // darf wieder zum Plan zurück, ohne als zu großer Sprung zu zählen (wie bei geplanten reduzierten Wochen)
+    if (a.type === 'modify' && /-vol-/.test(a.id || '') && /Umfang -/.test(a.reason || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) w.reduced = true; }
     else if (a.type === 'cancel') { s.cancelled = true; s.cancelReason = a.reason; if (a.removed) s.removed = true; }
     else if (a.type === 'move') {
       const to = dayByDate[a.to]; if (!to || to === d) continue;

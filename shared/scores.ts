@@ -12,7 +12,7 @@ import { actualMetrics, crawlOf } from './results';
 import type { Activity } from './activity/analyze';
 import { intervalsOf } from './activity/structure';
 import type { Profile } from './profile';
-import { ageOf } from './profile';
+import { ageOf, ageExact } from './profile';
 import type { Goal } from './goals';
 import { requirementFor, type Requirement } from './sports';
 import { addDays, illnessAt, planDays, isIntervals } from './core';
@@ -106,7 +106,7 @@ export function ageSexFactor(p: Pick<Profile, 'birthYear' | 'sex'>, today: strin
   if (sport === 'strength') return 1;
   let f = 1;
   if (p.sex === 'f') f /= sport === 'run' ? 0.89 : sport === 'bike' ? 0.86 : 0.92;
-  const age = ageOf(p, today);
+  const age = ageExact(p, today); // Auftrag 21: gleitend, kein Sprung am 1. Januar
   if (age != null && age > 35) f /= Math.max(0.45, 1 - 0.0075 * (age - 35) - (age > 60 ? 0.006 * (age - 60) : 0));
   if (age != null && age < 18) f /= Math.max(0.6, 1 - 0.025 * (18 - age));
   return f;
@@ -1017,7 +1017,9 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
     const sp = sport === 'run' && paceSec ? 1000 / paceSec : sport === 'bike' && speed ? speed / 3.6 : null;
     // Pace aus Gesamtzeit nur, wenn sie wie Schwimmen am Stück aussieht (Technik-Einheiten mit Pausen sonst viel zu langsam)
     const p100raw = meters && min ? min * 60 / (meters / 100) : null;
-    const p100 = pace(m.pace100) || (p100raw && p100raw <= 200 ? p100raw : null);
+    // Auftrag 21: Technik- und Lern-Einheiten (Übungen, Brett, viele Pausen) liefern aus Zeit und Metern kein Leistungs-Tempo
+    const drills = /technik|lernen|stufe|wassergewöhnung|beinschlag/i.test(title || '');
+    const p100 = pace(m.pace100) || (p100raw && p100raw <= 200 && !drills ? p100raw : null);
     const spl = num(m.spl), dps = num(m.dps);
     const indoor = m.indoor === 'in' || m.indoor === 'basic' || (sport === 'run' && m.surface === 'treadmill') || (sport === 'bike' && /rolle|trainer|indoor|zwift|home ?trainer/i.test(title || ''));
     const effMin = min ?? (km && paceSec ? Math.round(km * paceSec / 60) : km && speed ? Math.round(km / speed * 60) : null);

@@ -170,7 +170,9 @@ function runFilter20(o: FilterIn): FResult {
     P = Math.max(P, 0.012 * 0.012);
     const e = m.z - x; const S = P + R;
     let status: FStatus = 'counted'; let note = '';
-    if (!isTest && e * e > 6.25 * S) {
+    // Auftrag 21: auch ein Test, der mehr als ~28 % von der Erwartung abweicht (z. B. Tippfehler, falsche Dauer), zählt erst nach Bestätigung
+    const wildTest = isTest && Math.abs(e) > 0.25;
+    if ((!isTest || wildTest) && e * e > 6.25 * S) {
       // eine zweite ähnliche Messung bestätigt den Ausreißer: beide zählen jetzt
       const pi = pending.findIndex(p => Math.abs(p.z - m.z) <= Math.max(SIMILAR, 1.5 * m.sd) && days(p.date, m.date) <= 42);
       if (pi >= 0) { status = 'confirmed'; R = R / 2; note = `bestätigt den Wert vom ${pending[pi].date.slice(8)}.${pending[pi].date.slice(5, 7)}.`; pending.splice(pi, 1); }
@@ -180,8 +182,8 @@ function runFilter20(o: FilterIn): FResult {
     const before = x;
     let nx = x + K * e;
     P = (1 - K) * P;
-    if (isTest) { tested = true; cap = null; }
-    else {
+    if (isTest && status !== 'damped') { tested = true; cap = null; }
+    else if (!isTest) {
       // höchstens ±weekPts Punkte in 7 Tagen (ein schon erreichter Wert wird dabei nie zurückgenommen). Gilt, sobald der Wert belegt ist
       // (5 brauchbare Messungen oder ein genauer Startwert); vorher findet die Schätzung erst ihr Niveau (dafür steht „vorläufig“ dabei).
       const limitOn = usable >= 5 || prior.sd <= 0.05;

@@ -19,3 +19,9 @@ test('Archive nur gelöscht, wenn mehr als 10 und älter als 60 Tage', () => {
   const p = planPrune([], arch, now);
   expect(p.deleteArchive).toEqual(['test-10.sql.gz', 'test-11.sql.gz', 'test-12.sql.gz']);
 });
+test('von Tests genutzte Vorlagen bleiben immer unverändert', () => {
+  const now = Date.parse('2026-10-28T12:00:00Z');
+  const files = Array.from({ length: 8 }, (_, i) => ({ name: `prod-${i}.sqlite`, mtime: now - i * 86400000 }));
+  const p = planPrune(files, [], now, new Set(['prod-7.sqlite']));
+  expect(p.keep).toContain('prod-7.sqlite'); expect(p.compress).not.toContain('prod-7.sqlite');
+});

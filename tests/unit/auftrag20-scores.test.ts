@@ -227,3 +227,26 @@ describe('Auftrag 21: Scores mit mehr Daten', () => {
     expect(s.confText).toMatch(/5 Läufe zählen insgesamt .*davon 3 in den letzten 6 Wochen/);
   });
 });
+
+/* Auftrag 21 (Langzeit-Simulation): am 1. Januar sprang der Score aller über 35/unter 18, weil das Alter nur aus dem Geburtsjahr kam */
+test('Auftrag 21: kein Score-Sprung am Jahreswechsel', () => {
+  for (const birthYear of [1960, 1975, 2010]) {
+    const p = prof({ birthYear } as any);
+    const acts = [3, 9, 15, 22].map(d => act('run', d));
+    const shift = (list: Activity[], days: number) => list.map(a => ({ ...a, date: addDays(a.date, days) }));
+    const dec31 = sportScores({ today: '2026-12-31', profile: p, goal: null, illness: [], trend: [], activities: shift(acts, addDays('2026-12-31', 0) > today ? 68 : 0) }, ['run'])[0];
+    const jan1 = sportScores({ today: '2027-01-01', profile: p, goal: null, illness: [], trend: [], activities: shift(acts, 69) }, ['run'])[0];
+    expect(Math.abs(jan1.score - dec31.score)).toBeLessThanOrEqual(1);
+  }
+});
+
+/* Auftrag 21 (Langzeit-Simulation): ein Test mit unmöglichem Wert (z. B. Dauer korrigiert, Strecke nicht) sprang um 33 Punkte */
+test('Auftrag 21: Test weit weg von allem Bisherigen zählt erst nach Bestätigung', () => {
+  const base = [70, 64, 58, 52, 46, 40, 34, 28, 22, 16, 10].map(d => act('bike', d));
+  const ref = sc('bike', base);
+  const wild = sc('bike', [...base, act('bike', 3, { name: 'Radtest 20 min', min: 20, avgHr: 160, speedKmh: 40, km: 13.3 })]);
+  expect(wild.score - ref.score).toBeLessThanOrEqual(4);
+  expect(why(wild)).toMatch(/gedämpft/);
+  const twice = sc('bike', [...base, act('bike', 9, { name: 'Radtest 20 min', min: 20, avgHr: 160, speedKmh: 40, km: 13.3 }), act('bike', 3, { name: 'Radtest 20 min', min: 20, avgHr: 160, speedKmh: 40, km: 13.3 })]);
+  expect(twice.score).toBeGreaterThan(wild.score);
+});

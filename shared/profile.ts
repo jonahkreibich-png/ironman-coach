@@ -191,6 +191,11 @@ export function defaultProfile(): Profile {
 export function ageOf(p: Pick<Profile, 'birthYear'>, today: string): number | null {
   return p.birthYear ? +today.slice(0, 4) - p.birthYear : null;
 }
+/* Auftrag 21: gleitendes Alter (nur Geburtsjahr bekannt: Mitte des Jahres angenommen). Für stetige Rechnungen wie den Altersausgleich der
+   Scores, die sonst am 1. Januar für alle sprangen. */
+export function ageExact(p: Pick<Profile, 'birthYear'>, today: string): number | null {
+  return p.birthYear ? (Date.parse(today + 'T12:00:00Z') - Date.parse(p.birthYear + '-07-01T12:00:00Z')) / (365.25 * 86400000) : null;
+}
 export function isMinor(p: Pick<Profile, 'birthYear'>, today: string): boolean {
   const a = ageOf(p, today);
   return a != null && a < 18;

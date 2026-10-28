@@ -425,3 +425,24 @@ Nach Regel 8 selbst entschieden. Jede Zeile: was, warum, wie rückgängig.
 | 343 | Gemeldeten Dropboxfehler im Testablauf statt Produktcode beheben: echten Anfangsstatus vorab lesen, vollstaendigen Fehlerablauf abwarten, Handler geordnet beenden. | Protokoll: APIResponse bereits disposed; Zaehler lag vor fulfill und Statusreload. Alle bisherigen Assertions erhalten; 10 Wiederholungen und 3 Dateifaelle bestanden, bestehender WebKit-Skip unveraendert. Kein Deploy oder Gate-Bypass. |
 
 | 344 | Aktuelle Freigabe nach erfolgreichem Testdeploy als Produktionsfreigabe des Coach-Auftrags dokumentieren; vorhandenen Releaseablauf verwenden. | Gesamtprotokoll: 2398 Unit-/Server- und 449 Browsertests bestanden; Testsicherung erneut lokal validiert. Produktionssicherung scheitert an fehlgeschlagener DNS-Aufloesung der Cloudflare-API; daher kein Deploy, Fortsetzung ueber vorhandenen Helfer ausserhalb der Sitzung ohne neue Freigabefrage. |
+
+## Auftrag 21
+
+| Nr. | Was | Warum | Rückgängig |
+|---|---|---|---|
+| 345 | Codex-Stand 3.7.1–3.8.0 unverändert als eigener Commit übernommen. | Lief schon live (Jonah hatte das Freigabe-Skript am 28.10. ausgeführt); 2.398 Unit-Tests grün. | git revert 89dcab6 |
+| 346 | Kraul und Pull Buoy über einen Weg: „bestätigt“ = zwei Nachweise (zwei Einheiten oder eigene Angabe + eine Einheit); ein einzelner neuer Wert wird als Bestwert gemeldet. Eigene Angaben gelten, bis Einheiten nach der Angabe mehr belegen. | Gleiche Daten gaben vorher verschiedene Ergebnisse; eine eigene Angabe blieb für immer stehen. Stufen nur nach Ist-Werten bleibt. | swimskill.ts |
+| 347 | Jede Coach-Meldung höchstens einmal je Anlass (Art, Titel, Text, Tag) – auf dem Server vor dem Speichern, in der App beim Anzeigen und Aufräumen. Feste Kennungen statt Zeitstempel. | 9 gleiche „Schwimmen: bitte prüfen“; gilt für alle Meldungsarten. | feed.ts duplicateMsgIds |
+| 348 | KI-Schutz für Oura-Daten entfernt nur Begründungen von Ampel-Anpassungen, nicht mehr Titel und Aufbau aller Einheiten. | Der Platzhalter stand als Einheitenname in Vorschlägen; Titel kommen vom Plan-Generator und enthalten keine Oura-Werte. | server/src/ai.ts |
+| 349 | Feste Prüfung hinter jeder Coach-Antwort: interne Texte weg, Wochentag aus dem Datum, eindeutig falsche Artikel berichtigt. | KI nannte „Samstag“ statt Dienstag und „den Schwimmtraining“; eine Prüfung im Code wirkt für alle Modelle. | claims.ts fixCoachText |
+| 350 | Tempo je Lage (Kraul/Brust) aus echten Werten; gemischte Einheiten mit bekanntem Brust-Tempo herausgerechnet. Alte automatische Anpassungen werden mit dem aktuellen Tempo neu gerechnet. | 2:50 statt 2:25: Anpassungen trugen den alten Tempo-Kontext. | refresh.ts refreshAdjustments |
+| 351 | Rolle drinnen: nie km/h. Einfache Rolle: Puls und Gefühl (RPE); Smart-Trainer: Watt. | Auftrag 21 Punkt 6. | workouts.ts intensity |
+| 352 | Scores: alle Einheiten des letzten Jahres mit abnehmendem Gewicht (Halbwertszeit 6 Wochen, Effizienz/Technik 3 Wochen), Hand = Uhr (nur Datenqualität zählt). Bezugstag nur aus Einheiten mit Messwerten. | Mehr Daten, keine Sprünge an der 42-Tage-Grenze. Score-Logik selbst unverändert. | scores.ts HORIZON |
+| 353 | Historie: einmalig 12 Monate von intervals.icu und HealthFit-Dropbox als reine Aufzeichnungen (keine Plan-Einträge, keine Handeinträge überschrieben, Doppelte und Tage mit Handeintrag übersprungen). | Mehr Daten für Scores ohne Eingriff in die Vergangenheit. | ingest.ts historyFilter |
+| 354 | „Jetzt abrufen“ höchstens einmal pro Minute je Nutzer; Status in Worten. | Abruflimits der Anbieter schonen. | shared/fetchnow.ts |
+| 355 | Ein Test, der mehr als ~28 % von der Erwartung abweicht, zählt erst nach Bestätigung. | Simulation: falsche Dauer im Test → +33 Punkte in einer Woche. | scorefilter.ts wildTest |
+| 356 | Altersausgleich der Scores mit gleitendem Alter. | Simulation: am 1. Januar sprang der Score aller über 35/unter 18. | profile.ts ageExact |
+| 357 | Vom Coach gekürzte Woche gilt als reduzierte Woche (wie geplante). | Simulation: Rückkehr zum Plan zählte sonst als zu großer Sprung beim langen Lauf. | core.ts applyAdjustments |
+| 358 | Technik-/Lern-Schwimmeinheiten liefern aus Zeit und Metern kein Leistungs-Tempo. | Simulation: Schwimm-Score fiel trotz Fortschritt. | scores.ts legacyActivities |
+| 359 | data-export: 5 neueste Sicherungen je Umgebung bleiben, ältere komprimiert (archiv/), Archive erst nach 60 Tagen und über 10 Stück gelöscht. | 722 MB → 290 MB; Löschen ist nicht umkehrbar, deshalb vorsichtig. | scripts/prune-backups.mjs |
+| 360 | Für viele Nutzer: Zeitplan verteilt Nutzer auf 6 Läufe, Datenstand-Zähler (1 Zeile), Server-Sicherung nur bei Änderung (7 Tage + Sonntage), entschiedene Vorschläge nach 7 Tagen klein, Fehler-Posteingang bis 5.000 Einträge inkl. Server. | D1-Gratis-Grenzen (gelesene Zeilen, 500 MB); Rechnung in STORE-PLAN.md Abschnitt 7. | server/src/index.ts |

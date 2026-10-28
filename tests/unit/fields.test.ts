@@ -105,7 +105,14 @@ describe('automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung', ()
     expect(keys('bike')).toEqual(expect.arrayContaining(['min', 'km', 'power', 'maxPower', 'cadence', 'maxCadence', 'hr', 'maxHr', 'indoor', 'bikeType']));
     expect(keys('swim')).toEqual(expect.arrayContaining(['min', 'meters', 'pace100', 'spl', 'rate', 'dps', 'longestCrawl', 'crawlShare', 'technique']));
     expect(keys('strength')).toEqual(['area', 'min', 'exercises']);
-    expect(keys('football')).toEqual(['kind', 'min', 'hr', 'maxHr']);
+    // Auftrag 21: Distanz und Sprints unter „Weitere Werte“
+    expect(keys('football')).toEqual(['kind', 'min', 'hr', 'maxHr', 'km', 'sprints']);
+    expect(keys('run')).toEqual(expect.arrayContaining(['ascent', 'strideLen', 'gct', 'power', 'temp', 'surface', 'shoe']));
+    expect(keys('bike')).toEqual(expect.arrayContaining(['np', 'ascent', 'temp', 'carbs', 'fluid']));
+    expect(SPORT_FIELDS.bike.find(x => x.key === 'indoor')!.options!.map(o => o[0])).toContain('basic');
+    expect(keys('swim')).toEqual(expect.arrayContaining(['hr', 'maxHr', 'paceBreast', 'swolf', 'poolLen', 'aids']));
+    // neue Werte nur unter „Weitere Werte“, nichts doppelt
+    for (const sp of Object.keys(SPORT_FIELDS)) expect(new Set(keys(sp)).size).toBe(keys(sp).length);
     expect(fieldsOf({ rpe: '6', feel: '4', deviation: 'verkürzt', metrics: {} }, 'run')).toMatchObject({ rpe: 6, feel: 4, deviation: 'verkürzt' });
   });
 });

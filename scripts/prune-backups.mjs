@@ -12,10 +12,24 @@ export const KEEP = 5, KEEP_ARCHIVE = 10, ARCHIVE_DAYS = 60;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const groupOf = name => /^(prod|production)[-_]/i.test(name) ? 'production' : /^test[-_]/i.test(name) ? 'test' : null;
 export const isBackup = name => /\.(sql|sqlite)$/i.test(name) && !!groupOf(name);
+/* Dateien, die Tests oder Skripte als Vorlage brauchen (z. B. tests/helpers/real-data.ts), bleiben immer unverändert */
+export function usedByTests(root = ROOT) {
+  const out = new Set();
+  const walk = d => {
+    for (const n of fs.existsSync(d) ? fs.readdirSync(d) : []) {
+      const p = path.join(d, n);
+      if (fs.statSync(p).isDirectory()) walk(p);
+      else if (/\.(ts|mjs|js)$/.test(n)) for (const m of fs.readFileSync(p, 'utf8').matchAll(/data-export\/([A-Za-z0-9._-]+)/g)) out.add(m[1]);
+    }
+  };
+  walk(path.join(root, 'tests')); walk(path.join(root, 'scripts'));
+  return out;
+}
 
 /* Was passiert mit welcher Datei (reine Planung, testbar) */
-export function planPrune(files, archives, now = Date.now()) {
-  const out = { keep: [], compress: [], deleteArchive: [] };
+export function planPrune(files, archives, now = Date.now(), pinned = new Set()) {
+  const out = { keep: [...files.filter(f => pinned.has(f.name)).map(f => f.name)], compress: [], deleteArchive: [] };
+  files = files.filter(f => !pinned.has(f.name));
   for (const g of ['production', 'test']) {
     const list = files.filter(f => groupOf(f.name) === g && isBackup(f.name)).sort((a, b) => b.mtime - a.mtime);
     out.keep.push(...list.slice(0, KEEP).map(f => f.name));
@@ -32,7 +46,7 @@ export async function prune(dir = path.join(ROOT, 'data-export'), dry = false) {
   const stat = (d, n) => ({ name: n, mtime: fs.statSync(path.join(d, n)).mtimeMs });
   const files = fs.readdirSync(dir).filter(n => fs.statSync(path.join(dir, n)).isFile()).map(n => stat(dir, n));
   const archives = fs.existsSync(archDir) ? fs.readdirSync(archDir).filter(n => n.endsWith('.gz')).map(n => stat(archDir, n)) : [];
-  const p = planPrune(files, archives);
+  const p = planPrune(files, archives, Date.now(), usedByTests());
   if (dry) return p;
   for (const n of p.compress) {
     const src = path.join(dir, n), dst = path.join(archDir, n + '.gz');
