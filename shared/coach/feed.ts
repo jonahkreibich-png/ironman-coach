@@ -80,3 +80,12 @@ export function dedupeIncoming(existing: Record<string, any>, incoming: any[]): 
   const dups = new Set(duplicateMsgIds(Object.values(merged)));
   return { keep: incoming.filter(m => !m || !dups.has(m.id)), drop: [...dups].filter(id => existing && existing[id]) };
 }
+
+/* Auftrag 21: entschiedene oder überholte Vorschläge brauchen nach 7 Tagen keinen vollständigen Bauplan mehr (Speicher bei vielen Nutzern).
+   Es bleiben Titel, Text, Status und die Zeilen „was, von wann, nach wann“. Liefert die verkleinerte Meldung oder null. */
+export function compactDecided(m: any, now: number): any | null {
+  const p = m && m.proposal;
+  if (!p || p.status === 'open' || !Array.isArray(p.changes) || !p.changes.length || (m.at || 0) > now - 7 * 86400000) return null;
+  const lines = p.changes.filter((c: any) => c && c.data && c.data.what).map((c: any) => ({ kind: c.kind, key: c.key, data: { what: String(c.data.what) } }));
+  return { ...m, proposal: { ...p, changes: lines, compacted: true } };
+}

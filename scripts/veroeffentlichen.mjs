@@ -95,6 +95,8 @@ export async function publishRelease({ run = execute, checkBackup = verifyBackup
     await verify(target);
   }
   console.log('Veröffentlicht und geprüft: ' + TARGETS.production.url + ' — Version ' + VERSION);
+  // Auftrag 21: nur die 5 neuesten Sicherungen je Umgebung unverändert behalten, ältere komprimieren
+  try { const { prune } = await import('./prune-backups.mjs'); const p = await prune(); console.log(`Sicherungen aufgeräumt: ${p.keep.length} behalten, ${p.compress.length} komprimiert`); } catch (e) { console.log('Aufräumen der Sicherungen übersprungen: ' + e.message); }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(SELF)) {
   const args = process.argv.slice(2);

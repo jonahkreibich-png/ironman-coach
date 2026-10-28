@@ -11,7 +11,7 @@ import { prognosis, correctionFromGoals, type Prognosis, type PlanFacts } from '
 import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
 import type { Activity } from '../../shared/activity/analyze';
-import { duplicateMsgIds } from '../../shared/coach/feed';
+import { duplicateMsgIds, compactDecided } from '../../shared/coach/feed';
 
 export interface Derived {
   today: string; profile: Profile; goals: Goal[]; goal: Goal | null; minor: boolean; age: number | null;
@@ -62,6 +62,7 @@ function afterCompute(d: Derived) {
     // Auftrag 21: doppelte Coach-Meldungen (gleicher Anlass) aufräumen; die Löschung geht per Abgleich auch an den Server
     const dups = duplicateMsgIds(Object.values(STATE.coachMsgs || {}));
     if (dups.length) { dups.forEach(id => { delete STATE.coachMsgs[id]; }); changed = true; }
+    for (const m of Object.values(STATE.coachMsgs || {}) as any[]) { const c = compactDecided(m, Date.now()); if (c) { STATE.coachMsgs[m.id] = c; changed = true; } }
     if (changed) saveSoon();
   } catch (e) { /* Anzeige geht vor */ }
 }

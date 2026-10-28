@@ -1,7 +1,8 @@
 /* Fehlerprotokoll: kurze Meldungen ohne Gesundheitsdaten. Zahlen und Adressen werden entfernt. */
 import type { Env } from './store';
 
-const MAX_ROWS = 500;
+// Auftrag 21: für viele Nutzer mehr Platz (gruppiert angezeigt); ältere Einträge fallen weg
+const MAX_ROWS = 5000;
 export function scrub(s: unknown, n?: number): string {
   return String(s == null ? '' : s)
     .replace(/https?:\/\/\S+/gi, '<url>')

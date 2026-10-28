@@ -214,8 +214,9 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
 }
 /* Fingerabdruck der Einheiten: ändert er sich, ist eine neue Einheit da (egal aus welcher Quelle) */
 export async function dataSignature(env: Env, uid: number): Promise<string> {
-  const row: any = await env.DB.prepare("SELECT COUNT(*) AS n, MAX(updated_at) AS m FROM records WHERE user_id = ? AND kind IN ('session', 'custom', 'activity')").bind(uid).first();
-  return row ? row.n + ':' + row.m : '';
+  // Auftrag 21: eine Zeile lesen statt alle Einheiten (D1 zählt gelesene Zeilen; bei 1.000 Nutzern mit 1 Jahr Daten sonst über dem Gratis-Kontingent)
+  const row: any = await env.DB.prepare("SELECT v FROM user_meta WHERE user_id = ? AND k = 'data_rev'").bind(uid).first();
+  return row ? 'r' + row.v : 'r0';
 }
 /* Sonntags: Plan verlängern, wenn er bald endet */
 export async function extendIfNeeded(env: Env, uid: number, L: any): Promise<boolean> {

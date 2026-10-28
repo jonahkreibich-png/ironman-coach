@@ -62,9 +62,17 @@ export async function dailyBackup(env: Env, uid: number) {
   const rows = await env.DB.prepare('SELECT kind, key, data, updated_at FROM records WHERE user_id = ? AND deleted = 0').bind(uid).all();
   const records = (rows.results || []).map((r: any) => ({ kind: r.kind, key: r.key, data: JSON.parse(r.data), updatedAt: r.updated_at }));
   if (!records.length) return { day, count: 0 };
+  // Auftrag 21: unveränderter Datenstand → keine neue Kopie (spart bei vielen Nutzern den meisten Speicher)
+  const sig = String(records.length) + ':' + records.reduce((m: number, r: any) => Math.max(m, r.updatedAt || 0), 0);
+  const prev = await getMeta(env, uid, 'backup_sig');
+  if (prev && prev.sig === sig && prev.day >= berlinDate(Date.now() - 6 * 86400000)) return { day, count: records.length, unchanged: true };
   await env.DB.prepare('INSERT OR REPLACE INTO backups (user_id, day, created_at, data) VALUES (?, ?, ?, ?)').bind(uid, day, Date.now(), JSON.stringify(records)).run();
-  const cutoff = berlinDate(Date.now() - BACKUP_KEEP_DAYS * 86400000);
+  await setMeta(env, uid, 'backup_sig', { sig, day });
+  // Auftrag 21: 7 Tage täglich, danach nur Sonntage bis 30 Tage
+  const cutoff = berlinDate(Date.now() - BACKUP_KEEP_DAYS * 86400000), week = berlinDate(Date.now() - 7 * 86400000);
   await env.DB.prepare('DELETE FROM backups WHERE user_id = ? AND day < ?').bind(uid, cutoff).run();
+  const old = await env.DB.prepare('SELECT day FROM backups WHERE user_id = ? AND day < ?').bind(uid, week).all();
+  for (const r of (old.results || []) as any[]) if (new Date(r.day + 'T12:00:00Z').getUTCDay() !== 0) await env.DB.prepare('DELETE FROM backups WHERE user_id = ? AND day = ?').bind(uid, r.day).run();
   return { day, count: records.length };
 }
 async function nightly(env: Env) {
@@ -280,7 +288,9 @@ export async function everyFive(env: Env, b?: any, onlyUsers?: number[]) {
   const out: any = {};
   for (const uid of users) {
     let L: any = null;
-    if (b.hour >= 6 && b.hour <= 23 && b.minute % 30 < 5) {
+    // Auftrag 21: halbstündliche Arbeit je Nutzer auf die sechs 5-Minuten-Läufe verteilt (gleiche Häufigkeit, ein Sechstel der Last pro Lauf)
+    const slot = Math.floor((b.minute % 30) / 5);
+    if (b.hour >= 6 && b.hour <= 23 && (onlyUsers ? b.minute % 30 < 5 : slot === uid % 6)) {
       if (await intervalsCreds(env, uid)) { try { await runImport(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'intervals', { uid }); } }
       let daily: any = null;
       // Morgens nach dem Abruf: Tagesampel → Plan anpassen (einmal pro Tag)
@@ -288,8 +298,10 @@ export async function everyFive(env: Env, b?: any, onlyUsers?: number[]) {
       // Sonntag ab 18 Uhr: nächste Woche planen (einmal)
       if (b.dow === 0 && b.hour >= 18) { try { await runWeekly(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'weekly', { uid }); } }
       // Neue Einheit aus irgendeiner Quelle (Uhr, intervals.icu, Dropbox, Kurzbefehl): Analyse-Coach, auch wenn die App zu ist
-      try { const last = await getMeta(env, uid, 'analysis_last'); const sig = await dataSignature(env, uid); if (!last || last.sig !== sig) await runAnalysis(env, uid, 'activity'); } catch (e) { await logError(env, 'server', (e as Error).message, 'analysis', { uid }); }
-      if (env.VAPID_PRIVATE_JWK) {
+      let fresh = true;
+      try { const last = await getMeta(env, uid, 'analysis_last'); const sig = await dataSignature(env, uid); fresh = !last || last.sig !== sig; if (fresh) await runAnalysis(env, uid, 'activity'); } catch (e) { await logError(env, 'server', (e as Error).message, 'analysis', { uid }); }
+      // Auftrag 21: Hinweise nach dem Abruf nur bei neuen Daten, nach dem Morgenlauf oder einmal am Morgen (sonst alle Daten jedes Nutzers alle 30 min lesen)
+      if (env.VAPID_PRIVATE_JWK && (fresh || (daily && !daily.skipped) || (b.hour === 7 && b.minute < 30))) {
         try {
           L = await loadState(env, uid);
           if (L.plan) {

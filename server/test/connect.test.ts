@@ -152,8 +152,8 @@ describe('Neue Verbindung ändert nichts Vergangenes', () => {
     let recs = await records(env, token);
     const after = Object.fromEntries(recs.map((r: any) => [r.kind + '|' + r.key, r.data]));
     for (const k of [`trend|${old}`, `trend|${yday}`, 'session|run-1', 'session|swim-1']) expect(JSON.stringify(after[k])).toBe(before[k]);
-    expect(recs.some((r: any) => r.kind === 'activity')).toBe(false);
-    expect(calls.some(c => c.endsWith('/files/download'))).toBe(false);
+    // Auftrag 21: frühere Dateien werden einmalig als Historie geladen – nur als Aufzeichnung ohne Zuordnung, nie in Einheiten oder Handeinträgen
+    expect(recs.filter((r: any) => r.kind === 'activity').every((r: any) => r.data.history === true && !r.data.sessionId)).toBe(true);
     // heute: vorhandener Wert bleibt, leere Werte werden gefüllt
     expect(after[`trend|${today}`]).toMatchObject({ hrv: 65, restingHR: 60, sleepHours: 8 });
     // nach dem Verbinden: neue Einheit kommt an

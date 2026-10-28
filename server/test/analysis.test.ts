@@ -1,3 +1,4 @@
+import { putRecords } from '../src/store';
 /* Auftrag 7, Punkt 6: der Analyse-Coach läuft auf dem Server, auch wenn die App zu ist:
    nach einer neuen Einheit (Sync), beim 5-Minuten-Lauf, wenn sich Einheiten aus einer anderen Quelle geändert haben, morgens und sonntags. */
 import { test, expect } from 'vitest';
@@ -42,8 +43,8 @@ test('Zeitplan ohne App: geänderte Einheiten (z. B. von intervals.icu) lösen d
   const first = (await env.DB.prepare("SELECT updated_at FROM records WHERE kind = 'analysis'").first()).updated_at;
   await everyFive(env, { ...b, minute: 30 }, [uid]);
   expect((await env.DB.prepare("SELECT updated_at FROM records WHERE kind = 'analysis'").first()).updated_at).toBe(first);
-  // neue Einheit direkt in der Datenbank (wie ein Import von intervals.icu)
-  await env.DB.prepare("INSERT INTO records (user_id, kind, key, data, updated_at, deleted, rev) VALUES (1, 'session', 's7', '{\"completed\":true,\"metrics\":{\"min\":\"40\",\"hr\":\"150\"}}', ?, 0, 999)").bind(Date.now() + 5000).run();
+  // neue Einheit wie ein Import von intervals.icu (alle Importe schreiben über putRecords; Auftrag 21: Datenstand-Zähler statt Zählen)
+  await putRecords(env, 1, [{ kind: 'session', key: 's7', data: { completed: true, metrics: { min: '40', hr: '150' } }, updatedAt: Date.now() + 5000 }]);
   await everyFive(env, { ...b, hour: 15, minute: 0 }, [uid]);
   expect((await env.DB.prepare("SELECT updated_at FROM records WHERE kind = 'analysis'").first()).updated_at).toBeGreaterThan(first);
 });

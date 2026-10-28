@@ -114,7 +114,7 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
   if (p === '/api/admin/errors' && M === 'GET') {
     const since = Date.now() - 14 * 86400000;
     const acks: Record<string, number> = (await getMeta(env, a.uid, 'err_ack')) || {};
-    const rows = await env.DB.prepare('SELECT e.user_id, u.name, e.msg, e.place, e.version, e.at FROM error_log e LEFT JOIN users u ON u.id = e.user_id WHERE e.at > ? AND e.user_id IS NOT NULL ORDER BY e.id DESC LIMIT 500').bind(since).all();
+    const rows = await env.DB.prepare('SELECT e.user_id, u.name, e.msg, e.place, e.version, e.at FROM error_log e LEFT JOIN users u ON u.id = e.user_id WHERE e.at > ? ORDER BY e.id DESC LIMIT 5000').bind(since).all();
     const groups: Record<string, any> = {}; const ops: Record<string, any> = {};
     for (const r of (rows.results || []) as any[]) {
       const op = operatorHint(r.place, r.msg);
@@ -123,10 +123,12 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
       const tgt = op ? ops : groups;
       const g = tgt[key] = tgt[key] || (op ? { key, text: op.text, help: op.help, count: 0, lastAt: 0 } : { key, label: errorLabel(r.place), text: errorShort(r.msg), count: 0, lastAt: 0, users: [] as string[], versions: [] as string[] });
       g.count++; g.lastAt = Math.max(g.lastAt, r.at);
-      if (!op) { const n = r.name || 'Nutzer ' + r.user_id; if (!g.users.includes(n)) g.users.push(n); if (r.version && !g.versions.includes(r.version)) g.versions.push(r.version); }
+      // Auftrag 21: auch Server-Fehler ohne Nutzerbezug (Zeitpläne); bei vielen Betroffenen nur die Anzahl
+      if (!op) { const n = r.user_id == null ? 'Server' : r.name || 'Nutzer ' + r.user_id; if (!g.users.includes(n)) g.users.push(n); if (r.version && !g.versions.includes(r.version)) g.versions.push(r.version); }
     }
     const byLast = (x: any, y: any) => y.lastAt - x.lastAt;
-    return { groups: Object.values(groups).sort(byLast), operator: Object.values(ops).sort(byLast) };
+    const short = (g: any) => ({ ...g, userCount: g.users.length, users: g.users.length > 5 ? [...g.users.slice(0, 3), `+${g.users.length - 3} weitere`] : g.users });
+    return { groups: Object.values(groups).sort(byLast).map(short), operator: Object.values(ops).sort(byLast) };
   }
   if (p === '/api/admin/errors/ack' && M === 'POST') {
     const b = await readJson(req);

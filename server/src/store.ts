@@ -81,6 +81,9 @@ export async function putRecords(env: Env, uid: number, changes: Change[], expec
        WHERE excluded.updated_at > records.updated_at`
     ).bind(uid, c.kind, c.key, c.deleted ? null : JSON.stringify(c.data), Math.round(c.updatedAt), c.deleted ? 1 : 0));
   }
+  // Auftrag 21: ändert sich eine Einheit/Aufzeichnung, steigt der Datenstand-Zähler des Nutzers (statt bei jedem Zeitplan alle Datensätze zu zählen)
+  if (changes.some(c => c.kind === 'session' || c.kind === 'custom' || c.kind === 'activity')) stmts.push(env.DB.prepare(
+    "INSERT INTO user_meta (user_id, k, v) VALUES (?, 'data_rev', '1') ON CONFLICT (user_id, k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)").bind(uid));
   // Ein Batch ist eine D1-Transaktion: Aenderungen und Revisionen muessen
   // auch oberhalb von 100 Datensaetzen bei einem Fehler gemeinsam zurueckrollen.
   if (stmts.length) try { await env.DB.batch(stmts); }
