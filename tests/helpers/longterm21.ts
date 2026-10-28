@@ -180,6 +180,8 @@ export async function simulateLongterm21(u: LtUser, seed = 2101): Promise<LtResu
     for (const x of sc) {
       scores[x.sport] = x.score;
       if (!(Number.isFinite(x.score) && x.score >= 1 && x.score <= 120)) fail('Score ungültig', `${date} ${x.sport}: ${x.score}`);
+      // Kraft: höchstens 3 Einheiten pro Woche im Plan → kein „Elite-Niveau“ (Regelmäßigkeit über das Jahr richtig gerechnet)
+      if (x.sport === 'strength' && x.score > 90) fail('Score unplausibel', `${date} Kraft ${x.score} (${(x.parts[0] || {}).value})`);
       // ein großer Schritt braucht einen Grund in „Warum?“: Test oder harte Einheit mit Puls in dieser Woche (zählt stark)
       const reason = (x.why || []).some((t: string) => { const mm = /(\d\d)\.(\d\d)\./.exec(t); if (!/zählt stark/.test(t) || !mm) return false; const d = `${date.slice(0, 4)}-${mm[2]}-${mm[1]}`; return d > C.addDays(date, -7) && d <= date; });
       if (x.sport !== 'strength' && prevScores && prevScores[x.sport] != null && Math.abs(x.score - prevScores[x.sport]) > 10 && !reason) fail('Score-Sprung ohne Grund', `${date} ${x.sport}: ${prevScores[x.sport]} → ${x.score}`);

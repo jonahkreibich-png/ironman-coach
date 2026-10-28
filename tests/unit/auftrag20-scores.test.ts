@@ -250,3 +250,12 @@ test('Auftrag 21: Test weit weg von allem Bisherigen zählt erst nach Bestätigu
   const twice = sc('bike', [...base, act('bike', 9, { name: 'Radtest 20 min', min: 20, avgHr: 160, speedKmh: 40, km: 13.3 }), act('bike', 3, { name: 'Radtest 20 min', min: 20, avgHr: 160, speedKmh: 40, km: 13.3 })]);
   expect(twice.score).toBeGreaterThan(wild.score);
 });
+
+/* Auftrag 21: Kraft-Regelmäßigkeit mit Einheiten des ganzen Jahres – 2× pro Woche bleibt 2× pro Woche (nicht Jahr/6 Wochen) */
+test('Auftrag 21: Kraft 2× pro Woche über ein Jahr ergibt etwa 2 pro Woche', () => {
+  const acts = Array.from({ length: 104 }, (_, i) => ({ id: 'k' + i, sport: 'strength', date: addDays(today, -Math.round(i * 3.5)), source: 'manual', sources: ['manual'], min: 30, laps: [] } as any));
+  const s = sportScores({ today, profile: prof({ sports: ['strength'] } as any), goal: null, illness: [], trend: [], activities: acts }, ['strength'])[0];
+  const reg = s.parts.find((p: any) => p.key === 'reg')!;
+  expect(reg.raw).toBeGreaterThanOrEqual(1.8); expect(reg.raw).toBeLessThanOrEqual(2.2);
+  expect(s.score).toBeLessThan(85);
+});

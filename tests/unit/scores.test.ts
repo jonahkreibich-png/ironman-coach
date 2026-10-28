@@ -131,7 +131,8 @@ describe('Rad, Schwimmen, Kraft, Form', () => {
     const k = [2, 9, 16, 23, 30, 37, 5, 12, 19].map(d => ({ ...run(d), sport: 'strength' } as Activity));
     const [s] = sportScores({ ...base, activities: k }, ['strength']);
     expect(s.parts).toHaveLength(1);
-    expect(s.parts[0].sub).toBe(55);
+    // Auftrag 21: gleitend gewichtet (neuere Einheiten zählen etwas mehr) statt harter 6 Wochen: etwa 1,5 pro Woche ≈ 55
+    expect(s.parts[0].sub).toBeGreaterThanOrEqual(52); expect(s.parts[0].sub).toBeLessThanOrEqual(60);
   });
   test('Gesamt-Form: CTL im Verhältnis zum Ziel', () => {
     const loads: Record<string, number> = {};

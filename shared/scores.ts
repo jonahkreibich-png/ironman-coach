@@ -661,7 +661,12 @@ function capWith(cap: number | null, prior: { z: number; sd: number }, pts: (z: 
 /* ---------- Kraft: Regelmäßigkeit und Steigerung ---------- */
 function strengthRaw(c: Ctx): Raw {
   const { end, activities: list } = evidenceActivities(c, 'strength');
-  const perWeek = list.length / 6;
+  // Auftrag 21: Einheiten pro Woche gleitend gewichtet (Halbwertszeit 6 Wochen) statt Anzahl in einem harten 6-Wochen-Fenster;
+  // bei gleichmäßigem Training ergibt das dieselbe Zahl wie vorher
+  // (Nenner: gewichtete Tage seit der ersten Einheit, mindestens 6 Wochen – wer neu ist, wird nicht schlechter gerechnet)
+  const span = Math.max(WINDOW, list.length ? Math.ceil(Math.max(...list.map(a => ageOfDays(end, a.date)))) + 1 : WINDOW);
+  let days = 0; for (let d = 0; d < span; d++) days += Math.exp(-Math.LN2 * d / WINDOW);
+  const perWeek = Math.round(list.reduce((n, a) => n + Math.exp(-Math.LN2 * ageOfDays(end, a.date) / WINDOW), 0) / days * 7 * 10) / 10;
   const weights = list.map(a => (a as any).liftKg).filter((x: any) => typeof x === 'number');
   const prog = weights.length >= 2 ? (weights[weights.length - 1] - weights[0]) / Math.max(1, weights[0]) : null;
   const parts: ScorePart[] = [
