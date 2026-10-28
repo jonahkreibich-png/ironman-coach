@@ -191,3 +191,58 @@ export function stripUnsupported(text: string, f: ClaimFacts): string {
   for (const b of bad) t = t.split(b).join('');
   return t.replace(/[ \t]+\./g, '.').replace(/\.\s*\./g, '.').replace(/[ \t]{2,}/g, ' ').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 }
+
+/* ---------- Auftrag 21: Texte des Coachs prüfen (Regel-Coach und KI) ----------
+   1. Interne Texte (Platzhalter, Ids, „undefined“ …) erscheinen nie: der Satz fällt weg.
+   2. Wochentag + Datum („Sa 28.10.“): der Wochentag wird aus dem Datum berichtigt. „Schwimmtest vom Samstag“ ohne Datum: gibt es
+      an diesem Wochentag keine passende Einheit, aber genau eine in ±7 Tagen, wird der Wochentag berichtigt.
+   3. Artikel bei Einheitennamen: eindeutig falsche Formen („den Schwimmtraining“ → „das Schwimmtraining“). */
+export const INTERNAL_RE = /Begründung nicht für die KI freigegeben|Trainingsangabe \(|\bundefined\b|\bNaN\b|\[object Object\]|aiExcluded|session_id|\bto_date\b|\bmsg-[a-z]+-|\bg\d{6}w\d+-[a-z]{2}-\d|\bnull (?:min|m|km|W)\b|\{\{|\}\}/;
+export function internalLeaks(text: string): string[] { return String(text || '').split(/(?<=[.!?])\s+|\n/).filter(s => INTERNAL_RE.test(s)); }
+const DOW_LONG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const DOW_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const dowIdx = (w: string) => { const i = DOW_LONG.findIndex(x => x.toLowerCase() === w.toLowerCase()); return i >= 0 ? i : DOW_SHORT.findIndex(x => x.toLowerCase() === w.replace('.', '').toLowerCase()); };
+const dowOfDate = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
+const NEUTER = /(?:training|schwimmen|radfahren|laufen|krafttraining|intervalltraining|koppeltraining|techniktraining|spiel|rennen)$/i;
+const FEMININE = /(?:einheit|fahrt|ausfahrt|runde|intervalleinheit|übung|technikeinheit|session|pause|woche)$/i;
+const MASC = /(?:test|lauf|check|ruhetag|tag|block|wettkampf|koppellauf|dauerlauf)$/i;
+const SPORT_KEY: [RegExp, string][] = [[/schwimm|kraul|css/i, 'swim'], [/lauf|run/i, 'run'], [/rad|fahrt|bike|rolle/i, 'bike'], [/kraft/i, 'strength']];
+export function fixCoachText(text: string, ctx?: { today: string; baseWeeks?: any[]; state?: any }): string {
+  let t = String(text || '');
+  // 1. interne Texte
+  if (INTERNAL_RE.test(t)) t = t.split(/(?<=[.!?])\s+|\n/).filter(s => !INTERNAL_RE.test(s)).join(' ').trim();
+  // 2a. Wochentag passend zum genannten Datum
+  const year = ctx ? +ctx.today.slice(0, 4) : new Date().getUTCFullYear();
+  t = t.replace(/\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\.?,? (?:den )?(\d{1,2})\.(\d{1,2})\./g, (m, w, dd, mm) => {
+    let y = year; if (ctx && +mm < +ctx.today.slice(5, 7) - 6) y++; if (ctx && +mm > +ctx.today.slice(5, 7) + 6) y--;
+    const iso = `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; const real = dowOfDate(iso);
+    if (!Number.isFinite(real) || dowIdx(w) === real || dowIdx(w) < 0) return m;
+    const long = w.length > 3; return m.replace(w, long ? DOW_LONG[real] : DOW_SHORT[real]);
+  });
+  // 2b. „<Einheit> vom/am <Wochentag>“ ohne Datum gegen den Plan
+  if (ctx && ctx.baseWeeks) {
+    const days = C.planDays(C.applyAdjustments(ctx.baseWeeks, (ctx.state && ctx.state.adjustments) || {})).filter((d: any) => d.date >= C.addDays(ctx.today, -7) && d.date <= C.addDays(ctx.today, 7));
+    t = t.replace(/\b([A-ZÄÖÜ][\wäöüß-]*(?:test|lauf|training|schwimmen|einheit|fahrt|check))\s+(vom|am|von)\s+(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\b/g, (m, name, prep, w) => {
+      const sport = (SPORT_KEY.find(([re]) => re.test(name)) || [null, null])[1]; const isTest = /test|check/i.test(name);
+      const fit = (s: any) => s.sport !== 'rest' && (!sport || s.sport === sport) && (!isTest || /test|check/i.test(s.title || ''));
+      const hits = days.filter((d: any) => d.sessions.some(fit));
+      if (!hits.length || hits.some((d: any) => dowOfDate(d.date) === dowIdx(w))) return m;
+      const past = hits.filter((d: any) => prep === 'vom' ? d.date <= ctx.today : true);
+      const one = (past.length ? past : hits);
+      if (new Set(one.map((d: any) => dowOfDate(d.date))).size !== 1) return m;
+      return `${name} ${prep} ${DOW_LONG[dowOfDate(one[0].date)]}`;
+    });
+  }
+  // 3. Artikel
+  t = t.replace(/\b(den|die|dem|Den|Die|Dem)\s+([A-ZÄÖÜ][\wäöüß-]+)/g, (m, art, noun) => {
+    const a = art.toLowerCase(); const cap = art[0] === art[0].toUpperCase();
+    const fix = (x: string) => (cap ? x[0].toUpperCase() + x.slice(1) : x) + ' ' + noun;
+    if (/intervalle$|übungen$|einheiten$/i.test(noun)) return m; // Mehrzahl
+    if (NEUTER.test(noun) && (a === 'den' || a === 'die')) return fix('das');
+    if (FEMININE.test(noun) && a === 'den') return fix('die');
+    if (FEMININE.test(noun) && a === 'dem') return fix('der');
+    if (MASC.test(noun) && a === 'die') return fix('den');
+    return m;
+  });
+  return t.replace(/[ \t]{2,}/g, ' ').trim();
+}

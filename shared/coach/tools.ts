@@ -25,11 +25,11 @@ export const TOOL_DEFS = [
   { name: 'get_analysis', description: 'Ergebnis des Analyse-Coachs: Belastung (CTL/ATL/TSB, ACWR) und Erkenntnisse mit Begründung und Tipp (Trends wie aerobe Effizienz, zu hoher Puls, Ermüdung).',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'move_session', description: 'Verschiebt eine geplante Einheit auf einen anderen Tag.',
-    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, to_date: { type: 'string' }, reason: { type: 'string', description: 'ein kurzer Satz Begründung in der du-Form, z. B. „Du hast am Dienstag keine Zeit.“' } }, required: ['session_id', 'to_date', 'reason'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, to_date: { type: 'string' }, reason: { type: 'string', description: 'optional: ein kurzer Satz in der du-Form, nur wenn der Athlet einen Grund genannt hat. Nie nach einem Grund fragen.' } }, required: ['session_id', 'to_date'], additionalProperties: false } },
   { name: 'modify_session', description: 'Ändert eine geplante Einheit (Titel, Dauer, Zone, Beschreibung, Sport). Nur angegebene Felder ändern sich.',
-    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, sport: { type: 'string', enum: ['swim', 'bike', 'run', 'strength', 'football', 'rest'] }, title: { type: 'string' }, planned_minutes: { type: 'integer', minimum: 5, maximum: 600 }, zone: { type: 'string' }, description: { type: 'string' }, reason: { type: 'string', description: 'ein kurzer Satz in der du-Form' } }, required: ['session_id', 'reason'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, sport: { type: 'string', enum: ['swim', 'bike', 'run', 'strength', 'football', 'rest'] }, title: { type: 'string' }, planned_minutes: { type: 'integer', minimum: 5, maximum: 600 }, zone: { type: 'string' }, description: { type: 'string' }, reason: { type: 'string', description: 'optional: ein kurzer Satz in der du-Form' } }, required: ['session_id'], additionalProperties: false } },
   { name: 'cancel_session', description: 'Lässt eine geplante Einheit entfallen.',
-    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, reason: { type: 'string', description: 'ein kurzer Satz in der du-Form' } }, required: ['session_id', 'reason'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, reason: { type: 'string', description: 'optional: ein kurzer Satz in der du-Form' } }, required: ['session_id'], additionalProperties: false } },
   { name: 'rebuild_week', description: 'Baut eine ganze Woche neu (großer Eingriff, wird als Vorschlag gezeigt). Alle 7 Tage angeben.',
     input_schema: { type: 'object', properties: { week_number: { type: 'integer' }, start_date: { type: 'string' }, focus: { type: 'string' }, days: { type: 'array', items: { type: 'object', properties: { date: { type: 'string' }, sessions: { type: 'array', items: { type: 'object', properties: { sport: { type: 'string' }, title: { type: 'string' }, plannedMinutes: { type: 'integer' }, zone: { type: 'string' }, description: { type: 'string' } }, required: ['sport', 'title'] } } }, required: ['date', 'sessions'] } }, reason: { type: 'string' } }, required: ['week_number', 'start_date', 'days', 'reason'], additionalProperties: false } },
   { name: 'start_illness', description: 'Startet eine Krankheitsphase (Training pausiert, Einheiten zählen nicht als verpasst).',
@@ -62,6 +62,26 @@ function ruleCheck(ctx: EngineCtx, weeks: any[], date: string): any[] {
   return validateWeeks([weeks[i]], { minor: isMinor(ctx.profile, ctx.today), illness: ctx.state.illnessPeriods, maxIncPct: progressionOf(ctx.profile, ctx.today).incPct }, prev);
 }
 let seq = 0;
+/* Auftrag 21: Tag mit Wochentag („Di 28.10.“) aus dem Datum selbst, nie geraten */
+const DOW_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+export function dayDe(d: string): string { return `${DOW_DE[new Date(d + 'T12:00:00Z').getUTCDay()]} ${d.slice(8)}.${d.slice(5, 7)}.`; }
+/* Auftrag 21: Tausch-Wünsche als EIN Vorschlag „Tauschen“ statt zwei verwirrender Verschiebungen (A: X→Y und B: Y→X) */
+export function mergeSwapProposals<T extends { title?: string; text?: string; proposal?: any }>(props: T[]): T[] {
+  const moveOf = (m: T) => { const ch = m.proposal && m.proposal.changes; const a = ch && ch.length === 1 && ch[0].kind === 'adjust' ? ch[0].data : null; return a && a.type === 'move' ? a : null; };
+  const out: T[] = []; const used = new Set<number>();
+  props.forEach((m, i) => {
+    if (used.has(i)) return;
+    const a = moveOf(m);
+    const j = a ? props.findIndex((n, k) => k > i && !used.has(k) && (() => { const b = moveOf(n); return !!b && b.from === a.to && b.to === a.from && b.sessionId !== a.sessionId; })()) : -1;
+    if (j < 0) { out.push(m); return; }
+    used.add(j); const b = moveOf(props[j]);
+    const nameOf = (x: any) => String(x.what || '').split(':')[0];
+    const group = 'swap-' + a.id;
+    out.push({ ...m, title: `Tauschen: ${nameOf(a)} (${dayDe(a.from)}) ↔ ${nameOf(b)} (${dayDe(b.from)})`, text: [m.text, props[j].text].filter(Boolean).filter((x, k, l) => l.indexOf(x) === k).join(' '),
+      proposal: { ...m.proposal, changes: [...m.proposal.changes, ...props[j].proposal.changes].map((c: any) => ({ ...c, data: { ...c.data, group } })) } });
+  });
+  return out;
+}
 function adjId(prefix: string, ctx: EngineCtx) { return `ai-${prefix}-${ctx.now}-${++seq}`; }
 
 /* opts.proposeOnly (Auftrag 16): Planänderungen der KI gelten nie sofort, sondern werden als Vorschlag zum Bestätigen gespeichert */
@@ -117,9 +137,9 @@ export function runTool(ctx: EngineCtx, name: string, input: any, opts: { propos
       if (!DATE.test(input.to_date || '')) return err('to_date muss ein Datum JJJJ-MM-TT sein.');
       if (input.to_date < today) return err('Nicht in die Vergangenheit verschieben.');
       if (!C.planDays(weeks).some((d: any) => d.date === input.to_date)) return err('An diesem Tag gibt es keinen Plan.');
-      a = { id: adjId('move', ctx), type: 'move', sessionId: hit.s.id, from: hit.d.date, to: input.to_date, what: `${hit.s.title}: auf ${input.to_date.slice(8)}.${input.to_date.slice(5, 7)}. verschoben`, reason };
+      a = { id: adjId('move', ctx), type: 'move', sessionId: hit.s.id, from: hit.d.date, to: input.to_date, what: `${hit.s.title}: ${dayDe(hit.d.date)} → ${dayDe(input.to_date)}`, reason };
     } else if (name === 'cancel_session') {
-      a = { id: adjId('cancel', ctx), type: 'cancel', sessionId: hit.s.id, what: `${hit.s.title} entfällt`, reason };
+      a = { id: adjId('cancel', ctx), type: 'cancel', sessionId: hit.s.id, what: `${hit.s.title} (${dayDe(hit.d.date)}) entfällt`, reason };
     } else {
       const set: any = {};
       // Auftrag 15: nur Sportarten, die der Athlet gewählt hat (Teamsport nur, wenn angegeben)
@@ -131,7 +151,7 @@ export function runTool(ctx: EngineCtx, name: string, input: any, opts: { propos
       if (input.zone) set.zone = String(input.zone).slice(0, 30);
       if (input.description) set.description = String(input.description).slice(0, 400);
       if (!Object.keys(set).length) return err('Es wurde nichts geändert.');
-      a = { id: adjId('mod', ctx), type: 'modify', sessionId: hit.s.id, set, what: `${hit.s.title} → ${set.title || hit.s.title}${set.plannedMinutes ? ` (${set.plannedMinutes} min)` : ''}`, reason };
+      a = { id: adjId('mod', ctx), type: 'modify', sessionId: hit.s.id, set, what: `${hit.s.title} (${dayDe(hit.d.date)}) → ${set.title || hit.s.title}${set.plannedMinutes ? ` (${set.plannedMinutes} min)` : ''}`, reason };
     }
     a.from_ai = true; a.createdAt = ctx.now; a.date = today; a.group = 'ai-' + ctx.now;
     const after = effective(ctx, [a]);
@@ -154,7 +174,7 @@ export function runTool(ctx: EngineCtx, name: string, input: any, opts: { propos
     const grows = s2 && hit.s.plannedMinutes && s2.s.plannedMinutes && s2.s.plannedMinutes > hit.s.plannedMinutes * 1.3;
     const harder = s2 && !isIntense(hit.s) && isIntense(s2.s);
     const change = { kind: 'adjust', key: a.id, data: a };
-    if (grows || harder || opts.proposeOnly) return { result: 'Als Vorschlag gespeichert. Der Athlet sieht ihn im Chat und entscheidet selbst.', isError: false, changes: [], proposal: { title: 'Vorschlag: ' + a.what, text: reason, changes: [change] } };
+    if (grows || harder || opts.proposeOnly) return { result: 'Als Vorschlag gespeichert. Der Athlet sieht ihn im Chat und entscheidet selbst.', isError: false, changes: [], proposal: { title: (name === 'move_session' ? 'Verschieben: ' : name === 'cancel_session' ? 'Streichen: ' : 'Ändern: ') + a.what, text: reason, changes: [change] } };
     return { result: 'Erledigt: ' + a.what + '.', isError: false, changes: [change] };
   }
   if (name === 'rebuild_week') {

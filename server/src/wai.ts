@@ -4,11 +4,11 @@ import { guardReadinessAnswer } from '../../shared/readiness';
    Regel-Coach (in der App). Ist das Kontingent leer oder gibt es einen Fehler, antwortet die App selbst mit dem Regel-Coach.
    Fair: jede Person höchstens WAI_MAX_PER_DAY Fragen (30) und höchstens ein Viertel des Tageskontingents.
    Oura-Daten gehen nie an die KI (aiSafeCtx). Planänderungen nur als Vorschlag. Zahlen nur aus Daten und Werkzeugen (Zahlen-Wächter). */
-import { claimFacts, unsupportedClaims } from '../../shared/coach/claims';
+import { claimFacts, unsupportedClaims, fixCoachText } from '../../shared/coach/claims';
 import { type Env, berlinDate } from './store';
 import { HttpError } from './http';
 import { aiSafeCtx, type ChatResult, type ChatStream } from './ai';
-import { runTool, type ToolChange } from '../../shared/coach/tools';
+import { runTool, type ToolChange , mergeSwapProposals } from '../../shared/coach/tools';
 import { checkMessage } from '../../shared/coach/safety';
 import { coachSkill, compactContext, openAiTools, inventedNumbers, cleanAnswer, autoTool, isChangeRequest, claimsChange, leaksInternals } from '../../shared/coach/freeai';
 import { hasSource } from '../../shared/activity/merge';
@@ -178,7 +178,7 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
     await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 });
     throw new FallbackError('change without tool');
   }
-  final = cleanAnswer(final);
+  final = fixCoachText(cleanAnswer(final), ctx);
   const bad = inventedNumbers(final, sources);
   const claimed = claimsChange(final) && !props.length;
   // Auftrag 17: behauptete Leistungen (z. B. „100 m geschafft“) müssen in den echten Daten stehen, sonst antwortet der Regel-Coach
@@ -194,7 +194,7 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
   out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: final, aiExcluded: final.startsWith('Ampel der App:'), by: 'free' } as any);
   // Vorschläge nach der Antwort, damit „bestätige ihn unten“ stimmt
-  props.forEach((m, i) => out.messages.push({ ...m, at: Date.now() + 3 + i }));
+  mergeSwapProposals(props).forEach((m, i) => out.messages.push({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx), at: Date.now() + 3 + i }));
   out.status = await freeStatus(env, uid, ctx.state.settings, !!o.parentNeeded);
   return out;
 }

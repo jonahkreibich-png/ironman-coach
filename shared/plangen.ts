@@ -215,7 +215,8 @@ const shoulderOf = (p: Profile, today: string) => !!effectsOf(rulesOf(p, parseFo
 export function paceCtx(p: Profile, indoor: boolean, bikeName: string | null, today: string): W.PaceCtx {
   const th = p.thresholds; const age = ageOf(p, today) ?? 35;
   const pos = (v: any) => (typeof v === 'number' && v > 0 ? v : null);
-  return { runThrSec: pos(th.thresholdPaceRunSec), lthrRun: pos(th.lthrRun), lthrBike: pos(th.lthrBike), bikeKmh: pos(th.thresholdSpeedBikeKmh) ? speedFor(p, kindFromName(bikeName, indoor)) : null, ftp: p.powerMeter || (indoor && p.trainerType === 'smart') ? pos(th.ftp) : null, css: cssFor(p), breast100: pos(th.breast100Sec) || pos((p.skills || {}).swimPaceBreast) || (pos((p.skills || {}).swimPace100) ? Math.max(120, Math.round(pos((p.skills || {}).swimPace100)! + 5)) : 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0)), indoor, bikeName,
+  return { runThrSec: pos(th.thresholdPaceRunSec), lthrRun: pos(th.lthrRun), lthrBike: pos(th.lthrBike), // Auftrag 21: drinnen kein Tempo (auf der einfachen Rolle nur geschätzt, beim Smart-Trainer zählen die Watt): Puls, Watt, Gefühl
+    bikeKmh: pos(th.thresholdSpeedBikeKmh) && !indoor ? speedFor(p, kindFromName(bikeName, indoor)) : null, ftp: p.powerMeter || (indoor && p.trainerType === 'smart') ? pos(th.ftp) : null, css: cssFor(p), breast100: pos(th.breast100Sec) || pos((p.skills || {}).swimPaceBreast) || (pos((p.skills || {}).swimPace100) ? Math.max(120, Math.round(pos((p.skills || {}).swimPace100)! + 5)) : 165 + (age >= 50 ? 15 : 0) + (p.sex === 'f' ? 5 : 0)), indoor, bikeName,
     pool: (p.skills || {}).poolM === 50 ? 50 : 25, gear: Array.isArray((p.skills || {}).swimGear) ? ((p.skills || {}).swimGear as string[]).filter(g => g !== 'paddles' || !shoulderOf(p, today)) : [],
     swimMPerMin: pos((p.skills || {}).swimMPerMin),
     // ohne CSS: Kraul-Tempo aus dem Kraul-Check (25 m auf Zeit, auf 100 m hochgerechnet mit Wenden und Ermüdung)

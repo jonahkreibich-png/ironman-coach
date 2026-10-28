@@ -634,3 +634,7 @@ fieldset.custom-entry { border: 0; margin: 0; padding: 0; min-width: 0; }
 .gear-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: middle; }
 .gear-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; line-height: 1; padding: 3px 6px 3px 4px; border-radius: 999px; background: color-mix(in srgb, var(--swim) 14%, transparent); color: var(--text); white-space: nowrap; }
 .gear-chip svg { width: 13px; height: 13px; flex: none; }
+
+/* Auftrag 21: Vorschlag mit Was/von/nach */
+.prop-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.prop-list li { margin: 2px 0; }

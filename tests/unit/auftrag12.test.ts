@@ -35,13 +35,19 @@ describe('Rad-Geschwindigkeitszonen', () => {
     expect(kindOf({ bikeType: 'gravel' })).toBe('gravel'); expect(kindOf({ title: 'Lange Ausfahrt (Rennrad)' })).toBe('road');
     expect(kindOf({}, { bikes: ['gravel'] })).toBe('gravel');
   });
-  test('in den Einheiten: Puls/Watt zuerst, dann km/h flach mit Hinweis auf Wind und Steigung; drinnen virtuell', () => {
+  test('in den Einheiten: Puls/Watt zuerst, dann km/h flach mit Hinweis auf Wind und Steigung; drinnen ohne km/h', () => {
     const p = prof({ bikes: ['road', 'trainer'], powerMeter: true, thresholds: { ftp: 250 } });
     const out = W.build(W.bikeEasy(paceCtx(p, false, 'Rennrad', '2026-10-15'), 90));
     expect(out.description).toMatch(/W, Puls \d+–\d+, ca\. 26–29 km\/h flach/);
     expect(out.description).toMatch(/flache Strecken ohne Wind/);
     const ind = W.build(W.bikeEasy(paceCtx(p, true, 'Rolle', '2026-10-15'), 60));
-    expect(ind.description).toMatch(/km\/h \(virtuell\)/); expect(ind.description).not.toMatch(/ohne Wind/);
+    // Auftrag 21: drinnen nie km/h (auch nicht „virtuell“); Smart-Trainer mit Watt, einfache Rolle nur Puls und Gefühl
+    expect(ind.description).not.toMatch(/km\/h/); expect(ind.description).not.toMatch(/ohne Wind/);
+    expect(ind.description).toMatch(/\d+–\d+ W/);
+    const basic = prof({ bikes: ['road', 'trainer'], powerMeter: false, trainerType: 'basic', thresholds: { ftp: 250, lthrBike: 165 } });
+    const bi = W.build(W.bikeEasy(paceCtx(basic, true, 'Rolle', '2026-10-15'), 60));
+    expect(bi.description).not.toMatch(/km\/h|\bW\b/);
+    expect(bi.description).toMatch(/Puls \d+–\d+, Gefühl 3-4\/10/);
   });
   test('Gravel-Einheit rechnet mit dem Gravel-Tempo', () => {
     const p = prof({ bikes: ['road', 'gravel'] });

@@ -76,7 +76,7 @@ test.describe('Kostenlose KI im Coach', () => {
     await expect(prop).toBeVisible({ timeout: 10000 });
     await expect(prop.locator('[data-act="prop"][data-ok="1"]')).toBeVisible();
     await prop.locator('[data-act="prop"][data-ok="1"]').click();
-    await expect(page.locator('#toast')).toContainText('Angenommen', { timeout: 10000 });
+    await expect(page.locator('#toast')).toContainText('Bestätigt', { timeout: 10000 });
   });
 
   test('KI gerade nicht verfügbar (Kontingent leer): Regel-Coach antwortet mit Hinweis', async ({ page, request }) => {

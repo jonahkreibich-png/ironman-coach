@@ -89,7 +89,10 @@ function msgHtml(m: any, latest: boolean): string {
   }
   const cls = m.from === 'user' ? 'user' : `coach ${m.kind === 'warning' ? 'warning' : m.kind === 'adjust' ? 'adjust' : m.kind === 'proposal' || m.kind === 'proposal-local' ? 'proposal' : ''}`;
   const head = m.from !== 'user' && m.title ? `<div class="h">${m.kind === 'warning' ? ic('info') : m.kind === 'adjust' ? ic('calendar') : m.from === 'ai' ? ic('wand') : ''}${esc(m.title)}</div>` : '';
-  const prop = m.kind === 'proposal' && m.proposal ? (m.proposal.status === 'open'
+  // Auftrag 21: jeder Vorschlag zeigt klar, was sich ändert (Einheit, von wann, nach wann)
+  const propLines = m.kind === 'proposal' && m.proposal ? [...new Set(((m.proposal.changes || []) as any[]).filter(c => c && c.kind === 'adjust' && c.data && c.data.what).map(c => String(c.data.what)))] : [];
+  const propList = propLines.length && !(propLines.length === 1 && String(m.title || '').includes(propLines[0])) ? `<ul class="prop-list" data-prop-lines>${propLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : '';
+  const prop = m.kind === 'proposal' && m.proposal ? propList + (m.proposal.status === 'open'
     ? `<div class="row" style="margin-top:8px"><button class="btn sm" data-act="prop" data-id="${esc(m.id)}" data-ok="1">${esc(t('coach.accept'))}</button><button class="btn ghost sm" data-act="prop" data-id="${esc(m.id)}" data-ok="0">${esc(t('coach.reject'))}</button></div>`
     : `<div class="xs muted" style="margin-top:6px">${esc(m.proposal.status === 'superseded' ? 'Durch aktuelle Daten ueberholt' : m.proposal.status === 'accepted' ? t('coach.accepted') : t('coach.rejected'))}</div>`) : '';
   const acts = (m.actions || []).length && !m.actionsDone ? `<div class="suggest">${m.actions.map((a: ChatAction, i: number) => `<button class="btn sm ${i ? 'ghost' : ''}" data-act="chat-action" data-id="${esc(m.id)}" data-i="${i}">${esc(a.label)}</button>`).join('')}</div>` : m.actionsDone ? `<div class="xs muted" style="margin-top:6px">${esc(m.actionsDone)}</div>` : '';

@@ -5,14 +5,14 @@
    Ohne das läuft nur die Regel-Engine. Budget: Monatsbudget und Höchstzahl an Nachrichten pro Tag. */
 import { readinessSnapshot, withheldReadiness, guardReadinessAnswer } from '../../shared/readiness';
 import * as C from '../../shared/core';
-import { claimFacts, stripUnsupported } from '../../shared/coach/claims';
+import { claimFacts, stripUnsupported, fixCoachText } from '../../shared/coach/claims';
 import Anthropic from '@anthropic-ai/sdk';
 import { type Env, berlinDate, putRecords, getRecord, userEntitlements } from './store';
 import { needsParentConsent } from '../../shared/features';
 import { HttpError } from './http';
 import { COACHING_HANDBOOK } from '../../shared/coach/handbook';
 import { rulesForAi } from '../../shared/trainingknowledge';
-import { TOOL_DEFS, runTool, type ToolChange } from '../../shared/coach/tools';
+import { TOOL_DEFS, runTool, type ToolChange , mergeSwapProposals } from '../../shared/coach/tools';
 import { checkMessage } from '../../shared/coach/safety';
 import { buildContext } from '../../shared/coach/summary';
 import type { EngineCtx, CoachMsg } from '../../shared/coach/engine';
@@ -26,13 +26,12 @@ import { loadState } from './coach';
 
 /* Oura-Daten dürfen laut Oura-API-Vertrag (gültig ab 08.06.2026, Abschnitt 4(d)) nicht an KI-Modelle gehen. Sie werden vor jedem KI-Aufruf entfernt. */
 export const NO_AI_SOURCES = ['oura'];
-/* Alte Planbegründungen haben keine verlässliche Feld-Provenienz. Bei gesperrten
-   Quellen werden ihre freien Texte in einer Kopie entfernt; die App behält das Original. */
-function withoutPlanNarrative(value: any): any {
-  if (Array.isArray(value)) return value.map(withoutPlanNarrative);
-  if (!value || typeof value !== 'object') return value;
-  const narrative = new Set(['reason', 'description', 'what', 'title', 'why', 'note', 'notes', 'focus', 'label', 'blockName', 'text', 'summary', 'explanation', 'rationale', 'instructions', 'instruction', 'hint', 'tip', 'details']);
-  return Object.fromEntries(Object.entries(value).map(([key, v]) => [key, narrative.has(key) && typeof v === 'string' ? 'Trainingsangabe (Begründung nicht für die KI freigegeben)' : withoutPlanNarrative(v)]));
+/* Auftrag 21: Begründungen von Anpassungen, die aus Oura-Werten entstanden sind (aiExcluded), können Werte nennen und gehen nicht an
+   die KI. Entfernt werden nur diese Begründungstexte (leer, nie ein Platzhalter: der Platzhalter „Trainingsangabe (Begründung nicht für
+   die KI freigegeben)“ stand sonst als Einheitenname in Vorschlägen). Titel und Aufbau der Einheiten kommen vom Plan-Generator und bleiben. */
+const NARRATIVE = new Set(['reason', 'why', 'rationale', 'explanation', 'details', 'summary', 'text']);
+function withoutAdjustmentReasons(adjustments: any): any {
+  return Object.fromEntries(Object.entries(adjustments || {}).map(([id, a]: any) => [id, a && a.aiExcluded ? Object.fromEntries(Object.entries(a).map(([k, v]) => [k, NARRATIVE.has(k) && typeof v === 'string' ? '' : v])) : a]));
 }
 export function aiSafeCtx(ctx: EngineCtx): EngineCtx {
   let trend = ctx.state.trend || [];
@@ -41,10 +40,8 @@ export function aiSafeCtx(ctx: EngineCtx): EngineCtx {
   const withheld = !!ctx.readinessWithheld || (ctx.state.trend || []).some((p: any) => NO_AI_SOURCES.some(src => hasSource(p, src))) || Object.values(ctx.state.activities || {}).some((a: any) => a && NO_AI_SOURCES.some(src => a.source === src || a.sources?.includes(src)));
   const snapshot = withheld ? withheldReadiness(ctx.today) : readinessSnapshot(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.profile, ctx.today);
   const coachMsgs = Object.fromEntries(Object.entries(ctx.state.coachMsgs || {}).filter(([, m]: any) => !m?.aiExcluded && !(withheld && m?.from !== 'user')));
-  const redactPlan = withheld || Object.values(ctx.state.adjustments || {}).some((a: any) => a?.aiExcluded);
-  const baseWeeks = redactPlan ? withoutPlanNarrative(ctx.baseWeeks) : ctx.baseWeeks;
-  const adjustments = redactPlan ? withoutPlanNarrative(ctx.state.adjustments || {}) : ctx.state.adjustments;
-  const planMeta = redactPlan ? withoutPlanNarrative(ctx.planMeta) : ctx.planMeta;
+  const adjustments = withoutAdjustmentReasons(ctx.state.adjustments || {});
+  const baseWeeks = ctx.baseWeeks, planMeta = ctx.planMeta;
   return { ...ctx, baseWeeks, planMeta, readinessWithheld: withheld, readinessSnapshot: snapshot, state: { ...ctx.state, trend, activities: acts, coachMsgs, adjustments, coachNotes: withheld ? {} : ctx.state.coachNotes } };
 }
 
@@ -197,9 +194,10 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
   // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen; unbelegte Sätze werden nicht gezeigt
   let shown = finalText || 'Erledigt.'; try { shown = stripUnsupported(shown, claimFacts(ctx)) || shown; } catch (e) { /* unverändert */ }
-  shown = guardReadinessAnswer(shown, text, ctx0);
+  shown = fixCoachText(guardReadinessAnswer(shown, text, ctx0), ctx) || 'Erledigt.';
   if (live) { live.reset(); shown.split(/(?<=\s)/).forEach(t => live.delta(t)); }
   out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown, aiExcluded: shown.startsWith('Ampel der App:') });
+  { const props = out.messages.filter(m => m.kind === 'proposal'); const merged = mergeSwapProposals(props as any[]).map((m: any) => ({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx) })); out.messages = [...out.messages.filter(m => m.kind !== 'proposal'), ...merged]; }
   out.status = await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today)));
   return out;
 }

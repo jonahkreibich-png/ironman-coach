@@ -193,6 +193,7 @@ export function totals(spec: Spec): { min: number; km: number | null } {
 }
 
 /* ---------- Text ---------- */
+const RPE_OF: Record<number, string> = { 1: '2-3', 2: '3-4', 3: '5-6', 4: '7-8', 5: '9' };
 function hrRange(lthr: number, zone: number): string {
   const z = HR_ZONES[zone - 1];
   if (z.low === 0) return `Puls unter ${Math.round(lthr * z.high / 100)}`;
@@ -210,7 +211,9 @@ export function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
     if (c.ftp) { const z = POWER_ZONES[zone - 1]; parts.push(`${Math.round(c.ftp * z.low / 100)}–${z.high >= 999 ? Math.round(c.ftp * 1.2) : Math.round(c.ftp * z.high / 100)} W`); }
     if (c.lthrBike) parts.push(hrRange(c.lthrBike, zone));
     // Auftrag 12: Tempo als Anhalt (flach, ohne Wind), drinnen die virtuelle Geschwindigkeit; Puls und Watt bleiben die Vorgabe
-    if (c.bikeKmh && c.speedZones !== false) parts.push(`ca. ${speedRange(c.bikeKmh, zone)}${c.indoor ? ' (virtuell)' : ' flach'}`);
+    if (c.bikeKmh && c.speedZones !== false && !c.indoor) parts.push(`ca. ${speedRange(c.bikeKmh, zone)} flach`);
+    // Auftrag 21: drinnen ohne Watt (einfache Rolle): nur Puls und Gefühl (RPE 1-10)
+    if (c.indoor && !c.ftp) parts.push(`Gefühl ${RPE_OF[zone] || '3-4'}/10`);
   } else if (spec.sport === 'swim') {
     parts.push(`etwa ${mmss(swimPace(c, zone, mode))}/100 m`);
   }

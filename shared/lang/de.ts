@@ -154,7 +154,7 @@ export const de: Record<string, string> = {
   'food.shareText': 'Bitte schätze Kalorien, Kohlenhydrate, Eiweiß und Fett dieser Mahlzeit als Spanne. {q}', 'food.added': 'Zum Tag hinzugefügt',
 
   /* ---------- Coach ---------- */
-  'coach.title': 'Coach', 'coach.accept': 'Annehmen', 'coach.reject': 'Ablehnen', 'coach.accepted': 'Angenommen', 'coach.rejected': 'Abgelehnt',
+  'coach.title': 'Coach', 'coach.accept': 'Bestätigen', 'coach.reject': 'Ablehnen', 'coach.accepted': 'Bestätigt', 'coach.rejected': 'Abgelehnt',
   'coach.claude': 'Mit Claude besprechen', 'coach.planCode': 'Plan-Code einfügen', 'coach.notes': 'Notizen für den Coach',
   'coach.older': 'Ältere Nachrichten', 'coach.empty': 'Noch keine Nachrichten. Morgens kommt hier dein Briefing.',
   'coach.ask': 'Frag deinen Coach …', 'coach.send': 'Senden', 'coach.aiCost': 'KI diesen Monat: {used} $ von {budget} $',

@@ -4,7 +4,7 @@
    Ohne KI: Wörter, Tage, Sportarten, Mengen und Daten werden erkannt. Mit KI-Schlüssel übernimmt die KI das Verstehen und
    Formulieren, die Änderungen laufen aber durch dieselben Aktionen und Regeln.
    Versteht der Coach etwas nicht, fragt er gezielt nach und zeigt Knöpfe, statt mit einer Floskel zu antworten. */
-import { claimFacts, stripUnsupported, type ClaimFacts } from './claims';
+import { claimFacts, stripUnsupported, fixCoachText, type ClaimFacts } from './claims';
 import * as C from '../core';
 import { withTerms } from '../glossary';
 import * as W from '../workouts';
@@ -199,7 +199,7 @@ export function converse(ctx: EngineCtx, dialog: DialogState, input: string, ext
   // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen (nichts zeigen, was nicht eingetragen oder gemessen ist)
   let facts: ClaimFacts | null = null; try { facts = claimFacts(ctx); } catch (e) { facts = null; }
   // eigene Angabe im Chat („ich schaffe jetzt 100 m“) ist der Nachweis selbst und bleibt stehen
-  reply = { ...reply, text: withTerms(facts && reply.intent !== 'swim-skill' ? stripUnsupported(reply.text, facts) || reply.text : reply.text) };
+  reply = { ...reply, text: withTerms(fixCoachText(facts && reply.intent !== 'swim-skill' ? stripUnsupported(reply.text, facts) || reply.text : reply.text, ctx) || reply.text) };
   next.pending = reply.pending === undefined ? null : reply.pending;
   return { reply, dialog: next };
 }

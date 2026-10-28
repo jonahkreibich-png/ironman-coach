@@ -117,7 +117,13 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     const r = v.min / s.plannedMinutes;
     if (r >= 0.9 && r <= 1.15) good.push(`Dauer passt: ${Math.round(v.min)} von ${s.plannedMinutes} min.`);
     else if (r < 0.8) better.push(`Nur ${Math.round(v.min)} von ${s.plannedMinutes} min${v.deviation ? ` (${v.deviation})` : ''}. Wenn die Zeit fehlte, ist das okay; fehlt sie öfter, plane ich kürzer.`);
-    else if (r > 1.25 && !hard) better.push(`${Math.round(v.min - s.plannedMinutes)} min länger als geplant. Locker ist das in Ordnung, aber prüfe zusätzliche Dauer anhand deines bisherigen Trainings, der verfügbaren Zeit und deiner Erholung.`);
+    else if (r > 1.25 && !hard) {
+      // Auftrag 21: konkrete Aussage aus den eigenen Daten statt Textbaustein (vorher: „prüfe zusätzliche Dauer anhand …“)
+      const extra = Math.round(v.min - s.plannedMinutes);
+      const prev = C.recentLongest(ctx.state, ctx.baseWeeks || [], d.date, d.sport, 28);
+      if (prev && v.min > prev * 1.1) better.push(`${extra} min länger als geplant – länger als alles in den 4 Wochen davor (bisher höchstens ${Math.round(prev)} min). Morgen ruhig angehen.`);
+      else if (d.sport !== 'strength') good.push(`${extra} min länger als geplant, locker – das verträgst du (${prev ? `bis ${Math.round(prev)} min in den letzten 4 Wochen` : 'locker'}).`);
+    }
   }
   // Puls und Zone
   if (v.hr && lthr && (d.sport === 'run' || d.sport === 'bike')) {

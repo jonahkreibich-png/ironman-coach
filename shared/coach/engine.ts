@@ -1,7 +1,7 @@
 /* Coach-Engine (Algorithmus, ohne KI). Läuft auf dem Server bei jedem neuen Datenpunkt (Einheit, Nachtwerte,
    Krankheits-Notiz, Essen) und zusätzlich täglich und wöchentlich. Wertet aus, passt den Plan nach festen Regeln an
    und schreibt jede Änderung mit Grund als Nachricht in den Coach-Chat. Funktioniert ohne KI und ohne Einwilligung. */
-import { claimFacts, stripUnsupported, HR_DELTA, HEAT_C } from './claims';
+import { claimFacts, stripUnsupported, fixCoachText, HR_DELTA, HEAT_C } from './claims';
 import * as C from '../core';
 import { readinessInputs, readinessSnapshot, withheldReadiness } from '../readiness';
 import { intervalsOf } from '../activity/structure';
@@ -197,7 +197,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     } else if (!has(ctx, m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m);
     // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen
     const last = out.messages[out.messages.length - 1];
-    if (last && last.id === m.id && last.text) { try { const t = stripUnsupported(last.text, claimFacts(ctx)); if (t) last.text = t; } catch (e) { /* Prüfung darf die Nachricht nicht verhindern */ } }
+    if (last && last.id === m.id && last.text) { try { const t = fixCoachText(stripUnsupported(last.text, claimFacts(ctx)), ctx); if (t) last.text = t; } catch (e) { /* Prüfung darf die Nachricht nicht verhindern */ } }
   };
 
   // Warnzeichen in den Daten (einmal pro Art und Woche)

@@ -176,6 +176,8 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
       if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 });
         if (!L.state.coachMsgs['msg-swimrate-' + day]) changes.push({ kind: 'coachMsg', key: 'msg-swimrate-' + day, data: { id: 'msg-swimrate-' + day, at: t, date: day, kind: 'adjust', from: 'coach', title: 'Schwimmen an dein Tempo angepasst', text: swimRateText(rate ?? (L.profile.skills || {}).swimMPerMin ?? null, pace ?? null) }, updatedAt: t + 7 }); }
     }
+    // Auftrag 21: kommende Einheiten mit dem aktuellen Profil (z. B. Rolle ohne Watt: kein virtuelles Tempo) – nur wenn sich etwas ändert
+    if (L.plan) { const rf0 = refreshFuture(L.plan.weeks || [], L.profile, day, L.state); if (rf0.changed) { L.plan = { ...L.plan, weeks: rf0.weeks }; L.baseWeeks = rf0.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 }); } }
     // Auftrag 21: kommende automatische Anpassungen mit dem aktuellen Tempo/den Zonen neu rechnen
     refreshAdjustments(L.baseWeeks, L.state.adjustments || {}, L.profile, day).forEach((x, i) => { L.state.adjustments[x.id] = x; changes.push({ kind: 'adjust', key: x.id, data: x, updatedAt: t + 8 + i }); });
     const best = swimBests(L.state, L.baseWeeks, day);
