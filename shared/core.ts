@@ -742,6 +742,31 @@ function swimPace100(state, weeks, date) {
   if (vals.length < 2) return null;
   vals.sort((a, b) => a - b); return Math.round(vals[Math.floor((vals.length - 1) / 2)]);
 }
+/* Auftrag 21: Tempo je Lage (s/100 m, ohne Pausen) aus den tatsächlich geschwommenen Werten der letzten 6 Wochen, Median, je Lage
+   mindestens 2 Einheiten. Kraul: Pace je Lage von der Uhr, sonst „Ø Pace Kraul“, wenn die Einheit überwiegend Kraul war (ab 70 %).
+   Brust: „Ø Pace Brust“ oder überwiegend Brust (bis 20 % Kraul). Gemischte Einheiten mit bekanntem Brust-Tempo: Kraul herausgerechnet
+   (Gesamt-Pace = Anteil Kraul × Kraul-Pace + Anteil Brust × Brust-Pace). Vorher galt die gemischte Gesamt-Pace als Kraul-Tempo. */
+function swimStrokePaces(state, weeks, date) {
+  const crawl = [], breast = [], mixed = []; const from = addDays(date, -42); const used = new Set();
+  const sec = v => (typeof v === 'number' ? v : paceSec(v));
+  const ok = p => p && p >= 60 && p <= 260;
+  const look = (st, act) => {
+    if (act && act.id) used.add(act.id);
+    const m = actualMetrics(st || {}, act); const sw = (act && act.swim) || {};
+    const share = toNum(m.crawlShare); const p = sec(m.pace100), b = sec(m.paceBreast);
+    if (ok(sw.crawlPace100)) crawl.push(sw.crawlPace100); else if (ok(p) && (share == null || share >= 70)) crawl.push(p); else if (ok(p) && share != null && share > 20) mixed.push({ p, s: share / 100 });
+    if (ok(b)) breast.push(b); else if (ok(p) && share != null && share <= 20) breast.push(p);
+  };
+  planDays(weeks).filter(d => d.date <= date && d.date > from).forEach(d => d.sessions.filter(s => s.sport === 'swim').forEach(s => {
+    const st = (state.sessions || {})[s.id]; if (st && st.completed) look(st, st.activityId ? (state.activities || {})[st.activityId] : null);
+  }));
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
+  recordedActivities(state).filter(a => a.sport === 'swim' && !a.sessionId && !used.has(a.id) && a.date <= date && a.date > from).forEach(a => look(null, a));
+  const med = v => { if (v.length < 2) return null; const x = [...v].sort((a, b) => a - b); return Math.round(x[Math.floor((x.length - 1) / 2)]); };
+  const b = med(breast);
+  if (b) mixed.forEach(x => { if (x.s >= 0.4) { const c = (x.p - (1 - x.s) * b) / x.s; if (ok(c)) crawl.push(Math.round(c)); } });
+  return { crawl: med(crawl), breast: b, n: { crawl: crawl.length, breast: breast.length } };
+}
 /* Bestätigt = in mindestens 2 verschiedenen Einheiten geschafft (der zweitbeste Wert). Ein einzelner Wert ist ein Bestwert, keine neue Stufe. */
 function confirmedOf(values) { const v = (values || []).filter(x => x != null && x > 0).sort((a, b) => b - a); return v.length >= 2 ? v[1] : 0; }
 const swimCtxOf = state => { const sk = (state.profile || {}).skills || {}; return { gear: Array.isArray(sk.swimGear) ? [...sk.swimGear] : [], pool: sk.poolM === 50 ? 50 : 25 }; };
@@ -1124,11 +1149,14 @@ function bests(entries) {
   return b;
 }
 
+/* Auftrag 21: kurze, stabile Kennung aus einem Text (FNV-1a), z. B. für Meldungs-Ids je Anlass */
+function hashOf(text) { let h = 2166136261; const t = String(text); for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return (h >>> 0).toString(36); }
+
 export {
-  ruleOk,
+  ruleOk, hashOf,
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
-  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, ownDoneMinutes, recentOwnMinutes, recentLongest
+  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

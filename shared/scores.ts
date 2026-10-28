@@ -1008,13 +1008,13 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
     const p100raw = meters && min ? min * 60 / (meters / 100) : null;
     const p100 = pace(m.pace100) || (p100raw && p100raw <= 200 ? p100raw : null);
     const spl = num(m.spl), dps = num(m.dps);
-    const indoor = m.indoor === 'in' || (sport === 'bike' && /rolle|trainer|indoor|zwift|home ?trainer/i.test(title || ''));
+    const indoor = m.indoor === 'in' || m.indoor === 'basic' || (sport === 'run' && m.surface === 'treadmill') || (sport === 'bike' && /rolle|trainer|indoor|zwift|home ?trainer/i.test(title || ''));
     const effMin = min ?? (km && paceSec ? Math.round(km * paceSec / 60) : km && speed ? Math.round(km / speed * 60) : null);
     out.push({
       id: 'sess-' + id, source: (s && s.source) || 'manual', sources: [(s && s.source) || 'manual'], sport: sport as any, date, startMs: Date.parse(date + 'T12:00:00Z'), name: title,
       indoor, bikeType: m.bikeType || null, min: effMin != null ? Math.round(effMin) : null, elapsedMin: null, km: sport === 'swim' ? (meters ? meters / 1000 : null) : km,
       avgHr: hr, maxHr: num(m.maxHr), avgPower: num(m.power), avgCadence: num(m.cadence), speedKmh: sp && sport !== 'swim' ? Math.round(sp * 36) / 10 : null, paceSecKm: sport === 'run' ? paceSec : null,
-      ascentM: null, kcal: null, tempC: num(s && s.temp), hrZones: null, decouplingPct: num(m.decoupling),
+      ascentM: num(m.ascent), kcal: null, tempC: num(m.temp) ?? num(s && s.temp), hrZones: null, decouplingPct: num(m.decoupling), np: num(m.np), trainer: m.indoor === 'basic' ? 'basic' : m.indoor === 'in' ? 'smart' : null,
       efficiency: sp && hr ? Math.round(sp * 60 / hr * 100) / 100 : null,
       // Auftrag 20: eingetragene Testwerte (Puls und Tempo im Testteil) zählen wie eine Test-Runde
       laps: testLap(sport, m), intervals: null,

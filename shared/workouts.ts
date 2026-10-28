@@ -217,7 +217,15 @@ export function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
   return `Z${zone}${parts.length ? ': ' + parts.join(', ') : ''}`;
 }
 const STROKE: Record<StrokeMode, string> = { crawl: 'Kraul', breast: 'Brust', drill: 'Kraul-Technik', kick: 'Kraul-Beinschlag', mixed: 'Lage nach Wahl', easy: 'locker, Lage nach Wahl', pull: 'Kraul mit Pull Buoy' };
-const GEAR_TXT: Record<string, string> = { board: 'Kickbrett', buoy: 'Pull Buoy', fins: 'Flossen', paddles: 'Paddles', snorkel: 'Frontschnorchel' };
+export const GEAR_TXT: Record<string, string> = { board: 'Kickbrett', buoy: 'Pull Buoy', fins: 'Flossen', paddles: 'Paddles', snorkel: 'Frontschnorchel' };
+/* Auftrag 21: welche Hilfsmittel eine Schwimmeinheit braucht (aus den Bausteinen, nur was die Person hat), für Titel und Karte */
+export function swimAids(s: any): string[] {
+  const spec = s && s.spec; if (!s || s.sport !== 'swim' || !spec || !Array.isArray(spec.steps)) return [];
+  const have = new Set<string>((spec.ctx && spec.ctx.gear) || []);
+  const used = new Set<string>();
+  spec.steps.forEach((x: any) => { (x.gear || []).forEach((g: string) => used.add(g)); if (x.mode === 'pull') used.add('buoy'); if (x.mode === 'kick' && have.has('board') && !(x.gear || []).includes('fins')) used.add('board'); });
+  return ['board', 'buoy', 'fins', 'paddles', 'snorkel'].filter(g => used.has(g) && have.has(g));
+}
 export const SWIM_GEAR = ['board', 'buoy', 'fins', 'paddles', 'snorkel'] as const;
 /* Fokus je Serie: aus der Übung, sonst nach Lage und Zone */
 function swimFocus(spec: Spec, s: Step): string {

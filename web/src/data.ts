@@ -11,6 +11,7 @@ import { prognosis, correctionFromGoals, type Prognosis, type PlanFacts } from '
 import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
 import type { Activity } from '../../shared/activity/analyze';
+import { duplicateMsgIds } from '../../shared/coach/feed';
 
 export interface Derived {
   today: string; profile: Profile; goals: Goal[]; goal: Goal | null; minor: boolean; age: number | null;
@@ -58,6 +59,9 @@ function afterCompute(d: Derived) {
       // erst merken, wenn Daten da sind (beim ersten Öffnen vor dem Abgleich ist der Stand noch leer)
       if (had || d.today > '2026-11-21') { S.scoreModel = SCORE_MODEL; changed = true; }
     }
+    // Auftrag 21: doppelte Coach-Meldungen (gleicher Anlass) aufräumen; die Löschung geht per Abgleich auch an den Server
+    const dups = duplicateMsgIds(Object.values(STATE.coachMsgs || {}));
+    if (dups.length) { dups.forEach(id => { delete STATE.coachMsgs[id]; }); changed = true; }
     if (changed) saveSoon();
   } catch (e) { /* Anzeige geht vor */ }
 }

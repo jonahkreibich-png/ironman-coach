@@ -129,7 +129,13 @@ export function metricsFromActivity(a: Activity): Record<string, any> {
   if (a.min != null) m.min = String(a.min);
   if (a.avgHr != null) m.hr = String(a.avgHr);
   // Felder statt Notizen (Auftrag 7)
-  if (a.maxHr != null && a.sport !== 'swim') m.maxHr = String(a.maxHr);
+  if (a.maxHr != null) m.maxHr = String(a.maxHr);
+  // Auftrag 21: weitere Werte
+  if ((a.sport === 'run' || a.sport === 'bike') && a.ascentM != null && !a.indoor) m.ascent = String(Math.round(a.ascentM));
+  if ((a.sport === 'run' || a.sport === 'bike') && a.tempC != null) m.temp = String(Math.round(a.tempC));
+  if (a.sport === 'bike' && (a as any).np) m.np = String((a as any).np);
+  if (a.sport === 'run' && a.avgCadence && a.speedKmh) m.strideLen = String(Math.round(a.speedKmh / 3.6 / (a.avgCadence / 60) * 100) / 100);
+  if (a.sport === 'football' && a.km != null) m.km = String(a.km);
   if ((a.sport === 'run' || a.sport === 'bike') && a.decouplingPct != null) m.decoupling = String(a.decouplingPct);
   if ((a.sport === 'run' || a.sport === 'bike') && a.avgCadence) m.cadence = String(a.avgCadence);
   if (a.sport === 'bike' && a.maxCadence) m.maxCadence = String(a.maxCadence);
@@ -147,6 +153,11 @@ export function metricsFromActivity(a: Activity): Record<string, any> {
     if (a.swim && a.swim.strokesPerLength) m.spl = String(a.swim.strokesPerLength);
     if (a.swim && a.swim.metersPerStroke) m.dps = String(a.swim.metersPerStroke);
     if (a.swim && a.swim.strokeRate) m.rate = String(a.swim.strokeRate);
+    // Auftrag 21: Pace je Lage (Kraul ins Kraul-Feld, Brust getrennt), SWOLF, Beckenlänge
+    if (a.swim && a.swim.crawlPace100) m.pace100 = mmss(a.swim.crawlPace100);
+    if (a.swim && a.swim.breastPace100) m.paceBreast = mmss(a.swim.breastPace100);
+    if (a.swim && a.swim.swolf) m.swolf = String(a.swim.swolf);
+    if (a.swim && a.swim.poolLengthM) m.poolLen = String(a.swim.poolLengthM);
   } else {
     if (a.km != null) m.km = String(a.km);
     if (a.sport === 'run' && a.paceSecKm) m.pace = mmss(a.paceSecKm);

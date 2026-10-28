@@ -150,3 +150,25 @@ describe('Schwimm-Scores unterscheiden Leistungsnachweise', () => {
     expect(s.parts[0].raw).toBe(score([]).parts[0].raw);
   });
 });
+/* Auftrag 21: Hilfsmittel sichtbar und im Wechsel: Kickbrett etwa jede 2. Einheit, Pull Buoy regelmäßig, nie fehlendes Material */
+describe('Auftrag 21: Hilfsmittel im Wechsel und sichtbar', () => {
+  const series = (gear: string[], stage: any, n = 8) => Array.from({ length: n }, (_, k) => {
+    const base = stage ? W.swimLearn({ gear, pool: 25 } as any, stage) : W.swimNormal({ gear, pool: 25 } as any, 'technique', 45, 'base', 200);
+    const b = W.build(K.fitSwim(K.swimVariant(base, k, 1, 'base'), 45));
+    return W.swimAids({ ...b, sport: 'swim' });
+  });
+  for (const [name, stage] of [['Kraulende', null], ['Lernende Stufe 4', { ladder: 'swim', n: 4 }]] as [string, any][]) {
+    test(`${name}: Kickbrett und Pull Buoy je etwa jede 2. Einheit`, () => {
+      const s = series(['board', 'buoy'], stage);
+      const kick = s.filter(a => a.includes('board')).length, pull = s.filter(a => a.includes('buoy')).length;
+      expect(kick).toBeGreaterThanOrEqual(3); expect(kick).toBeLessThanOrEqual(6);
+      expect(pull).toBeGreaterThanOrEqual(3); expect(pull).toBeLessThanOrEqual(6);
+      // nie zweimal hintereinander ganz ohne Kickbrett
+      for (let i = 1; i < s.length; i++) expect(s[i].includes('board') || s[i - 1].includes('board')).toBe(true);
+    });
+  }
+  test('ohne Hilfsmittel: keines in der Einheit; nur Pull Buoy: kein Kickbrett', () => {
+    expect(series([], null).every(a => a.length === 0)).toBe(true);
+    expect(series(['buoy'], null).every(a => !a.includes('board'))).toBe(true);
+  });
+});

@@ -21,6 +21,8 @@ export interface SwimOut {
   poolLengthM: number | null; lengths: number; activeLengths: number;
   strokesPerLength: number | null; metersPerStroke: number | null; pace100: number | null;
   byStroke: Record<string, number>; longestContinuousM: number | null; longestCrawlM?: number | null; strokeRate: number | null;
+  /** Auftrag 21: Pace je Lage (s/100 m, aus den Bahnen) und SWOLF (Sekunden + Züge pro Bahn) */
+  crawlPace100?: number | null; breastPace100?: number | null; swolf?: number | null;
 }
 export interface Activity {
   id: string;
@@ -35,6 +37,7 @@ export interface Activity {
   min: number | null; elapsedMin: number | null;
   km: number | null;
   avgHr: number | null; maxHr: number | null; avgPower: number | null;
+  /** Auftrag 21: Normalized Power (Rad) */ np?: number | null;
   speedKmh: number | null; paceSecKm: number | null;
   ascentM: number | null; kcal: number | null; tempC: number | null;
   /** Sekunden in Pulszonen 1-5 (nach Schwellenpuls) */
@@ -154,6 +157,8 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   const maxCadence = cads.length ? Math.round(Math.max(...cads) * cadF) : null;
   const pw = recs.map(r => r.power).filter((x): x is number => x != null && x > 0);
   const maxPower = sport === 'bike' && pw.length ? Math.max(...pw) : null;
+  // Auftrag 21: Normalized Power (30-s-Mittel hoch 4, Mittel, 4. Wurzel), ab 20 min Wattdaten
+  const np = sport === 'bike' ? normalizedPower(recs) : null;
   // Splits je km aus der Strecke (Pace und Ø-Puls je Kilometer)
   const splits: { km: number; pace: string; hr: number | null }[] = [];
   if (sport === 'run' && recs.some(r => r.dist != null)) {
@@ -174,7 +179,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
     avgHr, maxHr, avgPower: T.avgPower ?? (usePower ? Math.round(avg(recs.map(r => r.power).filter((x): x is number => x != null && x > 0))!) : null),
     speedKmh: speed != null && sport !== 'swim' ? r1(speed * 3.6) : null,
     paceSecKm: speed && sport === 'run' ? Math.round(1000 / speed) : null,
-    ascentM: T.ascentM, kcal: T.kcal,
+    ascentM: T.ascentM, kcal: T.kcal, np,
     tempC: temps.length ? r1(avg(temps)!) : null,
     hrZones, decouplingPct, efficiency,
     avgCadence, maxCadence, maxPower, splits: splits.length ? splits : undefined,
@@ -241,6 +246,15 @@ export function intervalStats(laps: LapOut[], sport: ActSport, usePower = false)
   };
 }
 
+export function normalizedPower(recs: { t: number; power: number | null }[]): number | null {
+  const p = recs.filter(r => r.power != null && r.power >= 0);
+  if (p.length < 60 || p[p.length - 1].t - p[0].t < 1200) return null;
+  const roll: number[] = []; let j = 0, sum = 0;
+  for (let i = 0; i < p.length; i++) { sum += p[i].power!; while (p[i].t - p[j].t >= 30) { sum -= p[j].power!; j++; } if (p[i].t - p[0].t >= 30) roll.push(sum / (i - j + 1)); }
+  if (!roll.length) return null;
+  return Math.round(Math.pow(roll.reduce((a, x) => a + Math.pow(x, 4), 0) / roll.length, 0.25));
+}
+
 export function swimStats(raw: RawActivity): SwimOut {
   const pool = raw.poolLengthM ?? null;
   const act = raw.lengths.filter(l => l.active && l.sec > 0);
@@ -262,7 +276,12 @@ export function swimStats(raw: RawActivity): SwimOut {
   const swimSec = act.reduce((a, l) => a + l.sec, 0);
   const meters = act.length * (pool || 0);
   const cad = act.map(l => l.cadence).filter((x): x is number => x != null && x > 0);
+  // Auftrag 21: Pace je Lage aus mindestens 4 Bahnen dieser Lage
+  const strokePace = (re: RegExp) => { const ls = act.filter(l => re.test(l.stroke || '')); return pool && ls.length >= 4 ? Math.round(ls.reduce((a, l) => a + l.sec, 0) / (ls.length * pool / 100)) : null; };
+  const sw = act.filter(l => l.strokes != null && l.strokes > 0);
   return {
+    crawlPace100: strokePace(/^(freestyle|crawl|front_crawl)$/i), breastPace100: strokePace(/^breaststroke$/i),
+    swolf: sw.length ? Math.round(sw.reduce((a, l) => a + l.sec + (l.strokes || 0), 0) / sw.length) : null,
     poolLengthM: pool, lengths: raw.lengths.length, activeLengths: act.length,
     strokesPerLength: spl,
     metersPerStroke: spl && pool ? r2(pool / spl) : null,

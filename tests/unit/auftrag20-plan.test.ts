@@ -117,3 +117,39 @@ describe('Auftrag 20: Teamsport mit viel Laufen zählt halb', () => {
     expect((minFreqOf(t, base('Fußball', [1, 5]), [], {}, true) as any).run).toBe(2);
   });
 });
+
+/* Auftrag 21: Profil 2:25/100 m, Einheiten gaben 2:50 für Zone 2 vor. Ursachen: (1) Anpassungen behielten den alten Tempo-Kontext,
+   (2) die gemischte Gesamt-Pace galt als Kraul-Tempo. Jetzt: Tempo je Lage aus echten Werten, alte Anpassungen werden neu gerechnet. */
+import { paceCtx } from '../../shared/plangen';
+import { refreshAdjustments } from '../../shared/refresh';
+describe('Auftrag 21: Schwimm-Tempo je Lage aus echten Werten', () => {
+  const today = '2026-10-28';
+  const act = (id: string, d: string, swim: any) => ({ id, sport: 'swim', date: d, source: 'healthfit', sources: ['healthfit'], min: 40, km: 1, swim: { poolLengthM: 25, ...swim } });
+  test('Pace je Lage von der Uhr, Brust aus „Ø Pace Brust“, gemischte Einheit herausgerechnet', () => {
+    const st: any = { sessions: {}, customWorkouts: {}, activities: {
+      a: act('a', '2026-10-20', { pace100: 150, crawlPace100: 140, breastPace100: 165 }), b: act('b', '2026-10-24', { pace100: 152, crawlPace100: 142, breastPace100: 163 }) } };
+    expect(C.swimStrokePaces(st, [], today)).toMatchObject({ crawl: 140, breast: 163 });
+    // Handeinträge: Brust-Pace eingetragen, Gesamt-Pace bei 50 % Kraul → Kraul herausgerechnet
+    const days = [{ date: '2026-10-21', sessions: [{ id: 'x', sport: 'swim' }] }, { date: '2026-10-25', sessions: [{ id: 'y', sport: 'swim' }] }];
+    const man = { sessions: { x: { completed: true, metrics: { pace100: '2:30', paceBreast: '2:40', crawlShare: '50' } }, y: { completed: true, metrics: { pace100: '2:31', paceBreast: '2:42', crawlShare: '50' } } }, customWorkouts: {}, activities: {} };
+    const r = C.swimStrokePaces(man, [{ days }], today);
+    expect(r.breast).toBe(160);
+    expect(r.crawl).toBeGreaterThanOrEqual(138); expect(r.crawl).toBeLessThanOrEqual(142);
+  });
+  test('Plan rechnet mit dem Tempo je Lage; alte Anpassungen bekommen das aktuelle Tempo', () => {
+    const p: any = { ...defaultProfile(), birthYear: 2000, sports: ['swim'], thresholds: { ...defaultProfile().thresholds }, skills: { swimPace100: 145, swimPaceCrawl: 140, swimPaceBreast: 160, swimCrawlM: 100, swimCrawl: 'some', swimGear: [] } };
+    const ctx = paceCtx(p, false, null, today);
+    expect(ctx.crawl100).toBe(140); expect(ctx.breast100).toBe(160);
+    expect(W.swimPace(ctx, 2, 'crawl')).toBe(140);
+    const stale = W.build(W.swimLearn({ breast100: 165, pool: 25, gear: [] } as any, { ladder: 'swim', n: 4 }));
+    const weeks = [{ days: [{ date: '2026-10-30', sessions: [{ id: 's1', sport: 'swim', title: 'x' }] }] }];
+    const adj = { a1: { id: 'a1', type: 'modify', sessionId: 's1', set: { ...stale, spec: stale.spec } } };
+    expect(stale.description).toMatch(/Kraul \(Z2: etwa 2:5\d/);
+    const fresh = refreshAdjustments(weeks, adj, p, today);
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0].set.description).toMatch(/Kraul \(Z2: etwa 2:20/);
+    expect(refreshAdjustments(weeks, { a1: fresh[0] }, p, today)).toEqual([]);
+    // eigene Änderungen der Person bleiben unberührt
+    expect(refreshAdjustments(weeks, { a1: { ...adj.a1, from_user: true } }, p, today)).toEqual([]);
+  });
+});

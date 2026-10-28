@@ -7,12 +7,24 @@ import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../.
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
 import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/fields';
-import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate, swimPaceUpdate, swimRateText } from '../../shared/swimskill';
-import { refreshFuture, trendThresholds } from '../../shared/refresh';
+import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate, swimPaceUpdate, swimStrokeUpdate, swimRateText } from '../../shared/swimskill';
+import { refreshFuture, trendThresholds, refreshAdjustments } from '../../shared/refresh';
 import { mainGoal } from '../../shared/goals';
 import { analyze, swimReviewMessages, type Trigger } from '../../shared/coach/analysis';
 import { extendPlan } from '../../shared/replan';
 import { evidenceSignature } from '../../shared/results';
+import { dedupeIncoming } from '../../shared/coach/feed';
+
+/* Auftrag 21: jede Coach-Meldung höchstens einmal je Anlass (alle Meldungsarten). Vor dem Speichern: Duplikate unter anderer Id
+   fallen weg, alte Duplikate im Verlauf werden gelöscht. */
+export function dedupeMsgChanges(existing: Record<string, any>, changes: Change[], t: number): Change[] {
+  const incoming = changes.filter(c => c.kind === 'coachMsg' && !c.deleted && c.data).map(c => c.data);
+  const { keep, drop } = dedupeIncoming(existing || {}, incoming);
+  const ids = new Set(keep.map((m: any) => m.id));
+  const out = changes.filter(c => c.kind !== 'coachMsg' || c.deleted || ids.has(c.key));
+  drop.forEach((id, i) => out.push({ kind: 'coachMsg', key: id, deleted: true, updatedAt: t + 400 + i }));
+  return out;
+}
 
 export async function loadState(env: Env, uid: number): Promise<any> {
   const [planRec, settingsRec, profileRec, sessions, customs, trend, illness, weekNotes, adjustments, nutrition, activities, coachMsgs, coachNotes, goals] = await Promise.all([
@@ -64,7 +76,8 @@ export async function runEngineFor(env: Env, uid: number, ev: EngineEvent, opts:
   // Bewertungen (Auftrag 12) behalten ihre 3 Teile, die KI formuliert sie nicht um
   for (const m of out.messages) msgs.push(opts.rephrase && (m.kind === 'briefing' || m.kind === 'session' || m.kind === 'week') && !m.id.startsWith('msg-review-') ? await opts.rephrase(m) : m);
   msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));
-  try { await putRecords(env, uid, changes, revision); }
+  const final = dedupeMsgChanges(L.state.coachMsgs, changes, t);
+  try { await putRecords(env, uid, final, revision); }
   catch (e) { if (e instanceof RecordsChangedError) return {created:0,adjustments:[],messages:[],skipped:'Daten inzwischen geaendert'}; throw e; }
   // Im Speicher nachziehen, falls weitere Schritte denselben Stand nutzen
   out.adjustments.forEach(a => { L.state.adjustments[a.id] = a; });
@@ -155,18 +168,21 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
     const rate = swimRateUpdate(L.profile, L.state, L.baseWeeks, day);
     // Auftrag 20: eigenes Tempo ohne Pausen gleich mit
     const pace = swimPaceUpdate(L.profile, L.state, L.baseWeeks, day);
-    if (rate !== undefined || pace !== undefined) {
-      L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...(rate !== undefined ? { swimMPerMin: rate } : {}), ...(pace !== undefined ? { swimPace100: pace } : {}) } }; L.state.profile = L.profile;
+    const strokes = swimStrokeUpdate(L.profile, L.state, L.baseWeeks, day);
+    if (rate !== undefined || pace !== undefined || strokes) {
+      L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...(rate !== undefined ? { swimMPerMin: rate } : {}), ...(pace !== undefined ? { swimPace100: pace } : {}), ...(strokes || {}) } }; L.state.profile = L.profile;
       changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 2 }, updatedAt: t + 2 });
       const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day, L.state) : { weeks: [], changed: 0, example: null };
       if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 });
         if (!L.state.coachMsgs['msg-swimrate-' + day]) changes.push({ kind: 'coachMsg', key: 'msg-swimrate-' + day, data: { id: 'msg-swimrate-' + day, at: t, date: day, kind: 'adjust', from: 'coach', title: 'Schwimmen an dein Tempo angepasst', text: swimRateText(rate ?? (L.profile.skills || {}).swimMPerMin ?? null, pace ?? null) }, updatedAt: t + 7 }); }
     }
+    // Auftrag 21: kommende automatische Anpassungen mit dem aktuellen Tempo/den Zonen neu rechnen
+    refreshAdjustments(L.baseWeeks, L.state.adjustments || {}, L.profile, day).forEach((x, i) => { L.state.adjustments[x.id] = x; changes.push({ kind: 'adjust', key: x.id, data: x, updatedAt: t + 8 + i }); });
     const best = swimBests(L.state, L.baseWeeks, day);
     const su = legacySwimReview(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t, L.state) || swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t, undefined, L.state);
     const notices=swimReviewMessages({...engineCtx(L,day),now:t},su);
     notices.forEach((m,i)=>{L.state.coachMsgs[m.id]=m;changes.push({kind:'coachMsg',key:m.id,data:m,updatedAt:t+5+i});});
-    const swimMsgId = 'msg-swim-' + t;
+    const swimMsgId = su ? 'msg-' + su.key : '';
     if (su) {
       if (!su.reviewOnly) { L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...su.skills } }; L.state.profile = L.profile;
       changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 3 }, updatedAt: t + 3 }); }
@@ -175,7 +191,7 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
       } else {
         // Auftrag 17: Korrekturen und bestätigte Fortschritte gelten sofort für die kommenden Schwimmeinheiten (rückgängig machbar)
         su.adjustments.forEach((a, i) => { const x = { ...a, createdAt: t + i, date: day }; L.state.adjustments[a.id] = x; changes.push({ kind: 'adjust', key: a.id, data: x, updatedAt: t + 6 + i }); });
-        changes.push({ kind: 'coachMsg', key: swimMsgId, data: { id: swimMsgId, at: t, date: day, kind: 'adjust', from: 'coach', title: /^Korrigiert/.test(su.text) ? 'Schwimmen korrigiert' : 'Schwimm-Stufe', text: su.text, important: true }, updatedAt: t + 5 });
+        if (!su.silent && !L.state.coachMsgs[swimMsgId]) changes.push({ kind: 'coachMsg', key: swimMsgId, data: { id: swimMsgId, at: t, date: day, kind: 'adjust', from: 'coach', title: /^Korrigiert/.test(su.text) ? 'Schwimmen korrigiert' : 'Schwimm-Stufe', text: su.text, important: true }, updatedAt: t + 5 });
       }
     }
   }
@@ -186,7 +202,7 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
   for (const m of r.messages) msgs.push(opts.rephrase && m.kind !== 'proposal' && m.kind !== 'adjust' ? await opts.rephrase(m) : m);
   msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));
   changes.push({ kind: 'analysis', key: 'latest', data: { date: r.date, trigger, at: r.at, inputVersion:r.inputVersion, modelVersion:r.modelVersion, load: r.load, top: r.top, insights: r.insights.slice(0, 10) }, updatedAt: t + 200 });
-  try { await putRecords(env, uid, changes, revision); }
+  try { await putRecords(env, uid, dedupeMsgChanges(L.state.coachMsgs, changes, t), revision); }
   catch (e) { if (e instanceof RecordsChangedError) return {skipped:'Daten inzwischen geaendert'}; throw e; }
   r.auto.forEach(a => { L.state.adjustments[a.id] = a; });
   msgs.forEach(m => { L.state.coachMsgs[m.id] = m; });

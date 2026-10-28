@@ -9,7 +9,7 @@ import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { duration, dist, num, pace, swimPace, speed, mmss } from '../../../shared/i18n';
-import { on, onChange, onInput, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
+import { on, onChange, onInput, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, gearChips, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
 import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { diagramSvg } from '../../../shared/workoutdiagram';
@@ -55,7 +55,7 @@ export function sessionRow(s: any, opts: { check?: boolean } = {}): string {
     ? `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   return `<div class="li wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">
     <button class="row grow" data-act="sess-open" data-sid="${esc(s.id)}" style="border:0;background:none;text-align:left;padding:0;color:inherit;min-height:44px">
-      ${sportIc(s.sport)}<span class="grow"><span class="t">${esc(sessionTitle(s, st))}</span> ${badges}<br><span class="s">${esc(sub)}</span></span></button>
+      ${sportIc(s.sport)}<span class="grow"><span class="t">${esc(sessionTitle(s, st))}</span> ${gearChips(s)}${badges}<br><span class="s">${esc(sub)}</span></span></button>
     <span class="wo-status">${status === 'done' || status === 'open' || status === 'missed' ? check : statusIcon(status)}</span></div>`;
 }
 
@@ -80,7 +80,7 @@ function sessionSheet(id: string): string {
   const auto = st.metricsAuto || {};
   const fields = FIELDS[s.sport] || [['min', 'm.min']];
   let h = `<div class="stack">
-    <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div></div>${statusIcon(status)}</div>
+    <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div>${gearChips(s)}</div>${statusIcon(status)}</div>
     ${s.sport === 'strength' && st.completed ? `<p class="xs muted">Geplant: ${esc(s.title)}. Die folgenden Trainingsvorgaben sind kein Leistungsnachweis; tatsächliche Übungen stehen in den Ergebnisfeldern.</p>` : ''}${structureHtml(s)}${templateButtons(s, !!st.completed)}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);

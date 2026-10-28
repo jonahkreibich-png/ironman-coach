@@ -17,7 +17,8 @@ export function summaryOf(thread: any[]): string {
   return ((doneAct && doneAct.actionsDone !== 'Geöffnet' ? doneAct.actionsDone + ': ' : '') + (user ? user.text : thread[0].title || thread[0].text || '')).replace(/\s+/g, ' ').slice(0, 90);
 }
 export function arrangeFeed(all: any[], now: number, seenAt: number, keepDays = 7): { feed: FeedItem[]; archived: any[] } {
-  const msgs = (all || []).filter(m => m && !m.deleted).sort((a, b) => a.at - b.at);
+  const dups = new Set(duplicateMsgIds(all || []));
+  const msgs = (all || []).filter(m => m && !m.deleted && !dups.has(m.id)).sort((a, b) => a.at - b.at);
   const keep = (m: any) => m.pinned || isOpen(m, now) || (m.from !== 'user' && (m.at || 0) > seenAt && !m.read);
   // Gespräche: eine Nutzer-Nachricht mit den Antworten des Coachs bis zur nächsten Nutzer-Nachricht
   const groups: any[][] = [];
@@ -42,6 +43,40 @@ export function arrangeFeed(all: any[], now: number, seenAt: number, keepDays = 
 /* Verlauf durchsuchen (alles, auch Archiviertes) */
 export function searchMsgs(all: any[], q: string): any[] {
   const n = String(q || '').toLowerCase().trim();
-  const list = (all || []).filter(m => m && !m.deleted).sort((a, b) => b.at - a.at);
+  const dups = new Set(duplicateMsgIds(all || []));
+  const list = (all || []).filter(m => m && !m.deleted && !dups.has(m.id)).sort((a, b) => b.at - a.at);
   return n ? list.filter(m => `${m.title || ''} ${m.text || ''}`.toLowerCase().includes(n)) : list;
+}
+
+/* ---------- Auftrag 21: jede Meldung höchstens einmal je Anlass ----------
+   Anlass = Art, Titel und Text derselben Coach-Meldung am selben Tag. Gespräche (Nutzer, Chat-Antworten) sind nie doppelt.
+   Bleibt: die entschiedene Fassung (angenommen/abgelehnt), sonst die offene, sonst die älteste. Gilt für alle Meldungsarten,
+   auf dem Server (vor dem Speichern) und in der App (Anzeige und Aufräumen alter Duplikate). */
+const norm = (s: any) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+export function occasionKey(m: any): string | null {
+  if (!m || m.deleted || m.from === 'user' || m.chat || m.intent || m.kind === 'answer') return null;
+  const text = norm(m.text);
+  if (!text && !m.title) return null;
+  const day = m.date || (m.at ? new Date(m.at).toISOString().slice(0, 10) : '');
+  return [m.kind || '', norm(m.title).replace(/prue/g, 'prü'), text.replace(/prue/g, 'prü'), day].join('|');
+}
+const rank = (m: any) => (m.proposal && ['accepted', 'rejected'].includes(m.proposal.status) ? 0 : m.proposal && m.proposal.status === 'open' ? 1 : 2);
+const better = (a: any, b: any) => rank(a) - rank(b) || (a.at || 0) - (b.at || 0) || String(a.id).localeCompare(String(b.id));
+/* Ids aller doppelten Meldungen (die beste je Anlass bleibt) */
+export function duplicateMsgIds(all: any[]): string[] {
+  const best = new Map<string, any>(); const out: string[] = [];
+  for (const m of (all || []).filter(Boolean)) {
+    const k = occasionKey(m); if (!k) continue;
+    const cur = best.get(k);
+    if (!cur) { best.set(k, m); continue; }
+    if (better(m, cur) < 0) { out.push(cur.id); best.set(k, m); } else out.push(m.id);
+  }
+  return out;
+}
+/* Neue Meldungen gegen den vorhandenen Verlauf prüfen: Duplikate unter anderer Id fallen weg, alte Duplikate werden gelöscht */
+export function dedupeIncoming(existing: Record<string, any>, incoming: any[]): { keep: any[]; drop: string[] } {
+  const merged: Record<string, any> = { ...(existing || {}) };
+  for (const m of incoming) if (m && m.id) merged[m.id] = m;
+  const dups = new Set(duplicateMsgIds(Object.values(merged)));
+  return { keep: incoming.filter(m => !m || !dups.has(m.id)), drop: [...dups].filter(id => existing && existing[id]) };
 }

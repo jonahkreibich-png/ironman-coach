@@ -46,6 +46,29 @@ export function refreshFuture(weeks: any[], profile: any, today: string, state?:
   return { weeks: out, changed, example };
 }
 
+/* Auftrag 21: Auch Anpassungen (z. B. neue Schwimm-Stufe) tragen einen eigenen Bauplan. Wurden sie vor einer Tempo- oder Zonenänderung
+   gebaut, zeigten sie weiter die alten Vorgaben (Jonah: Profil 2:25/100 m, Einheit 2:50/100 m). Diese Funktion rechnet die Vorgaben aller
+   kommenden, automatisch erstellten Anpassungen mit dem aktuellen Profil neu. Eigene Änderungen der Person bleiben unberührt.
+   Liefert nur die geänderten Anpassungen (gleiche Id), idempotent. */
+export function refreshAdjustments(weeks: any[], adjustments: any, profile: any, today: string): any[] {
+  const dateOf: Record<string, string> = {};
+  C.planDays(weeks || []).forEach((d: any) => (d.sessions || []).forEach((s: any) => { dateOf[s.id] = d.date; }));
+  const out: any[] = [];
+  for (const a of C.activeAdjustments(adjustments || {}) as any[]) {
+    const set = a && a.set; const date = a.toDate || dateOf[a.sessionId];
+    if (!set || !set.spec || a.from_user || !date || date <= today) continue;
+    const sport = set.spec.sport; if (!['run', 'bike', 'swim'].includes(sport)) continue;
+    const old = set.spec.ctx || {};
+    const ctx = { ...old, ...paceCtx(profile, !!old.indoor, old.bikeName ?? null, today), indoor: old.indoor, bikeName: old.bikeName, ...(sport === 'swim' ? {} : { gear: old.gear }) };
+    if (JSON.stringify(old) === JSON.stringify(ctx)) continue;
+    let spec = { ...set.spec, ctx };
+    if (sport === 'swim' && set.plannedMinutes && W.totals(spec).min > set.plannedMinutes + 3) spec = K.fitSwim(JSON.parse(JSON.stringify(spec)), set.plannedMinutes);
+    const b = W.build(spec);
+    out.push({ ...a, set: { ...set, title: set.title === W.title(set.spec) ? b.title : set.title, description: b.description, plannedKm: b.plannedKm ?? set.plannedKm ?? null, ...(sport === 'swim' ? { plannedMinutes: b.plannedMinutes } : {}), spec: b.spec, zone: b.zone ?? set.zone } });
+  }
+  return out;
+}
+
 /* Klarer Trend aus den Uhrdaten: geschätzte Schwelle aus mindestens 4 Einheiten weicht deutlich ab (schneller ab 3 %, langsamer ab 5 %,
    höchstens 10 %). Höchstens alle 3 Wochen. Liefert die neuen Werte und einen Text mit vorher/nachher. */
 export function trendThresholds(state: any, weeks: any[], profile: any, goal: any, today: string): { thresholds: Record<string, any>; settings: Record<string, any>; text: string } | null {

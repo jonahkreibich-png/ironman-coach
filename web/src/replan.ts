@@ -91,7 +91,8 @@ export function replanFuture(reason: string, why: string, o: { needTests?: any; 
     text: `${why} Der angepasste Plan gilt ab ${from === today ? 'heute' : 'morgen'}. Vergangene und erledigte Einheiten bleiben, wie sie sind; der Rest dieser Woche ist neu verteilt.${changed.length ? ' Diese Woche: ' + changed.join('; ') + '.' : ''}${dropped.length ? ' Nicht alles passte: ' + dropped.join('; ') + '.' : ''}` };
   // passt ein Wunsch nicht zu den harten Regeln: klar sagen und Lösungen anbieten
   gen.conflicts.forEach((c, i) => {
-    const cid = `msg-conflict-${c.id}-${now}`;
+    // Auftrag 21: ein Anlass = eine Meldung (gleicher Konflikt am selben Tag wird aktualisiert, nicht verdoppelt)
+    const cid = `msg-conflict-${c.id}-${today}`;
     STATE.coachMsgs[cid] = { id: cid, at: now + 1 + i, date: today, kind: 'proposal-local', from: 'coach', title: 'Das passt nicht ganz', unread: true, text: c.text,
       actions: c.options.map(o => ({ label: o.label, kind: 'rule-fix', payload: { sport: c.sport, option: o.id, day: o.day, n: o.n } })) };
   });

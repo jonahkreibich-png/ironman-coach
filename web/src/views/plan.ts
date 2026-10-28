@@ -6,7 +6,7 @@ import { t, num, hours } from '../../../shared/i18n';
 import { on, sec, ic, pill, empty, more } from '../kit';
 import { metaLine, statusIcon, sessionTitle } from './session';
 import { editBar, editing, canUndoGroups } from './planedit';
-import { sportIc } from '../kit';
+import { sportIc, gearChips } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
 import { shortPlan } from '../../../shared/workouts';
 import { duration } from '../../../shared/i18n';
@@ -49,7 +49,7 @@ function planRow(s: any): string {
   const check = status === 'done' || status === 'open' || status === 'missed'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   const badge = s._adj && s._adj.length ? ' ' + pill(s.movedFrom ? t('st.moved') : t('st.adjusted'), 'warn') : '';
-  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
+  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${gearChips(s)}${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
 }
 
 export function renderPlan(): string {

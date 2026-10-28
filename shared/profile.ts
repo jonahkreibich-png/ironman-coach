@@ -89,6 +89,8 @@ export interface Skills {
   swimMPerMin?: number | null;
   /** Auftrag 20: eigenes Schwimm-Tempo ohne Pausen (s/100 m, Median der letzten 6 Wochen), solange es keine CSS gibt */
   swimPace100?: number | null;
+  /** Auftrag 21: eigenes Tempo je Lage ohne Pausen (s/100 m) aus den tatsächlich geschwommenen Werten */
+  swimPaceCrawl?: number | null; swimPaceBreast?: number | null;
   /** so lange am Stück locker laufen (min) */
   runContinuousMin?: number | null;
   /** längste Radfahrt in letzter Zeit (min) */

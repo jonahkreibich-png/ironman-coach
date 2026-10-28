@@ -40,7 +40,13 @@ describe('Schwimm-Stufen', () => {
     // Auftrag 17: einmal 100 m ist ein Bestwert, aber noch keine neue Stufe
     const once = { sessions: { a: { completed: true, metrics: { longestCrawl: '100', longestPull: '100' } } }, customWorkouts: {}, activities: {} };
     expect(swimBests(once, weeks, today)).toMatchObject({ crawl: 0, pull: 0, best: 100, bestPull: 100 });
-    expect(swimSkillUpdate(profile, weeks, {}, today, swimBests(once, weeks, today), 1000)).toBe(null);
+    // Auftrag 21: der neue Bestwert wird einmal gemeldet (Kraul und Pull Buoy gleich), Stufe und Können bleiben bis zum 2. Nachweis
+    const first = swimSkillUpdate(profile, weeks, {}, today, swimBests(once, weeks, today), 1000)!;
+    expect(first.adjustments).toEqual([]);
+    expect(first.skills.swimCrawlM ?? null).toBe(profile.skills.swimCrawlM ?? null);
+    expect(first.text).toMatch(/Kraul am Stück.*100 m geschafft \(Bestwert\)/);
+    expect(first.text).toMatch(/Pull Buoy.*100 m geschafft \(Bestwert\)/);
+    expect(swimSkillUpdate({ ...profile, skills: { ...profile.skills, ...first.skills } }, weeks, {}, today, swimBests(once, weeks, today), 1000)).toBe(null);
     const state = { sessions: { a: { completed: true, metrics: { longestCrawl: '100', longestPull: '100' } } }, customWorkouts: { '2026-11-01': [{ id: 'x1', sport: 'swim', metrics: { longestCrawl: '100', longestPull: '100' } }] }, activities: {} };
     expect(swimBests(state, weeks, today)).toMatchObject({ crawl: 100, pull: 100, authoritative: true });
     const u = swimSkillUpdate(profile, weeks, {}, today, swimBests(state, weeks, today), 1000)!;

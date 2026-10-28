@@ -19,6 +19,12 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'cadence', label: 'Kadenz', unit: 'spm', kind: 'num' }, { key: 'vertRatio', label: 'vertikales Verhältnis', unit: '%', kind: 'num', more: true },
     { key: 'vo2max', label: 'VO2max', kind: 'num', more: true }, { key: 'cardioRecovery', label: 'Cardio-Erholung', unit: 'bpm', kind: 'num', more: true },
     { key: 'splits', label: 'Splits je km', kind: 'splits', more: true },
+    // Auftrag 21: weitere Werte (aus Uhr bzw. Quelle, von Hand änderbar)
+    { key: 'ascent', label: 'Höhenmeter', unit: 'm', kind: 'num', more: true }, { key: 'strideLen', label: 'Schrittlänge', unit: 'm', kind: 'num', more: true },
+    { key: 'gct', label: 'Bodenkontaktzeit', unit: 'ms', kind: 'num', more: true }, { key: 'power', label: 'Leistung', unit: 'W', kind: 'num', more: true },
+    { key: 'temp', label: 'Temperatur', unit: '°C', kind: 'num', more: true },
+    { key: 'surface', label: 'Untergrund', kind: 'select', more: true, options: [['', '–'], ['road', 'Straße/Asphalt'], ['trail', 'Wald/Trail'], ['track', 'Bahn'], ['treadmill', 'Laufband'], ['mixed', 'gemischt']] },
+    { key: 'shoe', label: 'Schuh', kind: 'text', more: true, ph: 'z. B. Pegasus 40' },
     { key: 'testHr', label: 'Test: Ø Puls der letzten 20 min', unit: 'bpm', kind: 'num', test: true }, { key: 'testPace', label: 'Test: Ø Pace der 30 min', unit: '/km', kind: 'pace', ph: '4:40', test: true }
   ],
   bike: [
@@ -26,9 +32,12 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'power', label: 'Ø Watt', unit: 'W', kind: 'num' }, { key: 'maxPower', label: 'max. Watt', unit: 'W', kind: 'num' },
     { key: 'cadence', label: 'Ø Trittfrequenz', unit: 'rpm', kind: 'num' }, { key: 'maxCadence', label: 'max. Trittfrequenz', unit: 'rpm', kind: 'num', more: true },
     { key: 'hr', label: 'Ø Puls', unit: 'bpm', kind: 'num' }, { key: 'maxHr', label: 'max. Puls', unit: 'bpm', kind: 'num' },
-    { key: 'indoor', label: 'Wo', kind: 'select', options: [['', '–'], ['in', 'drinnen (Smart Trainer)'], ['out', 'draußen']] },
+    { key: 'indoor', label: 'Wo', kind: 'select', options: [['', '–'], ['in', 'drinnen (Smart Trainer)'], ['basic', 'drinnen (einfache Rolle)'], ['out', 'draußen']] },
     { key: 'bikeType', label: 'Rad', kind: 'select', options: [['', '–'], ['gravel', 'Gravelbike'], ['road', 'Rennrad'], ['mtb', 'Mountainbike'], ['other', 'anderes']] },
     { key: 'speed', label: 'Ø Tempo', unit: 'km/h', kind: 'num', more: true },
+    { key: 'np', label: 'Normalized Power', unit: 'W', kind: 'num', more: true }, { key: 'ascent', label: 'Höhenmeter', unit: 'm', kind: 'num', more: true },
+    { key: 'temp', label: 'Temperatur', unit: '°C', kind: 'num', more: true },
+    { key: 'carbs', label: 'Verpflegung: Kohlenhydrate', unit: 'g', kind: 'num', more: true }, { key: 'fluid', label: 'Verpflegung: Trinken', unit: 'ml', kind: 'num', more: true },
     { key: 'testHr', label: 'Test: Ø Puls der 20 min', unit: 'bpm', kind: 'num', test: true }, { key: 'testPower', label: 'Test: Ø Watt der 20 min (falls gemessen)', unit: 'W', kind: 'num', test: true },
     { key: 'testSpeed', label: 'Test: Ø Tempo der 20 min (flach)', unit: 'km/h', kind: 'num', test: true }
   ],
@@ -38,6 +47,10 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'rate', label: 'Züge pro Minute', kind: 'num' }, { key: 'dps', label: 'Meter pro Zug', unit: 'm', kind: 'num' },
     { key: 'longestCrawl', label: 'längste Strecke Kraul am Stück', unit: 'm', kind: 'num' }, { key: 'longestPull', label: 'längste Strecke mit Pull Buoy am Stück', unit: 'm', kind: 'num' }, { key: 'crawlShare', label: 'Anteil Kraul (Rest Brust)', unit: '%', kind: 'num' },
     { key: 'technique', label: 'Technik-Schwerpunkt oder -Problem', kind: 'text', ph: 'z. B. Atmung, Beine sinken ab' },
+    { key: 'hr', label: 'Ø Puls', unit: 'bpm', kind: 'num', more: true }, { key: 'maxHr', label: 'max. Puls', unit: 'bpm', kind: 'num', more: true },
+    { key: 'paceBreast', label: 'Ø Pace Brust', unit: '/100 m', kind: 'pace', ph: '2:45', more: true }, { key: 'swolf', label: 'SWOLF', kind: 'num', more: true },
+    { key: 'poolLen', label: 'Beckenlänge', kind: 'select', more: true, options: [['', '–'], ['25', '25 m'], ['50', '50 m']] },
+    { key: 'aids', label: 'benutzte Hilfsmittel', kind: 'text', more: true, ph: 'z. B. Pull Buoy, Kickbrett' },
     { key: 'crawl25', label: 'Test: Ø Zeit pro 25 m Kraul', kind: 'pace', ph: '0:35', test: true }, { key: 'breast200', label: 'Test: 200 m Brust', unit: 'min', kind: 'pace', ph: '4:10', test: true },
     { key: 'css400', label: 'Test: 400 m Kraul', unit: 'min', kind: 'pace', ph: '8:30', test: true }, { key: 'css200', label: 'Test: 200 m Kraul', unit: 'min', kind: 'pace', ph: '4:05', test: true }
   ],
@@ -48,7 +61,8 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
   ],
   football: [
     { key: 'kind', label: 'Art', kind: 'select', options: [['', '–'], ['training', 'Training'], ['game', 'Spiel']] },
-    { key: 'min', label: 'Einsatzminuten', unit: 'min', kind: 'num' }, { key: 'hr', label: 'Ø Puls', unit: 'bpm', kind: 'num' }, { key: 'maxHr', label: 'max. Puls', unit: 'bpm', kind: 'num' }
+    { key: 'min', label: 'Einsatzminuten', unit: 'min', kind: 'num' }, { key: 'hr', label: 'Ø Puls', unit: 'bpm', kind: 'num' }, { key: 'maxHr', label: 'max. Puls', unit: 'bpm', kind: 'num' },
+    { key: 'km', label: 'Distanz', unit: 'km', kind: 'num', more: true }, { key: 'sprints', label: 'Sprints', kind: 'num', more: true }
   ]
 };
 /* Für alle Sportarten (oben in der Einheit, nicht in metrics) */
@@ -64,7 +78,12 @@ export interface Fields { min: number | null; km: number | null; meters: number 
   decoupling: number | null; efficiency: number | null; cadence: number | null; vertRatio: number | null; vo2max: number | null; cardioRecovery: number | null;
   power: number | null; maxPower: number | null; maxCadence: number | null; speed: number | null; indoor: boolean | null; bikeType: string | null;
   spl: number | null; rate: number | null; dps: number | null; longestCrawl: number | null; longestPull: number | null; crawlShare: number | null; technique: string;
-  area: string | null; exercises: ExerciseDone[]; kind: string | null; splits: Split[]; rpe: number | null; feel: number | null; deviation: string; notes: string }
+  area: string | null; exercises: ExerciseDone[]; kind: string | null; splits: Split[]; rpe: number | null; feel: number | null; deviation: string; notes: string;
+  /** Auftrag 21: weitere Werte */
+  ascent: number | null; strideLen: number | null; gct: number | null; temp: number | null; surface: string | null; shoe: string; np: number | null; carbs: number | null; fluid: number | null;
+  /** Rolle: smart (Watt gemessen) oder basic (einfache Rolle, Watt/Tempo nur geschätzt) */ trainer: 'smart' | 'basic' | null;
+  paceBreast: number | null; swolf: number | null; poolLen: number | null; aids: string; sprints: number | null;
+  /** Schwimmen: Meter pro Herzschlag (Effizienz, nur mit Puls) */ swimEff: number | null }
 export function fieldsOf(st: any, sport?: string): Fields {
   const m = (st && st.metrics) || {};
   const km = num(m.km), min = num(m.min), meters = num(m.meters);
@@ -74,10 +93,15 @@ export function fieldsOf(st: any, sport?: string): Fields {
   return {
     min, km, meters, paceSec: pace, pace100: p100, hr: num(m.hr), maxHr: num(m.maxHr), decoupling: num(m.decoupling), efficiency: num(m.efficiency), cadence: num(m.cadence),
     vertRatio: num(m.vertRatio), vo2max: num(m.vo2max), cardioRecovery: num(m.cardioRecovery), power: num(m.power), maxPower: num(m.maxPower), maxCadence: num(m.maxCadence), speed,
-    indoor: m.indoor === 'in' ? true : m.indoor === 'out' ? false : null, bikeType: m.bikeType || null,
+    indoor: m.indoor === 'in' || m.indoor === 'basic' ? true : m.indoor === 'out' ? false : null, bikeType: m.bikeType || null,
     spl: num(m.spl), rate: num(m.rate), dps: num(m.dps), longestCrawl: num(m.longestCrawl), longestPull: num(m.longestPull), crawlShare: num(m.crawlShare), technique: String(m.technique || ''),
     area: m.area || null, exercises: Array.isArray(m.exercises) ? m.exercises : [], kind: m.kind || null, splits: Array.isArray(m.splits) ? m.splits : [],
-    rpe: num(st && st.rpe), feel: num(st && st.feel), deviation: String((st && st.deviation) || ''), notes: String((st && (st.notes ?? st.description)) || '')
+    rpe: num(st && st.rpe), feel: num(st && st.feel), deviation: String((st && st.deviation) || ''), notes: String((st && (st.notes ?? st.description)) || ''),
+    ascent: num(m.ascent), strideLen: num(m.strideLen) ?? (sport === 'run' && num(m.cadence) && km && min ? Math.round(km * 1000 / (min * num(m.cadence)!) * 100) / 100 : null),
+    gct: num(m.gct), temp: num(m.temp), surface: m.surface || null, shoe: String(m.shoe || ''), np: num(m.np), carbs: num(m.carbs), fluid: num(m.fluid),
+    trainer: m.indoor === 'basic' ? 'basic' : m.indoor === 'in' ? 'smart' : null,
+    paceBreast: paceSec(m.paceBreast), swolf: num(m.swolf), poolLen: num(m.poolLen), aids: String(m.aids || ''), sprints: num(m.sprints),
+    swimEff: sport === 'swim' && meters && min && num(m.hr) ? Math.round(meters / (min * num(m.hr)!) * 100) / 100 : null
   };
 }
 
@@ -118,6 +142,14 @@ export function fieldsFromIcu(a: any, sport: string): Record<string, any> {
   if (typeof a.decoupling === 'number' && isFinite(a.decoupling) && (sport === 'run' || sport === 'bike')) m.decoupling = String(Math.round(a.decoupling * 10) / 10);
   if (n('icu_efficiency_factor') && (sport === 'run' || sport === 'bike')) m.efficiency = String(Math.round(n('icu_efficiency_factor')! * 100) / 100);
   if (sport === 'bike' && typeof a.trainer === 'boolean') m.indoor = a.trainer ? 'in' : 'out';
+  // Auftrag 21: weitere Werte, nur was die API liefert
+  if ((sport === 'run' || sport === 'bike') && n('total_elevation_gain')) m.ascent = String(Math.round(n('total_elevation_gain')!));
+  if (typeof a.average_temp === 'number' && isFinite(a.average_temp) && (sport === 'run' || sport === 'bike')) m.temp = String(Math.round(a.average_temp));
+  if (sport === 'bike' && n('icu_weighted_avg_watts')) m.np = String(Math.round(n('icu_weighted_avg_watts')!));
+  if (sport === 'run' && w) m.power = String(Math.round(w));
+  if (sport === 'run' && n('average_stride')) m.strideLen = String(Math.round(n('average_stride')! * 100) / 100);
+  if (sport === 'swim' && n('pool_length')) m.poolLen = String(Math.round(n('pool_length')!));
+  if (sport === 'football' && n('distance')) m.km = String(Math.round(n('distance')! / 10) / 100);
   return m;
 }
 

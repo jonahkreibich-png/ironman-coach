@@ -31,7 +31,8 @@ export function actualMetrics(st: any = {}, a: any = null): Record<string, any> 
     speed: a.speedKmh, decoupling: a.decouplingPct, efficiency: a.efficiency,
     spl: sw.strokesPerLength, dps: sw.metersPerStroke, rate: sw.strokeRate,
     pace100: time(sw.pace100), longestCrawl: crawlOf(a), longestPull: sw.longestPullM, splits: a.splits,
-    area: a.strength?.area ?? a.area, exercises: a.strength?.exercises ?? a.exercises
+    area: a.strength?.area ?? a.area, exercises: a.strength?.exercises ?? a.exercises,
+    ascent: a.ascentM, temp: a.tempC, np: a.np, paceBreast: time(sw.breastPace100), swolf: sw.swolf
   } : {};
   for (const [k, v] of Object.entries(st?.metrics || {})) {
     const src = st.metricsSrc?.[k];
@@ -90,7 +91,7 @@ export function actualStrength(st: any = {}, activity: any = null): { area: Stre
 
 export function effectiveActivity(a: any, st: any = {}): any {
   const m = actualMetrics(st, a), out = { ...a };
-  const map: Record<string, string> = { min: 'min', km: 'km', hr: 'avgHr', maxHr: 'maxHr', power: 'avgPower', maxPower: 'maxPower', cadence: 'avgCadence', maxCadence: 'maxCadence', decoupling: 'decouplingPct', efficiency: 'efficiency' };
+  const map: Record<string, string> = { min: 'min', km: 'km', hr: 'avgHr', maxHr: 'maxHr', power: 'avgPower', maxPower: 'maxPower', cadence: 'avgCadence', maxCadence: 'maxCadence', decoupling: 'decouplingPct', efficiency: 'efficiency', ascent: 'ascentM', temp: 'tempC', np: 'np' };
   for (const [key, prop] of Object.entries(map)) out[prop] = resultNumber(m[key]);
   if (a.sport === 'swim') out.km = resultNumber(m.meters) == null ? null : resultNumber(m.meters)! / 1000;
   out.paceSecKm = pace(m.pace) ?? (out.km > 0 && out.min > 0 ? out.min * 60 / out.km : null);

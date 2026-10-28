@@ -249,6 +249,17 @@ export function swimVariant(spec: W.Spec, k: number, weekInBlock: number, phase:
   if (v === 'Technik') { const d = out.steps.find(s => s.mode === 'drill'); if (d) d.reps = (d.reps || 1) + 2; }
   if (v === 'Pull Buoy') { const p = out.steps.find(s => s.mode === 'pull'); if (p) p.reps = (p.reps || 1) + 2; }
   if (v === 'zügige Bahnen') { const c = out.steps.find(s => s.mode === 'crawl' && s.part === 'main'); if (c) out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: 4, m: Math.min(c.m || 25, 50), zone: 3, mode: 'crawl', restSec: 30, note: 'zügig, Technik sauber halten' })); }
+  // Auftrag 21: Hilfsmittel im Wechsel, nur vorhandene. Kickbrett etwa jede 2. Einheit (Schwerpunkt Beinschlag + kurzer Block bei
+  // „zügige Bahnen“), Pull Buoy ebenfalls jede 2. Einheit (Schwerpunkt Pull Buoy + kurzer Block bei „Technik“).
+  const crawling = !out.stage || (out.stage.ladder === 'swim' && out.stage.n >= 2);
+  if (gear.includes('board') && v === (list.includes('zügige Bahnen') ? 'zügige Bahnen' : 'Technik') && list.includes('Beinschlag') && list.length > 2 && !out.steps.some(s => s.mode === 'kick')) {
+    const i = out.steps.findIndex(s => s.part !== 'warm');
+    out.steps.splice(Math.max(1, i), 0, S('main', { reps: 4, m: 25, zone: 1, mode: 'kick', restSec: 30, note: 'kurzer Beinschlag-Block mit Kickbrett', focus: 'Beine aus der Hüfte, Knie locker' }));
+  }
+  if (gear.includes('buoy') && crawling && v === 'Technik' && list.includes('Pull Buoy') && !out.steps.some(s => s.mode === 'pull')) {
+    const c = crawlMain(); const m = Math.min(learnLen || 50, (c && c.m) || 50);
+    if (c) out.steps.splice(out.steps.indexOf(c) + 1, 0, S('main', { reps: 4, m, zone: 2, mode: 'pull', restSec: 30, note: 'kurzer Block mit Pull Buoy: Beine ruhig, lange Züge', focus: 'Zug und Wasserlage' }));
+  }
   // Freiwasser-Technik im Becken in der spezifischen Phase (Lernende nur in Stücken, die sie schon schaffen)
   const owM = out.stage && out.stage.ladder === 'swim' ? Math.min(50, W.SWIM_STAGE_M[out.stage.n] || 25) : 50;
   const ow = phase === 'specific' && !(out.stage && out.stage.ladder === 'swim' && out.stage.n < 2);

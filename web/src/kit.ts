@@ -1,3 +1,4 @@
+import { swimAids, GEAR_TXT } from '../../shared/workouts';
 /* UI-Bausteine nach DESIGN.md: Karten, Listen, Ring, Sparkline, Quellen-Symbol, Sheets, Aktionen. */
 import { esc, $ } from './util';
 import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
@@ -31,6 +32,11 @@ export function srcBadge(src?: string | null): string {
   const label = SOURCE_LABEL[src] || src;
   const short = src === 'manual' ? '✎' : src === 'note' ? 'Notiz' : label.replace(/[^A-Za-zÄÖÜ]/g, '').slice(0, 2).toUpperCase();
   return `<span class="src ${src === 'manual' ? 'manual' : ''}" title="${esc(t('src.from', { s: label }))}" aria-label="${esc(t('src.from', { s: label }))}">${esc(short)}</span>`;
+}
+/* Auftrag 21: Hilfsmittel einer Schwimmeinheit als Symbol + Wort */
+export function gearChips(s: any): string {
+  const aids = swimAids(s); if (!aids.length) return '';
+  return `<span class="gear-chips" data-gear>${aids.map(g => `<span class="gear-chip">${ic(g)}${esc(GEAR_TXT[g] || g)}</span>`).join('')}</span>`;
 }
 export function sportIc(sport: string): string { return `<span class="ic" style="--c:${SPORT_COLOR[sport] || 'var(--rest)'}">${sportIcon(sport)}</span>`; }
 export function ring(score: number | null, level: number, label: string, small = false): string {

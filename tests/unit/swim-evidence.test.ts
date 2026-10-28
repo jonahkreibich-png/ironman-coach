@@ -134,3 +134,47 @@ test('aktive eigene Trainingsänderungen bleiben bei neuer Schwimmstufe erhalten
  expect(explicit?.skills.swimCrawlM).toBe(100);
  expect(explicit?.adjustments.map(a=>a.sessionId)).toEqual(['undone','ordinary']);
 });
+
+/* Auftrag 21: Am 27.10. „längste Strecke mit Pull Buoy“ = 100 m eingetragen, der Coach meldete „Bestätigt: 100 m Kraul am Stück, 50 m mit
+   Pull Buoy“ und erwähnte die 100 m Pull Buoy nicht. Ursache: Kraul (eigene Angabe, blieb für immer stehen) und Pull Buoy (nur 2 Einheiten)
+   liefen über verschiedene Regeln, und „Bestätigt“ stand auch ohne Nachweis da. Jetzt: ein Weg, gleiche Regel, Bestwert wird gemeldet. */
+import { swimBests } from '../../shared/swimskill';
+describe('Auftrag 21: Kraul und Pull Buoy über denselben Weg', () => {
+  const day = '2026-10-27';
+  const mk = (dates: [string, number, number][]) => {
+    const sessions: any = {}; const days: any[] = [];
+    dates.forEach(([date, crawl, pull], i) => { sessions['s' + i] = { completed: true, metrics: { longestCrawl: String(crawl), longestPull: String(pull) }, metricsManual: { longestPull: true } }; days.push({ date, sessions: [{ id: 's' + i, sport: 'swim', title: 'Schwimmen' }] }); });
+    return { state: { sessions, customWorkouts: {}, activities: {} }, weeks: [{ days }] };
+  };
+  const hist = mk([['2026-10-17', 50, 50], ['2026-10-20', 50, 50], ['2026-10-24', 50, 50], ['2026-10-27', 100, 100]]);
+  const own = { skills: { swimCrawl: 'some', swimCrawlM: 100, swimPullM: 50, swimBreast: true, swimEvidence: { crawl: { value: 100, baseline: 100, manual: true }, mode: { value: 'some', baseline: 'some', manual: true } } } };
+  test('neue 100 m mit Pull Buoy werden gemeldet; Kraul und Pull Buoy mit derselben Begründung', () => {
+    const b = swimBests(hist.state, hist.weeks, day);
+    expect(b).toMatchObject({ best: 100, bestPull: 100, crawl: 50, pull: 50, bestPullDate: '2026-10-27' });
+    const u = swimSkillUpdate(own, hist.weeks, {}, day, b, 1)!;
+    expect(u.silent).toBeUndefined();
+    expect(u.text).not.toMatch(/^Bestätigt/);
+    expect(u.text).toMatch(/Kraul am Stück: 100 m \(deine Angabe, in einer Einheit bestätigt\)/);
+    expect(u.text).toMatch(/Pull Buoy am Stück: 50 m \(in 2 Einheiten geschafft\); am 27\.10\. 100 m geschafft \(Bestwert\)/);
+    // dieselbe Meldung nur einmal: gleiche Kennung bei jedem Lauf (App und Server), danach nichts mehr
+    expect(swimSkillUpdate(own, hist.weeks, {}, day, b, 999)!.key).toBe(u.key);
+    expect(swimSkillUpdate(apply(own, u), hist.weeks, {}, day, b, 2)).toBeNull();
+  });
+  test('zweite Einheit mit 100 m Pull Buoy: übernommen, genau wie beim Kraul', () => {
+    const two = mk([['2026-10-17', 50, 50], ['2026-10-20', 50, 50], ['2026-10-27', 100, 100], ['2026-10-31', 100, 100]]);
+    const b = swimBests(two.state, two.weeks, '2026-10-31');
+    const u = swimSkillUpdate(own, two.weeks, {}, '2026-10-31', b, 1)!;
+    expect(u.skills.swimPullM).toBe(100);
+    expect(u.text).toMatch(/Neu bestätigt: 100 m mit Pull Buoy am Stück|Pull Buoy am Stück: 100 m/);
+  });
+  test('eigene Angabe bleibt nicht für immer stehen: spätere Einheiten belegen mehr', () => {
+    const p = { skills: { swimCrawl: 'some', swimCrawlM: 100, swimEvidence: { crawl: { value: 100, baseline: 100, manual: true, at: '2026-10-01' } } } };
+    const later = mk([['2026-10-10', 200, 0], ['2026-10-20', 200, 0]]);
+    const u = swimSkillUpdate(p, later.weeks, {}, day, swimBests(later.state, later.weeks, day), 1)!;
+    expect(u.skills.swimCrawlM).toBe(200);
+    // Pull Buoy genauso
+    const pp = { skills: { swimPullM: 100, swimEvidence: { pull: { value: 100, baseline: 100, manual: true, at: '2026-10-01' } } } };
+    const lp = mk([['2026-10-10', 0, 200], ['2026-10-20', 0, 200]]);
+    expect(swimSkillUpdate(pp, lp.weeks, {}, day, swimBests(lp.state, lp.weeks, day), 1)!.skills.swimPullM).toBe(200);
+  });
+});
