@@ -1,3 +1,4 @@
+import { fetchStatusText } from '../../../shared/fetchnow';
 /* Verbindungen: Dienste verbinden (OAuth), intervals.icu-Schlüssel, Apple-Health-Kurzbefehl, Datei-Import,
    Quellen-Reihenfolge je Messwert. Hinweise, wenn eine Verbindung neu angemeldet werden muss.
    Auftrag 4 A2/A3: Jeder Knopf verbindet oder sagt klar, was fehlt und was man stattdessen tun kann.
@@ -138,6 +139,8 @@ function partnerGuide(name = 'Garmin'): string {
 /* ---------- Detail je Dienst ---------- */
 let CUR = '';
 const cur = () => (CONN || []).find(c => c.id === CUR);
+/* Auftrag 21: letzter Abruf je Quelle (Text für den Status unter dem Knopf) */
+const LAST_FETCH: Record<string, string> = {};
 const ALT: Record<string, string> = { oura: 'conn.alt.oura', whoop: 'conn.alt.whoop', polar: 'conn.alt.polar', withings: 'conn.alt.withings', dropbox: 'conn.alt.dropbox', fitbit: 'conn.alt.whoop' };
 function connSheet(): string {
   const c = cur(); if (!c) return '';
@@ -185,7 +188,8 @@ function connSheet(): string {
     if (c.id === 'dropbox' && st.errors && st.errors.length) h += `<div class="hint">${esc(t('conn.fileErrors', { list: st.errors.map((e: any) => typeof e === 'string' ? e : `${e.name} (${e.why})`).join(', ') }))}</div>`;
     if (c.id === 'dropbox') h += `<div class="row">${field('dbx-folder', t('conn.dbxFolder'), st.folderSet ? st.folder || '' : '', { wide: true, placeholder: st.folder && !st.folderSet ? st.folder : t('conn.dbxFolderPh') })}<button class="btn ghost" data-act="dbx-folder" style="align-self:flex-end">${esc(t('common.save'))}</button></div><div class="hint">${esc(t('conn.dbxHint'))}</div>`;
     if (c.status === 'reauth' || (c.status === 'error' && ['token_mismatch', 'scope', 'folder', 'appfolder'].includes(st.errorCode))) h += `<button class="btn block" data-act="conn-start">${esc(t('conn.reconnect'))}</button>`;
-    if (c.status !== 'reauth' && c.id !== 'intervals') h += `<button class="btn ${c.status === 'error' ? '' : 'ghost '}block" data-act="conn-sync">${ic('sync')} ${esc(t('conn.syncNow'))}</button>`;
+    // Auftrag 21: „Jetzt abrufen“ bei jeder Quelle (auch intervals.icu) mit verständlichem Ergebnis
+    if (c.status !== 'reauth') h += `<button class="btn ${c.status === 'error' ? '' : 'ghost '}block" data-act="conn-sync">${ic('sync')} ${esc(t('conn.syncNow'))}</button>${LAST_FETCH[c.id] ? `<div class="hint" data-fetch-status>${esc(LAST_FETCH[c.id])}</div>` : ''}`;
     if (c.id === 'dropbox') h += more(t('conn.hfIcuHow'), `<ol class="small stack" style="padding-left:18px;margin:0">${[1, 2, 3].map(i => `<li>${esc(t('conn.hfIcu' + i))}</li>`).join('')}</ol>`);
     h += more(t('conn.disconnect'), `<div class="hint">${esc(t('conn.disconnectHint'))}</div><label class="switch"><input type="checkbox" id="conn-del" ${c.id === 'oura' ? 'checked' : ''}><span>${esc(t('conn.deleteData'))}</span></label><button class="btn danger" data-act="conn-disconnect">${esc(t('conn.disconnect'))}</button>`);
   } else h += `<div class="hint">${esc(t('conn.willOpen', { name: c.label }))}</div><button class="btn block" data-act="conn-start">${esc(t('conn.connect'))}</button>`;
@@ -233,6 +237,12 @@ on('conn-sync', el => busy(el, async () => {
   let r: any;
   // Auch bei einem Fehler den neuen Status (Grund, Zeitpunkt) zeigen
   const sum = { days: 0, activities: 0 };
+  const id = CUR; const label = (cur() || {}).label || id;
+  if (id === 'intervals') {
+    try { const st = await apiCall('POST', '/api/intervals/import'); LAST_FETCH[id] = fetchStatusText(Date.now(), [{ provider: id, label, ok: !!st.ok, error: st.ok ? undefined : st.error, activities: (st.matched || 0) + (st.extras || 0), matched: st.matched || 0, days: st.wellnessDays || 0 }]); }
+    catch (e: any) { LAST_FETCH[id] = fetchStatusText(Date.now(), [{ provider: id, label, ok: false, error: e.message, activities: 0, matched: 0, days: 0 }]); }
+    await loadConnections(true); refreshSheet(); await syncNow(); toast(LAST_FETCH[id]); return;
+  }
   try {
     // Dropbox wertet eine Datei pro Aufruf aus (CPU-Grenze des Servers): weiter abrufen, solange Dateien warten (höchstens 12)
     for (let i = 0; i < 12; i++) {
@@ -241,9 +251,11 @@ on('conn-sync', el => busy(el, async () => {
       if (!s0.queued) break;
       toast(t('conn.queueing', { n: s0.queued }));
     }
-  } finally { await loadConnections(true); refreshSheet(); }
+  } catch (e: any) { LAST_FETCH[id] = fetchStatusText(Date.now(), [{ provider: id, label, ok: false, error: e.message, activities: 0, matched: 0, days: 0 }]); throw e; }
+  finally { await loadConnections(true); refreshSheet(); }
   await syncNow();
-  toast(t('conn.synced', { d: sum.days, a: sum.activities }));
+  LAST_FETCH[id] = fetchStatusText(Date.now(), [{ provider: id, label, ok: true, activities: sum.activities, matched: 0, days: sum.days }]);
+  refreshSheet(); toast(LAST_FETCH[id]);
 }));
 on('conn-disconnect', el => {
   if (!armed(el as HTMLElement, t('common.sure'))) return;

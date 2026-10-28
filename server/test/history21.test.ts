@@ -19,3 +19,16 @@ describe('Auftrag 21: Historie nachladen', () => {
     expect(out[0]).toMatchObject({ sessionId: null, history: true });
   });
 });
+
+/* Auftrag 21: „Jetzt abrufen“ – Status ohne Technikbegriffe */
+import { fetchStatusText } from '../../shared/fetchnow';
+describe('Auftrag 21: Jetzt abrufen', () => {
+  const at = Date.parse('2026-10-28T17:42:00Z'); // 18:42 in Berlin
+  const r = (o: any = {}) => ({ provider: 'intervals', label: 'intervals.icu', ok: true, activities: 0, matched: 0, days: 0, ...o });
+  test('Lauf gefunden und eingetragen / noch keine neue Aufzeichnung / Fehler verständlich', () => {
+    expect(fetchStatusText(at, [r({ activities: 1, matched: 1 })], { sport: 'run', before: false, done: true })).toBe('Abgerufen 18:42 – Lauf gefunden und eingetragen');
+    expect(fetchStatusText(at, [r()])).toBe('Abgerufen 18:42 – noch keine neue Aufzeichnung');
+    expect(fetchStatusText(at, [r({ ok: false, error: 'intervals.icu bremst gerade (zu viele Abrufe). In ein paar Minuten klappt es wieder.' })])).toMatch(/noch keine neue Aufzeichnung\. intervals\.icu: intervals\.icu bremst gerade/);
+    expect(fetchStatusText(at, [])).toMatch(/keine Verbindung eingerichtet/);
+  });
+});

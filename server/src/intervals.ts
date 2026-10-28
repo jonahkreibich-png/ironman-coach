@@ -39,6 +39,8 @@ async function icuGet(env: Env, creds: Creds, path: string) {
     headers: { Authorization: 'Basic ' + btoa('API_KEY:' + String(creds.key).trim()), Accept: 'application/json' }
   });
   if (res.status === 401 || res.status === 403 || res.status === 404) throw new Error(accessHint(creds, res.status));
+  if (res.status === 429) throw new Error('intervals.icu bremst gerade (zu viele Abrufe). In ein paar Minuten klappt es wieder.');
+  if (res.status >= 500) throw new Error('intervals.icu ist gerade nicht erreichbar. Der nächste Abruf versucht es wieder.');
   if (!res.ok) throw new Error('intervals.icu antwortet mit Fehler ' + res.status);
   return res.json();
 }

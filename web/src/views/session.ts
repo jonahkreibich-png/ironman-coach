@@ -1,3 +1,4 @@
+import { isSyncOn, apiCall, syncNow } from '../sync';
 import { actualStrength } from '../../../shared/results';
 import {describeTrainingBlocks} from '../../../shared/training-templates26';
 /* Einheit: Ansicht und Bearbeiten im Sheet, Abhaken. Werte von der Uhr tragen ihre Quelle,
@@ -59,6 +60,14 @@ export function sessionRow(s: any, opts: { check?: boolean } = {}): string {
     <span class="wo-status">${status === 'done' || status === 'open' || status === 'missed' ? check : statusIcon(status)}</span></div>`;
 }
 
+/* Auftrag 21: Status des letzten Abrufs je Einheit */
+const FETCH_TEXT: Record<string, string> = {};
+on('fetch-now', async el => {
+  const id = el.dataset.sid!; (el as HTMLButtonElement).disabled = true;
+  try { const r = await apiCall('POST', '/api/fetch-now', { sessionId: id, sport: el.dataset.sport }); FETCH_TEXT[id] = r.text; await syncNow(); }
+  catch (e: any) { FETCH_TEXT[id] = String(e && e.message || 'Abruf gerade nicht möglich. Bitte später noch einmal.'); }
+  finally { refreshSheet(); toast(FETCH_TEXT[id]); }
+});
 /* ---------- Sheet ---------- */
 const FIELDS: Record<string, [string, string, string?][]> = {
   run: [['km', 'm.km'], ['min', 'm.min'], ['hr', 'm.hr'], ['pace', 'm.pace', '5:30']],
@@ -96,6 +105,8 @@ function sessionSheet(id: string): string {
   // Felder statt Notizfeld (Auftrag 7): Werte je Sportart mit Quelle, RPE, Gefühl, Abweichung, optionale Notiz
   if (s.sport !== 'rest' && (st.completed || status === 'missed' || status === 'open' || status === 'skipped')) h += fieldsBlock({ kind: 'session', id, date: s.date, sport: s.sport, planned: s });
   if (act) h += activityDetails(act);
+  // Auftrag 21: „Jetzt abrufen“ in jeder Einheit (heute oder früher, noch ohne Aufzeichnung): holt neue Daten aller Quellen und ordnet sie zu
+  if (s.sport !== 'rest' && isSyncOn() && s.date <= todayStr() && !st.activityId) h += `<div class="stack" data-fetch-now><button class="btn ghost block" data-act="fetch-now" data-sid="${esc(id)}" data-sport="${esc(s.sport)}">${ic('sync')} ${esc(t('conn.syncNow'))}</button>${FETCH_TEXT[id] ? `<div class="hint" data-fetch-status>${esc(FETCH_TEXT[id])}</div>` : `<div class="xs muted">${esc('Holt neue Aufzeichnungen von deiner Uhr bzw. deinen Verbindungen und trägt sie hier ein.')}</div>`}</div>`;
   if (s.sport !== 'rest') h += more(t('sess.time'), `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>`);
   return h + '</div>';
 }

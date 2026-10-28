@@ -1,6 +1,8 @@
 /* Erweiterungen: Verbindungen (OAuth, Webhooks, Kurzbefehl), Datei-Import, Coach-Engine und KI-Coach.
    index.ts ruft diese Haken auf, damit der Kern übersichtlich bleibt. */
-import { type Env, type Change, berlinParts, getRecord } from './store';
+import { type Env, type Change, berlinParts, getRecord, getMeta, setMeta } from './store';
+import { runImport, intervalsCreds } from './intervals';
+import { fetchStatusText, FETCH_MIN_GAP_MS, type FetchResult } from '../../shared/fetchnow';
 import type { Auth } from './auth';
 import { HttpError, readJson } from './http';
 import * as X from './connect';
@@ -52,6 +54,31 @@ export async function extraRoutes(req: Request, env: Env, url: URL, p: string, a
       await env.DB.prepare("UPDATE connections SET stats = ?, cursor = NULL WHERE user_id = ? AND provider = 'dropbox'").bind(JSON.stringify({ ...stats, folder: folder || null, folderSet: !!folder }), a.uid).run();
       return { ok: true };
     }
+  }
+  // Auftrag 21: „Jetzt abrufen“ für alle verbundenen Quellen (aus einer Einheit oder den Verbindungen); höchstens einmal pro Minute
+  if (p === '/api/fetch-now' && M === 'POST') {
+    const body = await readJson(req); const only = body.provider ? String(body.provider) : null;
+    const last = await getMeta(env, a.uid, 'fetch_now_at');
+    if (last && Date.now() - last < FETCH_MIN_GAP_MS) throw new HttpError(429, 'Gerade eben schon abgerufen. In einer Minute geht es wieder.');
+    await setMeta(env, a.uid, 'fetch_now_at', Date.now());
+    const sid = body.sessionId ? String(body.sessionId) : null;
+    const before = sid ? await getRecord(env, a.uid, 'session', sid) : null;
+    const rows = await env.DB.prepare("SELECT provider FROM connections WHERE user_id = ? AND status IN ('connected', 'error')").bind(a.uid).all();
+    const provs = ((rows.results || []) as any[]).map(r => String(r.provider)).filter(x => !only || x === only);
+    const icu = await intervalsCreds(env, a.uid);
+    if (icu && (!only || only === 'intervals') && !provs.includes('intervals')) provs.push('intervals');
+    const results: FetchResult[] = [];
+    for (const prov of provs) {
+      const label = prov === 'intervals' ? 'intervals.icu' : prov === 'dropbox' ? 'HealthFit' : prov.charAt(0).toUpperCase() + prov.slice(1);
+      try {
+        if (prov === 'intervals') { const st = await runImport(env, a.uid, { days: 7 }); results.push({ provider: prov, label, ok: !!st.ok, error: st.ok ? undefined : st.error, activities: (st.matched || 0) + (st.extras || 0), matched: st.matched || 0, days: st.wellnessDays || 0 }); }
+        else if (prov !== 'shortcut') { const st: any = await X.syncProvider(env, a.uid, prov as X.ProviderId, { maxFiles: 2 }); results.push({ provider: prov, label, ok: true, activities: st.activities || 0, matched: st.matched || 0, days: st.days || 0 }); }
+      } catch (e: any) { results.push({ provider: prov, label, ok: false, error: X.friendlyError(e).text, activities: 0, matched: 0, days: 0 }); }
+    }
+    const after = sid ? await getRecord(env, a.uid, 'session', sid) : null;
+    const at = Date.now();
+    const sess = sid ? { sport: String(body.sport || ''), before: !!(before && before.data && before.data.activityId), done: !!(after && after.data && after.data.activityId) } : null;
+    return { at, results, text: fetchStatusText(at, results, sess) };
   }
   if (p === '/api/connect/intervals' && M === 'POST') return X.connectIntervals(env, a.uid, await readJson(req));
   if (p === '/api/connect/intervals/disconnect' && M === 'POST') return { ok: true, ...(await X.disconnect(env, a.uid, 'intervals', !!(await readJson(req)).deleteData)) };
