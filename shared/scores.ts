@@ -61,6 +61,14 @@ const clamp = (x: number, a = 0, b = 100) => Math.max(a, Math.min(b, x));
 const mmss = (s: number) => { s = Math.round(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const de = (v: number, d = 1) => (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d).replace('.', ',');
 const WINDOW = 42, RECENT = 21;
+/* Auftrag 21: statt harter 3-/6-Wochen-Grenze zählen alle Einheiten des letzten Jahres, ältere mit abnehmendem Gewicht
+   (Halbwertszeit 6 Wochen, für Effizienz und Technik 3 Wochen). Längste Einheiten: bis 6 Wochen voll, danach langsam weniger. */
+const HORIZON = 365;
+const ageOfDays = (end: string, date: string) => Math.max(0, (Date.parse(end) - Date.parse(date)) / 86400000);
+const recentW = (end: string, date: string) => Math.exp(-Math.LN2 * ageOfDays(end, date) / RECENT);
+const longDecay = (end: string, date: string) => { const a = ageOfDays(end, date); return a <= WINDOW ? 1 : Math.exp(-Math.LN2 * (a - WINDOW) / 56); };
+/* Datenqualität einer Einheit (Hand und Uhr gleich): Puls und Tempo/Watt = voll, sonst halb */
+const qualityOf = (a: Activity) => a.sport === 'swim' ? (a.km && a.min ? 1 : 0.5) : a.sport === 'strength' ? 1 : (a.avgHr && (a.speedKmh || a.avgPower || a.efficiency) ? 1 : 0.5);
 const SPORT_LABEL: Record<ScoreSport, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', strength: 'Kraft' };
 
 /* ---------- Feste Skalen (Mann, 18-35 Jahre); stückweise linear, über die Enden hinaus weiter (kein Abschneiden) ---------- */
@@ -401,9 +409,11 @@ function evidenceActivities(c: Ctx, sport: ScoreSport): { end: string; activitie
   const valid = c.inp.activities.filter(a => a.sport === sport && !a.mergedInto && a.date <= c.end && (a.min == null || (Number.isFinite(a.min) && a.min >= 0)) && (c.legacy || !gpsBad(a)) &&
     (sport === 'run' ? !!(a.min && a.min >= 10 && ((a.avgHr && (a.speedKmh || a.efficiency)) || a.laps?.some(l => l.kind === 'work' && l.speed && l.avgHr) || a.min >= 30)) :
       sport === 'bike' ? !!(a.min && a.min >= 15) : sport === 'swim' ? !!(a.km || a.min) : true));
-  const end = valid.map(a => a.date).sort().pop() || c.end;
+  // Auftrag 21: Einträge ohne Messwerte (nur Dauer) verschieben den Bezugstag nicht (sonst altern ältere Messungen ohne Grund)
+  const measured = (a: Activity) => !!(a.avgHr || a.speedKmh || a.avgPower || a.km || a.efficiency || a.rpe != null || (a.swim && (a.swim.pace100 || crawlOf(a))));
+  const end = valid.filter(measured).map(a => a.date).sort().pop() || valid.map(a => a.date).sort().pop() || c.end;
   const seen = new Set<string>();
-  const activities = valid.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return inWindow(a, end, WINDOW); });
+  const activities = valid.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return inWindow(a, end, HORIZON); });
   return { end, activities };
 }
 
@@ -442,7 +452,7 @@ function runRaw(c: Ctx): Raw {
   });
   const t = inp.profile.thresholds;
   const est = (t.estimated || []).includes('thresholdPaceRunSec');
-  const impMed = wmedian(imp.filter(x => x.date > addDays(end, -RECENT)));
+  const impMed = wmedian(imp.map(x => ({ ...x, w: x.w * recentW(end, x.date) })));
   const evidence = [...thr, ...imp.map(x => ({ ...x, w: x.w * 0.5 }))];
   const f = c.f;
   const lvl = (sp: number) => scale(SCALES.runVdot, vdotFromThreshold(sp * f));
@@ -455,11 +465,11 @@ function runRaw(c: Ctx): Raw {
   const flt = filterFor(c, 'run', obs, v20 ? { prior, o: { pts, weekPts: WEEK_PTS.run, capZ: cap != null ? zForPts(pts, cap, prior.z) : null } } : null);
   const thrSpeed = flt ? Math.exp(flt.z) : wmedian(evidence) ?? (t.thresholdPaceRunSec > 0 ? 1000 / t.thresholdPaceRunSec : null);
   const effSpeed = impMed && thrSpeed ? clamp(impMed, thrSpeed * 0.85, thrSpeed * 1.15) : null;
-  const effs = easy.filter(a => inWindow(a, end, RECENT) && a.efficiency && (!v20 || !a.indoor)).map(a => ({ v: a.efficiency! * heatFactor(a) * flatSpeedFactor(a), w: weightOf(a, inp, end), date: a.date }));
+  const effs = easy.filter(a => a.efficiency && (!v20 || !a.indoor)).map(a => ({ v: a.efficiency! * heatFactor(a) * flatSpeedFactor(a), w: weightOf(a, inp, end) * recentW(end, a.date), date: a.date }));
   const eff = wmedian(effs);
   const decs = runs.filter(a => a.decouplingPct != null && a.min! >= 30).map(a => ({ v: a.decouplingPct!, w: weightOf(a, inp, end) * (a.min! >= 45 ? 1 : 0.5), date: a.date }));
   const dec = wmedian(decs);
-  const easyMins = runs.filter(a => !a.avgHr || a.avgHr <= 0.9 * lthr).map(a => a.min || 0);
+  const easyMins = runs.filter(a => !a.avgHr || a.avgHr <= 0.9 * lthr).map(a => Math.round((a.min || 0) * longDecay(end, a.date)));
   const skillCont = (inp.profile.skills || {}).runContinuousMin || null;
   // Auftrag 19: kurze Läufe im Fenster sind kein Beweis, dass ein längerer nicht geht: höchster Wert aus Einheiten und Fragebogen
   const runMax = easyMins.length ? Math.max(...easyMins) : null;
@@ -473,7 +483,7 @@ function runRaw(c: Ctx): Raw {
   ];
   const latest = runs.map(a => a.date).sort().pop() || null;
   const fromData = v20 ? !!(flt && flt.usable) : thr.length > 1 || imp.length || !!flt;
-  return { evidence, parts, n: runs.length, counted, latest, manualShare: runs.length ? runs.filter(isManual).length / runs.length : 1, levelSource: fromData ? 'Einheiten' : est ? 'Schätzung aus dem Profil' : t.thresholdPaceRunSec > 0 ? t.source || 'Profil' : 'Schätzung aus dem Profil', extra: { thrSpeed, eff, dec, longest, impMed },
+  return { evidence, parts, n: runs.length, counted, latest, manualShare: runs.length ? 1 - runs.reduce((x, a) => x + qualityOf(a), 0) / runs.length : 1, levelSource: fromData ? 'Einheiten' : est ? 'Schätzung aus dem Profil' : t.thresholdPaceRunSec > 0 ? t.source || 'Profil' : 'Schätzung aus dem Profil', extra: { thrSpeed, eff, dec, longest, impMed },
     filter: flt, sub: pts, mainKey: 'thr', priorSd: est ? 0.1 : 0.05, ignored: ign, prior };
 }
 
@@ -543,7 +553,7 @@ function bikeRaw(c: Ctx): Raw {
     if (!pw(a)) counted.push({ date: a.date, title: titleOf(a), value: `${de(a.speedKmh!)} km/h ${BIKE_KIND_LABEL[k]} bei Puls ${a.avgHr}`, manual: isManual(a) });
   });
   const speedEst = (p.thresholds.estimated || []).includes('thresholdSpeedBikeKmh');
-  const impMed = wmedian(imp.filter(x => x.date > addDays(end, -RECENT)));
+  const impMed = wmedian(imp.map(x => ({ ...x, w: x.w * recentW(end, x.date) })));
   const speedEvidence = [...spThr, ...imp.map(x => ({ ...x, w: x.w * 0.5 }))];
   const ignS: Ignored[] = [];
   const sObs = bikeObs(c, lthr, false, ignS);
@@ -559,12 +569,12 @@ function bikeRaw(c: Ctx): Raw {
   }
   const thrKmh = fltS ? Math.exp(fltS.z) : wmedian(speedEvidence) ?? (p.thresholds.thresholdSpeedBikeKmh > 0 ? roadEq(bs[bs.main], bs.main) : null); // Rennrad-Äquivalent
   // Effizienz: mit Watt Leistung pro Herzschlag bei lockeren Fahrten (in FTP umgerechnet), sonst Tempo pro Herzschlag
-  const effP: Est[] = rides.filter(a => pw(a) && a.avgHr && a.avgHr <= 0.88 * lthr && inWindow(a, end, RECENT)).map(a => ({ v: pw(a)! / powerFracFromHr(a.avgHr! / lthr), w: weightOf(a, inp, end), date: a.date }));
+  const effP: Est[] = rides.filter(a => pw(a) && a.avgHr && a.avgHr <= 0.88 * lthr).map(a => ({ v: pw(a)! / powerFracFromHr(a.avgHr! / lthr), w: weightOf(a, inp, end) * recentW(end, a.date), date: a.date }));
   const effFtp = wmedian(effP);
-  const decs = rides.filter(a => a.decouplingPct != null && a.min! >= 60).map(a => ({ v: a.decouplingPct!, w: 1, date: a.date }));
+  const decs = rides.filter(a => a.decouplingPct != null && a.min! >= 60).map(a => ({ v: a.decouplingPct!, w: weightOf(a, inp, end), date: a.date }));
   const dec = wmedian(decs);
   const skillLong = (p.skills || {}).bikeLongestMin || null;
-  const rideMax = rides.length ? Math.max(...rides.map(a => a.min || 0)) : null;
+  const rideMax = rides.length ? Math.max(...rides.map(a => Math.round((a.min || 0) * longDecay(end, a.date)))) : null;
   const longest = rideMax != null && skillLong != null ? Math.max(rideMax, skillLong) : rideMax ?? skillLong;
   const rideFromSkill = longest != null && longest !== rideMax;
   const usePower = !!ftp;
@@ -581,7 +591,7 @@ function bikeRaw(c: Ctx): Raw {
   const latest = rides.map(a => a.date).sort().pop() || null;
   const flt = usePower ? fltP : fltS;
   const fromData = v20 ? !!(flt && flt.usable) : !!rides.length;
-  return { evidence: usePower ? ftpEst : speedEvidence, parts, n: rides.length, counted, latest, manualShare: rides.length ? rides.filter(isManual).length / rides.length : 1, levelSource: fromData ? 'Einheiten' : speedEst || !(p.thresholds.thresholdSpeedBikeKmh > 0) ? 'Schätzung aus dem Profil' : 'Profil', extra: { ftp, thrKmh, shownKmh, usePower, dec, longest, weight, mainKind: bs.main },
+  return { evidence: usePower ? ftpEst : speedEvidence, parts, n: rides.length, counted, latest, manualShare: rides.length ? 1 - rides.reduce((x, a) => x + qualityOf(a), 0) / rides.length : 1, levelSource: fromData ? 'Einheiten' : speedEst || !(p.thresholds.thresholdSpeedBikeKmh > 0) ? 'Schätzung aus dem Profil' : 'Profil', extra: { ftp, thrKmh, shownKmh, usePower, dec, longest, weight, mainKind: bs.main },
     filter: flt, sub: z => usePower ? lvlW(Math.exp(z)) : lvlS(Math.exp(z)), mainKey: 'thr',
     priorSd: usePower ? ((p.thresholds.estimated || []).includes('ftp') ? 0.1 : 0.05) : speedEst ? 0.06 : 0.035,
     ignored: [...ignP, ...ignS].filter((x, i, l) => l.findIndex(y => y.date === x.date && y.title === x.title && y.why === x.why) === i) };
@@ -624,20 +634,20 @@ function swimRaw(c: Ctx): Raw {
   const cap = v20 ? capWith(capPts(c, 'swim', null), prior, pts) : null;
   const flt = filterFor(c, 'swim', swimObs(c), v20 ? { prior, o: { pts, weekPts: WEEK_PTS.swim, capZ: cap != null ? zForPts(pts, cap, prior.z) : null } } : null);
   const cssV = flt ? Math.exp(-flt.z) : wmedian(s)!;
-  const conts = swims.map(a => crawlOf(a) || 0).filter(x => x > 0);
+  const conts = swims.map(a => Math.round((crawlOf(a) || 0) * longDecay(end, a.date))).filter(x => x > 0);
   // ein kurzes Stück in einer Technik-Einheit senkt das Können nicht: höchster Wert aus Einheiten und Fragebogen
   const cont = conts.length ? Math.max(...conts, sk.swimCrawlM || 0) : (sk.swimCrawlM ?? null);
   const pool = (a: Activity) => (a.swim && a.swim.poolLengthM) || 25;
-  const dpsVals = swims.filter(a => inWindow(a, end, RECENT) && a.swim && (a.swim.strokesPerLength || a.swim.metersPerStroke)).map(a => ({ v: a.swim!.strokesPerLength ? (pool(a) - 5) / a.swim!.strokesPerLength! : a.swim!.metersPerStroke!, w: 1, date: a.date }));
+  const dpsVals = swims.filter(a => a.swim && (a.swim.strokesPerLength || a.swim.metersPerStroke)).map(a => ({ v: a.swim!.strokesPerLength ? (pool(a) - 5) / a.swim!.strokesPerLength! : a.swim!.metersPerStroke!, w: recentW(end, a.date), date: a.date }));
   const dps = wmedian(dpsVals);
-  const spl = wmedian(swims.filter(a => inWindow(a, end, RECENT) && a.swim && a.swim.strokesPerLength).map(a => ({ v: a.swim!.strokesPerLength!, w: 1, date: a.date })));
+  const spl = wmedian(swims.filter(a => a.swim && a.swim.strokesPerLength).map(a => ({ v: a.swim!.strokesPerLength!, w: recentW(end, a.date), date: a.date })));
   const parts: ScorePart[] = [
     mk('css', canCrawl ? 'CSS (Schwellen-Pace)' : 'Brust-Tempo', 0.45, cssV, scale(SCALES.swimCss, cssV / f), mmss(cssV) + '/100 m' + (source === 'Brust' ? ' Brust' : ''), { lowerBetter: true }),
     mk('cont', 'Kraul am Stück', 0.3, cont, cont != null ? scale(SCALES.swimCont, cont) : null, cont ? Math.round(cont) + ' m' : cont == null ? 'unbekannt' : 'noch nicht'),
     mk('tech', 'Meter pro Zug', 0.25, dps, dps ? scale(SCALES.swimDps, dps) : null, dps ? de(dps, 2) + ' m' + (spl ? ' (' + (Number.isInteger(spl) ? spl : de(spl)) + ' Züge/Bahn)' : '') : '–', { target: '1,6 m' })
   ];
   const latest = swims.map(a => a.date).sort().pop() || null;
-  return { evidence, parts, n: swims.length, counted, latest, manualShare: swims.length ? swims.filter(isManual).length / swims.length : 1, levelSource: source === 'CSS' ? (cssEst && !swims.length ? 'Schätzung aus dem Profil' : 'Einheiten und Test') : source === 'Brust' ? 'Brust-Tempo' : 'Schätzung', extra: { css: cssV, dps, spl, cont, canCrawl },
+  return { evidence, parts, n: swims.length, counted, latest, manualShare: swims.length ? 1 - swims.reduce((x, a) => x + qualityOf(a), 0) / swims.length : 1, levelSource: source === 'CSS' ? (cssEst && !swims.length ? 'Schätzung aus dem Profil' : 'Einheiten und Test') : source === 'Brust' ? 'Brust-Tempo' : 'Schätzung', extra: { css: cssV, dps, spl, cont, canCrawl },
     filter: flt, sub: pts, mainKey: 'css', priorSd: source === 'CSS' ? (cssEst ? 0.1 : 0.04) : 0.12, ignored };
 }
 
@@ -933,8 +943,9 @@ function whyTexts(sport: ScoreSport, now: ReturnType<typeof scoreAt>, then: Retu
 function confTextOf(sport: ScoreSport, s: ReturnType<typeof scoreAt>): string {
   const r = s.raw; const lvl = s.confidence >= 0.6 ? 'hoch' : s.confidence >= 0.3 ? 'mittel' : 'niedrig';
   const what = { run: 'Läufe', bike: 'Fahrten', swim: 'Schwimmeinheiten', strength: 'Krafteinheiten' }[sport];
-  const watch = r.n ? Math.round((1 - r.manualShare) * r.n) : 0;
-  const bits = [r.n ? `${r.n} ${what} im letzten Messfenster (6 Wochen)${sport !== 'strength' ? `, ${watch ? `davon ${watch} von der Uhr` : 'alle von Hand eingetragen'}` : ''}` : `noch keine verwertbaren ${what}`];
+  // Auftrag 21: wie viele Einheiten insgesamt zählen (das ganze letzte Jahr, ältere mit weniger Gewicht; Hand und Uhr gleich)
+  const recent = (r.counted || []).filter(x => x.date > addDays(s.c.end, -WINDOW)).length;
+  const bits = [r.n ? `${r.n} ${what} zählen insgesamt (letztes Jahr, ältere mit weniger Gewicht), davon ${recent} in den letzten 6 Wochen` : `noch keine verwertbaren ${what}`];
   if (r.latest && s.ageDays > 10) bits.push(`letzte vor ${Math.round(s.ageDays)} Tagen`);
   if (/Schätzung/.test(r.levelSource)) bits.push('Hauptwert nur aus dem Profil geschätzt (ein Test macht ihn genau)');
   else if (sport !== 'strength' && !r.evidence?.length) bits.push('Hauptwert aus dem Profil, keine neue Leistungsmessung');

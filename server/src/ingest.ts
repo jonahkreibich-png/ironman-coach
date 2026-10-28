@@ -5,7 +5,7 @@ import * as C from '../../shared/core';
 import { type Env, getRecords, putRecords, getRecord, type Change } from './store';
 import { analyze, streamsOf, type Activity, type Source } from '../../shared/activity/analyze';
 import type { RawActivity } from '../../shared/activity/types';
-import { mergeTrendValues, ingestActivity } from '../../shared/activity/merge';
+import { mergeTrendValues, ingestActivity, sameWorkout } from '../../shared/activity/merge';
 import { loadState, runEngineFor } from './coach';
 
 export interface IngestInput {
@@ -94,6 +94,30 @@ export async function ingest(env: Env, uid: number, inp: IngestInput, opts: { ru
     } catch (e) { /* Engine-Fehler dürfen die Übernahme nicht verlieren */ }
   }
   return stats;
+}
+
+/* Auftrag 21: frühere Workouts (Historie, z. B. 12 Monate) einmalig nachladen. Sie zählen für Scores, Belastung und Prognose, ändern aber
+   nichts im Plan: keine Zuordnung zu Einheiten, keine Extra-Einheiten, keine Handeinträge überschrieben. Gibt es am selben Tag schon
+   dieselbe Aufzeichnung (gleiche Startzeit) oder einen Handeintrag derselben Sportart, wird nichts doppelt gezählt. */
+export function historyFilter(existing: Activity[], manualDays: Set<string>, incoming: Activity[]): Activity[] {
+  const out: Activity[] = [];
+  for (const a of incoming.sort((x, y) => x.startMs - y.startMs)) {
+    if (!a || !a.id || !a.date) continue;
+    if ([...existing, ...out].some(x => x && !x.mergedInto && (x.id === a.id || sameWorkout(x, a)))) continue;
+    if (manualDays.has(a.date + '|' + a.sport)) continue;
+    out.push({ ...a, sessionId: null, history: true } as any);
+  }
+  return out;
+}
+export async function ingestHistory(env: Env, uid: number, incoming: Activity[]): Promise<{ added: number; skipped: number }> {
+  const L = await loadState(env, uid);
+  const manualDays = new Set<string>();
+  C.planDays(C.applyAdjustments(L.baseWeeks, L.state.adjustments)).forEach((d: any) => d.sessions.forEach((s: any) => { const st = L.state.sessions[s.id]; if (st && st.completed) manualDays.add(d.date + '|' + s.sport); }));
+  Object.entries(L.state.customWorkouts || {}).forEach(([d, l]: any) => (l || []).forEach((c: any) => { if (c && c.completed !== false) manualDays.add((c.date || d) + '|' + c.sport); }));
+  const keep = historyFilter(Object.values(L.state.activities || {}) as Activity[], manualDays, incoming);
+  const t = Date.now();
+  for (let i = 0; i < keep.length; i += 80) await putRecords(env, uid, keep.slice(i, i + 80).map((a, k) => ({ kind: 'activity', key: a.id, data: a, updatedAt: t + i + k })));
+  return { added: keep.length, skipped: incoming.length - keep.length };
 }
 
 function keepPast(inp: IngestInput, P: Protect, stats: IngestStats): IngestInput {

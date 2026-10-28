@@ -102,7 +102,9 @@ export function runFilter(o: FilterIn): FResult | null {
 export function obsSd(base: number, a: { date: string; source?: string; sources?: string[] }, illness: any[]): { sd: number; ill: boolean; manual: boolean } {
   const ill = !!(illnessAt(illness, a.date) || illnessAt(illness, addDays(a.date, -2)) || illnessAt(illness, addDays(a.date, -3)));
   const manual = a.source === 'manual' || (a.sources || []).every(s => s === 'manual');
-  return { sd: base * (ill ? 1.7 : 1) * (manual ? 1.25 : 1), ill, manual };
+  // Auftrag 21: Handeinträge zählen wie Aufzeichnungen; nur die Datenqualität zählt (ohne Puls etwas ungenauer)
+  const noHr = !(a as any).avgHr && (a as any).sport !== 'swim' && (a as any).sport !== 'strength';
+  return { sd: base * (ill ? 1.7 : 1) * (noHr ? 1.15 : 1), ill, manual };
 }
 
 /* Gefühl (RPE 1-10) → Anteil der Schwellen-Intensität (nur wenn kein Puls da ist) */

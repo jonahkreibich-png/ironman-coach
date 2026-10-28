@@ -198,3 +198,32 @@ describe('Auftrag 20: Radtest zählt als Test (auch ohne Watt)', () => {
     expect(sc('bike', [...outdoor, ...leg], p).provisional).toBe(false);
   });
 });
+
+/* Auftrag 21: mehr Daten einrechnen – ältere Einheiten mit abnehmendem Gewicht statt harter 3-/6-Wochen-Grenze, Handeinträge wie
+   Aufzeichnungen (nur nach Datenqualität), „Warum?“ nennt, wie viele Einheiten insgesamt zählen. */
+describe('Auftrag 21: Scores mit mehr Daten', () => {
+  test('Einheiten älter als 6 Wochen zählen weiter (weniger), Sprünge an der alten Grenze gibt es nicht', () => {
+    const recent = [5, 12, 19].map(d => act('run', d));
+    const old = [50, 60, 75, 90].map(d => act('run', d, { min: 100, speedKmh: 10.5, km: 17.5 }));
+    const a = sc('run', recent), b = sc('run', [...recent, ...old]);
+    expect(b.parts.find((p: any) => p.key === 'long')!.raw).toBeGreaterThan(a.parts.find((p: any) => p.key === 'long')!.raw);
+    // längster Lauf vor 75 Tagen zählt weniger als frisch
+    const fresh = sc('run', [...recent, act('run', 20, { min: 100, speedKmh: 10.5, km: 17.5 })]);
+    expect(fresh.parts.find((p: any) => p.key === 'long')!.raw).toBeGreaterThan(b.parts.find((p: any) => p.key === 'long')!.raw);
+    // ein Tag später kein Sprung, nur weil eine Einheit die 42-Tage-Grenze überschreitet
+    const edge = [3, 10, 41.5].map(d => act('run', Math.round(d)));
+    const d0 = sc('run', edge, prof(), today).score, d1 = sc('run', edge, prof(), addDays(today, 1)).score;
+    expect(Math.abs(d1 - d0)).toBeLessThanOrEqual(1);
+  });
+  test('Handeintrag mit denselben Werten zählt wie eine Aufzeichnung', () => {
+    const watch = [3, 9, 15, 22].map(d => act('run', d));
+    const hand = watch.map(a => ({ ...a, id: 'h' + a.id, source: 'manual', sources: ['manual'] } as Activity));
+    const a = sc('run', watch), b = sc('run', hand);
+    expect(b.score).toBe(a.score);
+    expect(b.confidence).toBe(a.confidence);
+  });
+  test('„Warum?“ nennt, wie viele Einheiten insgesamt zählen', () => {
+    const s = sc('run', [...[5, 12, 19].map(d => act('run', d)), ...[60, 120].map(d => act('run', d))]);
+    expect(s.confText).toMatch(/5 Läufe zählen insgesamt .*davon 3 in den letzten 6 Wochen/);
+  });
+});

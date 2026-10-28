@@ -134,6 +134,33 @@ function fillEmpty(target, src, srcMap?) {
   return changed;
 }
 
+/* Auftrag 21: intervals.icu-Aktivität als Aufzeichnung (für die Historie), nur Werte, die die API liefert */
+export function activityFromIcu(a: any): any | null {
+  const sport = sportOf(a && a.type); if (!sport || !a.start_date_local) return null;
+  const m = activityMetrics(a, sport); const num = (v: any) => (v == null || v === '' ? null : +v);
+  const startMs = Date.parse(a.start_date || '') || Date.parse(a.start_date_local + 'Z');
+  const min = num(m.min), km = sport === 'swim' ? (num(m.meters) ? num(m.meters)! / 1000 : null) : num(m.km);
+  return { id: 'icu-' + a.id, source: 'intervals', sources: ['intervals'], sport, date: a.start_date_local.slice(0, 10), startMs, name: a.name || undefined,
+    indoor: !!a.trainer || /Virtual|Treadmill/.test(a.type || ''), min, elapsedMin: null, km, avgHr: num(m.hr), maxHr: num(m.maxHr), avgPower: num(m.power), np: num(m.np),
+    speedKmh: sport !== 'swim' && km && min ? Math.round(km / (min / 60) * 10) / 10 : null, paceSecKm: sport === 'run' && km && min ? Math.round(min * 60 / km) : null,
+    ascentM: num(m.ascent), kcal: null, tempC: num(m.temp), hrZones: null, decouplingPct: num(m.decoupling), efficiency: num(m.efficiency), avgCadence: num(m.cadence),
+    laps: [], intervals: null, swim: sport === 'swim' ? { poolLengthM: num(m.poolLen), lengths: 0, activeLengths: 0, strokesPerLength: null, metersPerStroke: null, pace100: km && min ? Math.round(min * 60 / (km * 10)) : null, byStroke: {}, longestContinuousM: null, strokeRate: null } : null,
+    rpe: num(a.icu_rpe) || null, icuLoad: num(a.icu_training_load) };
+}
+export const HISTORY_DAYS = 365;
+/* einmalig nach dem Verbinden: frühere Workouts (vor dem normalen 6-Wochen-Abruf) nachladen */
+export async function importIcuHistory(env: Env, uid: number, creds: Creds): Promise<{ added: number; skipped: number } | null> {
+  const done = await getMeta(env, uid, 'icu_history');
+  if (done && done.at) return null;
+  const today = berlinDate();
+  const athlete = encodeURIComponent(String(creds.id).trim());
+  const acts = await icuGet(env, creds, `/api/v1/athlete/${athlete}/activities?oldest=${addDaysStr(today, -HISTORY_DAYS)}&newest=${addDaysStr(today, -43)}`);
+  const { ingestHistory } = await import('./ingest');
+  const r = await ingestHistory(env, uid, (acts || []).map(activityFromIcu).filter(Boolean));
+  await setMeta(env, uid, 'icu_history', { at: Date.now(), ...r });
+  return r;
+}
+
 /* ---------- Hauptlauf ---------- */
 export async function runImport(env: Env, uid: number, opts?: any): Promise<any> {
   opts = opts || {};
@@ -249,6 +276,8 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
     Object.keys(linked).forEach(k => { if (linked[k].date < keepFrom) delete linked[k]; });
     await setMeta(env, uid, 'icu_links', linked);
     status.ok = true;
+    // Auftrag 21: einmalig die Historie (12 Monate) nachladen; ein Fehler dabei stört den normalen Abruf nicht
+    try { const h = await importIcuHistory(env, uid, creds); if (h) status.history = h; } catch (e) { status.historyError = String((e as Error).message || e).slice(0, 120); }
   } catch (e) {
     status.error = e.message;
   }

@@ -2,10 +2,10 @@
    Tokens liegen nur verschlüsselt in der Datenbank (Schlüssel TOKEN_KEY), App-Schlüssel der Dienste nur als Cloudflare-Secrets.
    Fertig: Dropbox (HealthFit-Dateien), Oura, WHOOP, Polar, Withings, intervals.icu (API-Schlüssel), Kurzbefehl, Datei-Import.
    Vorbereitet bzw. Freischaltung nötig: Fitbit/Google Health, Suunto, COROS, Wahoo, Garmin, TrainingPeaks. */
-import { type Env, berlinDate, addDaysStr, putRecords, getRecords } from './store';
+import { type Env, berlinDate, addDaysStr, putRecords, getRecords, getRecord } from './store';
 import { HttpError, encryptJson, decryptJson, randomToken, sha256, readJson, b64url } from './http';
 import type { Auth } from './auth';
-import { ingest, type IngestStats, type Protect } from './ingest';
+import { ingest, ingestHistory, type IngestStats, type Protect } from './ingest';
 import { parseFit } from '../../shared/activity/fit';
 import { parseActivityFile } from '../../shared/activity/xml';
 import { upgradeLegacyPoint, bestAuto } from '../../shared/activity/merge';
@@ -379,6 +379,8 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
   // Beim ersten Mal nur die letzten 6 Wochen ansehen, und nie Dateien von vor dem Verbinden (die Tage davor bleiben, wie sie waren)
   const prot = await protectOf(env, uid, 'dropbox');
   const since = Math.max(Date.now() - 42 * 86400000, prot ? prot.at - 6 * 3600000 : 0);
+  // Auftrag 21: einmalig frühere Dateien (bis 12 Monate) als Historie: zählen für Scores, ändern nichts im Plan
+  const histFrom = Date.now() - 365 * 86400000;
   const fileTime = (f: any) => Date.parse(f.client_modified || f.server_modified || '') || 0;
   // Warteschlange: neue Dateien erst merken (mit Cursor sofort speichern), dann höchstens maxFiles pro Aufruf auswerten.
   // Grund (Auftrag 13): Der kostenlose Cloudflare-Tarif erlaubt 10 ms CPU pro Aufruf, eine FIT-Datei braucht 5-40 ms.
@@ -392,9 +394,18 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
     if (Object.prototype.hasOwnProperty.call(done, f.path_lower) && done[f.path_lower] === stamp(f)) continue;
     if (!queue.some(q => q.path === f.path_lower)) queue.push({ path: f.path_lower, name: f.name, at: f.client_modified || f.server_modified || null, n: 0, stamp: stamp(f) });
   }
+  if (!meta.historyAt) {
+    for (const f of files.filter(f => fileTime(f) >= histFrom && fileTime(f) < since).sort((x, y) => fileTime(y) - fileTime(x)).slice(0, 400)) {
+      if (Object.prototype.hasOwnProperty.call(done, f.path_lower)) continue;
+      if (!queue.some(q => q.path === f.path_lower)) queue.push({ path: f.path_lower, name: f.name, at: f.client_modified || f.server_modified || null, n: 0, stamp: stamp(f), hist: true });
+    }
+    meta.historyAt = Date.now();
+  }
   const errors: { name: string; why: string }[] = (meta.errors || []).filter((e: any) => e && typeof e === 'object').slice(-4);
   let lastFile = meta.lastFile || null;
-  let st: any = { ...meta, folder, filesInFolder: files.length || meta.filesInFolder || 0, queue: queue.slice(-60), errors, lastFile, done };
+  // neue Dateien zuerst, frühere Workouts (Historie) danach
+  const ordered = [...queue.filter(q => !q.hist), ...queue.filter(q => q.hist)];
+  let st: any = { ...meta, folder, filesInFolder: files.length || meta.filesInFolder || 0, queue: ordered.slice(0, 460), errors, lastFile, done };
   delete st.retry;
   await saveConn(env, uid, 'dropbox', { cursor: res.cursor || null, stats: JSON.stringify(st) });
   const total: IngestStats = { days: 0, activities: 0, matched: 0, extras: 0, merged: 0, duplicates: 0 };
@@ -417,7 +428,12 @@ async function syncDropbox(env: Env, uid: number, maxFiles = 1): Promise<IngestS
     }
     // Fortschritt vor der Auswertung speichern: bricht der Aufruf ab, ist die Datei trotzdem aus der Warteschlange
     await saveConn(env, uid, 'dropbox', { stats: JSON.stringify(st) });
-    if (raw) {
+    if (raw && f.hist) {
+      const { analyze } = await import('../../shared/activity/analyze');
+      const prof = await getRecord(env, uid, 'profile', 'main'); const th = (prof && prof.data && prof.data.thresholds) || {};
+      const h = await ingestHistory(env, uid, [analyze(raw, { source: 'healthfit', lthr: { run: th.lthrRun, bike: th.lthrBike } })]);
+      total.activities = (total.activities || 0) + h.added;
+    } else if (raw) {
       const one = await ingest(env, uid, { source: 'healthfit', raw: [raw] }, { protect: await protectOf(env, uid, 'dropbox') });
       for (const key of Object.keys(total) as (keyof IngestStats)[]) (total as any)[key] = ((total as any)[key] || 0) + ((one as any)[key] || 0);
     }
