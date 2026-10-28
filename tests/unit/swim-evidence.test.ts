@@ -120,3 +120,17 @@ describe('Korrigierte Schwimmnachweise', () => {
     expect(scan(explicit, 50)).toBeNull();
   });
 });
+
+
+test('aktive eigene Trainingsänderungen bleiben bei neuer Schwimmstufe erhalten',()=>{
+ const profile={skills:{swimCrawlM:25,swimCrawl:'some',swimBreast:true}};
+ const session=(id:string)=>({...W.build(W.swimLearn({}, {ladder:'swim',n:2})),id,sport:'swim'});
+ const weeks=[{days:[{date:'2026-10-21',sessions:[session('manual'),session('undone'),session('ordinary')]}]}];
+ const adjustments={own:{id:'own',type:'modify',sessionId:'manual',from_user:true,set:{description:'Meine eigene Technikübung'}},old:{id:'old',type:'modify',sessionId:'undone',from_user:true,undone:true,set:{description:'Zurückgenommen'}}};
+ const update=swimSkillUpdate(profile,weeks,adjustments,today,{crawl:100,authoritative:true});
+ expect(update?.skills.swimCrawlM).toBe(100);
+ expect(update?.adjustments.map(a=>a.sessionId)).toEqual(['undone','ordinary']);
+ const explicit=swimSkillUpdate(profile,weeks,adjustments,today,{crawl:100});
+ expect(explicit?.skills.swimCrawlM).toBe(100);
+ expect(explicit?.adjustments.map(a=>a.sessionId)).toEqual(['undone','ordinary']);
+});

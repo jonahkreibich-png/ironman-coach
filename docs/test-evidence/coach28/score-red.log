@@ -1,0 +1,276 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/auftrag20-scores.test.ts (20 tests | 1 failed) 64ms
+   Ô£ô Auftrag 20: Datenqualit├ñt je Wert > Rolle ohne Watt mit Fantasie-Geschwindigkeit (36 km/h bei Puls 129) z├ñhlt nicht, Warum nennt den Grund 15ms
+   Ô£ô Auftrag 20: Datenqualit├ñt je Wert > Watt z├ñhlen nur von Wattmesser oder Smart-Trainer 1ms
+   Ô£ô Auftrag 20: Datenqualit├ñt je Wert > Smart-Trainer mit Watt: FTP in W/kg aus den Watt 2ms
+   Ô£ô Auftrag 20: Datenqualit├ñt je Wert > Laufband z├ñhlt schw├ñcher als drau├ƒen 5ms
+   Ô£ô Auftrag 20: Datenqualit├ñt je Wert > GPS-Fehler (unrealistische Spitzen) z├ñhlen nicht 3ms
+   Ô£ô Auftrag 20: Datenqualit├ñt je Wert > Nutzer ohne Puls: Score aus Tempo und Gef├╝hl, vorl├ñufig und mit breitem Bereich 1ms
+   ├ù Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > ohne Einheiten: vorsichtiger Startwert aus dem Profil, vorl├ñufig 5ms
+     ÔåÆ expected 43 to be null
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > nur 1-2 Einheiten: kleiner Schritt, vorl├ñufig 3ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > ab 5 brauchbaren Einheiten nicht mehr vorl├ñufig 1ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > Ausrei├ƒer wird ged├ñmpft, bis ein zweiter ├ñhnlicher Wert ihn best├ñtigt 6ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > ohne Test h├Âchstens etwa 3 Punkte pro Woche, wenn der Wert belegt ist 4ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > echter Test darf mehr bewegen (Score springt passend) 5ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > Plausibilit├ñt: Rad-Neuling ohne Test kommt mit hochgerechneten lockeren Fahrten nicht auf 80 1ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > fehlende Werte z├ñhlen weiter als unbekannt, nicht als schlecht 2ms
+   Ô£ô Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > Filter: Startwert mit gro├ƒer Unsicherheit, erste Messung bewegt nur einen Teil 0ms
+   Ô£ô Auftrag 20: Fall wie Jonah und Umstieg > Rad-Score realistisch (etwa 40-55, vorl├ñufig) statt 80+ 2ms
+   Ô£ô Auftrag 20: Fall wie Jonah und Umstieg > Umstieg: Warum und Coach erkl├ñren die Neuberechnung (Rollen-Speed z├ñhlt nicht mehr) 2ms
+   Ô£ô Auftrag 20: Fall wie Jonah und Umstieg > Verlauf ohne unerkl├ñrten Sprung: jeder Punkt mit der neuen Rechnung, keine Spr├╝nge ├╝ber 8 1ms
+   Ô£ô Auftrag 20: Radtest z├ñhlt als Test (auch ohne Watt) > von der Uhr: 20-min-Runde im geplanten ÔÇ×RadtestÔÇ£ (Name aus dem Plan) bewegt den Score und hebt ÔÇ×vorl├ñufigÔÇ£ auf 2ms
+   Ô£ô Auftrag 20: Radtest z├ñhlt als Test (auch ohne Watt) > von Hand: Testfelder (├ÿ-Puls und Tempo der 20 min) z├ñhlen wie eine Test-Runde 2ms
+ ÔØ» tests/unit/swim-equipment-quality.test.ts (22 tests | 7 failed) 69ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > 50 m Kraul: Brett und Buoy im Wechsel mit eigener Aufgabe, ohne l├ñngere Kraulstrecken 4ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > ohne Material: keine Serie mit Material, kein Schwerpunkt daf├╝r 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 2: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 3: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 4: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 5: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > l├ñngere Pull-St├╝cke brauchen eine eigene best├ñtigte Pull-Distanz 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material []: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["board"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["buoy"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["board","buoy"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["fins","snorkel"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > normales Training bei 50 m: Brett und Buoy ├╝ber die Schwerpunkte, kurze Serien 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > 12 Wochen: best├ñtigte 50 m bleiben, Brett und Buoy kommen regelm├ñ├ƒig, aber nicht beide in jeder Einheit 40ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > eigene Pace mit Pausen: weniger Meter in derselben Zeit, wenn jemand mehr Pause braucht 1ms
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > Brust ist kein Kraulrekord ohne Hilfsmittel 10ms
+     ÔåÆ expected 1000 to be null
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > unbekannter Stil ist kein Kraulrekord ohne Hilfsmittel 1ms
+     ÔåÆ expected 1000 to be null
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > Pull Buoy ist kein Kraulrekord ohne Hilfsmittel 1ms
+     ÔåÆ expected 1000 to be null
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > verifizierte Kraulstrecke ersetzt die allgemeine Gesamtstrecke 2ms
+     ÔåÆ expected 1000 to be 100 // Object.is equality
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > Brust-Pace aktualisiert keine Kraul-CSS 1ms
+     ÔåÆ expected 158.41878322325513 to be 159.99999999999994 // Object.is equality
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > Pull Buoy-Pace aktualisiert keine Kraul-CSS 1ms
+     ÔåÆ expected 157.58292659770422 to be 159.99999999999994 // Object.is equality
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > manuelles Pull-Ergebnis wird nicht zur Kraul-CSS oder zum Kraulrekord 2ms
+     ÔåÆ expected 158.9146241697067 to be 159.99999999999994 // Object.is equality
+ ÔØ» tests/unit/fitness-quality.test.ts (16 tests | 7 failed) 53ms
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > ohne Leistungsnachweis bleibt der Startwert eine Sch├ñtzung, keine Messung 9ms
+     ÔåÆ expected 47 to be null
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine locked Einheit 6ms
+     ÔåÆ expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine pinned Einheit 1ms
+     ÔåÆ expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine frozen Einheit 1ms
+     ÔåÆ expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine _done Einheit 1ms
+     ÔåÆ expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine completed Einheit 1ms
+     ÔåÆ expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+   ├ù Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine cancelled Einheit 1ms
+     ÔåÆ expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > ein Training bekommt unabh├ñngig von der Anzahl identischer Runden eine Stimme 10ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > ein alter langer Lauf verschwindet an einem Ruhetag nicht aus der F├ñhigkeit; lange Pause: langsamer Formverlust (Auftrag 19) 16ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > fehlende Schwimmstrecke ist unbekannt und kein Nullpunkt 1ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > Einheiten ohne verwertbare Leistungsdaten erh├Âhen die Sicherheit nicht 1ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > bekannt sp├ñter aktualisierte Profil-Schwellen flie├ƒen nicht in historische Sch├ñtzungen ein 1ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > ein schlechter oder besserer Profilwert ├╝berstimmt neue gemessene L├ñufe nicht (Auftrag 20: wenige Daten = kleiner Schritt) 1ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > gleiche Pulstempo-Daten z├ñhlen nicht nochmals als eigener Fitness-Anteil 1ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > unendliche Dauer kann kein Ausdauer-Rekord werden 1ms
+   Ô£ô Qualit├ñt der Fitness-Sch├ñtzung > geplante Kraftvorlagen z├ñhlen vor dem Erledigen nicht als Training 1ms
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 15 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/auftrag20-scores.test.ts > Auftrag 20: Startwert, wenig Daten, Ausrei├ƒer, Wochengrenze, Test > ohne Einheiten: vorsichtiger Startwert aus dem Profil, vorl├ñufig
+AssertionError: expected 43 to be null
+
+- Expected: 
+null
+
++ Received: 
+43
+
+ ÔØ» tests/unit/auftrag20-scores.test.ts:77:24
+     75|   test('ohne Einheiten: vorsichtiger Startwert aus dem Profil, vorl├ñufÔÇª
+     76|     const s = sc('bike', []);
+     77|     expect(s.measured).toBeNull();
+       |                        ^
+     78|     expect(s.provisional).toBe(true);
+     79|     expect(s.rangeText).toMatch(/vorl├ñufig/);
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/15]ÔÄ»
+
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > ohne Leistungsnachweis bleibt der Startwert eine Sch├ñtzung, keine Messung
+AssertionError: expected 47 to be null
+
+- Expected: 
+null
+
++ Received: 
+47
+
+ ÔØ» tests/unit/fitness-quality.test.ts:23:26
+     21|     for (const sport of ['run', 'bike', 'swim'] as const) {
+     22|       const [s] = sportScores({ ...base, activities: [] }, [sport]);
+     23|       expect(s.measured).toBeNull();
+       |                          ^
+     24|       expect(Number.isFinite(s.score)).toBe(true);
+     25|       expect(s.provisional).toBe(true);
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/15]ÔÄ»
+
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine locked Einheit
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine pinned Einheit
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine frozen Einheit
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine _done Einheit
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine completed Einheit
+ FAIL  tests/unit/fitness-quality.test.ts > Qualit├ñt der Fitness-Sch├ñtzung > neue Zonen ├╝berschreiben keine cancelled Einheit
+AssertionError: expected { id: 'manual', sport: 'run', ÔÇª(7) } to deeply equal { id: 'manual', sport: 'run', ÔÇª(7) }
+
+- Expected
++ Received
+
+@@ -1,10 +1,15 @@
+  {
+-   "description": "Eigene Trainingsanweisung",
++   "description": "Aufw├ñrmen: 10 min ganz locker (Z1: 6:30ÔÇô7:00/km, Puls unter 138), ganz locker einlaufen
++ Hauptteil: 30 min locker (Z2: 5:45ÔÇô6:18/km, Puls 138ÔÇô151)
++ Ausklang: 5 min ganz locker (Z1: 6:30ÔÇô7:00/km, Puls unter 138), locker auslaufen, ein paar Minuten gehen
++ Gesamt: 45 min, ca. 7,2 km
++ Wie hart: locker, du kannst noch ganze S├ñtze sprechen.
++ Warum: Grundlagenausdauer aufbauen, ohne m├╝de zu machen.",
+    "id": "manual",
+    "locked": true,
+-   "plannedKm": 6,
++   "plannedKm": 7.2,
+    "plannedMinutes": 45,
+    "spec": {
+      "ctx": {
+        "bikeKmh": null,
+        "bikeName": null,
+@@ -15,11 +20,11 @@
+        "gear": [],
+        "indoor": false,
+        "lthrBike": null,
+        "lthrRun": 170,
+        "pool": 25,
+-       "runThrSec": 360,
++       "runThrSec": 300,
+        "swimMPerMin": null,
+      },
+      "kind": "easy",
+      "sport": "run",
+      "steps": [
+
+ ÔØ» tests/unit/fitness-quality.test.ts:33:46
+     31|     const ordinary = { ...edited, id: 'automatic', [flag]: false };
+     32|     const out = refreshFuture([{ days: [{ date: addDays(today, 1), sesÔÇª
+     33|     expect(out.weeks[0].days[0].sessions[0]).toEqual(edited);
+       |                                              ^
+     34|     expect(out.changed).toBe(1);
+     35|     expect(out.weeks[0].days[0].sessions[1].description).not.toBe(ordiÔÇª
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[3/15]ÔÄ»
+
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > Brust ist kein Kraulrekord ohne Hilfsmittel
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > unbekannter Stil ist kein Kraulrekord ohne Hilfsmittel
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > Pull Buoy ist kein Kraulrekord ohne Hilfsmittel
+AssertionError: expected 1000 to be null
+
+- Expected: 
+null
+
++ Received: 
+1000
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts:111:72
+    109|     ['Pull Buoy', { byStroke: { freestyle: 1000 }, longestCrawlM: nullÔÇª
+    110|   ])('%s ist kein Kraulrekord ohne Hilfsmittel', (_, data) => {
+    111|     expect(score([swim(data)]).parts.find(x => x.key === 'cont')!.raw)ÔÇª
+       |                                                                        ^
+    112|   });
+    113|   test('verifizierte Kraulstrecke ersetzt die allgemeine GesamtstreckeÔÇª
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[4/15]ÔÄ»
+
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > verifizierte Kraulstrecke ersetzt die allgemeine Gesamtstrecke
+AssertionError: expected 1000 to be 100 // Object.is equality
+
+- Expected
++ Received
+
+- 100
++ 1000
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts:115:54
+    113|   test('verifizierte Kraulstrecke ersetzt die allgemeine GesamtstreckeÔÇª
+    114|     const s = score([swim({ longestCrawlM: 100, byStroke: { freestyle:ÔÇª
+    115|     expect(s.parts.find(x => x.key === 'cont')!.raw).toBe(100);
+       |                                                      ^
+    116|   });
+    117|   test.each([
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[5/15]ÔÄ»
+
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > Brust-Pace aktualisiert keine Kraul-CSS
+AssertionError: expected 158.41878322325513 to be 159.99999999999994 // Object.is equality
+
+- Expected
++ Received
+
+- 159.99999999999994
++ 158.41878322325513
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts:121:46
+    119|     ['Pull Buoy', { byStroke: { freestyle: 1000 }, longestCrawlM: nullÔÇª
+    120|   ])('%s-Pace aktualisiert keine Kraul-CSS', (_, data) => {
+    121|     expect(score([swim(data)]).parts[0].raw).toBe(score([]).parts[0].rÔÇª
+       |                                              ^
+    122|   });
+    123|   test('manuelles Pull-Ergebnis wird nicht zur Kraul-CSS oder zum KrauÔÇª
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[6/15]ÔÄ»
+
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > Pull Buoy-Pace aktualisiert keine Kraul-CSS
+AssertionError: expected 157.58292659770422 to be 159.99999999999994 // Object.is equality
+
+- Expected
++ Received
+
+- 159.99999999999994
++ 157.58292659770422
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts:121:46
+    119|     ['Pull Buoy', { byStroke: { freestyle: 1000 }, longestCrawlM: nullÔÇª
+    120|   ])('%s-Pace aktualisiert keine Kraul-CSS', (_, data) => {
+    121|     expect(score([swim(data)]).parts[0].raw).toBe(score([]).parts[0].rÔÇª
+       |                                              ^
+    122|   });
+    123|   test('manuelles Pull-Ergebnis wird nicht zur Kraul-CSS oder zum KrauÔÇª
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[7/15]ÔÄ»
+
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > manuelles Pull-Ergebnis wird nicht zur Kraul-CSS oder zum Kraulrekord
+AssertionError: expected 158.9146241697067 to be 159.99999999999994 // Object.is equality
+
+- Expected
++ Received
+
+- 159.99999999999994
++ 158.9146241697067
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts:127:28
+    125|     const s = score(legacyActivities(state, [], p));
+    126|     expect(s.parts.find(x => x.key === 'cont')!.raw).toBeNull();
+    127|     expect(s.parts[0].raw).toBe(score([]).parts[0].raw);
+       |                            ^
+    128|   });
+    129| });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[8/15]ÔÄ»
+
+
+ Test Files  3 failed (3)
+      Tests  15 failed | 43 passed (58)
+   Start at  21:54:11
+   Duration  1.08s (transform 509ms, setup 53ms, collect 905ms, tests 186ms, environment 0ms, prepare 307ms)
+

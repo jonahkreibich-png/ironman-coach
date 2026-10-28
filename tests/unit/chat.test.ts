@@ -181,3 +181,16 @@ test('mindestens 150 Gespräche laufen wirklich (nicht übersprungen)', () => {
   // läuft nach den Gesprächen (Reihenfolge der Datei)
   expect(CONVS.length - SKIPPED.length).toBeGreaterThanOrEqual(150);
 });
+
+import {defaultProfile as choiceProfile28} from '../../shared/profile';
+describe('Konkrete Trainingsentscheidung statt allgemeiner Analyse',()=>{
+ const context=()=>({today:'2026-10-27',now:1000,profile:{...choiceProfile28(),sports:['run','swim','bike']},goals:[],planMeta:{},baseWeeks:[{days:[{date:'2026-10-28',sessions:[{id:'choice-run',sport:'run',title:'SYNTHETIC lockerer Lauf',plannedMinutes:30}]}]}],state:{sessions:{},customWorkouts:{},activities:{},adjustments:{},trend:[],illnessPeriods:[],coachMsgs:{},settings:{}}} as any);
+ for(const question of ['Soll ich morgen schwimmen oder laufen?','Was ist morgen sinnvoller: laufen oder schwimmen?'])test(question,()=>{const ctx=context(),before=JSON.stringify(ctx.state);const r=converse(ctx,{},question).reply;expect(r.intent).toBe('sport-choice');expect(r.text).toMatch(/Laufen/);expect(r.text.length).toBeLessThan(600);expect(r.apply).toBeUndefined();expect(JSON.stringify(ctx.state)).toBe(before);});
+ test('Krankheit bleibt vorrangig, keine sichere Trainingsfreigabe',()=>{const ctx=context();ctx.state.illnessPeriods=[{start:'2026-10-26',end:null}];const r=converse(ctx,{},'Soll ich morgen schwimmen oder laufen?').reply;expect(r.intent).toBe('sport-choice');expect(r.text).toMatch(/Pause|Ruhe/);expect(r.apply).toBeUndefined();});
+ test('ohne Plan keine erfundene Einheitsvorgabe',()=>{const ctx=context();ctx.baseWeeks=[];const r=converse(ctx,{},'Soll ich morgen schwimmen oder laufen?').reply;expect(r.intent).toBe('sport-choice');expect(r.text).toContain('?');expect(r.text).not.toMatch(/30 min/);});
+});
+
+test('Sportwahl mit Knieschmerzen nutzt bestehenden Schmerzdialog statt Laufempfehlung',()=>{
+ const ctx={today:'2026-10-27',now:1000,profile:{...choiceProfile28(),sports:['run','swim']},goals:[],planMeta:{},baseWeeks:[{days:[{date:'2026-10-27',sessions:[{id:'pain-choice',sport:'run',title:'SYNTHETIC Lauf',plannedMinutes:30}]}]}],state:{sessions:{},customWorkouts:{},activities:{},adjustments:{},trend:[],illnessPeriods:[],coachMsgs:{},settings:{}}} as any;
+ for(const question of ['Soll ich mit Schmerzen im Knie heute laufen oder schwimmen?','Soll ich trotz Knieschmerzen heute laufen oder schwimmen?','Mein Knie tut weh. Soll ich heute laufen oder schwimmen?','Meine Wade zieht. Soll ich heute laufen oder schwimmen?','Ich bin umgeknickt. Soll ich heute laufen oder schwimmen?','Meine Wade ist gezerrt. Soll ich heute laufen oder schwimmen?']){const r=converse(ctx,{},question).reply;expect(r.intent).toBe('pain');expect(r.text).toContain('?');expect(r.apply).toBeUndefined();}
+});

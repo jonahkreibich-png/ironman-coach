@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './storage-harness';
 import { seed, open, stored, TODAY } from './helpers';
 
 test('Belastungswerte speichern, Widersprüche kennzeichnen und zur Automatik zurückkehren', async ({ page }) => {

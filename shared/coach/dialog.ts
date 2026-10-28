@@ -9,7 +9,7 @@ import * as C from '../core';
 import { withTerms } from '../glossary';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
-import { understand as answerQuestion, norm, has, dayIn, sportIn, bodyIn, weeksOf, dayOf, live, fmtD, sessLine, easyToday } from './intents';
+import { painMention, trainingChoice, understand as answerQuestion, norm, has, dayIn, sportIn, bodyIn, weeksOf, dayOf, live, fmtD, sessLine, easyToday } from './intents';
 import { checkMessage } from './safety';
 import { joinDe } from './texts';
 import { rulesOf, evaluate, describe as ruleText, type Rule } from '../constraints';
@@ -236,6 +236,7 @@ function step(ctx: EngineCtx, d: DialogState, raw: string, extra: Extra): Reply 
   // 2) Trainings-Bewertung (Auftrag 12): „Wie war mein Lauf?“, „Wie war meine Woche?“, „Vergleich mit letzter Woche“
   const rv = reviewAnswer(ctx, raw);
   if (rv) return { intent: 'review', text: rv.text, options: rv.options.length ? rv.options : undefined };
+  const choice=trainingChoice(ctx,raw);if(choice)return choice;
   // 2b) Einheit tagesgenau erklären (Auftrag 7): „Was genau soll ich heute beim Schwimmen machen?“, „Ich hab nur 20 min“
   const j0 = toks.join(' ');
   if (explainWanted(toks, raw) || (limitIn(j0) && /\b(hab|habe)\b/.test(j0) && !/\b(verschieb|streich|tausch)/.test(j0))) {
@@ -355,7 +356,7 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
   // Schwimmen: „ich schaffe jetzt 100 m Kraul am Stück“ → eintragen und alle kommenden Schwimmeinheiten neu stufen
   const sw = parseSwimSkill(raw);
   if (sw) {
-    const u = swimSkillUpdate(ctx.profile, ctx.baseWeeks, ctx.state.adjustments || {}, ctx.today, sw, ctx.now, 'Coach-Chat');
+    const u = swimSkillUpdate(ctx.profile, ctx.baseWeeks, ctx.state.adjustments || {}, ctx.today, sw, ctx.now, 'Coach-Chat', ctx.state);
     if (!u) return { intent: 'swim-skill', text: `Das ist schon eingetragen: ${(ctx.profile.skills || {}).swimCrawlM || 0} m Kraul am Stück${(ctx.profile.skills || {}).swimPullM ? `, ${(ctx.profile.skills || {}).swimPullM} m mit Pull Buoy` : ''}. Deine Schwimmeinheiten passen schon dazu.` };
     return propose('swim-skill', u.text + ' Soll ich diese Angabe und die gezeigten Änderungen übernehmen?', [{ op: 'swim-skill', skills: u.skills }, ...(u.adjustments.length ? [{ op: 'adjust', adj: u.adjustments } as Op] : [])], YES_OPTS('Angabe und Änderungen übernehmen'));
   }
@@ -395,7 +396,7 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
   }
   // Schmerzen / Verletzung
   const body = bodyIn(toks);
-  if ((body && has(toks, ['schmerz', 'schmerzen', 'weh', 'zwickt', 'zieht', 'tut', 'verletzt', 'probleme', 'beschwerden', 'entzuendet', 'umgeknickt', 'gezerrt', 'zerrung'])) || has(toks, ['verletzt', 'verletzung', 'umgeknickt', 'zerrung', 'gezerrt', 'schmerzen', 'schmerz'])) {
+  if (painMention(toks)) {
     if (!body) return { intent: 'pain', text: 'Danke, dass du es sagst. Wo tut es weh?', pending: { kind: 'pain-where', at: Date.now() },
       options: PAIN_WHERE.map(x => ({ label: x, say: x })) };
     return painStrength(body);

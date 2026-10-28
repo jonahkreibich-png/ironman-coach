@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô tests/unit/auftrag20-gross.test.ts (51 tests | 46 skipped) 11979ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v09-tri-olympic-nohr  3488ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v19-run-half-nohr  1899ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v29-tri-sprint-nohr  2789ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v39-bike-event-nohr  1374ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v49-tri-middle-nohr  2424ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 46 skipped (51)
+   Start at  17:46:33
+   Duration  13.39s (transform 723ms, setup 24ms, collect 1.06s, tests 11.98s, environment 0ms, prepare 114ms)
+

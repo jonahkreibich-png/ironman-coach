@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô tests/unit/longitudinal24.test.ts (53 tests | 43 skipped) 86ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed | 43 skipped (53)
+   Start at  21:57:02
+   Duration  1.30s (transform 610ms, setup 24ms, collect 886ms, tests 86ms, environment 0ms, prepare 114ms)
+

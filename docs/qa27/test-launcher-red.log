@@ -1,0 +1,55 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach
+
+ ÔØ» tests/unit/plan-c-launcher27.test.ts (2 tests | 2 failed) 99ms
+   ├ù Windows launcher forwards --plan 61ms
+     ÔåÆ expected false to be true // Object.is equality
+   ├ù Windows launcher forwards --production 37ms
+     ÔåÆ expected false to be true // Object.is equality
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 2 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/plan-c-launcher27.test.ts > Windows launcher forwards --plan
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» tests/unit/plan-c-launcher27.test.ts:9:73
+      7|  fs.copyFileSync('PLAN-C-TESTEN.cmd',launcher);fs.writeFileSync(path.jÔÇª
+      8|  execFileSync(process.env.ComSpec||'cmd.exe',['/d','/c',launcher,argumÔÇª
+      9|  expect(fs.readFileSync(received,'utf8').trim().endsWith(' '+argument)ÔÇª
+       |                                                                         ^
+     10| });
+     11| 
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/2]ÔÄ»
+
+ FAIL  tests/unit/plan-c-launcher27.test.ts > Windows launcher forwards --production
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ÔØ» tests/unit/plan-c-launcher27.test.ts:9:73
+      7|  fs.copyFileSync('PLAN-C-TESTEN.cmd',launcher);fs.writeFileSync(path.jÔÇª
+      8|  execFileSync(process.env.ComSpec||'cmd.exe',['/d','/c',launcher,argumÔÇª
+      9|  expect(fs.readFileSync(received,'utf8').trim().endsWith(' '+argument)ÔÇª
+       |                                                                         ^
+     10| });
+     11| 
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/2]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  15:29:33
+   Duration  399ms (transform 24ms, setup 21ms, collect 10ms, tests 99ms, environment 0ms, prepare 101ms)
+

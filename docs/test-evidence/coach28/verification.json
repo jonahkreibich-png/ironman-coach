@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-28",
+  "sourceFiles": 41,
+  "sourceHashMatches": true,
+  "productionChanged": false,
+  "deployed": false,
+  "targeted": {
+    "passed": 632,
+    "skipped": 61
+  },
+  "serverFinal": {
+    "passed": 214,
+    "skipped": 4,
+    "blockedSuites": [
+      "server/test/api.test.ts"
+    ]
+  },
+  "raceAndNeighbors": {
+    "passed": 86
+  },
+  "browser": {
+    "passed": 107,
+    "skipped": 51
+  },
+  "browserAfterIntegration": {
+    "passed": 10
+  },
+  "typecheck": true,
+  "build": true,
+  "fullSuite": {
+    "passed": 2325,
+    "skipped": 67,
+    "failedBeforeRaceFix": 1,
+    "blockedSuites": [
+      "server/test/api.test.ts"
+    ]
+  },
+  "standardE2E": "started then stopped: localhost unreachable; minimal probe EACCES"
+}

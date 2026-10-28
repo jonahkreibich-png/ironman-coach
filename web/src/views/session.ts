@@ -1,3 +1,5 @@
+import { actualStrength } from '../../../shared/results';
+import {describeTrainingBlocks} from '../../../shared/training-templates26';
 /* Einheit: Ansicht und Bearbeiten im Sheet, Abhaken. Werte von der Uhr tragen ihre Quelle,
    Korrekturen von Hand gelten ab dann, „Auf Original zurücksetzen“ holt die Werte der Uhr zurück. */
 import * as C from '../../../shared/core';
@@ -7,7 +9,7 @@ import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { duration, dist, num, pace, swimPace, speed, mmss } from '../../../shared/i18n';
-import { on, onChange, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
+import { on, onChange, onInput, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
 import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { diagramSvg } from '../../../shared/workoutdiagram';
@@ -25,6 +27,10 @@ export function zoneText(s: any): string {
 export function metaLine(s: any): string {
   return [s.plannedMinutes ? duration(s.plannedMinutes) : null, s.plannedKm ? (s.sport === 'swim' ? `${Math.round(s.plannedKm * 1000)} m` : dist(s.plannedKm)) : null, zoneText(s) || null].filter(Boolean).join(' · ');
 }
+/** Historical completed strength uses results; the sheet retains its original prescription. */
+export function sessionTitle(s: any, st: any = sessState(s.id)): string {
+  return s.sport === 'strength' && st?.completed ? actualStrength(st, st.activityId ? STATE.activities?.[st.activityId] : null).title : s.title;
+}
 export function doneLine(s: any): string {
   const m = (sessState(s.id).metrics) || {};
   const parts: string[] = [];
@@ -33,6 +39,7 @@ export function doneLine(s: any): string {
   if (m.pace && s.sport === 'run') parts.push(`${m.pace}/km`);
   if (m.pace100 && s.sport === 'swim') parts.push(`${m.pace100}/100 m`);
   if (m.hr) parts.push(`${t('m.hr')} ${m.hr}`);
+  if (s.sport === 'strength') parts.push(...actualStrength(sessState(s.id), STATE.activities?.[sessState(s.id).activityId]).exercises.slice(0, 3).map((e: any) => e.name));
   return parts.join(' · ');
 }
 export function statusIcon(status: string): string {
@@ -48,7 +55,7 @@ export function sessionRow(s: any, opts: { check?: boolean } = {}): string {
     ? `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   return `<div class="li wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">
     <button class="row grow" data-act="sess-open" data-sid="${esc(s.id)}" style="border:0;background:none;text-align:left;padding:0;color:inherit;min-height:44px">
-      ${sportIc(s.sport)}<span class="grow"><span class="t">${esc(s.title)}</span> ${badges}<br><span class="s">${esc(sub)}</span></span></button>
+      ${sportIc(s.sport)}<span class="grow"><span class="t">${esc(sessionTitle(s, st))}</span> ${badges}<br><span class="s">${esc(sub)}</span></span></button>
     <span class="wo-status">${status === 'done' || status === 'open' || status === 'missed' ? check : statusIcon(status)}</span></div>`;
 }
 
@@ -62,7 +69,7 @@ const FIELDS: Record<string, [string, string, string?][]> = {
 };
 export function openSession(id: string): void {
   const s = SESS_BY_ID[id]; if (!s) return;
-  openSheet(s.title, () => sessionSheet(id));
+  openSheet(sessionTitle(s), () => sessionSheet(id));
 }
 function sessionSheet(id: string): string {
   const s = SESS_BY_ID[id]; if (!s) return '';
@@ -74,7 +81,7 @@ function sessionSheet(id: string): string {
   const fields = FIELDS[s.sport] || [['min', 'm.min']];
   let h = `<div class="stack">
     <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div></div>${statusIcon(status)}</div>
-    ${structureHtml(s)}`;
+    ${s.sport === 'strength' && st.completed ? `<p class="xs muted">Geplant: ${esc(s.title)}. Die folgenden Trainingsvorgaben sind kein Leistungsnachweis; tatsächliche Übungen stehen in den Ergebnisfeldern.</p>` : ''}${structureHtml(s)}${templateButtons(s, !!st.completed)}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
     const o = s._orig || {};
@@ -94,6 +101,8 @@ function sessionSheet(id: string): string {
 }
 /* Ablauf der Einheit in Schritten (Auftrag 7): Ein-/Aufwärmen, Hauptteil mit Wiederholungen, Pausen und Zonen, Ausklang */
 export function structureHtml(s: any): string {
+  if (Array.isArray(s.trainingBlocks)) return '<div class="card flat tight structure" data-training-blocks><b>Geplanter Trainingsinhalt</b><p style="white-space:pre-line">'+esc([s.trainingTemplateSnapshot?.description,describeTrainingBlocks(s.trainingBlocks,0,s.sport)].filter(Boolean).join('\n'))+'</p></div>';
+
   const x = s.sport !== 'rest' ? structureOf(s, profile(), todayStr()) : null;
   if (!x || !x.parts.length) return s.description ? `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>` : '';
   const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
@@ -156,6 +165,12 @@ on('sess-reset', el => {
 });
 /* "5:30" oder Zahl → Sekunden (für die Min/Sek-Felder) */
 function paceSecOf(v: any): number | null { if (v == null || v === '') return null; const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v).trim()); return m ? +m[1] * 60 + +m[2] : null; }
+onInput('sess-metric', el => {
+  let value=(el as HTMLInputElement).value.trim();
+  if(el.dataset.tf){const sec=readTime(el);if(sec!=null && isNaN(sec))return;value=sec?secToMmss(sec):'';}
+  STATE.sessions[el.dataset.sid!]=setSessionMetricManual(ensureSess(el.dataset.sid!),el.dataset.sm!,value);saveSoon();
+});
+onInput('sess-field', el=>{ensureSess(el.dataset.sid!)[el.dataset.sf!]=(el as HTMLInputElement).value;saveSoon();});
 onChange('sess-metric', el => {
   const id = el.dataset.sid!; const k = el.dataset.sm!;
   let val = (el as HTMLInputElement).value.trim();
@@ -170,3 +185,9 @@ onChange('sess-field', el => {
 });
 export function closeIfOpen() { closeSheet(); }
 void todayStr;
+
+export function templateButtons(s:any,completed=false):string {
+ if(completed||!['swim','bike','run','strength'].includes(s.sport))return '';
+ const data=' data-sid="'+esc(s.id)+'" data-date="'+esc(s.date)+'"';
+ return '<div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="template-insert"'+data+'>Vorlage einfügen</button>'+(s.trainingBlocks?'<button class="btn ghost" data-act="template-edit"'+data+'>Trainingsinhalt bearbeiten</button>':'')+'</div>';
+}

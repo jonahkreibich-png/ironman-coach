@@ -91,7 +91,7 @@ function msgHtml(m: any, latest: boolean): string {
   const head = m.from !== 'user' && m.title ? `<div class="h">${m.kind === 'warning' ? ic('info') : m.kind === 'adjust' ? ic('calendar') : m.from === 'ai' ? ic('wand') : ''}${esc(m.title)}</div>` : '';
   const prop = m.kind === 'proposal' && m.proposal ? (m.proposal.status === 'open'
     ? `<div class="row" style="margin-top:8px"><button class="btn sm" data-act="prop" data-id="${esc(m.id)}" data-ok="1">${esc(t('coach.accept'))}</button><button class="btn ghost sm" data-act="prop" data-id="${esc(m.id)}" data-ok="0">${esc(t('coach.reject'))}</button></div>`
-    : `<div class="xs muted" style="margin-top:6px">${esc(m.proposal.status === 'accepted' ? t('coach.accepted') : t('coach.rejected'))}</div>`) : '';
+    : `<div class="xs muted" style="margin-top:6px">${esc(m.proposal.status === 'superseded' ? 'Durch aktuelle Daten ueberholt' : m.proposal.status === 'accepted' ? t('coach.accepted') : t('coach.rejected'))}</div>`) : '';
   const acts = (m.actions || []).length && !m.actionsDone ? `<div class="suggest">${m.actions.map((a: ChatAction, i: number) => `<button class="btn sm ${i ? 'ghost' : ''}" data-act="chat-action" data-id="${esc(m.id)}" data-i="${i}">${esc(a.label)}</button>`).join('')}</div>` : m.actionsDone ? `<div class="xs muted" style="margin-top:6px">${esc(m.actionsDone)}</div>` : '';
   // Knöpfe einer Rückfrage: nur bei der letzten Nachricht aktiv (sonst gehört die Antwort nicht mehr dazu)
   const opts = (m.options || []).length && latest && !m.answered ? `<div class="suggest" data-chat-options>${m.options.map((o: Opt, i: number) => `<button class="btn sm ${i ? 'ghost' : ''}" data-act="chat-opt" data-id="${esc(m.id)}" data-i="${i}">${esc(o.label)}</button>`).join('')}</div>` : '';
@@ -102,7 +102,7 @@ function msgHtml(m: any, latest: boolean): string {
   const sugg = (m.suggestions || []).length && latest ? `<div class="suggest">${m.suggestions.map((s: string) => `<button class="chip" data-act="chat-say" data-text="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '';
   const pin = m.from !== 'user' ? `<button class="msg-pin ${m.pinned ? 'on' : ''}" data-act="chat-pin" data-id="${esc(m.id)}" aria-label="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}" title="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}">${ic('flag')}</button>` : '';
   const by = m.from === 'ai' && !m.title && m.kind === 'answer' ? `<div class="xs muted" data-by-ai>${esc(t('coach.byAi'))}</div>` : '';
-  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(m.text)}</span>${by}${prop}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
+  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(m.text)}</span>${by}${prop}${m.details?.length ? '<details class="more"><summary>Details zu den betroffenen Einheiten</summary><div class="body">'+m.details.map((x:string)=>'<p>'+esc(x)+'</p>').join('')+'</div></details>' : ''}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
 }
 
 /* Was der Coach gerade sieht (Auftrag 7): die 3 wichtigsten Erkenntnisse der Analyse mit Begründung und Tipp.
@@ -175,8 +175,9 @@ export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boo
     if (!o.local && aiState().chatActive && !(STATE.chatDialog && STATE.chatDialog.pending)) {
       if (el) el.disabled = true;
       // Frage sofort zeigen, Antwort als Strom (Auftrag 12); ohne Strom die bisherige Anfrage
-      STATE.coachMsgs[userMsg.id] = userMsg; STREAM = { text: '' }; nav.rerender(); toBottom();
       try {
+        if (!await syncNow()) throw new Error('Aktuelle Daten noch nicht synchronisiert.');
+      STATE.coachMsgs[userMsg.id] = userMsg; STREAM = { text: '' }; nav.rerender(); toBottom();
         let last: any = null;
         try { last = await apiStream('/api/coach/chat/stream', { text }, o => { if (!STREAM) return; if (o.t === 'delta') { STREAM.text += o.text; streamUpdate(); } else if (o.t === 'reset') { STREAM.text = ''; streamUpdate(); } }); }
         catch (e: any) { if (e && e.status && e.status !== 404) throw e; last = null; }
@@ -190,7 +191,7 @@ export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boo
       }
       catch (e) { STREAM = null; delete STATE.coachMsgs[userMsg.id]; /* ohne Verbindung, Kontingent leer oder Fehler: der Regel-Coach antwortet */ if (!FELL_BACK) { FELL_BACK = true; toast(t('coach.freeFallback')); } loadAiState().then(() => nav.rerender()); } finally { if (el) el.disabled = false; }
     }
-    const d = D();
+    invalidate(); const d = D();
     const { reply, dialog } = converse(d.engine, STATE.chatDialog || {}, text, { scores: d.scores, prognosis: d.prognosis });
     STATE.chatDialog = dialog;
     const msg: any = { id: `msg-a-${now}`, at: now + 1, date: todayStr(), kind: reply.intent === 'safety' ? 'warning' : 'answer', from: 'coach', chat: true, intent: reply.intent, text: reply.text, options: reply.options || [], suggestions: reply.suggestions || [], pendingOpen: !!reply.pending };
@@ -250,6 +251,7 @@ on('prop', async el => {
   if (!isSyncOn()) {
     const m = STATE.coachMsgs[el.dataset.id!]; const p = m?.proposal; if (!p || p.status !== 'open') return;
     const accept = el.dataset.ok === '1';
+    if (accept && (p.changes || []).some((c:any) => c.kind === 'adjust' && STATE.sessions[c.data?.sessionId]?.completed)) { toast('Diese Einheit ist inzwischen absolviert. Bitte einen aktuellen Vorschlag anfordern.'); return; }
     if (accept && p.evidenceSignature && p.evidenceSignature !== evidenceSignature(STATE, D().engine.baseWeeks)) { toast('Trainingsdaten geändert. Bitte den aktuellen Vorschlag prüfen.'); return; }
     if (accept) for (const c of p.changes || []) if (c.kind === 'adjust') STATE.adjustments[c.key] = c.data;
     else if (p.skillsOnly && c.kind === 'profile') saveProfile({ ...profile(), skills: { ...profile().skills, ...c.data.skills } });

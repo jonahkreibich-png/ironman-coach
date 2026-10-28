@@ -597,3 +597,35 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 @media (max-width: 360px) { .cday-b { padding-left: var(--s3); } .cday-d { flex-basis: 58px; } }
 .pr-what { font-size: var(--t-xs); color: var(--ink-2); line-height: 1.35; padding: 0 0 6px 38px; margin-top: -4px; }
 .health-row { margin-top: var(--s3); display: flex; flex-direction: column; gap: 6px; }
+
+/* Ausgewaehltes Plan-Dashboard C: bestehende Aktionen und Theme-Tokens bleiben erhalten. */
+.plan-c { min-width: 0; }
+.plan-dashboard { margin: var(--s4) 0; padding: var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.plan-dashboard-title { margin: 0 0 var(--s4); font-family: var(--f-display); font-size: var(--t-xl); line-height: 1.15; }
+.plan-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--s2); }
+.plan-metric { padding: var(--s4); background: var(--surface-2); border-radius: var(--r); min-width: 0; overflow-wrap: anywhere; }
+.plan-metric-primary { background: #102a44; color: #fff; }
+.plan-metric-primary .lbl { color: #d7e5f5; }
+.plan-metric-value { font-family: var(--f-display); font-size: clamp(27px,6vw,40px); font-weight: 700; line-height: 1.2; margin: var(--s2) 0; font-variant-numeric: tabular-nums; }
+.plan-metric-value small { font: 500 var(--t-sm) var(--f-body); }
+.plan-metric p { font-size: var(--t-xs); margin: 0 0 var(--s2); }
+.plan-sports { margin-top: var(--s4); }
+.plan-sports h2 { font-size: var(--t-md); margin: 0 0 var(--s3); }
+.plan-sport { display: grid; grid-template-columns: minmax(0,90px) minmax(15px,1fr) minmax(50px,max-content); align-items: center; gap: var(--s2); margin-top: var(--s2); font-size: var(--t-xs); }
+.plan-sport > :last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.plan-sport-track { height: 7px; border-radius: 10px; background: var(--line); overflow: hidden; }
+.plan-sport-track i { display: block; height: 100%; border-radius: inherit; }
+.plan-c .cdays { display: grid; gap: var(--s2); border: 0; background: none; box-shadow: none; overflow: visible; }
+.plan-c .cday { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.plan-c .cday.today { border-color: var(--accent); }
+.plan-c .cday-h { min-height: 64px; }
+.plan-c .pmix { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+@media (max-width:360px) { .plan-dashboard { padding: var(--s3); } .plan-metric { padding: var(--s3); } .plan-sport { grid-template-columns: minmax(0,72px) minmax(12px,1fr) minmax(50px,max-content); gap: 5px; } }
+
+.plan-dashboard-title .btn { font: inherit; font-size: clamp(18px,5vw,24px); text-align: left; padding: 0; justify-content: space-between; }
+.plan-dashboard-label { min-width: 0; flex: 1 1 auto; overflow-wrap: normal; word-break: normal; }
+.plan-dashboard-chevron { flex: 0 0 18px; }
+[aria-expanded="false"] > .plan-dashboard-chevron { transform: rotate(-90deg); }
+#plan-dashboard-body[hidden] { display: none; }
+
+fieldset.custom-entry { border: 0; margin: 0; padding: 0; min-width: 0; }

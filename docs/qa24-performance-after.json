@@ -1,0 +1,72 @@
+[
+  {
+    "synthetic": true,
+    "trainings": 500,
+    "messages": 1500,
+    "historyDays": 250,
+    "contextChars": 23636,
+    "phasesMs": [
+      {
+        "activities": 2,
+        "load": 6,
+        "scores": 52,
+        "context": 16
+      },
+      {
+        "activities": 1,
+        "load": 3,
+        "scores": 32,
+        "context": 11
+      },
+      {
+        "activities": 1,
+        "load": 3,
+        "scores": 31,
+        "context": 10
+      }
+    ],
+    "samplesMs": [
+      77,
+      46,
+      45
+    ],
+    "medianMs": 46,
+    "heapDeltaMiB": 7.6,
+    "note": "Node-Laufzeit; Heap-Differenz ist kein Spitzenverbrauch. Keine Browser-/D1-Latenz."
+  },
+  {
+    "synthetic": true,
+    "trainings": 5000,
+    "messages": 15000,
+    "historyDays": 2500,
+    "contextChars": 23694,
+    "phasesMs": [
+      {
+        "activities": 9,
+        "load": 30,
+        "scores": 420,
+        "context": 133
+      },
+      {
+        "activities": 14,
+        "load": 29,
+        "scores": 307,
+        "context": 97
+      },
+      {
+        "activities": 7,
+        "load": 23,
+        "scores": 286,
+        "context": 85
+      }
+    ],
+    "samplesMs": [
+      592,
+      447,
+      402
+    ],
+    "medianMs": 447,
+    "heapDeltaMiB": 52.3,
+    "note": "Node-Laufzeit; Heap-Differenz ist kein Spitzenverbrauch. Keine Browser-/D1-Latenz."
+  }
+]

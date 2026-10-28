@@ -1,0 +1,125 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/fields.test.ts (32 tests | 9 failed) 23ms
+   Ô£ô Notizen lesen > Beispiel aus dem Auftrag: ÔÇ×5,07km, ├ÿ6:21/km, ├ÿHF153, Entkopplung 4,5 %, Kadenz 163ÔÇ£ 2ms
+   Ô£ô Notizen lesen > Lauf mit max. Puls, vertikalem Verh├ñltnis, VO2max, RPE und Abweichung 1ms
+   Ô£ô Notizen lesen > ohne ├ÿ: Pace aus Distanz und Zeit, nicht der schnelle letzte Kilometer; Spannen z├ñhlen nicht 0ms
+   Ô£ô Notizen lesen > Rad drinnen mit Watt und Trittfrequenz, drau├ƒen mit Gravelbike 1ms
+   Ô£ô Notizen lesen > Schwimmen: Meter, l├ñngste Strecke Kraul am St├╝ck, Technik-Problem; Abschnitte sind keine Gesamtdauer 1ms
+   Ô£ô Notizen lesen > Kraft und Fu├ƒball 0ms
+   Ô£ô alte Notizen ├╝bertragen > leere Felder werden gef├╝llt (Quelle ÔÇ×aus NotizÔÇ£), vorhandene Werte und die Notiz bleiben 1ms
+   Ô£ô alte Notizen ├╝bertragen > nur einmal: eine sp├ñtere Korrektur von Hand wird nicht wieder ├╝berschrieben 0ms
+   Ô£ô alte Notizen ├╝bertragen > Scores nutzen die Felder: Entkopplung und l├ñngste Kraul-Strecke kommen in die Messungen 1ms
+   Ô£ô automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung > Uhr f├╝llt die Felder mit Quelle, eine Korrektur von Hand gilt, ÔÇ×OriginalÔÇ£ holt den Uhr-Wert zur├╝ck 1ms
+   Ô£ô automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung > intervals.icu: Kadenz beim Laufen doppelt, Watt, Entkopplung, drinnen 0ms
+   Ô£ô automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung > Splits aus Kilometer-Runden 0ms
+   Ô£ô automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung > Pulszone: ÔÇ×Zone 3 statt 2ÔÇ£ bzw. ÔÇ×wie geplantÔÇ£ 0ms
+   Ô£ô automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung > CTL/ATL/TSB des Tages aus intervals.icu, sonst aus den eigenen Einheiten 3ms
+   Ô£ô automatisch: Werte aus Uhr und intervals.icu, Pulszone, Belastung > jede Sportart hat die Felder aus dem Auftrag 1ms
+   Ô£ô nach dem Schwellentest: Zonen automatisch aktualisieren > eingetragene Werte des Tests (├ÿ-Puls, ├ÿ-Pace) ÔåÆ neue Schwellen und aerobe Schwelle im gleichen Verh├ñltnis 1ms
+   Ô£ô nach dem Schwellentest: Zonen automatisch aktualisieren > von der Uhr: Belastungsrunde von 30 min (├ÿ-Puls ├ù 1,01) 0ms
+   Ô£ô nach dem Schwellentest: Zonen automatisch aktualisieren > unplausible Werte (z. B. lockerer Puls) werden nicht ├╝bernommen, ohne erledigten Test nichts 0ms
+   Ô£ô Pull Buoy bleibt ein eigenes kanonisches Ergebnis 0ms
+   Ô£ô unbekannte oder unterst├╝tzte Dauerschwimmstrecke ist kein Kraulnachweis 1ms
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m Brust am St├╝ck 5ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m R├╝cken am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m breaststroke am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m backstroke am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit Kickbrett am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit board am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit fins am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   Ô£ô Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit Flossen am St├╝ck 0ms
+   ├ù Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit snorkel am St├╝ck 0ms
+     ÔåÆ expected '100' to be undefined
+   Ô£ô Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit Schnorchel am St├╝ck 0ms
+   Ô£ô Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit paddles am St├╝ck 0ms
+ ÔØ» tests/unit/auftrag9.test.ts (19 tests | 7 failed) 33ms
+   Ô£ô Schwimm-Stufen > Stufen nach Strecke am St├╝ck: 25 ÔåÆ 50 ÔåÆ 100, ab 200 m normales Training (Auftrag 11); Brust-Weg f├╝r Anf├ñnger 1ms
+   Ô£ô Schwimm-Stufen > mit jeder Stufe ├ñndern sich Wiederholungsl├ñngen, Pull Buoy und Brust-Anteil 1ms
+   Ô£ô Schwimm-Stufen > jede Lern-Einheit fragt am Ende nach der l├ñngsten Strecke 0ms
+   Ô£ô Schwimm-Stufen > Feld ÔÇ×l├ñngste Strecke Kraul am St├╝ckÔÇ£ 100 m in 2 Einheiten ÔåÆ K├Ânnen eintragen, ALLE kommenden Schwimmeinheiten auf die 100-m-Stufe 12ms
+   Ô£ô Schwimm-Stufen > ab 400 m: CSS-Hinweis; ab 200 m normales Training 1ms
+   Ô£ô Coach versteht Schwimm-Fortschritte > S├ñtze erkennen 1ms
+   Ô£ô Coach versteht Schwimm-Fortschritte > ÔÇ×ich schaffe jetzt 100 m Kraul am St├╝ckÔÇ£ im Chat: eintragen und hochstufen, r├╝ckg├ñngig m├Âglich 6ms
+   Ô£ô Neue Zonen in alle kommenden Einheiten > nach dem Lauftest: kommende L├ñufe rechnen mit dem neuen Puls und der neuen Pace, Beispiel vorher/nachher 1ms
+   Ô£ô Schwimmangaben trennen Hilfsmittel und Intervalle 0ms
+   Ô£ô eine Aktivit├ñt mit zwei Verkn├╝pfungen best├ñtigt keine zweite Einheit 1ms
+   Ô£ô Schwimmfortschritt sch├╝tzt feste und abgeschlossene zuk├╝nftige Einheiten 1ms
+   Ô£ô freie Uhreintr├ñge behalten getrennte Pull-Nachweise und pr├╝fen Gesamtdistanz 0ms
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Brust am Stueck 5ms
+     ÔåÆ expected { crawl: 100 } to be null
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m R├╝cken am St├╝ck 1ms
+     ÔåÆ expected { crawl: 100 } to be null
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m am St├╝ck 0ms
+     ÔåÆ expected { crawl: 100 } to be null
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit Kickbrett am St├╝ck 0ms
+     ÔåÆ expected { crawl: 100 } to be null
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit board am St├╝ck 0ms
+     ÔåÆ expected { crawl: 100 } to be null
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit fins am St├╝ck 0ms
+     ÔåÆ expected { crawl: 100 } to be null
+   ├ù Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit snorkel am St├╝ck 0ms
+     ÔåÆ expected { crawl: 100 } to be null
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 16 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Brust am Stueck
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m R├╝cken am St├╝ck
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m am St├╝ck
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit Kickbrett am St├╝ck
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit board am St├╝ck
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit fins am St├╝ck
+ FAIL  tests/unit/auftrag9.test.ts > Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: Ich kann jetzt 100 m Kraul mit snorkel am St├╝ck
+AssertionError: expected { crawl: 100 } to be null
+
+- Expected: 
+null
+
++ Received: 
+{
+  "crawl": 100,
+}
+
+ ÔØ» tests/unit/auftrag9.test.ts:123:31
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/16]ÔÄ»
+
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m Brust am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m R├╝cken am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m breaststroke am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m backstroke am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit Kickbrett am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit board am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit fins am St├╝ck
+ FAIL  tests/unit/fields.test.ts > Notiz bildet keinen unaided Kraulnachweis aus 100 m Kraul mit snorkel am St├╝ck
+AssertionError: expected '100' to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+"100"
+
+ ÔØ» tests/unit/fields.test.ts:151:59
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/16]ÔÄ»
+
+
+ Test Files  2 failed (2)
+      Tests  16 failed | 35 passed (51)
+   Start at  22:02:39
+   Duration  1.22s (transform 766ms, setup 47ms, collect 1.26s, tests 56ms, environment 0ms, prepare 238ms)
+

@@ -1,5 +1,5 @@
 /* Auftrag 5 E2E: Regeln steuern den Plan (A), Ergebnisse auf iPhone-Breite in Chromium und WebKit. */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './storage-harness';
 import { seed, open, stored } from './helpers';
 
 const dow = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
@@ -63,6 +63,8 @@ test('A4: Plan bearbeiten – Regel bewusst brechen nur mit Warnung, gilt dann n
   await page.locator(`[data-act="sess-edit"][data-sid="${bike.id}"]`).click();
   await page.selectOption('#ed-day', '2026-10-16');
   await page.locator('[data-act="edit-save"]').click();
+  await expect(page.locator('[data-edit-preview]')).toBeVisible();
+  await page.locator('[data-act="edit-preview-confirm"]').click();
   await expect(page.locator('[data-edit-warn]')).toContainText('bricht deine Regel „Rad: nie Fr“');
   await page.locator('[data-act="edit-anyway"]').click();
   const adj = Object.values((await stored(page)).adjustments) as any[];

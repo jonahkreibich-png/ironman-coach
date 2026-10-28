@@ -156,7 +156,10 @@ function runFilter20(o: FilterIn): FResult {
     at = to;
   };
   // Wert vor 7 Tagen (Bezug für die Wochengrenze)
-  const ref = (date: string) => { const lim = addDays(date, -7); let r = hist[0].x; for (const h of hist) if (h.date <= lim) r = h.x; return r; };
+  // Beobachtungen und Verlauf sind chronologisch. Der Bezug wandert nur vorwärts,
+  // statt für jede Messung die gesamte mehrjährige Historie erneut zu durchlaufen.
+  let refIndex = 0;
+  const ref = (date: string) => { const lim = addDays(date, -7); while (refIndex + 1 < hist.length && hist[refIndex + 1].date <= lim) refIndex++; return hist[refIndex].x; };
   for (const m of obs) {
     advance(m.date);
     let R = m.sd * m.sd;

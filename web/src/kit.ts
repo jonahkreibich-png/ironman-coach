@@ -10,6 +10,8 @@ export const ACTIONS: Record<string, ActFn> = {};
 export function on(name: string, fn: ActFn) { ACTIONS[name] = fn; }
 export const CHANGE: Record<string, ActFn> = {};
 export function onChange(name: string, fn: ActFn) { CHANGE[name] = fn; }
+export const INPUT: Record<string, ActFn> = {};
+export function onInput(name: string, fn: ActFn) { INPUT[name] = fn; }
 
 /* ---------- Text und Kleinteile ---------- */
 export const sportLabel = (s: string) => t(SPORT_LABEL_KEY[s] || 'sport.other');

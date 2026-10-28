@@ -1,9 +1,10 @@
+import { storage as localStorage } from "./persistence";
 /* Sync mit dem eigenen Server (Cloudflare Worker).
    Datensatz-Ebene: jede Einheit, jeder Trend-Tag usw. hat einen eigenen updatedAt.
    Konflikte: die neueste Änderung pro Datensatz gewinnt. Offline bleibt alles in der Warteschlange.
    Dazu: Einrichtung (Einrichtungscode, Kopplung, Einladung), allgemeiner Server-Aufruf, KI-Status, Mitteilungen. */
 // @ts-nocheck
-import { STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData } from './store';
+import { canPersist, refreshStoredState, saveState, STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData } from './store';
 import { esc, fmtDate, ymd } from './util';
 import { toast } from './toast';
 import { STORAGE, API_BASE, APP_VERSION, APP_RELEASE } from './config';
@@ -12,17 +13,19 @@ import { t } from '../../shared/i18n';
 
 const AUTH_KEY = STORAGE.syncAuth;
 /* Datensatz-Arten, die als Wörterbuch im Zustand liegen: kind → Feld */
-export const DICT_KINDS: Record<string, string> = { goal: 'goals', activity: 'activities', coachMsg: 'coachMsgs', coachNote: 'coachNotes', raceResult: 'raceResults', meal: 'meals', analysis: 'analysis', strengthTemplate: 'strengthTemplates' };
+export const DICT_KINDS: Record<string, string> = { goal: 'goals', activity: 'activities', coachMsg: 'coachMsgs', coachNote: 'coachNotes', raceResult: 'raceResults', meal: 'meals', analysis: 'analysis', strengthTemplate: 'strengthTemplates', workoutTemplate: 'workoutTemplates' };
 const META_KEY = STORAGE.syncMeta;
 const API = API_BASE;
 
 /* ---------- Speicher ---------- */
-function readJson(k, fb) { try { return JSON.parse(localStorage.getItem(k) || 'null') || fb; } catch (e) { return fb; } }
-function writeJson(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+function readJson(k, fb) { try { return JSON.parse(localStorage.getItem(k) || 'null') || fb; } catch (e) { localStorage.block(k); return fb; } }
+function writeJson(k, v) { return localStorage.setItem(k, JSON.stringify(v)); }
 let AUTH = readJson(AUTH_KEY, null);
+let identityReady = !!AUTH?.userId && AUTH.userId === readJson(STORAGE.owner, null);
 const META = Object.assign({ cursor: 0, hashes: {}, pending: {}, lastSyncAt: null, offset: 0, lastError: null }, readJson(META_KEY, {}));
-function saveMeta() { writeJson(META_KEY, META); }
+function saveMeta() { if (!localStorage.changing) { META.localRevision = STATE._storageRevision || 0; writeJson(META_KEY, META); } }
 function now() { return Date.now() + (META.offset || 0); }
+let initialRemoteOnly = !!AUTH && !META.lastSyncAt && !hasLocalData();
 
 /* ---------- Datensätze aus dem Zustand ---------- */
 function hash(str) {
@@ -32,44 +35,45 @@ function hash(str) {
 }
 function itemKey(o, prefix) { return o.id || (prefix + ':' + (o.start || o.date || '') + ':' + (o.text || o.note || '')); }
 function rawPlan() { try { return localStorage.getItem(PLAN_KEY); } catch (e) { return null; } }
-function collect() {
+function collect(state = STATE, plan = rawPlan()) {
   const m = new Map();
   const put = (kind, key, data) => { if (key != null && key !== '') m.set(kind + '|' + key, { kind, key: String(key), data }); };
-  Object.entries(STATE.sessions || {}).forEach(([id, s]) => put('session', id, s));
-  (STATE.trend || []).forEach(p => put('trend', p.date, p));
-  Object.entries(STATE.nutrition || {}).forEach(([d, v]) => put('nutrition', d, v));
-  Object.entries(STATE.customWorkouts || {}).forEach(([d, list]) => (list || []).forEach(w => put('custom', w.id, Object.assign({}, w, { date: d }))));
-  (STATE.illnessPeriods || []).forEach(p => put('illness', itemKey(p, 'ill'), p));
-  (STATE.milestones || []).forEach(p => put('milestone', itemKey(p, 'ms'), p));
-  Object.entries(STATE.weekNotes || {}).forEach(([w, t]) => put('weekNote', w, t));
-  Object.entries(STATE.adjustments || {}).forEach(([id, a]) => put('adjust', id, a));
-  put('settings', 'main', { settings: STATE.settings, nutritionProfile: STATE.nutritionProfile, scoreAdjust: STATE.scoreAdjust, scoreCalibVersion: STATE.scoreCalibVersion ?? null });
-  Object.entries(DICT_KINDS).forEach(([kind, field]) => Object.entries(STATE[field] || {}).forEach(([k, v]) => put(kind, k, v)));
-  if (STATE.profile) put('profile', 'main', STATE.profile);
-  { const raw = rawPlan(); if (raw) m.set('plan|main', { kind: 'plan', key: 'main', data: null, raw }); }
+  Object.entries(state.sessions || {}).forEach(([id, s]) => put('session', id, s));
+  (state.trend || []).forEach(p => put('trend', p.date, p));
+  Object.entries(state.nutrition || {}).forEach(([d, v]) => put('nutrition', d, v));
+  Object.entries(state.customWorkouts || {}).forEach(([d, list]) => (list || []).forEach(w => put('custom', w.id, Object.assign({}, w, { date: d }))));
+  (state.illnessPeriods || []).forEach(p => put('illness', itemKey(p, 'ill'), p));
+  (state.milestones || []).forEach(p => put('milestone', itemKey(p, 'ms'), p));
+  Object.entries(state.weekNotes || {}).forEach(([w, t]) => put('weekNote', w, t));
+  Object.entries(state.adjustments || {}).forEach(([id, a]) => put('adjust', id, a));
+  put('settings', 'main', { settings: state.settings, nutritionProfile: state.nutritionProfile, scoreAdjust: state.scoreAdjust, scoreCalibVersion: state.scoreCalibVersion ?? null });
+  Object.entries(DICT_KINDS).forEach(([kind, field]) => Object.entries(state[field] || {}).forEach(([k, v]) => put(kind, k, v)));
+  if (state.profile) put('profile', 'main', state.profile);
+  { const raw = plan; if (raw) m.set('plan|main', { kind: 'plan', key: 'main', data: null, raw }); }
   return m;
 }
 function recHash(r) { return hash(r.raw != null ? r.raw : JSON.stringify(r.data)); }
 
 /* Vergleicht den aktuellen Zustand mit dem zuletzt bekannten und legt Änderungen in die Warteschlange. */
 function detect(ts?) {
+  if (localStorage.changing || localStorage.blocked || (typeof canPersist === 'function' && !canPersist())) return 0;
   const cur = collect();
-  const t = ts || now();
+  const t = ts || (initialRemoteOnly ? 1 : now());
   let n = 0;
   cur.forEach((r, k) => {
     const h = recHash(r);
     if (META.hashes[k] === h) return;
     const data = r.raw != null ? JSON.parse(r.raw) : r.data;
-    META.pending[k] = { kind: r.kind, key: r.key, data, updatedAt: t };
+    META.pending[k] = { kind: r.kind, key: r.key, data, updatedAt: Math.max(t, (META.pending[k]?.updatedAt || 0) + 1) };
     META.hashes[k] = h; n++;
   });
   Object.keys(META.hashes).forEach(k => {
     if (cur.has(k)) return;
     const [kind, ...rest] = k.split('|');
-    META.pending[k] = { kind, key: rest.join('|'), deleted: true, updatedAt: t };
+    META.pending[k] = { kind, key: rest.join('|'), deleted: true, updatedAt: Math.max(t, (META.pending[k]?.updatedAt || 0) + 1) };
     delete META.hashes[k]; n++;
   });
-  if (n) saveMeta();
+  if (n) { saveMeta(); updateStatusEls(); }
   return n;
 }
 function rebaseline() {
@@ -131,13 +135,13 @@ function applyRecord(rec) {
       const raw = JSON.stringify(d);
       if (raw !== rawPlan()) { try { localStorage.setItem(PLAN_KEY, raw); planChanged = true; } catch (e) { return false; } }
       META.hashes[k] = hash(raw);
-      if (p && p.updatedAt <= rec.updatedAt) delete META.pending[k];
+      // Quittierung erst nach erfolgreicher lokaler Speicherung.
       return true;
     }
     default: return false;
   }
   if (del) delete META.hashes[k]; else META.hashes[k] = hash(JSON.stringify(rec.kind === 'settings' ? collect().get('settings|main').data : d));
-  if (p && p.updatedAt <= rec.updatedAt) delete META.pending[k];
+  // Quittierung erfolgt nach dem lokalen Commit.
   return true;
 }
 
@@ -174,41 +178,88 @@ let STATUS = 'idle'; // idle | syncing | ok | offline | error
 /* Nach jedem erfolgreichen Abgleich (z. B. Ausgang für Meldungen leeren) */
 const SYNCED: (() => void)[] = [];
 export function onSynced(fn: () => void) { SYNCED.push(fn); }
-let syncing = false, again = false;
-export async function syncNow(opts?) {
-  opts = opts || {};
-  if (!AUTH) return;
-  if (syncing) { again = true; return; }
+let syncFlight: Promise<boolean> | null = null, again = false;
+/* Wartet auf den gesamten Abgleich, einschliesslich Aenderungen waehrend einer Anfrage.
+   false bedeutet: Serverstand nicht bestaetigt; darauf darf kein KI-Kontext aufbauen. */
+export function syncNow(opts?): Promise<boolean> {
+  if (!AUTH || localStorage.changing || localStorage.blocked || (typeof canPersist === 'function' && !canPersist())) return Promise.resolve(false);
+  if (typeof refreshStoredState === 'function' && !refreshStoredState()) return Promise.resolve(false);
   detect();
-  if (opts.onlyIfPending && !Object.keys(META.pending).length) return;
-  syncing = true; STATUS = 'syncing'; updateStatusEls();
-  let appliedAny = false;
+  if (syncFlight) { again = true; return syncFlight; }
+  if (opts?.onlyIfPending && !Object.keys(META.pending).length) return Promise.resolve(true);
+  syncFlight = runSyncLocked().finally(() => { syncFlight = null; });
+  return syncFlight;
+}
+async function runSyncLocked(): Promise<boolean> {
+  if (typeof window !== 'undefined' && window === globalThis && navigator.locks) return await navigator.locks.request('stamio-sync', () => prepareSync());
+  return await prepareSync();
+}
+async function prepareSync(): Promise<boolean> {
+  try {
+    await localStorage.refresh();
+    if (!identityReady) { await loadMe(); if (!identityReady) throw new Error('Konto konnte nicht bestaetigt werden. Lokale Daten bleiben erhalten.'); }
+    if (localStorage.changing) return false;
+    if (typeof refreshStoredState === 'function' && !refreshStoredState()) return false;
+    const stored = readJson(META_KEY, null);
+    if (stored) {
+      const pending = {...(stored.pending || {})};
+      Object.entries(META.pending).forEach(([k,p]: any) => { if (!pending[k] || pending[k].updatedAt < p.updatedAt) pending[k] = p; });
+      META.pending = pending; META.hashes = {...(stored.hashes || {})}; META.cursor = Math.max(META.cursor || 0, stored.cursor || 0);
+    }
+    return await drainSync();
+  } catch (e) { STATUS = 'error'; META.lastError = e.message; updateStatusEls(); return false; }
+}
+async function drainSync(): Promise<boolean> {
+  STATUS = 'syncing'; updateStatusEls();
+  let appliedAny = false, uncommittedHashes = null;
   try {
     let more = true, guard = 0;
-    while (more && guard++ < 50) {
+    while ((more || again) && guard++ < 50) {
+      again = false;
+      detect();
       const sent = Object.values(META.pending).slice(0, 800);
+      const epoch = localStorage.epoch;
       const res = await api('POST', '/api/sync', { since: META.cursor || 0, changes: sent });
-      sent.forEach(c => { const k = c.kind + '|' + c.key; if (META.pending[k] && META.pending[k].updatedAt === c.updatedAt) delete META.pending[k]; });
+      if (epoch !== localStorage.epoch || localStorage.changing) throw new Error('Wiederherstellung hat den laufenden Abgleich ersetzt.');
+      if (!res || !Array.isArray(res.records) || !Number.isFinite(res.cursor) || res.cursor < (META.cursor || 0)) throw new Error('Ungueltige Antwort beim Speichern. Bitte erneut synchronisieren.');
+      // Vor Quittierung/Remote-Uebernahme lokale Aenderungen erkennen, die waehrend
+      // fetch entstanden sind. Ein alter Ack darf sie nicht aus der Warteschlange loeschen.
+      detect();
+      uncommittedHashes = {...META.hashes};
       (res.records || []).forEach(r => { if (applyRecord(r)) appliedAny = true; });
+      // Zustand vor Cursor/Ausgang bestaetigen. Bei Fehler bleibt der Ausgang wiederholbar.
+      if (typeof saveState === 'function') saveState(true);
+      if (!await localStorage.settled()) throw new Error('Daten noch nicht lokal gespeichert. App offen lassen und Backup exportieren.');
+      uncommittedHashes = null;
+      sent.forEach(c => { const k = c.kind + '|' + c.key; if (META.pending[k] && META.pending[k].updatedAt === c.updatedAt) delete META.pending[k]; });
+      if (typeof refreshStoredState === 'function') refreshStoredState();
       META.cursor = res.cursor;
       if (res.intervals) META.intervals = res.intervals;
       more = !!res.more || Object.keys(META.pending).length > 0;
     }
-    META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok';
+    if (more || again) throw new Error('Synchronisierung noch nicht vollstaendig. Bitte erneut versuchen.');
+    initialRemoteOnly = false; META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok';
+    saveMeta();
+    if (!await localStorage.settled()) throw new Error('Speicherbestaetigung fehlt. App offen lassen.');
     SYNCED.forEach(f => { try { f(); } catch (e) {} });
+    return true;
   } catch (e) {
-    if (e.status === 401) { disconnect(true); toast(t('sync.removed')); }
+    if (uncommittedHashes) META.hashes = uncommittedHashes;
+    if (e.status === 401) {
+      // Ungueltige Sitzung ist kein Auftrag, den noch offenen Ausgang zu verwerfen.
+      AUTH = null; localStorage.removeItem(AUTH_KEY);
+      toast('Anmeldung abgelaufen. Lokale Daten bleiben erhalten. Bitte erneut verbinden.');
+    }
     STATUS = (e.status && e.status !== 0) ? 'error' : 'offline';
     META.lastError = e.message;
+    return false;
   } finally {
-    syncing = false; saveMeta();
+    again = false; saveMeta();
     if (appliedAny) afterRemoteApply();
     updateStatusEls();
-    if (again) { again = false; setTimeout(() => syncNow(), 50); }
   }
 }
 function afterRemoteApply() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
   if (planChanged) { planChanged = false; toast(t('sync.reloading')); setTimeout(() => location.reload(), 900); return; }
   if (adjustChanged) { adjustChanged = false; if (true) rebuildPlanIndex(); }
   safeRerender();
@@ -242,13 +293,14 @@ function deviceName() {
 /* Wem gehören die Daten auf diesem Gerät? (Nutzer-Nummer auf dem Server, null = noch nie verbunden) */
 export function localOwner(): number | null { const o = readJson(STORAGE.owner, null); return typeof o === 'number' ? o : null; }
 /* Vor dem Verbinden: Daten einer anderen Person entfernen. keep: Nutzer hat bestätigt, dass die Daten auf diesem Gerät seine eigenen sind. */
-function prepareDevice(uid: number | null, keep: boolean) {
+async function prepareDevice(uid: number | null, keep: boolean) {
   const owner = localOwner();
-  if (owner != null && uid != null && owner !== uid) { wipeLocalData(); return; }
-  if (owner == null && !keep && hasLocalData()) wipeLocalData();
+  if (owner != null && uid != null && owner !== uid) { await wipeLocalData(); return; }
+  if (owner == null && !keep && hasLocalData()) await wipeLocalData();
 }
 function connected(res, first) {
-  AUTH = { token: res.token, deviceId: res.deviceId, connectedAt: Date.now() };
+  AUTH = { token: res.token, deviceId: res.deviceId, userId: res.userId, connectedAt: Date.now() };
+  identityReady = true;
   writeJson(AUTH_KEY, AUTH);
   if (res.userId != null) writeJson(STORAGE.owner, res.userId);
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
@@ -258,13 +310,13 @@ function connected(res, first) {
 }
 async function pairWith(code, keep?: boolean) {
   const res = await api('POST', '/api/pair/redeem', { code, name: deviceName() }, true);
-  prepareDevice(res.userId ?? null, !!keep);
+  await prepareDevice(res.userId ?? null, !!keep);
   connected(res, false);
   await syncNow();
   if (!planChanged) rebaseline();
   if (!keep) reloadSoon();
 }
-function reloadSoon() { try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {} setTimeout(() => location.reload(), 600); }
+async function reloadSoon() { if (typeof saveState === 'function') saveState(); if (await localStorage.settled()) location.reload(); else toast('Nicht gespeichert. App offen lassen und Backup exportieren.'); }
 function disconnect(silent?) {
   AUTH = null; ME = null; try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem('ec_me'); } catch (e) {}
   META.cursor = 0; META.hashes = {}; META.pending = {}; META.lastSyncAt = null; saveMeta();
@@ -296,7 +348,7 @@ export async function uploadFiles(files: File[]): Promise<any> {
 export async function setupFirst(setupCode?: string) {
   const res = await api('POST', '/api/setup', { name: deviceName(), ...(setupCode ? { setupCode: setupCode.trim() } : {}) }, true);
   // Betreiber (Nutzer 1): vorhandene Daten dieses Geräts sind seine (alte App), außer sie gehören erkennbar jemand anderem
-  prepareDevice(res.userId ?? 1, true);
+  await prepareDevice(res.userId ?? 1, true);
   // Ein Gerät ohne eigene Daten (z. B. nach dem Umzug auf eine neue Adresse) darf nur Lücken füllen:
   // sonst würden seine leeren Standard-Einstellungen die echten auf dem Server überschreiben (Auftrag 7)
   connected(res, hasLocalData());
@@ -308,7 +360,7 @@ export async function setupFirst(setupCode?: string) {
    (sonst könnten Daten einer anderen Person in sein Konto wandern). */
 export async function setupWithInvite(invite: string, userName: string, keepLocal = false) {
   const res = await api('POST', '/api/setup', { name: deviceName(), invite, userName }, true);
-  prepareDevice(res.userId ?? null, keepLocal);
+  await prepareDevice(res.userId ?? null, keepLocal);
   connected(res, true);
   remember(res);
   // neuer Tester: kurze Begrüßung vor dem Fragebogen (Auftrag 5 E3)
@@ -321,7 +373,7 @@ export async function setupWithInvite(invite: string, userName: string, keepLoca
    kein Konto) und kommt mit. Kein Neuladen: danach geht es direkt weiter zur Anmeldung beim Dienst. */
 export async function setupSignup(userName = '') {
   const res = await api('POST', '/api/setup', { signup: true, name: deviceName(), userName }, true);
-  prepareDevice(res.userId ?? null, true);
+  await prepareDevice(res.userId ?? null, true);
   connected(res, true);
   remember(res);
   await syncNow(); rebaseline();
@@ -333,7 +385,7 @@ function remember(res: any) { if (res && res.recoveryCode) try { localStorage.se
 /* Neues Gerät mit Wiederherstellungscode: das eigene Konto mit allen Daten zurück */
 export async function recoverWith(code: string, name?: string) {
   const res = await api('POST', '/api/recover', { code, name: name || deviceName() }, true);
-  prepareDevice(res.userId ?? null, false);
+  await prepareDevice(res.userId ?? null, false);
   connected(res, false);
   await syncNow(); rebaseline();
   reloadSoon();
@@ -342,7 +394,7 @@ export async function recoverWith(code: string, name?: string) {
 /* Konto löschen: auf dem Server alles weg (Backups nach Frist), dann das Gerät leeren */
 export async function deleteAccount(confirmWord: string) {
   await apiCall('DELETE', '/api/me', { confirm: confirmWord });
-  AUTH = null; wipeLocalData();
+  AUTH = null; await wipeLocalData();
   try { localStorage.removeItem('ec_fb_outbox'); } catch (e) {}
   setTimeout(() => location.reload(), 600);
 }
@@ -350,9 +402,11 @@ export async function pair(code: string, keepLocal = false) { await pairWith(cod
 export function stopSync() { disconnect(false); }
 /* Abmelden und Gerät für eine andere Person freimachen: Gerät beim Server abmelden, alle lokalen Daten löschen */
 export async function signOut() {
+  if (AUTH && (!await syncNow() || Object.keys(META.pending).length)) throw new Error('Abmelden abgebrochen: Noch nicht uebertragene Aenderungen. Bitte verbinden oder zuerst ein Backup exportieren.');
   if (AUTH) { try { await api('POST', '/api/devices/self/logout'); } catch (e) {} }
   disconnect(true);
-  wipeLocalData();
+  await wipeLocalData();
+  if (!await localStorage.settled()) throw new Error('Abmelden nicht abgeschlossen. App offen lassen.');
   location.href = location.pathname;
 }
 
@@ -377,11 +431,12 @@ export async function loadMe() {
     ME = await api('GET', '/api/me'); writeJson('ec_me', ME);
     const owner = localOwner();
     // Daten auf dem Gerät gehören zu einem anderen Konto → lokal löschen und neu vom Server holen
-    if (owner != null && ME.userId != null && owner !== ME.userId) { wipeLocalData(true); writeJson(STORAGE.owner, ME.userId); resetSyncMeta(); location.reload(); return me(); }
+    if (owner != null && ME.userId != null && owner !== ME.userId) { localStorage.block(AUTH_KEY); identityReady = false; throw new Error('Konto und lokale Daten passen nicht zusammen. Es wurde nichts geloescht oder hochgeladen.'); }
     if (owner == null && ME.userId != null) writeJson(STORAGE.owner, ME.userId);
+    if (ME.userId != null) { AUTH.userId = ME.userId; identityReady = true; writeJson(AUTH_KEY, AUTH); }
     // Vom Betreiber zurückgesetzt (Test-Nutzer): lokal neu anfangen
     const seen = readJson('ec_reset_seen', 0);
-    if (ME.resetAt && ME.resetAt > seen) { wipeLocalData(true); writeJson('ec_reset_seen', ME.resetAt); resetSyncMeta(); location.href = location.pathname; return me(); }
+    if (ME.resetAt && ME.resetAt > seen) { await wipeLocalData(true); writeJson('ec_reset_seen', ME.resetAt); resetSyncMeta(); if (!await localStorage.settled()) throw new Error('Speichern fehlgeschlagen.'); location.href = location.pathname; return me(); }
   } catch (e) {}
   return me();
 }
@@ -411,6 +466,7 @@ export function backupFromRecords(records) {
   base.sessions = {}; base.trend = []; base.nutrition = {}; base.customWorkouts = {}; base.illnessPeriods = []; base.milestones = []; base.weekNotes = {}; base.adjustments = {};
   let plan = null;
   records.forEach(r => {
+    if (r.deleted) return;
     const d = r.data; const field = DICT_KINDS[r.kind];
     if (field) (base[field] = base[field] || {})[r.key] = d;
     else if (r.kind === 'profile') base.profile = d;
@@ -449,6 +505,8 @@ export function statusText() {
 }
 function statusClass() { return STATUS === 'offline' || STATUS === 'error' ? 'warn' : 'ok'; }
 function updateStatusEls() {
+  const global = document.getElementById?.('global-sync-status');
+  if (global) { global.hidden = !AUTH || (STATUS !== 'error' && STATUS !== 'offline' && !Object.keys(META.pending).length); global.textContent = statusText(); }
   document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = statusText(); el.className = 'sync-st ' + statusClass(); });
 }
 /* Nur sichtbar, wenn etwas nicht stimmt (offline, Fehler, Warteschlange) */
@@ -458,5 +516,35 @@ export function syncStatusLine() {
 }
 export function syncStatusBadge() { return AUTH ? `<span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>` : ''; }
 
-onSave(() => syncNotify());
+if (!localStorage.blocked && (typeof canPersist !== 'function' || canPersist())) {
+  const pending = { ...META.pending };
+  const current = collect();
+  const pendingIsNewer = (META.localRevision || 0) > (STATE._storageRevision || 0);
+  Object.values(pending).forEach((record: any) => {
+    if (!record || !record.kind || !record.key) return;
+    const key = record.kind + '|' + record.key, existing = current.get(key);
+    if (!existing || pendingIsNewer) applyRecord(record);
+    else if (recHash(existing) !== recHash({data:record.data}) || record.deleted) {
+      // Alte Versionen hatten noch keine Speicherrevision: keinen bestaetigten Wert blind ersetzen.
+      STATE.storageConflicts = [...(STATE.storageConflicts || []), {at:Date.now(),values:[{path:key,local:existing.data,other:record.data,deleted:record.deleted,source:'startup-outbox'}]}];
+    }
+  });
+  META.pending = pending;
+}
+onSave(() => { detect(); syncNotify(); });
 if (AUTH) setTimeout(() => { syncNow(); loadAiState(); loadMe(); }, 300);
+
+/* Import ist ein ausdruecklicher Ersatz. Ausgang und Zustand werden gemeinsam
+   committed; eine alte Netzwerkantwort darf ihn anschliessend nicht ueberrollen. */
+export function prepareRestoreMeta(state, plan) {
+  const current = collect(), next = collect(state, plan ? JSON.stringify(plan) : rawPlan());
+  const pending = {}, hashes = {};
+  let stamp = Object.values(META.pending).reduce((n:number,p:any) => Math.max(n,p.updatedAt || 0),now()) + 1;
+  next.forEach((r,k) => { hashes[k] = recHash(r); pending[k] = {kind:r.kind,key:r.key,data:r.raw != null ? JSON.parse(r.raw) : r.data,updatedAt:stamp++}; });
+  for (const k of new Set([...current.keys(), ...Object.keys(META.hashes)])) {
+    if (next.has(k)) continue;
+    const [kind,...parts] = k.split('|'); pending[k] = {kind,key:parts.join('|'),deleted:true,updatedAt:stamp++};
+  }
+  return {...META,pending,hashes,lastSyncAt:null,lastError:null};
+}
+export function activateRestoreMeta(meta) { Object.assign(META, meta); initialRemoteOnly = false; }

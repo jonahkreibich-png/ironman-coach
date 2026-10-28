@@ -257,3 +257,15 @@ describe('Datenschutz und Betreiber', () => {
     expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM wai_usage WHERE user_id = ?').bind(u2.userId).first()).n).toBe(0);
   });
 });
+
+test('kostenlose KI: roter Modelltext wird erst nach Prüfung als echte gelbe App-Ampel ausgegeben', async () => {
+  const ai = fakeAI([{ text: 'Deine Ampel ist rot. Heute Ruhe.' }]);
+  const { env, T } = await user({ ai, oura: true });
+  await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'trend', key: today, data: { date: today, sleepHours: 6, restingHR: 37, _src: { sleepHours: 'oura', restingHR: 'oura' }, _auto: { sleepHours: { oura: 6 }, restingHR: { oura: 37 } } }, updatedAt: Date.now() + 1000 }] }, T);
+  const r = await stream(env, T, 'Wie soll ich heute trainieren?');
+  expect(r.last.t).toBe('done');
+  expect(r.last.messages.find((m: any) => m.kind === 'answer').text).toContain('Ampel der App: Gelb');
+  const deltas = r.lines.filter(l => l.t === 'delta').map(l => l.text).join('');
+  expect(deltas).not.toContain('rot'); expect(deltas).toContain('Gelb');
+  expect(JSON.stringify(ai.calls[0].input.messages)).not.toContain('Gelb');
+});

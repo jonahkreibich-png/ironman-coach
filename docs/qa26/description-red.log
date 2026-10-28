@@ -1,0 +1,57 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/plan26-work
+
+ ÔØ» tests/unit/training-templates26.test.ts (27 tests | 1 failed) 305ms
+   Ô£ô universal training templates > run counts work and rests between repetitions 1ms
+   Ô£ô universal training templates > bike counts work and rests between repetitions 0ms
+   Ô£ô universal training templates > swim counts work and rests between repetitions 0ms
+   Ô£ô universal training templates > strength counts work and rests between repetitions 0ms
+   Ô£ô universal training templates > repeats ordered groups without doubling rests 1ms
+   Ô£ô universal training templates > never invents time for distance-only swimming or strength reps 0ms
+   Ô£ô universal training templates > counts strength sets and explicit per-set work 0ms
+   Ô£ô universal training templates > labels time derived from pace as estimated 0ms
+   Ô£ô universal training templates > validates sports, prescriptions and nonempty blocks 1ms
+   Ô£ô universal training templates > creates independent snapshots 0ms
+   Ô£ô universal training templates > replaces planned fields with same ID and untouched actuals 2ms
+   Ô£ô universal training templates > appends original content once and sums duration 1ms
+   Ô£ô universal training templates > never converts missing duration to zero 0ms
+   Ô£ô universal training templates > rejects completed and cross-sport append 0ms
+   Ô£ô universal training templates > adapts legacy strength read-only preserving original prescriptions 0ms
+   Ô£ô all sports snapshot regression > run replaces/appends on same ID and preserves actual journal 0ms
+   Ô£ô all sports snapshot regression > bike replaces/appends on same ID and preserves actual journal 0ms
+   Ô£ô all sports snapshot regression > swim replaces/appends on same ID and preserves actual journal 0ms
+   Ô£ô all sports snapshot regression > strength replaces/appends on same ID and preserves actual journal 0ms
+   Ô£ô all sports snapshot regression > keeps full snapshot after append independently editable 0ms
+   Ô£ô sport-specific pace editor > shows swim seconds per 100 m, stores normalized pace, and reopens without drift 287ms
+   Ô£ô append generated prescriptions > keeps generated 6 x 1km intervals structured, editable and lossless 1ms
+   Ô£ô append generated prescriptions > preserves running/walking cycle 0ms
+   Ô£ô generated swimming precision > preserves supplied swim pace and explicit series changes without faking rounded duration 0ms
+   Ô£ô preserved generated summaries > keeps advertised rounded time and aggregate distance through unchanged editor and repeated append 1ms
+   Ô£ô preserved generated summaries > keeps generated strength exercises editable inside labelled shared time budget 1ms
+   ├ù keeps generated-session instructions in the editable snapshot after appending 5ms
+     ÔåÆ expected 'SYNTHETIC Zusatzanweisung' to contain 'SYNTHETIC konkrete Originalanweisung'
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/training-templates26.test.ts > keeps generated-session instructions in the editable snapshot after appending
+AssertionError: expected 'SYNTHETIC Zusatzanweisung' to contain 'SYNTHETIC konkrete Originalanweisung'
+
+Expected: "SYNTHETIC konkrete Originalanweisung"
+Received: "SYNTHETIC Zusatzanweisung"
+
+ ÔØ» tests/unit/training-templates26.test.ts:213:54
+    211|  const original={id:'generated',sport:'run',title:'Generated',descriptÔÇª
+    212|  const result=applyTemplate(original,makeTrainingTemplate({id:'extra',ÔÇª
+    213|  expect(result.trainingTemplateSnapshot.description).toContain(originaÔÇª
+       |                                                      ^
+    214|  expect(result.trainingTemplateSnapshot.description).toContain('SYNTHEÔÇª
+    215|  expect(templateSession(result.trainingTemplateSnapshot,result.id).desÔÇª
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/1]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  14:33:28
+   Duration  962ms (transform 312ms, setup 23ms, collect 162ms, tests 305ms, environment 0ms, prepare 151ms)
+

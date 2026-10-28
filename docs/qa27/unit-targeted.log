@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/dashboard27-work
+
+ Ô£ô tests/unit/plan-summary26.test.ts (8 tests) 6ms
+ Ô£ô tests/unit/plan-dashboard27.test.ts (3 tests) 3ms
+
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+   Start at  15:02:21
+   Duration  704ms (transform 285ms, setup 45ms, collect 446ms, tests 8ms, environment 0ms, prepare 218ms)
+

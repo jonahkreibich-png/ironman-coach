@@ -22,7 +22,7 @@ export function renderFortschritt(): string {
   h += sec(t('prog.scores'), `<div class="score-grid">${d.scores.map(s => {
     const first = s.trend[0].score, last = s.score; const delta = last - first;
     return `<button class="score" data-act="score-open" data-sport="${s.sport}" style="--c:${SPORT_COLOR[s.sport]}"><div class="top-l"><span style="color:var(--c);width:20px;height:20px;display:inline-block">${sportIcon(s.sport)}</span><span class="nm">${esc(sportLabel(s.sport))}</span></div>
-      <div class="spread"><span class="val">${s.score}<small class="xs muted rng" data-range> ±${s.range}${s.provisional ? ' ' + esc(t('prog.provisional')) : ''}</small><small class="xs muted lvl"> ${esc(s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
+      <div class="spread"><span class="val">${s.score}<small class="xs muted rng" data-range> ±${s.range}${s.provisional ? ' ' + esc(t('prog.provisional')) : ''}</small><small class="xs muted lvl"> ${esc(s.measured==null?'Schätzwert':s.level)}</small></span><span class="delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}">${delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '± '}${Math.abs(delta) || ''} ${esc(t('prog.6w'))}</span></div>
       ${sparkline(s.trend.map((x: any) => x.score), SPORT_COLOR[s.sport])}<div class="xs muted">${esc(s.provisional ? t('prog.provisionalHint') : s.confidence < 0.3 ? t('prog.lowData') : (s.gains[0] && s.gains[0].delta ? s.gains[0].text : t('prog.scale')))}</div></button>`;
   }).join('')}</div><div class="xs muted">${termLink('Score', t('prog.scaleLink'))}</div>`, t('prog.tapWhy'));
   // Auftrag 13: Trends (Erholung, Fitness, Effizienz, Intensität, Schwimmen, Bestwerte, lange Einheiten, Zusammenhänge)
@@ -58,7 +58,7 @@ function markBar(sub: number | null, marks: any[], color: string): string {
 function scoreSheet(sport: string): string {
   const s: any = D().scores.find(x => x.sport === sport); if (!s) return '';
   const col = SPORT_COLOR[sport];
-  return `<div class="stack" data-score-sheet><div class="spread"><span class="hero-num" style="color:${col}">${s.score}</span><span class="small muted" style="text-align:right">${esc(s.level)}<br><span data-range>${esc(s.rangeText)}</span><br>${esc(t('prog.basis', { b: s.basis }))}</span></div>
+  return `<div class="stack" data-score-sheet><div class="spread"><span class="hero-num" style="color:${col}">${s.score}</span><span class="small muted" style="text-align:right">${esc(s.measured==null?'Schätzwert':s.level)}<br><span data-range>${esc(s.rangeText)}</span><br>${esc(t('prog.basis', { b: s.basis }))}</span></div>
     ${sparkline(s.trend.map((x: any) => x.score), col)}
     <div class="card flat tight"><div class="lbl">${esc(t('prog.why'))}</div><ul class="small" style="margin:6px 0 0;padding-left:18px">${s.why.map((w: string) => `<li>${esc(w)}</li>`).join('')}</ul>
       <div class="small" style="margin-top:6px" data-conf>${esc(s.confText)}</div></div>

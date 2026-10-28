@@ -99,7 +99,22 @@ export function simulate20(u: ManyUser20, T0: string): { findings: Finding20[]; 
       for (const x of s2) { const a = by(base, x.sport); if ((x.sport === 'run' || x.sport === 'bike') && spikes.some(z => z.sport === x.sport) && x.score !== a.score) add('Score GPS', `${x.sport}: GPS-Fehler verändert den Score (${a.score} → ${x.score})`); }
     }
     if (cs === 'nohr') {
-      for (const x of score(acts)) if ((x.sport === 'run' || x.sport === 'bike') && x.measured == null) add('Score ohne Puls', `${x.sport}: kein Wert ohne Puls`);
+      // Manual device fixtures contain duration/distance/RPE but no recorded pace or power.
+      // A displayed profile estimate is valid here; it must not claim measured certainty.
+      for (const x of score(acts)) if (x.sport === 'run' || x.sport === 'bike') {
+        if (!Number.isFinite(x.score)) add('Score ohne Puls', `${x.sport}: kein numerischer Schätzwert ohne Puls`);
+        if (x.measured == null && (!x.provisional || x.confidence > 0.45 || x.range < 5 || !/Profil|Schätzung|geschätzt/i.test(x.confText))) {
+          add('Score ohne Puls', `${x.sport}: unbelegte Schätzung ohne passende Unsicherheit oder Herkunft`);
+        }
+      }
+      // Independently exercise usable no-HR evidence as well: known pace plus RPE must
+      // update the performance estimate, rather than passing only on a profile prior.
+      const knownPace: Activity[] = [];
+      if (sp.includes('run')) knownPace.push(mk('run', 1, { min: 40, speedKmh: 10, km: 20 / 3, avgHr: null, rpe: 4 }));
+      if (sp.includes('bike')) knownPace.push(mk('bike', 1, { min: 60, speedKmh: 25, km: 25, avgHr: null, avgPower: null, rpe: 4, bikeType: 'road' }));
+      for (const x of score([...acts, ...knownPace])) if ((x.sport === 'run' || x.sport === 'bike') && (x.measured == null || !Number.isFinite(x.measured))) {
+        add('Score ohne Puls', `${x.sport}: bekannte Pace und Belastungsgefühl liefern keinen belegten Wert ohne Puls`);
+      }
     }
     // alle Fälle: gültige Werte, Bereich und „vorläufig“ passen zusammen, keine Sprünge im Verlauf
     for (const x of score(acts)) {

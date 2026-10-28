@@ -1,0 +1,368 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/chat.test.ts (343 tests | 1 failed | 342 skipped) 19ms
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > mindestens 150 Gespr├ñche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > laeuferin-hm: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > marathon-anfaenger: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > rad-event: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Frage beantwortet (Warum locker)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: verschieben auf erlaubten Tag mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: n├ñchste Einheit auf 20 min
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: heute lieber locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: h├ñrter machen (oder begr├╝ndet ablehnen)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: streichen mit Best├ñtigung
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Tage tauschen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Tag frei heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Woche leichter
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: nicht gut ÔåÆ nur locker
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Verletzung stark ÔåÆ Pause und Arzt
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Urlaub mit Daten ÔåÆ kein Training im Zeitraum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Pr├╝fungszeit ÔåÆ wenig Training
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Wunschzeit ├ñndern
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: R├╝ckg├ñngig stellt alles wieder her
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Frage beantwortet (heute)
+   Ôåô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Frage beantwortet (Warum locker)
+   Ôåô D2: genau der Beispiel-Dialog: ÔÇ×Ich hab Mittwoch keine ZeitÔÇ£ ÔåÆ ÔÇ×Donnerstag oder Samstag?ÔÇ£ ÔåÆ ÔÇ×SamstagÔÇ£
+   Ôåô A4 im Chat: Verschieben gegen eine harte Regel wird abgelehnt, erlaubte Tage werden angeboten
+   Ôåô krank: ÔÇ×Kann ich morgen schon wieder schwimmen?ÔÇ£ ÔåÆ Antwort zur Krankheit, keine Plan-R├╝ckfrage
+   Ôåô verschieben bietet abends den heutigen Tag nicht mehr an
+   Ôåô D4: Schnellaktionen passen zur Lage
+   Ôåô D1: jede Nachricht bekommt eine Antwort (100 zuf├ñllige Nachrichten) > keine Ausnahme, nie leer, nie Floskel
+   Ôåô mindestens 150 Gespr├ñche laufen wirklich (nicht ├╝bersprungen)
+   Ôåô Konkrete Trainingsentscheidung statt allgemeiner Analyse > Soll ich morgen schwimmen oder laufen?
+   Ôåô Konkrete Trainingsentscheidung statt allgemeiner Analyse > Was ist morgen sinnvoller: laufen oder schwimmen?
+   Ôåô Konkrete Trainingsentscheidung statt allgemeiner Analyse > Krankheit bleibt vorrangig, keine sichere Trainingsfreigabe
+   Ôåô Konkrete Trainingsentscheidung statt allgemeiner Analyse > ohne Plan keine erfundene Einheitsvorgabe
+   ├ù Sportwahl mit Knieschmerzen nutzt bestehenden Schmerzdialog statt Laufempfehlung 18ms
+     ÔåÆ expected 'sport-choice' to be 'pain' // Object.is equality
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/chat.test.ts > Sportwahl mit Knieschmerzen nutzt bestehenden Schmerzdialog statt Laufempfehlung
+AssertionError: expected 'sport-choice' to be 'pain' // Object.is equality
+
+Expected: "pain"
+Received: "sport-choice"
+
+ ÔØ» tests/unit/chat.test.ts:195:447
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/1]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 342 skipped (343)
+   Start at  22:06:03
+   Duration  1.25s (transform 616ms, setup 24ms, collect 908ms, tests 19ms, environment 0ms, prepare 117ms)
+

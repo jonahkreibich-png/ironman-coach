@@ -1,3 +1,4 @@
+import {swimReviewMessages} from '../../shared/coach/analysis';
 /* Nach dem Schwellentest die Zonen automatisch übernehmen (Auftrag 7), sobald der Test erledigt ist und Werte hat.
    Derselbe Schritt läuft auf dem Server (Werte von der Uhr ohne App). */
 import { STATE, PLAN, BASE_WEEKS, profile, saveProfile, rebuildPlanIndex, replacePlanInPlace } from './store';
@@ -22,7 +23,7 @@ export function checkSwimSkill(): boolean {
   const pace = swimPaceUpdate(profile(), STATE, BASE_WEEKS, today);
   if (rate !== undefined || pace !== undefined) {
     const p0 = profile(); saveProfile({ ...p0, skills: { ...(p0.skills || {}), ...(rate !== undefined ? { swimMPerMin: rate } : {}), ...(pace !== undefined ? { swimPace100: pace } : {}) } });
-    const rf = refreshFuture(BASE_WEEKS, profile(), today);
+    const rf = refreshFuture(BASE_WEEKS, profile(), today, STATE);
     if (rf.changed) {
       replacePlanInPlace({ ...PLAN, weeks: rf.weeks });
       const mid = 'msg-swimrate-' + today;
@@ -30,16 +31,17 @@ export function checkSwimSkill(): boolean {
     }
   }
   const best = swimBests(STATE, BASE_WEEKS, today);
-  const u = legacySwimReview(profile(), BASE_WEEKS, STATE.adjustments || {}, today, best) || swimSkillUpdate(profile(), BASE_WEEKS, STATE.adjustments || {}, today, best);
-  if (!u) return false;
-  const id = u.reviewOnly ? 'msg-swim-legacy-' + evidenceSignature(STATE, BASE_WEEKS) : 'msg-swim-' + Date.now();
-  if (u.reviewOnly && STATE.coachMsgs[id]) return false;
+  const u = legacySwimReview(profile(), BASE_WEEKS, STATE.adjustments || {}, today, best, Date.now(), STATE) || swimSkillUpdate(profile(), BASE_WEEKS, STATE.adjustments || {}, today, best, Date.now(), undefined, STATE);
+  const noticeChanges=swimReviewMessages({state:STATE,profile:profile(),baseWeeks:BASE_WEEKS,today,now:Date.now()} as any,u);
+  const newlyVisible=noticeChanges.some(m=>m.proposal?.status==='open' && !STATE.coachMsgs[m.id]);
+  noticeChanges.forEach(m=>{STATE.coachMsgs[m.id]=m;});
+  if (!u) return noticeChanges.length>0;
+  if(u.reviewOnly && !noticeChanges.length){lastSwimInputs=signature();return false;}
+  const id = 'msg-swim-' + Date.now();
   const p = profile(); if (!u.reviewOnly) saveProfile({ ...p, skills: { ...(p.skills || {}), ...u.skills } });
   const now = Date.now();
   if (u.reviewOnly) {
-    // alte Profilangabe ohne Herkunft: nur ein Vorschlag, erst die Zustimmung ändert Profil und Plan
-    STATE.coachMsgs[id] = { id, at: now, date: today, kind: 'proposal', from: 'coach', title: 'Schwimmen: bitte prüfen', text: u.text + (u.adjustments.length ? '\n\n' + u.adjustments.map(a => a.what).join('\n') : ''), unread: true, important: true,
-      proposal: { status: 'open', skillsOnly: true, evidenceSignature: evidenceSignature(STATE, BASE_WEEKS), changes: [{ kind: 'profile', key: 'main', data: { skills: u.skills } }, ...u.adjustments.map((a, i) => ({ kind: 'adjust', key: a.id, data: { ...a, createdAt: now + i, date: today } }))] } };
+    // Nachricht und Status stammen aus derselben geteilten Deduplizierung wie auf dem Server.
   } else {
     // Auftrag 17: Korrekturen und bestätigte Fortschritte wirken sofort auf die kommenden Schwimmeinheiten (rückgängig machbar)
     u.adjustments.forEach((a, i) => { STATE.adjustments[a.id] = { ...a, createdAt: now + i, date: today }; });
@@ -47,7 +49,7 @@ export function checkSwimSkill(): boolean {
     STATE.coachMsgs[id] = { id, at: now, date: today, kind: 'adjust', from: 'coach', title: /^Korrigiert/.test(u.text) ? 'Schwimmen korrigiert' : 'Schwimm-Stufe', text: u.text, unread: true, important: true };
   }
   lastSwimInputs = signature();
-  invalidate(); toast(u.reviewOnly ? 'Schwimmen: bitte prüfen' : 'Schwimm-Stufe aktualisiert');
+  invalidate(); if(!u.reviewOnly || newlyVisible)toast(u.reviewOnly ? 'Schwimmen: bitte prüfen' : 'Schwimm-Stufe aktualisiert');
   return true;
 }
 export function checkTestResult(): boolean {
@@ -55,7 +57,7 @@ export function checkTestResult(): boolean {
   if (!u) return false;
   saveProfile(applyTestUpdate(profile(), u));
   // alle kommenden Einheiten bekommen die neuen Vorgaben, der Coach zeigt ein Beispiel vorher/nachher
-  const rf = refreshFuture(BASE_WEEKS, profile(), todayStr());
+  const rf = refreshFuture(BASE_WEEKS, profile(), todayStr(), STATE);
   if (rf.changed) replacePlanInPlace({ ...PLAN, weeks: rf.weeks });
   const more = rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '';
   const id = 'msg-test-' + u.sessionId;

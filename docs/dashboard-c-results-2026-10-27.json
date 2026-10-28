@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-27",
+  "design": "C",
+  "implemented": true,
+  "deployed": false,
+  "sourceHashes": {
+    "web/src/views/plan-dashboard27.ts": "6306ff1b42ae88adc07531a23c52231fc06a04f363cbb18399f00a64712abb6a",
+    "web/src/views/plan.ts": "030f85300f16d903463d1be849a507b09698c6b246a399c0cf0c0893fabed91d",
+    "web/src/styles.css": "02e46e3776aa2a3258860b8fe3364117f56f23df2fbe8135f28f05220e6e98fc",
+    "tests/unit/plan-dashboard27.test.ts": "6b90d73808eaa039ed1238c5bc88095b23d06acbe52f677e3dd50168301ecf85",
+    "tests/e2e/plan-dashboard27.spec.ts": "0128f24c92b0afdccd8605042c163e1cf66a18ec0092c3decfe631fac5cd2d3b",
+    "playwright.plan26.config.ts": "d6664939b11e2ec266f4d472da4bc2cb9d97cb421026c52a0910933465ba0959"
+  },
+  "typecheck": true,
+  "build": true,
+  "review": {
+    "independent": true,
+    "p1p2Findings": 0
+  },
+  "targetedUnit": {
+    "passed": 67,
+    "files": 6
+  },
+  "browser": {
+    "planAndTemplates": 51,
+    "storage": 22,
+    "originalFolderRecheck": 3,
+    "engines": [
+      "chromium-desktop",
+      "chromium-mobile",
+      "webkit-mobile"
+    ]
+  },
+  "fullUnit": {
+    "success": false,
+    "passed": 2226,
+    "failed": 2,
+    "skipped": 67,
+    "failedFiles": [
+      "server/test/api.test.ts",
+      "server/test/scheduled.test.ts",
+      "tests/unit/auftrag18-regeln.test.ts"
+    ],
+    "fixtureFailuresRechecked": {
+      "passed": 34,
+      "files": [
+        "server/test/scheduled.test.ts",
+        "tests/unit/auftrag18-regeln.test.ts"
+      ],
+      "reason": "Test copy lacked unchanged wrangler.toml and TRAININGSREGELN.md"
+    },
+    "apiRecheck": "Failed local mock-server readiness; 4 cases skipped"
+  },
+  "httpProbe": {
+    "stage": "fetch",
+    "code": "EACCES"
+  },
+  "normalHttpE2e": "Timed out at server/plugin setup; no successful test claim",
+  "limitations": [
+    "Firefox absent",
+    "No real iOS device",
+    "No Cloudflare test/production deploy",
+    "Chromium backup captured at Web Share boundary, not native OS download"
+  ]
+}

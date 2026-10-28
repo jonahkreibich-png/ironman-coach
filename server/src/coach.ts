@@ -2,7 +2,7 @@
    und zusätzlich täglich und wöchentlich. Anpassungen (kind "adjust") und Nachrichten (kind "coachMsg") werden
    gespeichert und per Sync an die App verteilt, wichtige Nachrichten zusätzlich als Mitteilung. */
 import * as C from '../../shared/core';
-import { type Env, berlinParts, getRecord, getRecords, putRecords, getMeta, setMeta, type Change } from './store';
+import { type Env, berlinParts, getRecord, getRecords, putRecords, getMeta, setMeta, recordsRevision, RecordsChangedError, type Change } from './store';
 import { runEngine, type EngineCtx, type EngineEvent, type CoachMsg } from '../../shared/coach/engine';
 import { profileFromLegacy, mergeProfile } from '../../shared/profile';
 import { goalFromPlanMeta, type Goal } from '../../shared/goals';
@@ -10,7 +10,7 @@ import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/field
 import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate, swimPaceUpdate, swimRateText } from '../../shared/swimskill';
 import { refreshFuture, trendThresholds } from '../../shared/refresh';
 import { mainGoal } from '../../shared/goals';
-import { analyze, type Trigger } from '../../shared/coach/analysis';
+import { analyze, swimReviewMessages, type Trigger } from '../../shared/coach/analysis';
 import { extendPlan } from '../../shared/replan';
 import { evidenceSignature } from '../../shared/results';
 
@@ -48,11 +48,14 @@ export function engineCtx(L: any, date?: string): EngineCtx {
   return { today: date || berlinParts().date, now: Date.now(), state: L.state, baseWeeks: L.baseWeeks, planMeta: L.planMeta, profile: L.profile, goals: L.goals };
 }
 
-export interface EngineRun { created: number; adjustments: any[]; messages: CoachMsg[] }
+export interface EngineRun { created: number; adjustments: any[]; messages: CoachMsg[]; skipped?: string }
 /* Engine für ein Ereignis ausführen und Ergebnisse speichern */
 export async function runEngineFor(env: Env, uid: number, ev: EngineEvent, opts: { date?: string; L?: any; rephrase?: (m: CoachMsg) => Promise<CoachMsg> } = {}): Promise<EngineRun> {
-  const L = opts.L || await loadState(env, uid);
-  if (!L.plan) return { created: 0, adjustments: [], messages: [] };
+  // Ein von einer vorherigen KI-/Enginephase gereichter Stand kann veraltet sein.
+  // Revision vor dem Lesen erfassen; bei Aenderungen wird atomar nichts geschrieben.
+  const revision = await recordsRevision(env, uid);
+  const L = await loadState(env, uid);
+  if (!L.plan) return { created: 0, adjustments: [], messages: [], skipped: 'kein Plan' };
   const ctx = engineCtx(L, opts.date);
   const out = runEngine(ctx, ev);
   const t = Date.now();
@@ -61,10 +64,12 @@ export async function runEngineFor(env: Env, uid: number, ev: EngineEvent, opts:
   // Bewertungen (Auftrag 12) behalten ihre 3 Teile, die KI formuliert sie nicht um
   for (const m of out.messages) msgs.push(opts.rephrase && (m.kind === 'briefing' || m.kind === 'session' || m.kind === 'week') && !m.id.startsWith('msg-review-') ? await opts.rephrase(m) : m);
   msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));
-  if (changes.length) await putRecords(env, uid, changes);
+  try { await putRecords(env, uid, changes, revision); }
+  catch (e) { if (e instanceof RecordsChangedError) return {created:0,adjustments:[],messages:[],skipped:'Daten inzwischen geaendert'}; throw e; }
   // Im Speicher nachziehen, falls weitere Schritte denselben Stand nutzen
   out.adjustments.forEach(a => { L.state.adjustments[a.id] = a; });
   msgs.forEach(m => { L.state.coachMsgs[m.id] = m; });
+  if (opts.L) Object.assign(opts.L, L);
   return { created: out.adjustments.length, adjustments: out.adjustments, messages: msgs };
 }
 
@@ -80,6 +85,7 @@ export async function runDaily(env: Env, uid: number, opts?: any): Promise<any> 
   // Auf die Morgenwerte warten, höchstens bis 10 Uhr
   if (!opts.force && !C.hasRecovery(today) && b.hour < 10) return { skipped: 'warte auf Morgenwerte' };
   const r = await runEngineFor(env, uid, { type: 'daily' }, { L, rephrase: opts.rephrase });
+  if (r.skipped) return { skipped: r.skipped };
   await setMeta(env, uid, 'daily_done', b.date);
   try { await runAnalysis(env, uid, 'morning', { L, rephrase: opts.rephrase }); } catch (e) { /* die Analyse darf den Morgen nie stören */ }
   return { date: b.date, created: r.created, adjustments: r.adjustments, messages: r.messages.length };
@@ -96,6 +102,7 @@ export async function runWeekly(env: Env, uid: number, opts?: any): Promise<any>
   const date = opts.date || b.date;
   try { await extendIfNeeded(env, uid, L); } catch (e) { /* weiter mit dem bisherigen Plan */ }
   const r = await runEngineFor(env, uid, { type: 'weekly' }, { L, date, rephrase: opts.rephrase });
+  if (r.skipped) return { skipped: r.skipped };
   await setMeta(env, uid, 'weekly_done', b.date);
   try { await runAnalysis(env, uid, 'weekly', { L, date, rephrase: opts.rephrase }); } catch (e) { /* weiter */ }
   const summary = C.weekSummary(L.state, L.baseWeeks, date);
@@ -105,8 +112,12 @@ export async function runWeekly(env: Env, uid: number, opts?: any): Promise<any>
 /* Analyse-Coach (Auftrag 7): morgens, nach neuen Einheiten, sonntags. Speichert das Ergebnis (analysis/latest), kleine Änderungen
    als Anpassung mit Mitteilung (Rückgängig in der App), größere als Vorschlag. rephrase: die KI formuliert nur die Texte um. */
 export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts: { L?: any; date?: string; rephrase?: (m: CoachMsg) => Promise<CoachMsg> } = {}): Promise<any> {
-  const L = opts.L || await loadState(env, uid);
+  // Ein von einer vorherigen KI-/Enginephase gereichter Stand kann veraltet sein.
+  // Revision vor dem Lesen erfassen; bei Aenderungen wird atomar nichts geschrieben.
+  const revision = await recordsRevision(env, uid);
+  const L = await loadState(env, uid);
   if (!L.plan) return { skipped: 'kein Plan' };
+  const sourceSignature = await dataSignature(env, uid);
   const t = Date.now();
   const changes: Change[] = [];
   // Schwellentest erledigt (z. B. von der Uhr): Zonen automatisch übernehmen, mit Mitteilung
@@ -118,7 +129,7 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
     if (tu.settings && Object.keys(tu.settings).length) changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), ...tu.settings } }, updatedAt: t + 1 });
     // alle kommenden Einheiten mit den neuen Zonen, Beispiel vorher/nachher
     const day = opts.date || berlinParts().date;
-    const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day) : { weeks: [], changed: 0, example: null };
+    const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day, L.state) : { weeks: [], changed: 0, example: null };
     if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 }); }
     const more = rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '';
     changes.push({ kind: 'coachMsg', key: 'msg-test-' + tu.sessionId, data: { id: 'msg-test-' + tu.sessionId, at: t, date: tu.date, kind: 'info', from: 'coach', title: tu.title, text: tu.text + more, important: true }, updatedAt: t + 2 });
@@ -131,7 +142,7 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
       const sRec = await getRecord(env, uid, 'settings', 'main'); const sd = (sRec && sRec.data) || {};
       changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t }, updatedAt: t });
       if (Object.keys(tr.settings).length) changes.push({ kind: 'settings', key: 'main', data: { ...sd, settings: { ...(sd.settings || {}), ...tr.settings } }, updatedAt: t + 1 });
-      const rf = refreshFuture(L.plan.weeks || [], L.profile, day);
+      const rf = refreshFuture(L.plan.weeks || [], L.profile, day, L.state);
       if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 }); }
       changes.push({ kind: 'coachMsg', key: 'msg-trend-' + day, data: { id: 'msg-trend-' + day, at: t, date: day, kind: 'info', from: 'coach', title: 'Zonen aus deinen Uhrdaten aktualisiert', important: true,
         text: tr.text + (rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '') + ' Ändern kannst du die Werte unter Mehr → Einstellungen.' }, updatedAt: t + 2 });
@@ -147,20 +158,20 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
     if (rate !== undefined || pace !== undefined) {
       L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...(rate !== undefined ? { swimMPerMin: rate } : {}), ...(pace !== undefined ? { swimPace100: pace } : {}) } }; L.state.profile = L.profile;
       changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 2 }, updatedAt: t + 2 });
-      const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day) : { weeks: [], changed: 0, example: null };
+      const rf = L.plan ? refreshFuture(L.plan.weeks || [], L.profile, day, L.state) : { weeks: [], changed: 0, example: null };
       if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 });
         if (!L.state.coachMsgs['msg-swimrate-' + day]) changes.push({ kind: 'coachMsg', key: 'msg-swimrate-' + day, data: { id: 'msg-swimrate-' + day, at: t, date: day, kind: 'adjust', from: 'coach', title: 'Schwimmen an dein Tempo angepasst', text: swimRateText(rate ?? (L.profile.skills || {}).swimMPerMin ?? null, pace ?? null) }, updatedAt: t + 7 }); }
     }
     const best = swimBests(L.state, L.baseWeeks, day);
-    const su = legacySwimReview(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t) || swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t);
-    const swimMsgId = su?.reviewOnly ? 'msg-swim-legacy-' + evidenceSignature(L.state, L.baseWeeks) : 'msg-swim-' + t;
-    if (su && !(su.reviewOnly && L.state.coachMsgs[swimMsgId])) {
+    const su = legacySwimReview(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t, L.state) || swimSkillUpdate(L.profile, L.baseWeeks, L.state.adjustments || {}, day, best, t, undefined, L.state);
+    const notices=swimReviewMessages({...engineCtx(L,day),now:t},su);
+    notices.forEach((m,i)=>{L.state.coachMsgs[m.id]=m;changes.push({kind:'coachMsg',key:m.id,data:m,updatedAt:t+5+i});});
+    const swimMsgId = 'msg-swim-' + t;
+    if (su) {
       if (!su.reviewOnly) { L.profile = { ...L.profile, skills: { ...(L.profile.skills || {}), ...su.skills } }; L.state.profile = L.profile;
       changes.push({ kind: 'profile', key: 'main', data: { ...L.profile, updatedAt: t + 3 }, updatedAt: t + 3 }); }
       if (su.reviewOnly) {
-        // alte Profilangabe ohne Herkunft: nur ein Vorschlag
-        changes.push({ kind: 'coachMsg', key: swimMsgId, data: { id: swimMsgId, at: t, date: day, kind: 'proposal', from: 'coach', title: 'Schwimmen: bitte prüfen', text: su.text + (su.adjustments.length ? '\n\n' + su.adjustments.map(a => a.what).join('\n') : ''), important: true,
-          proposal: { status: 'open', skillsOnly: true, evidenceSignature: evidenceSignature(L.state, L.baseWeeks), changes: [{ kind: 'profile', key: 'main', data: { skills: su.skills } }, ...su.adjustments.map((a, i) => ({ kind: 'adjust', key: a.id, data: { ...a, createdAt: t + i, date: day } }))] } }, updatedAt: t + 5 });
+        // Der bestehende Proposal-Speicher verwendet dieselbe Ereigniskennung wie die App.
       } else {
         // Auftrag 17: Korrekturen und bestätigte Fortschritte gelten sofort für die kommenden Schwimmeinheiten (rückgängig machbar)
         su.adjustments.forEach((a, i) => { const x = { ...a, createdAt: t + i, date: day }; L.state.adjustments[a.id] = x; changes.push({ kind: 'adjust', key: a.id, data: x, updatedAt: t + 6 + i }); });
@@ -174,11 +185,13 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
   const msgs: CoachMsg[] = [];
   for (const m of r.messages) msgs.push(opts.rephrase && m.kind !== 'proposal' && m.kind !== 'adjust' ? await opts.rephrase(m) : m);
   msgs.forEach((m, i) => changes.push({ kind: 'coachMsg', key: m.id, data: m, updatedAt: t + 100 + i }));
-  changes.push({ kind: 'analysis', key: 'latest', data: { date: r.date, trigger, at: r.at, load: r.load, top: r.top, insights: r.insights.slice(0, 10) }, updatedAt: t + 200 });
-  await putRecords(env, uid, changes);
+  changes.push({ kind: 'analysis', key: 'latest', data: { date: r.date, trigger, at: r.at, inputVersion:r.inputVersion, modelVersion:r.modelVersion, load: r.load, top: r.top, insights: r.insights.slice(0, 10) }, updatedAt: t + 200 });
+  try { await putRecords(env, uid, changes, revision); }
+  catch (e) { if (e instanceof RecordsChangedError) return {skipped:'Daten inzwischen geaendert'}; throw e; }
   r.auto.forEach(a => { L.state.adjustments[a.id] = a; });
   msgs.forEach(m => { L.state.coachMsgs[m.id] = m; });
-  await setMeta(env, uid, 'analysis_last', { at: t, trigger, sig: await dataSignature(env, uid) });
+  if (opts.L) Object.assign(opts.L, L);
+  await setMeta(env, uid, 'analysis_last', { at: t, trigger, sig: sourceSignature });
   return { trigger, top: r.top.map(i => i.title), auto: r.auto.length, proposals: r.proposals.length, messages: msgs.length };
 }
 /* Fingerabdruck der Einheiten: ändert er sich, ist eine neue Einheit da (egal aus welcher Quelle) */

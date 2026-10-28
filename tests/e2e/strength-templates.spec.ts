@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './storage-harness';
 import { seed, open, stored, TODAY, openPlanSession } from './helpers';
 
 test('Kraftvorlage erstellen, bearbeiten, starten und unabhängig abschließen', async ({ page }) => {

@@ -29,6 +29,7 @@ export async function open(page: Page, path = '/') {
   await expect(page.locator('#app')).not.toBeEmpty();
 }
 export async function stored(page: Page): Promise<any> {
+  await expect(page.locator('#storage-status')).toBeHidden();
   return page.evaluate(() => JSON.parse(localStorage.getItem('ec_state_v2') || 'null'));
 }
 /* Auftrag 19 (Plan-Tab C): Einheit im Plan öffnen – Woche wählen und den Tag aufklappen, falls er zu ist */
@@ -43,4 +44,13 @@ export async function openPlanSession(page: Page, sid: string) {
   if (!(await btn.count())) await page.locator(`[data-act="plan-week"][data-i="${at.week}"]`).click();
   if (!(await btn.count())) await page.locator(`.cday-h[data-date="${at.date}"]`).click();
   await btn.first().click();
+}
+
+/* Ausschliesslich synthetische Testdaten: neuen kanonischen Speicher mit aktualisieren. */
+export async function writeStored(page: Page, state: any) {
+ await page.evaluate(async value => {
+  const d=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('stamio-durable-storage',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+  await new Promise<void>((resolve,reject)=>{const tx=d.transaction('values','readwrite');tx.objectStore('values').put(JSON.stringify(value),'ec_state_v2');tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error);});
+  localStorage.setItem('ec_state_v2',JSON.stringify(value));
+ },state);
 }

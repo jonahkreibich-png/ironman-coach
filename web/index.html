@@ -44,7 +44,8 @@ try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElem
 </head>
 <body>
 <header class="top"><div class="top-in" id="top"></div></header>
-<main id="app"></main>
+<p id="app-startup" role="status" style="padding:16px">Deine gespeicherten Daten werden geladen …</p>
+<main id="app" data-app-state="loading"></main>
 <nav class="tabbar" aria-label="Bereiche"><div class="tabbar-in" id="tabs"></div></nav>
 <div id="sheet" class="sheet-wrap" hidden>
   <div class="sheet-bg" data-act="sheet-close"></div>
@@ -52,6 +53,6 @@ try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElem
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 <noscript><p style="padding:16px">%APP_NAME% braucht JavaScript.</p></noscript>
-<script type="module" src="/src/main.ts"></script>
+<script type="module" src="/src/bootstrap.ts"></script>
 </body>
 </html>

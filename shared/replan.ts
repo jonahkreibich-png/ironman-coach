@@ -1,13 +1,18 @@
+import {effectiveCustomBuckets} from './custom-state26';
 /* Kommende Wochen neu planen (Kern, ohne Browser): gleicher Ablauf für App, Fragebogen, Coach-Chat, Server und Tests.
    Regel für alle (Auftrag 7): Gibt es schon einen Plan, wird FORTGESETZT, nicht neu begonnen. Vergangene Wochen bleiben,
    Wochen- und Blockzählung laufen weiter, der Umfang knüpft an die Belastung (CTL/ATL) an, Score-Kalibrierung und Verlauf
    bleiben im Plan. Auftrag 11: Änderungen gelten ab heute (ab 18 Uhr ab morgen), nicht erst ab nächstem Montag. Vergangene Tage und
    erledigte Einheiten der laufenden Woche bleiben unverändert, der Rest der Woche wird neu verteilt (Erledigtes zählt mit).
    Vom Nutzer als „fest“ markierte Einheiten werden übernommen. */
-import { generatePlan, transitionPlan, continuationOf, mondayOf, type GenResult } from './plangen';
+import { generatePlan, transitionPlan, continuationOf, mondayOf, dayCap, type GenResult } from './plangen';
 import * as C from './core';
 import type { Profile } from './profile';
 import type { Goal } from './goals';
+import { repairSpacing } from './planrules';
+import { easyOf, isHardSession } from './intensity';
+import { rulesOf, evaluate, dayLimit, allowedHard } from './constraints';
+import { parseFor } from './ruleparse';
 
 /* Ab wann gilt eine Änderung? Heute, ab 18 Uhr morgen. */
 export function replanStart(today: string, hour: number): string { return hour >= 18 ? C.addDays(today, 1) : today; }
@@ -78,6 +83,34 @@ export function extendPlan(plan: any, profile: Profile, goals: Goal[], today: st
   const past = (goals || []).filter(g => g && g.date && g.date <= lastEnd && g.date > C.addDays(lastEnd, -21));
   const gen = generatePlan({ profile, goals: gl, today: lastEnd, continueFrom: continuationOf(plan, lastEnd), load: null, pastGoals: past });
   const next = transitionPlan(plan, gen.plan, lastEnd);
+  // Generated blocks have no knowledge of the preceding Sunday's sport. Repair
+  // the join with a read-only copy of the old tail; all existing weeks stay exact.
+  const from = C.addDays(lastEnd, 1);
+  const tail = JSON.parse(JSON.stringify(weeks[weeks.length - 1]));
+  for (const d of tail.days || []) for (const s of d.sessions || []) s.frozen = true;
+  const rules = rulesOf(profile, parseFor(from));
+  const fixes = repairSpacing([tail, ...next.weeks.slice(weeks.length)], profile, {
+    from, noMove: true, keep: (s: any) => !!s.pinned || !!s.locked || !!s._done,
+    dayCap: (date: string) => Math.min(dayCap(profile, new Date(date + 'T12:00:00Z').getUTCDay()), dayLimit(rules, date).cap),
+    allowed: (s: any, date: string) => !evaluate(rules, s, date).hard.length && dayLimit(rules, date).cap > 0 && !(s.sport === 'swim' && s.place !== 'outdoor' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, date)),
+  });
+  // The first new day also observes the old block's final hard day, across sports.
+  const lastDay = (tail.days || []).find((d: any) => d.date === lastEnd);
+  const firstDay = next.weeks.slice(weeks.length).flatMap((w: any) => w.days || []).find((d: any) => d.date === from);
+  if (lastDay?.sessions.some(isHardSession) && firstDay) {
+    firstDay.sessions = firstDay.sessions.map((s: any) => {
+      if (!isHardSession(s)) return s;
+      if (s.fixed || s.race || s.stage || s.frozen || s.pinned || s.locked || s._done || !s.spec || /test/i.test(s.title || '')) {
+        fixes.push(from + ': Konflikt: zwei harte Tage hintereinander; feste Einheit bleibt erhalten.');
+        return s;
+      }
+      const easy = easyOf(s, next.weeks[weeks.length]?.phase || 'base');
+      easy.description = (easy.description || '') + ' Warum: Nach dem harten Vortag locker, damit keine zwei harten Tage hintereinander entstehen.';
+      fixes.push(from + ': Locker nach dem harten Vortag: keine zwei harte Tage hintereinander.');
+      return easy;
+    });
+  }
+  if (fixes.length) next.meta = { ...next.meta, ruleFixes: [...(next.meta?.ruleFixes || []), ...fixes] };
   next.meta = { ...next.meta, explain: (plan.meta && plan.meta.explain) || gen.plan.meta.explain, extendedAt: today };
   return next.weeks.length > weeks.length ? next : null;
 }
@@ -92,7 +125,7 @@ export function calibrationDue(plan: any, state: any, today: string): { minutes:
     const st = ((state && state.sessions) || {})[s.id]; if (!st || !st.completed || s.sport === 'football' || s.sport === 'rest') return;
     min += +((st.metrics || {}).min) || s.plannedMinutes || 0; n++;
   }));
-  Object.entries((state && state.customWorkouts) || {}).forEach(([d, l]: any) => { if (d >= from && d < m.calibrateAt) (l || []).forEach((c: any) => { if (c && c.sport !== 'football') { min += +((c.metrics || {}).min) || c.plannedMinutes || 0; n++; } }); });
+  Object.entries((state && effectiveCustomBuckets(state)) || {}).forEach(([d, l]: any) => { if (d >= from && d < m.calibrateAt) (l || []).forEach((c: any) => { if (c && c.sport !== 'football') { min += +((c.metrics || {}).min) || c.plannedMinutes || 0; n++; } }); });
   if (n < 2) return null;
   return { minutes: Math.round(min / 2) };
 }

@@ -94,3 +94,29 @@ describe('Analyse: Grundtests (ohne echte Daten)', () => {
   });
   test('Krankheit hat Vorrang vor allem', () => { const W1 = world('jugend-langdistanz'); W1.state.illnessPeriods = [{ id: 'i', start: CHAT_TODAY, end: null }]; expect(analyze(W1.ctx() as any).top[0].id).toBe('ill'); });
 });
+
+import {swimReviewMessages} from '../../shared/coach/analysis';
+import {defaultProfile} from '../../shared/profile';
+describe('Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis',()=>{
+ const setup=()=>({today:'2026-10-27',now:1000,profile:{...defaultProfile(),skills:{swimCrawlM:100,swimPullM:50}},baseWeeks:[],state:{sessions:{},customWorkouts:{},activities:{},adjustments:{},coachMsgs:{},profile:{skills:{swimCrawlM:100,swimPullM:50}}}} as any);
+ const update=(crawl=50)=>({reviewOnly:true,skills:{swimCrawlM:crawl,swimPullM:50},text:'Bitte pruefen: aktuelle Ergebnisse belegen 50 m.',adjustments:Array.from({length:30},(_,i)=>({id:'old-'+i,sessionId:'s'+i,set:{title:'SYNTHETIC Schwimmen'},what:'SYNTHETIC neue Schwimmeinheit'}))});
+ const applyMessages=(ctx:any,msgs:any[])=>msgs.forEach(m=>ctx.state.coachMsgs[m.id]=m);
+ test('alte dreifache Hinweise werden ueberholt, Text bleibt kurz, Details bleiben separat',()=>{const ctx=setup();for(let i=0;i<3;i++)ctx.state.coachMsgs['msg-swim-legacy-old'+i]={id:'msg-swim-legacy-old'+i,proposal:{status:'open',skillsOnly:true,changes:[]},text:'alt'};const msgs=swimReviewMessages(ctx,update());applyMessages(ctx,msgs);const all=Object.values(ctx.state.coachMsgs) as any[];expect(all.filter(m=>m.proposal.status==='open')).toHaveLength(1);expect(all.filter(m=>m.proposal.status==='superseded')).toHaveLength(3);const current=all.find(m=>m.proposal.status==='open');expect(current.text.length).toBeLessThan(500);expect(current.details).toHaveLength(1);expect(current.proposal.changes).toHaveLength(31);});
+ test('unveraenderter Anlass erzeugt keine neue ID; irrelevante Daten erneuern nur den Leseschutz',()=>{const ctx=setup();applyMessages(ctx,swimReviewMessages(ctx,update()));const id=Object.keys(ctx.state.coachMsgs)[0];ctx.state.sessions.other={completed:true,metrics:{hr:120}};ctx.now=2000;applyMessages(ctx,swimReviewMessages(ctx,update()));expect(Object.keys(ctx.state.coachMsgs)).toEqual([id]);expect(ctx.state.coachMsgs[id].at).toBe(1000);});
+ test('abgelehnter Anlass bleibt erledigt, veraenderter Vorschlag ist neuer Anlass',()=>{const ctx=setup();applyMessages(ctx,swimReviewMessages(ctx,update()));const old=Object.values(ctx.state.coachMsgs)[0] as any;old.proposal.status='rejected';expect(swimReviewMessages(ctx,update())).toEqual([]);applyMessages(ctx,swimReviewMessages(ctx,update(25)));expect((Object.values(ctx.state.coachMsgs) as any[]).filter(m=>m.proposal.status==='open')).toHaveLength(1);expect(old.proposal.status).toBe('rejected');});
+ test('korrigierte Daten lassen offene alte Vorschlaege nicht als aktuelle Fakten stehen',()=>{const ctx=setup();applyMessages(ctx,swimReviewMessages(ctx,update()));applyMessages(ctx,swimReviewMessages(ctx,null));expect((Object.values(ctx.state.coachMsgs) as any[]).every(m=>m.proposal.status==='superseded')).toBe(true);});
+});
+
+test('Analyseversion folgt Eingangsdaten statt Chat-Lesestatus',()=>{
+ const ctx={today:'2026-10-27',now:1000,profile:defaultProfile(),goals:[],baseWeeks:[],planMeta:{},state:{sessions:{},customWorkouts:{},activities:{},adjustments:{},trend:[],illnessPeriods:[],settings:{},coachMsgs:{}}} as any;
+ const first=analyze(ctx,'view');expect(first.inputVersion).toMatch(/^results-/);expect(first.modelVersion).toBe('analysis-v1');
+ ctx.state.coachMsgs.a={id:'a',text:'gelesen',unread:false};expect(analyze(ctx,'view').inputVersion).toBe(first.inputVersion);
+ ctx.state.trend=[{date:ctx.today,ctl:20,atl:30,tsb:-10}];expect(analyze(ctx,'view').inputVersion).not.toBe(first.inputVersion);
+});
+
+test('ueberholter Schwimmvorschlag wird bei erneut passendem Anlass reaktiviert',()=>{
+ const ctx={today:'2026-10-27',now:1000,profile:{...defaultProfile(),skills:{swimCrawlM:400,swimPullM:50}},baseWeeks:[],state:{sessions:{},customWorkouts:{},activities:{},adjustments:{},coachMsgs:{},profile:{skills:{swimCrawlM:400,swimPullM:50}}}} as any;
+ const update=(n:number)=>({reviewOnly:true,skills:{swimCrawlM:n,swimPullM:50},text:'SYNTHETIC Pruefvorschlag',adjustments:[]});
+ const apply=(n:number)=>swimReviewMessages(ctx,update(n)).forEach(m=>ctx.state.coachMsgs[m.id]=m);
+ apply(50);apply(100);apply(50);const open=Object.values(ctx.state.coachMsgs).filter((m:any)=>m.proposal.status==='open') as any[];expect(open).toHaveLength(1);expect(open[0].proposal.changes[0].data.skills.swimCrawlM).toBe(50);
+});

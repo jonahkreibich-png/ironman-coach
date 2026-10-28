@@ -131,3 +131,22 @@ describe('nach dem Schwellentest: Zonen automatisch aktualisieren', () => {
     expect(runTestUpdate({ sessions: {} }, weeks, prof, '2026-10-25')).toBe(null);
   });
 });
+
+test('Pull Buoy bleibt ein eigenes kanonisches Ergebnis', () => {
+ expect(fieldsOf({metrics:{longestCrawl:'50',longestPull:'100'}},'swim')).toMatchObject({longestCrawl:50,longestPull:100});
+ expect(fieldsFromNote('100 m Kraul mit Pull Buoy am Stück und 50 m Kraul ohne Pull Buoy am Stück','swim').metrics).toMatchObject({longestPull:'100',longestCrawl:'50'});
+ expect(fieldsFromNote('2 x 50 m Kraul mit Pause, insgesamt 100 m','swim').metrics.longestCrawl).toBeUndefined();
+});
+
+test('unbekannte oder unterstützte Dauerschwimmstrecke ist kein Kraulnachweis', async()=>{
+ const {crawlOf}=await import('../../shared/results');
+ expect(crawlOf({source:'manual',swim:{longestContinuousM:100}})).toBeNull();
+ expect(crawlOf({swim:{longestContinuousM:100,byStroke:{freestyle:100},equipment:['pull buoy']}})).toBeNull();
+ expect(crawlOf({swim:{longestContinuousM:100,byStroke:{freestyle:100}}})).toBe(100);
+ expect(crawlOf({source:'manual',swim:{longestCrawlM:50,longestPullM:100,equipment:['pull buoy']}})).toBe(50);
+});
+
+
+test.each(['100 m Brust am Stück','100 m Rücken am Stück','100 m breaststroke am Stück','100 m backstroke am Stück','100 m am Stück','100 m Kraul mit Kickbrett am Stück','100 m Kraul mit board am Stück','100 m Kraul mit fins am Stück','100 m Kraul mit Flossen am Stück','100 m Kraul mit snorkel am Stück','100 m Kraul mit Schnorchel am Stück','100 m Kraul mit paddles am Stück'])('Notiz bildet keinen unaided Kraulnachweis aus %s',text=>{
+ expect(fieldsFromNote(text,'swim').metrics.longestCrawl).toBeUndefined();
+});

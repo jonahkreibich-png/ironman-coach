@@ -1,4 +1,5 @@
-import { actualMetrics } from './results';
+import {effectiveCustomBuckets} from './custom-state26';
+import { actualMetrics, crawlOf } from './results';
 /* Leistungs-Scores je Sportart (Auftrag 12): feste Leistungsskala 0-100 statt „Anteil am Ziel“.
    20 = Einsteiger, 50 = solider Hobbysportler, 70 = stark, 85 = Spitzenamateur, 100 = Elite; alters- und geschlechtsbereinigt, wenn bekannt.
    Kein Abschneiden bei 100 mehr: wer besser wird, steigt weiter.
@@ -30,7 +31,7 @@ export interface Counted { date: string; title: string; value: string; manual: b
 export interface Gain { key: string; text: string; delta: number }
 export interface StageGoal { target: number; from: number; set: string }
 export interface SportScore {
-  sport: ScoreSport; score: number; measured: number | null; confidence: number; confText: string; level: string;
+  sport: ScoreSport; score: number; /** Evidence-backed score; null for a profile/start estimate. score remains available to low-data UI. */ measured: number | null; confidence: number; confText: string; level: string;
   /** Auftrag 19: Bereich der Schätzung (± Punkte) und Text dazu („± 4, wenig Daten“) */
   range: number; rangeText: string;
   /** Auftrag 20: vorläufig (weniger als 5 brauchbare Einheiten und kein Test) */
@@ -172,7 +173,7 @@ function trainDays(c: Ctx, sport: string): { trained: string[]; cross: string[] 
    (bei der einfachen Rolle ist sie geschätzt, beim Smart-Trainer zählen die Watt). Laufband-Pace zählt schwächer. GPS-Ausreißer
    (unrealistische Werte) zählen nicht. Bei niedrigem Puls (unter 80 % der Schwelle) wird nur vorsichtig hochgerechnet: die Messung zählt
    weniger; unter 60 % sagt sie nichts über die Leistung. Was nicht zählt, steht mit Grund im „Warum?“. */
-export interface Ignored { date: string; title: string; value: string; why: string; key: 'trainer' | 'watts' | 'gps' | 'lowhr' | 'intervals' }
+export interface Ignored { date: string; title: string; value: string; why: string; key: 'trainer' | 'watts' | 'gps' | 'lowhr' | 'intervals' | 'swim' }
 export const isSmartTrainer = (p: Pick<Profile, 'trainerType' | 'powerMeter'>) => p.trainerType === 'smart' || (p.trainerType == null && !!p.powerMeter);
 /* Stammen die Watt dieser Fahrt von einem Messgerät? */
 export function wattsTrusted(a: Pick<Activity, 'indoor' | 'bikeType' | 'name'>, p: Pick<Profile, 'trainerType' | 'powerMeter' | 'bikes'>): boolean {
@@ -320,13 +321,24 @@ function bikeObs(c: Ctx, lthr: number, power: boolean, ign: Ignored[] = []): FOb
   });
   return out;
 }
+/* Aggregate pace cannot prove unaided crawl performance when the recorded session includes
+   other strokes or equipment. Unknown style remains a weak pace estimate, never a test. */
+function swimPaceEligible(a: Activity): boolean {
+  const sw: any = a.swim;
+  if (!sw || !(sw.pace100 > 4) || !Number.isFinite(sw.pace100)) return false;
+  const strokes = Object.keys(sw.byStroke || {}).filter(k => sw.byStroke[k] > 0);
+  if (strokes.some(k => !/^(freestyle|crawl|front_crawl)$/i.test(k))) return false;
+  const gear = [sw.gear, sw.equipment, (a as any).gear, (a as any).equipment].flatMap(v => Array.isArray(v) ? v : v && typeof v === 'object' ? Object.keys(v).filter(k => v[k]) : v ? [v] : []);
+  return !(sw.longestPullM > 0) && !gear.some(g => /buoy|pull|fin|paddle|board|snorkel|floss|brett/i.test(String(g)));
+}
 function swimObs(c: Ctx): FObs[] {
   const out: FObs[] = [];
   const v20 = !c.legacy;
   historyActs(c, 'swim').forEach(a => {
-    const pc = a.swim && a.swim.pace100; if (!pc) return;
-    const cont = (a.swim && a.swim.longestContinuousM) || 0;
-    const test = TEST_RE.test(a.name || '');
+    const pc = a.swim && a.swim.pace100; if (!pc || (v20 && !swimPaceEligible(a))) return;
+    const cont = (v20 ? crawlOf(a) : a.swim?.longestContinuousM) || 0;
+    // A session title does not establish the measured 400/200 m protocol; profile test updates handle it.
+    const test = !v20 && TEST_RE.test(a.name || '');
     const add = adder(c, a, out, false);
     const value = `${mmss(pc)}/100 m${cont ? `, ${cont} m am Stück` : ''}`;
     // Auftrag 20: viel Brust oder Technik in der Einheit → das Tempo sagt weniger über die Kraul-Schwelle
@@ -582,13 +594,16 @@ function swimRaw(c: Ctx): Raw {
   const p = inp.profile; const sk = p.skills || {}; const th = p.thresholds;
   const v20 = !c.legacy;
   const counted: Counted[] = [];
-  const canCrawl = sk.swimCrawl === 'yes' || sk.swimCrawl === 'some' || (sk.swimCrawlM || 0) >= 25 || (!!th.cssSec && !(th.estimated || []).includes('cssSec')) || swims.some(a => a.swim && (a.swim.longestContinuousM || 0) >= 25) || (sk.swimCrawl == null && !!th.cssSec);
+  const canCrawl = sk.swimCrawl === 'yes' || sk.swimCrawl === 'some' || (sk.swimCrawlM || 0) >= 25 || (!!th.cssSec && !(th.estimated || []).includes('cssSec')) || swims.some(a => (crawlOf(a) || 0) >= 25) || (sk.swimCrawl == null && !!th.cssSec);
   // CSS: lange Serien (+3 s), Pace einer Einheit (−4 s, Pausen sind drin), Test im Profil, 25-m-Zeit, sonst Brust
   const css: Est[] = [];
+  const ignored: Ignored[] = [];
   swims.forEach(a => {
     const pc = a.swim && a.swim.pace100;
-    const cont = (a.swim && a.swim.longestContinuousM) || 0;
-    if (pc) css.push({ v: cont >= 400 ? pc + 3 : pc - 4, w: (cont >= 400 ? 1 : 0.5) * weightOf(a, inp, end), date: a.date });
+    const cont = (crawlOf(a) || 0);
+    const eligible = !v20 || swimPaceEligible(a);
+    if (pc && !eligible) ignored.push({ date: a.date, title: titleOf(a), value: mmss(pc) + '/100 m', why: 'Stil oder Hilfsmittel der Einheit erlauben keine Zuordnung zur Kraul-CSS ohne Hilfsmittel', key: 'swim' });
+    if (pc && eligible) css.push({ v: cont >= 400 ? pc + 3 : pc - 4, w: (cont >= 400 ? 1 : 0.5) * weightOf(a, inp, end), date: a.date });
     counted.push({ date: a.date, title: titleOf(a), value: [a.km ? Math.round(a.km * 1000) + ' m' : '', pc ? mmss(pc) + '/100 m' : '', cont ? `${cont} m am Stück` : ''].filter(Boolean).join(', ') || `${a.min} min`, manual: isManual(a) });
   });
   const cssEst = (th.estimated || []).includes('cssSec');
@@ -609,7 +624,7 @@ function swimRaw(c: Ctx): Raw {
   const cap = v20 ? capWith(capPts(c, 'swim', null), prior, pts) : null;
   const flt = filterFor(c, 'swim', swimObs(c), v20 ? { prior, o: { pts, weekPts: WEEK_PTS.swim, capZ: cap != null ? zForPts(pts, cap, prior.z) : null } } : null);
   const cssV = flt ? Math.exp(-flt.z) : wmedian(s)!;
-  const conts = swims.map(a => (a.swim && a.swim.longestContinuousM) || 0).filter(x => x > 0);
+  const conts = swims.map(a => crawlOf(a) || 0).filter(x => x > 0);
   // ein kurzes Stück in einer Technik-Einheit senkt das Können nicht: höchster Wert aus Einheiten und Fragebogen
   const cont = conts.length ? Math.max(...conts, sk.swimCrawlM || 0) : (sk.swimCrawlM ?? null);
   const pool = (a: Activity) => (a.swim && a.swim.poolLengthM) || 25;
@@ -623,7 +638,7 @@ function swimRaw(c: Ctx): Raw {
   ];
   const latest = swims.map(a => a.date).sort().pop() || null;
   return { evidence, parts, n: swims.length, counted, latest, manualShare: swims.length ? swims.filter(isManual).length / swims.length : 1, levelSource: source === 'CSS' ? (cssEst && !swims.length ? 'Schätzung aus dem Profil' : 'Einheiten und Test') : source === 'Brust' ? 'Brust-Tempo' : 'Schätzung', extra: { css: cssV, dps, spl, cont, canCrawl },
-    filter: flt, sub: pts, mainKey: 'css', priorSd: source === 'CSS' ? (cssEst ? 0.1 : 0.04) : 0.12, ignored: [] };
+    filter: flt, sub: pts, mainKey: 'css', priorSd: source === 'CSS' ? (cssEst ? 0.1 : 0.04) : 0.12, ignored };
 }
 
 /* Auftrag 20: Obergrenze, aber nie unter einem genau bekannten Startwert (Test im Profil, Bestzeit) */
@@ -671,7 +686,9 @@ function scoreAt(sport: ScoreSport, inp: ScoreInput, end: string, legacy = false
   const c = { ...ctxFor(sport, inp, end), legacy };
   const r = rawFor(sport, c);
   const cb = combine(r.parts);
-  const measured = cb.score;
+  // A usable observation supports the estimate; a profile prior by itself is not measured.
+  const supported = !!((r.filter?.n || 0) || r.evidence?.length || (sport === 'strength' && r.n) || (sport === 'swim' && c.inp.activities.some(a => a.sport === 'swim' && !a.mergedInto && a.date <= end && (crawlOf(a) || 0) > 0)));
+  const measured = supported ? cb.score : null;
   // Vertrauen: Menge, Aktualität, Uhr statt Hand, Anteil gemessener Teile
   const evidenceLatest = r.evidence?.map(x => x.date).sort().pop() || r.latest;
   const ageDays = evidenceLatest ? Math.max(0, (Date.parse(end) - Date.parse(evidenceLatest)) / 86400000) : 99;
@@ -686,7 +703,7 @@ function scoreAt(sport: ScoreSport, inp: ScoreInput, end: string, legacy = false
   const deviation = med && wmedian((r.evidence || []).map(x => ({ ...x, v: Math.abs(x.v - med) / Math.abs(med) })));
   const agreement = deviation == null ? 1 : 1 / (1 + 4 * deviation);
   const confidence = Math.round(Math.max(r.n ? 0 : 0.05, nF * recF * qF * cb.coverage * agreement) * 100) / 100;
-  const score = Math.round(clamp((measured ?? 10) + ((inp.manualAdjust && inp.manualAdjust[sport]) || 0), 1, 120));
+  const score = Math.round(clamp((cb.score ?? 10) + ((inp.manualAdjust && inp.manualAdjust[sport]) || 0), 1, 120));
   // Auftrag 20: vorläufig, bis mindestens 5 brauchbare Einheiten oder ein Test da sind; dann ist auch der Bereich mindestens ± 5
   const provisional = !legacy && sport !== 'strength' && !(r.filter && r.filter.tested) && ((r.filter && r.filter.usable) || 0) < 5;
   const range = provisional ? Math.max(5, rangeOf(sport, r, effectiveN)) : rangeOf(sport, r, effectiveN);
@@ -1001,12 +1018,12 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       efficiency: sp && hr ? Math.round(sp * 60 / hr * 100) / 100 : null,
       // Auftrag 20: eingetragene Testwerte (Puls und Tempo im Testteil) zählen wie eine Test-Runde
       laps: testLap(sport, m), intervals: null,
-      swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), strokeRate: num(m.rate) } : null,
+      swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), longestCrawlM: num(m.longestCrawl), longestPullM: num(m.longestPull), strokeRate: num(m.rate) } : null,
       rpe: num(s && s.rpe)
     } as Activity);
   };
   planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, s.sport, st.metrics || {}, s.title, { ...st, zone: s.zone }, s.plannedMinutes); }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
   return out;
 }
 

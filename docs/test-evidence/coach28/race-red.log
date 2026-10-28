@@ -1,0 +1,104 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» server/test/sync-integrity.test.ts (15 tests | 2 failed | 12 skipped) 33ms
+   Ôåô Kopie der echten Datenbank umstellen (Auftrag 6, Punkt 4) > Altbestand ohne error_log: upgradeCopy bringt ihn auf den neuen Aufbau, nichts geht verloren
+   Ôåô Migration 0002 an einer Kopie mit Altdaten > Daten landen bei Nutzer 1, nichts geht verloren
+   Ôåô Mehrere Nutzer > Einladung, getrennte Daten, Kopplung bleibt beim eigenen Nutzer
+   Ôåô Einrichtungscode > ohne Code keine Erst-Einrichtung, mit Code Zugang als Nutzer 1
+   Ôåô Atomare und wiederholbare Synchronisierung > Fehler nach Datensatz 100 rollt Daten und Revision zurueck
+   Ôåô Atomare und wiederholbare Synchronisierung > Retry und veraltete Aenderung beleben Tombstone nicht wieder
+   Ôåô Atomare und wiederholbare Synchronisierung > Konten bleiben privat; fremde user_id und SQL im Schluessel wirken nicht
+   Ôåô Atomare und wiederholbare Synchronisierung > ueberlappende Schreibaufrufe behalten den neuesten Zeitstempel
+   Ôåô Atomare und wiederholbare Synchronisierung > 5000 Datensaetze bleiben per Cursor vollstaendig ohne externe KI-Aufrufe
+   Ôåô API bestaetigt Datenbankfehler nicht; alte Trainingswerte bleiben und Retry funktioniert
+   Ôåô alter Coach-Vorschlag darf eine inzwischen absolvierte Einheit nicht verschieben
+   ├ù Analyse schreibt nur auf unveraenderten Nutzerstand > atomarer Guard verhindert alle alten Schreibvorgaenge und Revisionsaenderungen 19ms
+     ÔåÆ promise resolved "undefined" instead of rejecting
+   Ôåô Analyse schreibt nur auf unveraenderten Nutzerstand > unveraenderter Nutzerstand erlaubt mehrere Writes im selben Batch
+   ├ù Analyse schreibt nur auf unveraenderten Nutzerstand > Tombstone macht alten Stand ungueltig und wird nicht wiederbelebt 7ms
+     ÔåÆ promise resolved "undefined" instead of rejecting
+   Ô£ô Analyse schreibt nur auf unveraenderten Nutzerstand > echte Datenbankfehler bleiben Fehler 7ms
+ ÔØ» server/test/coach-results-flow.test.ts (9 tests | 2 failed | 7 skipped) 62ms
+   Ôåô Kopie der echten Datenbank umstellen (Auftrag 6, Punkt 4) > Altbestand ohne error_log: upgradeCopy bringt ihn auf den neuen Aufbau, nichts geht verloren
+   Ôåô Migration 0002 an einer Kopie mit Altdaten > Daten landen bei Nutzer 1, nichts geht verloren
+   Ôåô Mehrere Nutzer > Einladung, getrennte Daten, Kopplung bleibt beim eigenen Nutzer
+   Ôåô Einrichtungscode > ohne Code keine Erst-Einrichtung, mit Code Zugang als Nutzer 1
+   Ôåô echter Sync-Pfad bewertet r├╝ckdatierte Korrektur erneut und l├ñsst den gespeicherten Plan bestehen
+   Ôåô synthetischer Serverpfad bewertet Oberkoerper statt geplantem Unterkoerper
+   Ôåô synthetischer Serverpfad konsolidiert alte Hinweise und respektiert abgelehnten Anlass
+   ├ù vor einer Ablehnung geladener Analysezustand darf den Anlass nicht erneut oeffnen 47ms
+     ÔåÆ expected 'open' to be 'rejected' // Object.is equality
+   ├ù Aenderung waehrend KI-Wartezeit verwirft alte Enginewrites und Erfolgsmarkierung 14ms
+     ÔåÆ expected undefined to be truthy
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 4 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  server/test/coach-results-flow.test.ts > vor einer Ablehnung geladener Analysezustand darf den Anlass nicht erneut oeffnen
+AssertionError: expected 'open' to be 'rejected' // Object.is equality
+
+Expected: "rejected"
+Received: "open"
+
+ ÔØ» server/test/coach-results-flow.test.ts:56:77
+     54|   expect((await getRecord(env,1,'coachMsg',open.id))!.data.proposal.stÔÇª
+     55|   now.mockReturnValue(base+3000);await runAnalysis(env,1,'activity',{dÔÇª
+     56|   expect((await getRecord(env,1,'coachMsg',open.id))!.data.proposal.stÔÇª
+       |                                                                             ^
+     57|  }finally{now.mockRestore();}
+     58| });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/4]ÔÄ»
+
+ FAIL  server/test/coach-results-flow.test.ts > Aenderung waehrend KI-Wartezeit verwirft alte Enginewrites und Erfolgsmarkierung
+AssertionError: expected undefined to be truthy
+
+- Expected: 
+true
+
++ Received: 
+undefined
+
+ ÔØ» server/test/coach-results-flow.test.ts:65:118
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/4]ÔÄ»
+
+ FAIL  server/test/sync-integrity.test.ts > Analyse schreibt nur auf unveraenderten Nutzerstand > atomarer Guard verhindert alle alten Schreibvorgaenge und Revisionsaenderungen
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected: 
+Error {
+  "message": "rejected promise",
+}
+
++ Received: 
+undefined
+
+ ÔØ» server/test/sync-integrity.test.ts:114:170
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[3/4]ÔÄ»
+
+ FAIL  server/test/sync-integrity.test.ts > Analyse schreibt nur auf unveraenderten Nutzerstand > Tombstone macht alten Stand ungueltig und wird nicht wiederbelebt
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected: 
+Error {
+  "message": "rejected promise",
+}
+
++ Received: 
+undefined
+
+ ÔØ» server/test/sync-integrity.test.ts:124:108
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[4/4]ÔÄ»
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 1 passed | 19 skipped (24)
+   Start at  17:56:12
+   Duration  1.84s (transform 825ms, setup 39ms, collect 2.87s, tests 95ms, environment 0ms, prepare 220ms)
+

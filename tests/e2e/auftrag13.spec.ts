@@ -1,5 +1,5 @@
 /* Auftrag 13 (Punkt 1 und 3): Verbindungen zeigen Fehler mit Grund, letzte Datei, letzten Abruf und „Jetzt abrufen“; Trends im Fortschritt. */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './storage-harness';
 import { seed, open } from './helpers';
 
 const DBX_ERROR = { id: 'dropbox', label: 'Dropbox (HealthFit)', kind: 'oauth', availability: 'ready', configured: true, status: 'error', lastSyncAt: Date.parse('2026-10-14T05:15:00Z'), lastOkAt: Date.parse('2026-10-13T18:00:00Z'),
@@ -15,26 +15,46 @@ test.describe('mit Server', () => {
     await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einrichtungscode' }).click();
     await page.locator('[data-act="sync-setup"]').click();
     await expect(page.locator('[data-sync-status]').first()).toBeVisible();
-    let syncCalls = 0;
-    await page.route('**/api/connections', async r => { const real = await (await r.fetch()).json(); real.connections = real.connections.map((c: any) => c.id === 'dropbox' ? DBX_ERROR : c); await r.fulfill({ json: real }); });
-    await page.route('**/api/connect/dropbox/sync', r => { syncCalls++; return r.fulfill({ status: 404, json: { error: DBX_ERROR.error } }); });
+    // Echten Kontostatus einmal vollstaendig lesen, bevor der Fehler injiziert wird.
+    // Kein route.fetch() im wiederholt aufgerufenen Handler: seine APIResponse
+    // kann sonst erst nach dem Testende gelesen und bereits disposed sein.
+    const connectionsResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/connections' && r.request().method() === 'GET');
     await open(page, '/?go=mehr&open=verbindungen');
-    const row = page.locator('[data-act="conn-open"][data-id="dropbox"]');
-    await expect(row).toHaveAttribute('data-state', 'error');
-    await expect(row).toContainText('Fehler');
-    await expect(row).not.toContainText('nicht verbunden');
-    await row.click();
-    await expect(page.locator('[data-conn-state]')).toContainText('Fehler');
-    await expect(page.locator('[data-conn-check]')).toContainText('fehlgeschlagen');
-    await expect(page.locator('[data-conn-file]')).toContainText('Laufen-Apple Watch');
-    await expect(page.locator('[data-conn-error="folder"]')).toContainText('HealthFit-Ordner');
-    await expect(page.locator('#sheetPanel')).toContainText('Automatischer Export');
-    await expect(page.locator('#sheetPanel')).toContainText('Full Dropbox'); // Betreiber sieht, was an der Dropbox-App zu ändern ist
-    await expect(page.locator('#sheetPanel summary', { hasText: 'HealthFit → intervals.icu' })).toBeVisible();
-    await page.locator('#sheetPanel [data-act="conn-sync"]').click();
-    await expect.poll(() => syncCalls).toBe(1);
-    // „Neu verbinden“ (nach neuer Dropbox-App nötig), aber kein „Verbinden“, das so tut, als wäre nichts verbunden
-    await expect(page.locator('#sheetPanel [data-act="conn-start"]')).toHaveText('Neu verbinden');
+    const response = await connectionsResponse;
+    expect(response.ok()).toBe(true);
+    const real = await response.json();
+    expect(real.connections.some((c: any) => c.id === 'dropbox')).toBe(true);
+    const withError = { ...real, connections: real.connections.map((c: any) => c.id === 'dropbox' ? DBX_ERROR : c) };
+    let syncCalls = 0;
+    try {
+      await page.route('**/api/connections', r => r.fulfill({ json: withError }));
+      await page.route('**/api/connect/dropbox/sync', r => { syncCalls++; return r.fulfill({ status: 404, json: { error: DBX_ERROR.error } }); });
+      await open(page, '/?go=mehr&open=verbindungen');
+      const row = page.locator('[data-act="conn-open"][data-id="dropbox"]');
+      await expect(row).toHaveAttribute('data-state', 'error');
+      await expect(row).toContainText('Fehler');
+      await expect(row).not.toContainText('nicht verbunden');
+      await row.click();
+      await expect(page.locator('[data-conn-state]')).toContainText('Fehler');
+      await expect(page.locator('[data-conn-check]')).toContainText('fehlgeschlagen');
+      await expect(page.locator('[data-conn-file]')).toContainText('Laufen-Apple Watch');
+      await expect(page.locator('[data-conn-error="folder"]')).toContainText('HealthFit-Ordner');
+      await expect(page.locator('#sheetPanel')).toContainText('Automatischer Export');
+      await expect(page.locator('#sheetPanel')).toContainText('Full Dropbox'); // Betreiber sieht, was an der Dropbox-App zu ändern ist
+      await expect(page.locator('#sheetPanel summary', { hasText: 'HealthFit → intervals.icu' })).toBeVisible();
+      const syncResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/connect/dropbox/sync' && r.request().method() === 'POST');
+      await page.locator('#sheetPanel [data-act="conn-sync"]').click();
+      expect((await syncResponse).status()).toBe(404);
+      // Die Fehlermeldung erscheint erst nach dem anschliessenden Status-Neuladen.
+      // Der Zaehler allein lief schon VOR fulfill() und bewies keinen Abschluss.
+      await expect(page.locator('#toast')).toContainText(DBX_ERROR.error);
+      await expect.poll(() => syncCalls).toBe(1);
+      // „Neu verbinden“ (nach neuer Dropbox-App nötig), aber kein „Verbinden“, das so tut, als wäre nichts verbunden
+      await expect(page.locator('#sheetPanel [data-act="conn-start"]')).toHaveText('Neu verbinden');
+    } finally {
+      // Auch laufende fulfill-Handler beenden, bevor Playwright den Kontext schliesst.
+      await page.unrouteAll({ behavior: 'wait' });
+    }
   });
 });
 

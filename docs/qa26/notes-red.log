@@ -1,0 +1,43 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/plan26-work
+
+ ÔØ» tests/unit/plan-actions26.test.ts (15 tests | 1 failed) 356ms
+   Ô£ô plan actions preserve identity and actual journal > moves an undocumented past session three weeks onto an empty date 3ms
+   Ô£ô plan actions preserve identity and actual journal > swaps individual sessions without moving siblings 7ms
+   Ô£ô plan actions preserve identity and actual journal > swaps whole days across weeks and supports undo with adjustment groups 0ms
+   Ô£ô plan actions preserve identity and actual journal > rechecks completed history immediately before confirmation 1ms
+   Ô£ô plan actions preserve identity and actual journal > rejects invalid dates, duplicate IDs, stale moves and swaps involving completed siblings 1ms
+   Ô£ô plan actions preserve identity and actual journal > warns about combining hard sessions without forbidding a move 0ms
+   Ô£ô plan actions preserve identity and actual journal > repeated moves preserve one copy and leave actual records untouched 1ms
+   Ô£ô moves custom drafts by replay, preserves raw buckets, and blocks legacy completed extras 1ms
+   Ô£ô applies custom draft prescriptions without modifying actual data and rejects legacy completion at confirm 0ms
+   Ô£ô rejects nonpositive or nonfinite minutes and negative distances before constructing changes 0ms
+   Ô£ô requires coherent prescription blocks when changing structured template totals or sport 0ms
+   Ô£ô keeps structured prescriptions behind the block editor and skips generic week scaling  335ms
+   Ô£ô rejects negative duration from both add and generic edit handlers without saving 1ms
+   Ô£ô blocks undo and redo groups after moved or newly added sessions are completed 1ms
+   ├ù keeps custom journal pain signals separate from template instructions at the moved date 4ms
+     ÔåÆ expected undefined to be 'Leistenschmerz 4/10' // Object.is equality
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/plan-actions26.test.ts > keeps custom journal pain signals separate from template instructions at the moved date
+AssertionError: expected undefined to be 'Leistenschmerz 4/10' // Object.is equality
+
+- Expected: 
+"Leistenschmerz 4/10"
+
++ Received: 
+undefined
+
+ ÔØ» tests/unit/plan-actions26.test.ts:139:86
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/1]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  14:34:36
+   Duration  1.07s (transform 456ms, setup 22ms, collect 301ms, tests 356ms, environment 0ms, prepare 146ms)
+

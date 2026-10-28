@@ -1,0 +1,16 @@
+
+Running 4 tests using 1 worker
+
+
+
+(node:26364) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/4] [chromium-iphone] ÔÇ║ tests\e2e\auftrag4.spec.ts:136:1 ÔÇ║ C5: Plan bearbeiten ÔÇô Einheit ├ñndern, als fest markieren, r├╝ckg├ñngig und Original
+[2/4] [chromium-iphone] ÔÇ║ tests\e2e\auftrag5.spec.ts:57:1 ÔÇ║ A4: Plan bearbeiten ÔÇô Regel bewusst brechen nur mit Warnung, gilt dann nur f├╝r diese Einheit
+(node:8048) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[3/4] [webkit-iphone] ÔÇ║ tests\e2e\auftrag4.spec.ts:136:1 ÔÇ║ C5: Plan bearbeiten ÔÇô Einheit ├ñndern, als fest markieren, r├╝ckg├ñngig und Original
+[4/4] [webkit-iphone] ÔÇ║ tests\e2e\auftrag5.spec.ts:57:1 ÔÇ║ A4: Plan bearbeiten ÔÇô Regel bewusst brechen nur mit Warnung, gilt dann nur f├╝r diese Einheit
+  4 passed (10.8s)

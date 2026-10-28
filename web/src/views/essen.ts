@@ -1,3 +1,4 @@
+import {effectiveCustomWorkouts} from '../store';
 /* Essen: Bedarf des Tages, Gegessenes, Vorschläge, Gewicht. Ziel ist GENUG zu essen: kein Defizit, für Minderjährige keine Gewichtsziele.
    Essen per Foto ist vorbereitet: ohne KI-Coach geht Foto und Frage per Teilen-Menü an die Claude-App. */
 import { STATE, saveState, findDay, UI } from '../store';
@@ -24,7 +25,7 @@ function sessionsFor(date: string): DaySession[] {
     const min = status === 'done' && m.min ? parseNum(m.min) : (s.plannedMinutes || (s.sport === 'football' ? (/spiel/i.test(s.title) ? 60 : 90) : 0));
     out.push({ sport: s.sport, title: s.title, zone: s.zone, minutes: min || 0, race: !!s.race });
   });
-  ((STATE.customWorkouts || {})[date] || []).forEach((w: any) => out.push({ sport: w.sport, title: w.title, minutes: parseNum((w.metrics || {}).min) ?? w.plannedMinutes ?? 0, custom: true }));
+  ((effectiveCustomWorkouts() || {})[date] || []).forEach((w: any) => out.push({ sport: w.sport, title: w.title, minutes: parseNum((w.metrics || {}).min) ?? w.plannedMinutes ?? 0, custom: true }));
   return out.filter(x => x.minutes > 0);
 }
 function weightFor(date: string): number {

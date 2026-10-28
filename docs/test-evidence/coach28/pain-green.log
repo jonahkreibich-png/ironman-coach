@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô tests/unit/chat.test.ts (343 tests | 338 skipped) 16ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 338 skipped (343)
+   Start at  22:06:35
+   Duration  1.21s (transform 618ms, setup 23ms, collect 881ms, tests 16ms, environment 0ms, prepare 113ms)
+

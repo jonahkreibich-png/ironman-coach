@@ -1,5 +1,6 @@
 /* Auftrag 4: Fehler aus dem ersten Test, nachgestellt auf iPhone-Breite (Chromium und WebKit). Diese Tests bleiben im Paket. */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './storage-harness';
+import { type Page } from '@playwright/test';
 import { seed, open, stored, TODAY, openPlanSession } from './helpers';
 
 const tab = (page: Page, id: string) => page.locator(`.tab[data-tab="${id}"]`);

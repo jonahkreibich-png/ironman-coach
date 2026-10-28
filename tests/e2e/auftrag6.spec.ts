@@ -1,11 +1,14 @@
 /* Auftrag 6, Punkt 1: Bestätigen statt sofort ändern. Ein Tipp ins Wochenraster merkt nur vor; der Plan ändert sich erst mit „Übernehmen“. */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './storage-harness';
 import { seed, open, stored } from './helpers';
 
-const snapshot = (page: any) => page.evaluate(() => {
+const snapshot = async (page: any) => {
+  await stored(page); // Startmigrationen und bestaetigten Commit vor dem Vergleich abwarten.
+  return page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('ec_state_v2') || 'null');
   return { plan: localStorage.getItem('ec_plan'), rules: JSON.stringify((st.profile || {}).rules || []), notes: JSON.stringify((st.profile || {}).notes || []), adjustments: JSON.stringify(st.adjustments || {}), goals: JSON.stringify(st.goals || {}) };
 });
+};
 
 test('versehentlicher Tipp ins Wochenraster → Verwerfen → Plan und Regeln unverändert', async ({ page }) => {
   await seed(page);

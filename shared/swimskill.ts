@@ -7,6 +7,7 @@ import * as C from './core';
 import * as W from './workouts';
 import * as K from './keysessions';
 import { actualMetrics } from './results';
+import { swimDistancesFromText } from './fields';
 import type { Skills } from './profile';
 
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) && n > 0 ? n : null; };
@@ -53,7 +54,7 @@ export function stageFor(crawlM: number, breast: boolean, canCrawl = false): { l
 
 export interface SwimSkillUpdate { skills: Pick<Skills, 'swimCrawlM' | 'swimPullM' | 'swimCrawl' | 'swimEvidence'>; adjustments: any[]; text: string; stage: { ladder: string; n: number } | null; reviewOnly?: true }
 /* Bestwerte oder vollständigen Ergebnis-Scan auswerten. Rückgabe enthält Profiländerungen und Planvorschläge, keine Mutation. */
-export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, today: string, best: { crawl?: number | null; pull?: number | null; authoritative?: boolean }, now = Date.now(), source = 'deine Werte'): SwimSkillUpdate | null {
+export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, today: string, best: { crawl?: number | null; pull?: number | null; authoritative?: boolean }, now = Date.now(), source = 'deine Werte', state?: any): SwimSkillUpdate | null {
   const sk = profile.skills || {};
   const evidence: NonNullable<Skills['swimEvidence']> = JSON.parse(JSON.stringify(sk.swimEvidence || {}));
   const reconcile = (key: 'crawl' | 'pull', stored: any, incoming: any): number | null => {
@@ -94,6 +95,7 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
   const canCrawl = mode === 'yes';
   const stage = stageFor(crawl, !!sk.swimBreast, canCrawl);
   const repOld = W.swimRepMax(sk), repNew = W.swimRepMax({ swimCrawlM: crawl });
+  const manualSessions = new Set(C.activeAdjustments(adjustments || {}).filter((a: any) => a.from_user && (a.sessionId || a.session?.id)).map((a: any) => a.sessionId || a.session?.id));
   const eff = C.applyAdjustments(weeks, adjustments || {});
   const adj: any[] = [];
   const g = 'swimstage-' + now;
@@ -101,7 +103,7 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
     if (!skillChanged) break;
     if (d.date <= today) continue;
     for (const s of d.sessions) {
-      if (s.sport !== 'swim' || s.cancelled || (s.stage && s.stage.ladder === 'runwalk')) continue;
+      if (s.sport !== 'swim' || manualSessions.has(s.id) || s.cancelled || s.locked || s.fixed || s.pinned || s.frozen || s._done || s.completed || state?.sessions?.[s.id]?.completed || C.isTestOrRace(s) || s.spec?.kind === 'openwater' || (s.stage && s.stage.ladder === 'runwalk')) continue;
       const cur = s.stage;
       const ctx: W.PaceCtx = { ...((s.spec && s.spec.ctx) || {}),
         gear: Array.isArray(sk.swimGear) ? [...sk.swimGear] : [], pool: sk.poolM === 50 ? 50 : 25 };
@@ -143,14 +145,14 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
 /* Alte Profilwerte haben keine sichere Herkunft. Niedrigere echte Ergebnisse sind deshalb nur ein Pruefvorschlag.
    Weder das Profil noch der bestehende Plan werden hier veraendert; Uebernahme erst nach Zustimmung. */
 export function legacySwimReview(profile: any, weeks: any[], adjustments: any, today: string,
-  best: { crawl?: number | null; pull?: number | null; authoritative?: boolean }, now = Date.now()): SwimSkillUpdate | null {
+  best: { crawl?: number | null; pull?: number | null; authoritative?: boolean }, now = Date.now(), state?: any): SwimSkillUpdate | null {
   const sk = profile.skills || {};
   const current = num(sk.swimCrawlM), observed = num(best.crawl);
   if (sk.swimEvidence || !best.authoritative || !current || !observed || observed >= current) return null;
   // Nur fuer den Vorschlag behandeln wir die alte Zahl als unbestaetigte Ableitung.
   const candidateProfile = { ...profile, skills: { ...sk,
     swimEvidence: { crawl: { value: current, baseline: null } } } };
-  const update = swimSkillUpdate(candidateProfile, weeks, adjustments, today, best, now, 'geprüfte Ergebnisse');
+  const update = swimSkillUpdate(candidateProfile, weeks, adjustments, today, best, now, 'geprüfte Ergebnisse', state);
   if (!update) return null;
   return { ...update, reviewOnly: true,
     text: `Bitte prüfen: Im Profil stehen ${current} m Kraul am Stück; die aktuellen Ergebnisse belegen höchstens ${observed} m. Die Herkunft der alten Angabe ist unklar. Vorschlag: ${observed} m und passende künftige Schwimmeinheiten übernehmen. Erst deine Zustimmung ändert Profil und Plan.` };
@@ -161,14 +163,7 @@ export function parseSwimSkill(text: string): { crawl?: number; pull?: number } 
   if (/\?|\b(?:nicht|kein\w*|geplant|plan|soll\w*|möchte|moechte|will|würde|wuerde|könnte|koennte)\b/i.test(text)) return null;
   const t = text.toLowerCase().replace(/ß/g, 'ss');
   if (!/kraul|freistil|pull|pullbuoy|pull-buoy|am stück|am stueck|durchschwimmen/.test(t)) return null;
-  const out: { crawl?: number; pull?: number } = {};
-  const re = /(\d{2,4})\s*(?:m|meter)\b([^.,;\d]{0,40})/g; let m: RegExpExecArray | null;
-  while ((m = re.exec(t))) {
-    const v = +m[1]; if (v < 10 || v > 5000) continue;
-    const ctxAfter = m[2] || '';
-    const before = t.slice(Math.max(0, m.index - 25), m.index);
-    if (/pull/.test(ctxAfter) || /pull/.test(before)) out.pull = v; else out.crawl = v;
-  }
+  const out = swimDistancesFromText(t);
   if (!out.crawl && !out.pull) return null;
   if (!/schaff|kann|geschafft|am st|durch|bin|komme|jetzt/.test(t)) return null;
   return out;

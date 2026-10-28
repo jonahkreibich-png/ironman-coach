@@ -1,0 +1,14 @@
+
+Running 2 tests using 1 worker
+
+
+(node:15324) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/2] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload
+
+(node:27736) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[2/2] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload
+  2 passed (15.9s)

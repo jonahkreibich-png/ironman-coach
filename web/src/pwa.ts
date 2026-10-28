@@ -1,3 +1,4 @@
+import { storage, storageMessage } from './persistence';
 /* Service Worker, Updates und dauerhafter Speicher. */
 import { saveState } from './store';
 import { toast } from './toast';
@@ -12,8 +13,9 @@ function showUpdate(worker: ServiceWorker | null) {
   el.id = 'upd'; el.className = 'upd'; el.setAttribute('role', 'status');
   el.innerHTML = '<span>Neue Version der App ist da.</span><button class="btn small" id="upd-go">Aktualisieren</button>';
   document.body.appendChild(el);
-  document.getElementById('upd-go')!.addEventListener('click', () => {
-    try { saveState(); } catch (e) {}
+  document.getElementById('upd-go')!.addEventListener('click', async () => {
+    saveState();
+    if (!await storage.settled()) { toast(storageMessage()); return; }
     if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     else location.reload();
   });
@@ -28,7 +30,7 @@ export async function checkForUpdate(manual?: boolean): Promise<void> {
 export function startPwa(): void {
   // Im Entwicklungsmodus (vite dev) gibt es keinen Service Worker
   if (import.meta.env.DEV || !('serviceWorker' in navigator) || location.protocol === 'file:') return;
-  window.addEventListener('load', async () => {
+  const register = async () => {
     try {
       reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
       if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
@@ -43,17 +45,20 @@ export function startPwa(): void {
       // sonst gehen gerade eingegebene Daten verloren. Nur bei einem echten Update neu laden.
       let hadController = !!navigator.serviceWorker.controller;
       let reloading = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
+      navigator.serviceWorker.addEventListener('controllerchange', async () => {
         if (!hadController) { hadController = true; return; }
         if (reloading) return; reloading = true;
-        try { saveState(); } catch (e) {}
+        saveState();
+        if (!await storage.settled()) { reloading = false; showUpdate(null); toast(storageMessage()); return; }
         location.reload();
       });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg!.update().catch(() => {});
       });
     } catch (e) { /* offline oder nicht unterstützt: App läuft trotzdem */ }
-  });
+  };
+  if (document.readyState === 'complete') void register();
+  else window.addEventListener('load', register, {once:true});
   // Bittet den Browser, die Daten nicht automatisch zu löschen
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
 }

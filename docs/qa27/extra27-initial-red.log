@@ -1,0 +1,61 @@
+
+Running 4 tests using 1 worker
+
+(node:12932) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform (5.3s)
+(node:5124) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  2 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern (30.1s)
+Testing stopped early after 2 maximum allowed failures.
+
+
+  1) [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: getByRole('button', { name: 'Dein Trainingsdashboard' })
+    Expected: "true"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" getByRole('button', { name: 'Dein Trainingsdashboard' }) with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Dein Trainingsdashboard' })
+
+
+      3 | test('Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform',async({page})=>{
+      4 |  await seed(page,{extra:d=>{d.sessions={};d.customWorkouts={[TODAY]:[{id:'unknown-time',sport:'strength',title:'SYNTHETIC Kraft',completed:true}]};}});await open(page,'/?go=plan');
+    > 5 |  const toggle=page.getByRole('button',{name:'Dein Trainingsdashboard'});await expect(toggle).toHaveAttribute('aria-expanded','true');await toggle.click();await expect(page.locator('#plan-dashboard-body')).toBeHidden();await page.reload();await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(page.locator('#plan-dashboard-body')).toBeVisible();
+        |                                                                                              ^
+      6 |  await expect(page.locator('[data-actual-minutes]')).toHaveCount(0);await expect(page.locator('[data-dashboard-actual]')).toContainText('Dauer offen');await expect(page.locator('[data-dashboard-actual]')).not.toContainText('+ ?');
+      7 | });
+      8 | for(const sport of ['run','bike','swim','strength'])test(sport+': Extra direkt mit Istwerten abbrechen, speichern und neu laden',async({page})=>{
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\tests\e2e\dashboard-extra27.spec.ts:5:94
+
+    Error Context: scratch\scratch\test-results\extra27\dashboard-extra27-Dashboar-4b24c-eine-kryptische-Istkurzform-chromium-iphone\error-context.md
+
+  2) [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.fill: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('#fd-km')
+
+
+      21 | });
+      22 | test('Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern',async({page})=>{
+    > 23 |  await seed(page,{extra:d=>{d.customWorkouts={};}});await open(page,'/?go=plan');await page.locator('[data-act="custom-add"]').first().click();await page.locator('#fd-km').fill('8');await page.locator('#ca-sport').selectOption('strength');await expect(page.locator('#fd-km')).toHaveCount(0);await page.locator('#ca-sport').selectOption('run');await expect(page.locator('#fd-km')).toHaveValue('8');await page.locator('#ca-sport').selectOption('strength');await page.locator('#fd-min').fill('20');await page.locator('[data-act="custom-save"]').click();const all=Object.values((await stored(page)).customWorkouts).flat() as any[];expect(all).toHaveLength(1);expect(all[0].metrics.km).toBeUndefined();
+         |                                                                                                                                                                             ^
+      24 | });
+      25 |
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\tests\e2e\dashboard-extra27.spec.ts:23:173
+
+    Error Context: scratch\scratch\test-results\extra27\dashboard-extra27-Sportwec-b2d1a-meter-in-Kraft-zu-speichern-chromium-iphone\error-context.md
+
+  2 failed
+    [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform 
+    [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern 
+  2 did not run
+  1 error was not a part of any test, see above for details

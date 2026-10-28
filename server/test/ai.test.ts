@@ -282,3 +282,23 @@ describe('Streaming', () => {
     expect(l2[l2.length - 1]).toMatchObject({ t: 'error', status: 403 });
   });
 });
+
+describe('Kanonische App-Ampel vor Modelltext', () => {
+  test('injizierter roter Modelltext und Stream werden durch echte gelbe App-Ampel ersetzt', async () => {
+    mock([text('Deine Ampel ist rot. Bitte heute Ruhe.')]);
+    setStreamOverride(async (_req: any, delta: (t: string) => void) => {
+      delta('Deine Ampel ist rot.');
+      return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Deine Ampel ist rot. Bitte heute Ruhe.' }], usage: { input_tokens: 100, output_tokens: 20 } };
+    });
+    try {
+      const { env, T } = await user({ oura: true });
+      await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'trend', key: today, data: { date: today, sleepHours: 6.5, restingHR: 51, _src: { sleepHours: 'oura', restingHR: 'shortcut' }, _auto: { sleepHours: { oura: 6.5 }, restingHR: { shortcut: 51 } } }, updatedAt: Date.now() + 1000 }] }, T);
+      const res = await worker.fetch(new Request('http://x/api/coach/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T }, body: JSON.stringify({ text: 'Wie soll ich heute trainieren?' }) }), env, { waitUntil() {} } as any);
+      const lines = (await res.text()).trim().split('\n').map(l => JSON.parse(l));
+      const answer = lines.find(l => l.t === 'done').messages.find((m: any) => m.kind === 'answer');
+      expect(answer.text).toContain('Ampel der App: Gelb');
+      expect(lines.filter(l => l.t === 'delta').map(l => l.text).join('')).not.toContain('rot');
+      expect(lines.filter(l => l.t === 'delta').map(l => l.text).join('')).toContain('Gelb');
+    } finally { setStreamOverride(null); }
+  });
+});

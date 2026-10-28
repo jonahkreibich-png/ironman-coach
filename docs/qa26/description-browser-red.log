@@ -1,0 +1,38 @@
+
+Running 1 test using 1 worker
+
+
+(node:18232) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/1] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+  1) [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('[data-template-preview]')
+    Expected substring: "SYNTHETIC Vorlage"
+    Received string:    "2026-10-14 ┬À Geplanten Inhalt ersetzenBisher: SYNTHETIC Original ┬À 20 minSYNTHETIC runLaufen ┬À 4 min ┬À 600 m3 x ┬À SYNTHETIC Baustein ┬À 60 s ┬À 200 m ┬À 30 s Pause zwischen Wiederholungen/Saetzen ┬À Zone 2Die ID bleibt erhalten. Erfasste Istwerte bleiben unveraendert.ErsetzenErgaenzenAenderung bestaetigenAbbrechen"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" locator('[data-template-preview]') with timeout 5000ms
+      - waiting for locator('[data-template-preview]')
+        14 ├ù locator resolved to <div class="stack" data-template-preview="">ÔÇª</div>
+           - unexpected value "2026-10-14 ┬À Geplanten Inhalt ersetzenBisher: SYNTHETIC Original ┬À 20 minSYNTHETIC runLaufen ┬À 4 min ┬À 600 m3 x ┬À SYNTHETIC Baustein ┬À 60 s ┬À 200 m ┬À 30 s Pause zwischen Wiederholungen/Saetzen ┬À Zone 2Die ID bleibt erhalten. Erfasste Istwerte bleiben unveraendert.ErsetzenErgaenzenAenderung bestaetigenAbbrechen"
+
+
+      21 |  await page.locator('[data-act="template-insert"]').click();
+      22 |  await expect(page.locator('#tpl-filter')).toHaveValue(sport);
+    > 23 |  await page.locator('[data-act="tpl-pick"][data-id="t-'+sport+'"]').click();await expect(page.locator('[data-template-preview]')).toBeVisible();await expect(page.locator('[data-template-preview]')).toContainText('SYNTHETIC Vorlage');
+         |                                                                                                                                                                                                       ^
+      24 |  await page.locator('[data-act="tpl-confirm"]').click();await acceptWarnings(page);
+      25 |  let state=await stored(page);expect(state.sessions.target.metrics.min).toBe('12');expect(state.sessions.target.notes).toBe('SYNTHETIC Istwert bleibt');
+      26 |  let modifications=Object.values(state.adjustments) as any[];expect(modifications.filter(a=>a.type==='add')).toHaveLength(0);expect(modifications.find(a=>a.type==='modify').sessionId).toBe('target');
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\scratch\plan26-work\tests\e2e\plan-templates26.spec.ts:23:199
+
+    Error Context: test-results\plan26\plan-templates26-run-Vorla-97aa4-t-unabhaengige-neue-Einheit-chromium-desktop\error-context.md
+
+
+  1 failed
+    [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit 

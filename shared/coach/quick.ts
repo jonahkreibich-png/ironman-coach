@@ -1,7 +1,7 @@
 /* Schnellfragen: die Engine beantwortet sie aus den Daten, ganz ohne KI. */
 import * as C from '../core';
 import type { EngineCtx } from './engine';
-import { readinessFacts, readinessFallback } from './engine';
+import { readinessFacts, readinessOf } from './engine';
 import { joinDe, de, dowName, mmss } from './texts';
 import { mainGoal, GOALS } from '../goals';
 import { sleepNeed } from '../profile';
@@ -15,7 +15,6 @@ export const QUICK = [
 ] as const;
 export type QuickId = typeof QUICK[number]['id'];
 
-const fb = readinessFallback;
 function weeks(ctx: EngineCtx) { return C.applyAdjustments(ctx.baseWeeks, ctx.state.adjustments || {}); }
 
 export function answerQuick(ctx: EngineCtx, id: QuickId, extra?: { scores?: any[]; prognosis?: any }): string {
@@ -24,7 +23,7 @@ export function answerQuick(ctx: EngineCtx, id: QuickId, extra?: { scores?: any[
     const ill = C.illnessAt(ctx.state.illnessPeriods, today);
     if (ill) return 'Du bist gerade krank. Training würde die Genesung verlängern. Erst wenn du 24-48 h symptomfrei bist, geht es in Stufen weiter.';
     if (C.returnStageActive(ctx.state.illnessPeriods, today)) return 'Du kommst gerade aus einer Krankheit. In den ersten Tagen danach gibt es nur lockere Einheiten, damit dein Körper sich ganz erholt. Intervalle kommen ab Tag 6 zurück, wenn Ruhepuls und HFV passen.';
-    const R = C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, today, fb(ctx));
+    const R = readinessOf(ctx, today);
     const facts = readinessFacts(ctx, today);
     const day = C.planDays(weeks(ctx)).find((d: any) => d.date === today);
     const adj = day ? day.sessions.filter((s: any) => s._adj && s._adj.length) : [];

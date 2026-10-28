@@ -1,0 +1,30 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach
+
+ ÔØ» tests/unit/persistence-journal24.test.ts (9 tests | 1 failed) 8ms
+   Ô£ô Quota: erst Commit bestaetigt, danach Neustart aus IndexedDB statt altem LocalStorage 1ms
+   Ô£ô abgebrochene IDB-Transaktion bestaetigt nie Speichern 0ms
+   Ô£ô viele schnelle Korrekturen bleiben geordnet und neuester Commit gewinnt 0ms
+   Ô£ô Lesefehler im Journal ist kein leerer Datenstand 1ms
+   Ô£ô geloeschter Token darf nach Neustart nicht aus altem LocalStorage wiederkehren 0ms
+   Ô£ô zwei Tabs mit demselben Ausgangsstand schreiben atomar und behalten beide Einheiten 1ms
+   Ô£ô merged retry preserves unconfirmed additions and concurrent data; queued=false 1ms
+   Ô£ô merged retry preserves unconfirmed additions and concurrent data; queued=true 0ms
+   ├ù unchanged retry after multiple failures keeps new workout and clears retry baseline after success 3ms
+     ÔåÆ Cannot read properties of undefined (reading 'metrics')
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/persistence-journal24.test.ts > unchanged retry after multiple failures keeps new workout and clears retry baseline after success
+TypeError: Cannot read properties of undefined (reading 'metrics')
+ ÔØ» tests/unit/persistence-journal24.test.ts:55:508
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/1]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  16:57:32
+   Duration  314ms (transform 41ms, setup 20ms, collect 35ms, tests 8ms, environment 0ms, prepare 97ms)
+

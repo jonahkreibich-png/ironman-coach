@@ -1,0 +1,36 @@
+
+Running 1 test using 1 worker
+
+
+
+(node:10968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/1] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+  1) [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-plan-design="C"]')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('[data-plan-design="C"]') with timeout 5000ms
+      - waiting for locator('[data-plan-design="C"]')
+
+
+       5 | }
+       6 | for(const sport of ['swim','bike','run','strength'])test(sport+': Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss',async({page})=>{
+    >  7 |  await prepare(page,sport);await open(page,'/?go=plan');await expect(page.locator('[data-plan-design="C"]')).toBeVisible();await expect(page.locator('[data-dashboard-planned]')).toHaveAttribute('data-dashboard-planned','20');await expect(page.locator('[data-dashboard-actual]')).toHaveAttribute('data-dashboard-actual','0');
+         |                                                                                                              ^
+       8 |  const check=page.locator('.check[data-act="sess-toggle"][data-sid="dashboard27"]');await expect(check).toHaveAttribute('aria-pressed','false');await check.click();await expect(check).toHaveAttribute('aria-pressed','true');await expect(page.locator('[data-dashboard-actual]')).toHaveAttribute('data-dashboard-actual','17');await page.reload();await expect(check).toHaveAttribute('aria-pressed','true');
+       9 |  await page.locator('[data-act="sess-open"][data-sid="dashboard27"]').click();await page.locator('#fd-min').fill('23');await page.locator('#fd-min').blur();await expect(page.locator('#storage-status')).toBeHidden();await page.locator('button[data-act="sheet-close"]').click();await expect(page.locator('[data-dashboard-actual]')).toHaveAttribute('data-dashboard-actual','23');await page.reload();await expect(page.locator('[data-dashboard-actual]')).toHaveAttribute('data-dashboard-actual','23');await check.click();await expect(check).toHaveAttribute('aria-pressed','false');await expect(page.locator('[data-dashboard-actual]')).toHaveAttribute('data-dashboard-actual','0');expect((await stored(page)).sessions.dashboard27.metrics.min).toBe('23');expect((await stored(page)).sessions.dashboard27.notes).toBe('SYNTHETIC Notiz');
+      10 |  await page.locator('[data-act="template-add"][data-date="'+TODAY+'"]').click();await page.locator('[data-act="tpl-pick"][data-id="one"]').click();await page.locator('[data-act="tpl-confirm"]').click();if(await page.locator('[data-act="edit-anyway"]').count())await page.locator('[data-act="edit-anyway"]').click();const state=await stored(page);const added=(Object.values(state.adjustments) as any[]).find(a=>a.type==='add');const addedCheck=page.locator('.check[data-act="sess-toggle"][data-sid="'+added.session.id+'"]');await addedCheck.click();await expect(addedCheck).toHaveAttribute('aria-pressed','true');await expect(page.locator('[data-dashboard-actual]')).toHaveAttribute('data-unknown-actual','1');await expect(page.locator('[data-dashboard-actual]')).toContainText('Dauer offen');await page.reload();await expect(addedCheck).toHaveAttribute('aria-pressed','true');await expect(page.locator('[data-dashboard-planned]')).toHaveAttribute('data-dashboard-planned','23');
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\scratch\dashboard27-work\tests\e2e\plan-dashboard27.spec.ts:7:110
+
+    Error Context: test-results\plan26\plan-dashboard27-run-Dashb-0de73-start-und-Vorlagenabschluss-chromium-mobile\error-context.md
+
+
+  1 failed
+    [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss 

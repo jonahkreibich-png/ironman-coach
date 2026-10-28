@@ -6,6 +6,8 @@ import * as W from '../../shared/workouts';
 import * as K from '../../shared/keysessions';
 import { paceCtx, generatePlan } from '../../shared/plangen';
 import { defaultProfile, withEstimates } from '../../shared/profile';
+import { sportScores, legacyActivities } from '../../shared/scores';
+import type { Activity } from '../../shared/activity/analyze';
 
 const today = '2026-10-20';
 const profile = (gear: string[], crawl: 'some' | 'yes' = 'some') => withEstimates({
@@ -94,5 +96,57 @@ describe('Schwimmtechnik mit vorhandenem Material und bestätigtem Können', () 
     const b = W.build(W.swimLearn({ ...base, swimMPerMin: 19 }, { ladder: 'swim', n: 3, breast: true }, undefined, 46));
     expect(b.plannedKm! * 1000).toBeLessThan(a.plannedKm! * 1000);
     expect(b.plannedKm! * 1000 / b.plannedMinutes).toBeLessThanOrEqual(19 * 1.35);
+  });
+});
+
+describe('Schwimm-Scores unterscheiden Leistungsnachweise', () => {
+  const p = { ...defaultProfile(), skills: {}, thresholds: { ...defaultProfile().thresholds, cssSec: 160 } };
+  const score = (activities: Activity[]) => sportScores({ today, profile: p, goal: null, illness: [], trend: [], activities }, ['swim'])[0];
+  const swim = (data: any): Activity => ({ id: 'evidence', sport: 'swim', date: today, source: 'healthfit', sources: ['healthfit'], min: 30, km: 1, laps: [], indoor: false, swim: { pace100: 100, longestContinuousM: 1000, ...data } } as Activity);
+  test.each([
+    ['Brust', { byStroke: { breaststroke: 1000 }, longestCrawlM: null }],
+    ['unbekannter Stil', { byStroke: {}, longestCrawlM: null }],
+    ['Pull Buoy', { byStroke: { freestyle: 1000 }, longestCrawlM: null, gear: ['buoy'] }],
+  ])('%s ist kein Kraulrekord ohne Hilfsmittel', (_, data) => {
+    expect(score([swim(data)]).parts.find(x => x.key === 'cont')!.raw).toBeNull();
+  });
+  test('verifizierte Kraulstrecke ersetzt die allgemeine Gesamtstrecke', () => {
+    const s = score([swim({ longestCrawlM: 100, byStroke: { freestyle: 100, breaststroke: 900 } })]);
+    expect(s.parts.find(x => x.key === 'cont')!.raw).toBe(100);
+  });
+  test.each([
+    ['Brust', { byStroke: { breaststroke: 1000 }, longestCrawlM: null }],
+    ['Pull Buoy', { byStroke: { freestyle: 1000 }, longestCrawlM: null, gear: ['buoy'] }],
+  ])('%s-Pace aktualisiert keine Kraul-CSS', (_, data) => {
+    expect(score([swim(data)]).parts[0].raw).toBe(score([]).parts[0].raw);
+  });
+  test.each([
+    ['swim', 'gear'], ['swim', 'equipment'], ['activity', 'gear'], ['activity', 'equipment'],
+  ])('aktive Objekt-Hilfsmittel %s.%s erlauben keine unaided CSS-Pace', (scope, field) => {
+    const a = swim({ byStroke: { freestyle: 1000 }, longestCrawlM: 100 });
+    const target: any = scope === 'swim' ? a.swim : a;
+    target[field] = { pull: true, fins: false };
+    expect(score([a]).parts[0].raw).toBe(score([]).parts[0].raw);
+    expect(score([a]).why.join(' ')).toMatch(/ignoriert.*Hilfsmittel/);
+  });
+  test('deaktivierte Objekt-Hilfsmittel schließen eine echte Kraul-Pace nicht aus', () => {
+    const a = swim({ byStroke: { freestyle: 1000 }, longestCrawlM: 100, gear: { pull: false, fins: false } });
+    expect(score([a]).parts[0].raw).toBeLessThan(score([]).parts[0].raw!);
+  });
+  test('Warum erklärt ausgeschlossene Hilfsmittel-Pace statt sie als CSS-Nachweis anzuzeigen', () => {
+    const s = score([swim({ byStroke: { freestyle: 1000 }, longestPullM: 100, longestCrawlM: 100 })]);
+    expect(s.why.join(' ')).toMatch(/ignoriert.*Hilfsmittel/);
+  });
+  test('ein bloßer Schwimmtest-Titel macht die durchschnittliche Pace nicht zum CSS-Test', () => {
+    const a = swim({ byStroke: { freestyle: 1000 }, longestCrawlM: 100 });
+    const ordinary = score([a]), titled = score([{ ...a, name: 'CSS Test' }]);
+    expect(titled.parts[0].raw).toBe(ordinary.parts[0].raw);
+    expect(titled.provisional).toBe(true);
+  });
+  test('manuelles Pull-Ergebnis wird nicht zur Kraul-CSS oder zum Kraulrekord', () => {
+    const state = { customWorkouts: { [today]: [{ id: 'pull', sport: 'swim', completed: true, title: 'Pull Buoy', metrics: { min: 10, meters: 100, longestPull: 100, pace100: '1:40' } }] } };
+    const s = score(legacyActivities(state, [], p));
+    expect(s.parts.find(x => x.key === 'cont')!.raw).toBeNull();
+    expect(s.parts[0].raw).toBe(score([]).parts[0].raw);
   });
 });

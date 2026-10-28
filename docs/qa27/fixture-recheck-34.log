@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/dashboard27-work
+
+ Ô£ô server/test/scheduled.test.ts (7 tests) 83ms
+ Ô£ô tests/unit/auftrag18-regeln.test.ts (27 tests) 574ms
+
+ Test Files  2 passed (2)
+      Tests  34 passed (34)
+   Start at  15:16:50
+   Duration  1.92s (transform 1.11s, setup 46ms, collect 2.31s, tests 657ms, environment 0ms, prepare 257ms)
+

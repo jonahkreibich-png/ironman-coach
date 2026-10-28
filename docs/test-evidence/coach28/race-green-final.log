@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô server/test/sync-integrity.test.ts (16 tests) 371ms
+ Ô£ô server/test/ai.test.ts (28 tests) 449ms
+ Ô£ô server/test/analysis.test.ts (9 tests) 179ms
+ Ô£ô server/test/isolation.test.ts (11 tests) 155ms
+ Ô£ô server/test/scheduled.test.ts (7 tests) 80ms
+ Ô£ô server/test/coach-results-flow.test.ts (10 tests) 155ms
+ Ô£ô server/test/quality-sync.test.ts (5 tests) 83ms
+
+ Test Files  7 passed (7)
+      Tests  86 passed (86)
+   Start at  17:58:06
+   Duration  4.91s (transform 888ms, setup 91ms, collect 5.32s, tests 1.47s, environment 1ms, prepare 820ms)
+

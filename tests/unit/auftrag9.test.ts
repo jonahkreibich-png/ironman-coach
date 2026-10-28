@@ -97,3 +97,28 @@ describe('Neue Zonen in alle kommenden Einheiten', () => {
     void C;
   });
 });
+
+test('Schwimmangaben trennen Hilfsmittel und Intervalle',()=>{
+ expect(parseSwimSkill('Ich habe 100 m Kraul mit Pull Buoy und 50 m Kraul ohne Pull Buoy am Stück geschafft')).toEqual({pull:100,crawl:50});
+ expect(parseSwimSkill('Ich habe 2 x 50 m Kraul mit Pause geschafft')).toBeNull();
+ expect(parseSwimSkill('Ich habe insgesamt 100 m Kraul in mehreren Intervallen geschafft')).toBeNull();
+});
+test('eine Aktivität mit zwei Verknüpfungen bestätigt keine zweite Einheit',()=>{
+ const state:any={sessions:{a:{completed:true,activityId:'watch',metrics:{longestCrawl:100,longestPull:100}}},customWorkouts:{[today]:[{id:'duplicate',sport:'swim',activityId:'watch',metrics:{longestCrawl:100,longestPull:100}}]},activities:{watch:{id:'watch',sport:'swim',date:today}}};
+ expect(swimBests(state,weeks,today)).toMatchObject({crawl:0,pull:0,best:100,bestPull:100});
+});
+test('Schwimmfortschritt schützt feste und abgeschlossene zukünftige Einheiten',()=>{
+ const ws:any=[{days:[{date:'2026-11-10',sessions:[swimS('locked',2,{locked:true}),swimS('fixed',2,{fixed:true}),swimS('done',2),swimS('ordinary',2)]}]}];
+ const u=swimSkillUpdate(profile,ws,{},today,{crawl:100},1000,'Test',{sessions:{done:{completed:true}}})!;
+ expect(u.adjustments.map(a=>a.sessionId)).toEqual(['ordinary']);
+});
+
+test('freie Uhreinträge behalten getrennte Pull-Nachweise und prüfen Gesamtdistanz',()=>{
+ const state:any={activities:{a:{id:'a',sport:'swim',date:today,km:0.1,swim:{longestCrawlM:50,longestPullM:100}},b:{id:'b',sport:'swim',date:'2026-11-02',km:0.05,swim:{longestCrawlM:100,longestPullM:100}}}};
+ expect(swimBests(state,[],today)).toMatchObject({crawl:0,pull:0,best:50,bestPull:100});
+});
+
+
+test.each(['Ich kann jetzt 100 m Brust am Stueck','Ich kann jetzt 100 m Rücken am Stück','Ich kann jetzt 100 m am Stück','Ich kann jetzt 100 m Kraul mit Kickbrett am Stück','Ich kann jetzt 100 m Kraul mit board am Stück','Ich kann jetzt 100 m Kraul mit fins am Stück','Ich kann jetzt 100 m Kraul mit snorkel am Stück'])('Coach macht aus unbekanntem Stil oder Hilfsmittel keinen unaided Nachweis: %s',text=>{
+ expect(parseSwimSkill(text)).toBeNull();
+});

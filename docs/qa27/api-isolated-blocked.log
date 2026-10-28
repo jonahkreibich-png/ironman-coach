@@ -1,0 +1,33 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/dashboard27-work
+
+ ❯ server/test/api.test.ts (4 tests | 4 skipped) 11003ms
+   ↓ run.mjs
+   ↓ intervals.mjs
+   ↓ coach-server.mjs
+   ↓ push.mjs
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  server/test/api.test.ts [ server/test/api.test.ts ]
+Error: Server startet nicht: http://127.0.0.1:8799/
+mock push on 8798
+mock intervals on 8799, heute 2026-10-27
+
+ ❯ waitFor server/test/api.test.ts:23:9
+     21| async function waitFor(url: string) {
+     22|   for (let i = 0; i < 100; i++) { try { const r = await fetch(url); if…
+     23|   throw new Error('Server startet nicht: ' + url + '\n' + startupLogs.…
+       |         ^
+     24| }
+     25| function run(file: string, env: Record<string, string>): Promise<{ cod…
+ ❯ server/test/api.test.ts:51:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 skipped (4)
+   Start at  15:15:48
+   Duration  11.37s (transform 33ms, setup 27ms, collect 17ms, tests 11.00s, environment 0ms, prepare 130ms)
+

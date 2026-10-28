@@ -1,0 +1,95 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/auftrag20-gross.test.ts (51 tests | 5 failed | 46 skipped) 9882ms
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > Bandbreite: 50 Nutzer, 10 Daten-F├ñlle, 5 Ziele
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v01-tri-olympic-basicTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v02-tri-olympic-smartTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v03-tri-olympic-few
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v04-tri-olympic-outlier
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v05-tri-olympic-pause
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v06-tri-olympic-test
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v07-tri-olympic-treadmill
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v08-tri-olympic-gps
+   ├ù Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v09-tri-olympic-nohr 2935ms
+     ÔåÆ expected [ ÔÇª(2) ] to deeply equal []
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v10-tri-olympic-power
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v11-run-half-basicTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v12-run-half-smartTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v13-run-half-few
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v14-run-half-outlier
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v15-run-half-pause
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v16-run-half-test
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v17-run-half-treadmill
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v18-run-half-gps
+   ├ù Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v19-run-half-nohr 1517ms
+     ÔåÆ expected [ ÔÇª(2) ] to deeply equal []
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v20-run-half-power
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v21-tri-sprint-basicTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v22-tri-sprint-smartTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v23-tri-sprint-few
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v24-tri-sprint-outlier
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v25-tri-sprint-pause
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v26-tri-sprint-test
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v27-tri-sprint-treadmill
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v28-tri-sprint-gps
+   ├ù Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v29-tri-sprint-nohr 2067ms
+     ÔåÆ expected [ ÔÇª(2) ] to deeply equal []
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v30-tri-sprint-power
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v31-bike-event-basicTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v32-bike-event-smartTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v33-bike-event-few
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v34-bike-event-outlier
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v35-bike-event-pause
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v36-bike-event-test
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v37-bike-event-treadmill
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v38-bike-event-gps
+   ├ù Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v39-bike-event-nohr 1238ms
+     ÔåÆ expected [ ÔÇª(2) ] to deeply equal []
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v40-bike-event-power
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v41-tri-middle-basicTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v42-tri-middle-smartTrainer
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v43-tri-middle-few
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v44-tri-middle-outlier
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v45-tri-middle-pause
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v46-tri-middle-test
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v47-tri-middle-treadmill
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v48-tri-middle-gps
+   ├ù Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v49-tri-middle-nohr 2123ms
+     ÔåÆ expected [ ÔÇª(2) ] to deeply equal []
+   Ôåô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v50-tri-middle-power
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 5 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/auftrag20-gross.test.ts > Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v09-tri-olympic-nohr
+ FAIL  tests/unit/auftrag20-gross.test.ts > Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v19-run-half-nohr
+ FAIL  tests/unit/auftrag20-gross.test.ts > Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v29-tri-sprint-nohr
+ FAIL  tests/unit/auftrag20-gross.test.ts > Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v39-bike-event-nohr
+ FAIL  tests/unit/auftrag20-gross.test.ts > Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v49-tri-middle-nohr
+AssertionError: expected [ ÔÇª(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "Score ohne Puls: bike: kein Wert ohne Puls",
++   "Score ohne Puls: run: kein Wert ohne Puls",
++ ]
+
+ ÔØ» tests/unit/auftrag20-gross.test.ts:23:56
+     21|     for (const f of r.findings) { report.findings[f.kind] = (report.fiÔÇª
+     22|     expect(r.plan, 'kein Plan').toBeTruthy();
+     23|     expect(r.findings.map(f => `${f.kind}: ${f.msg}`)).toEqual([]);
+       |                                                        ^
+     24|   }, 180000);
+     25|   afterAll(() => { fs.mkdirSync('test-results', { recursive: true }); ÔÇª
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/5]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 46 skipped (51)
+   Start at  22:10:17
+   Duration  11.22s (transform 692ms, setup 24ms, collect 1.00s, tests 9.88s, environment 0ms, prepare 114ms)
+

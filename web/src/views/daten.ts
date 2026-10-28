@@ -1,3 +1,4 @@
+import { storage as localStorage } from '../persistence';
 /* Daten und Geräte: Sync mit dem eigenen Server, Geräte koppeln, Server-Sicherungen, Datei-Backup,
    Einladungen (nur Admin), Fehlerprotokoll und App-Info. */
 import { STATE, HAS_PLAN, hasLocalData } from '../store';
@@ -128,8 +129,12 @@ on('feat-toggle', el => busy(el, async () => {
 }));
 
 function backupCard(): string {
+  const recovery = localStorage.getItem('ec_restore_previous');
+  const conflicts = STATE.storageConflicts || [];
+  const recoveryInfo = (recovery ? '<button class="btn ghost" data-act="bk-previous">Stand vor letzter Wiederherstellung zurueckholen</button>' : '')
+    + (conflicts.length ? '<div class="banner warn">Es gibt unterschiedliche gespeicherte Werte. Deine aktuelle Anzeige wurde behalten; die anderen Werte sind im persoenlichen Backup enthalten. Bitte die betroffenen Trainingseintraege pruefen.</div>' + more('Andere gespeicherte Werte', '<pre class="small" style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(conflicts,null,2)) + '</pre>') : '');
   const srv = isSyncOn() && BACKUPS ? (BACKUPS.length ? `<div class="lbl">${esc(t('data.serverBackups'))}</div><div class="list">${BACKUPS.slice(0, 7).map(b => `<div class="li" data-bk="${esc(b.day)}"><span class="grow"><span class="t">${dowShort(b.day)} ${fmtDate(b.day)}</span></span><button class="btn ghost sm" data-act="bk-restore">${esc(t('data.restore'))}</button></div>`).join('')}</div>` : `<div class="hint">${esc(t('data.firstBackupTonight'))}</div>`) : '';
-  return `<div class="card stack"><div class="hint">${esc(isSyncOn() ? t('data.backupSync') : t('data.backupLocal'))}</div>
+  return `<div class="card stack">${recoveryInfo}<div class="hint">${esc(isSyncOn() ? t('data.backupSync') : t('data.backupLocal'))}</div>
     <div class="row"><button class="btn" data-act="backup-file">${esc(t('data.backupFile'))}</button><button class="btn ghost" data-act="backup-copy">${esc(t('data.backupCopy'))}</button></div>
     ${srv}
     ${more(t('data.restoreTitle'), `<div class="fld"><label for="bk-in">${esc(t('data.restoreLabel'))}</label><textarea class="inp" id="bk-in" rows="3" placeholder="${esc(t('data.restorePh'))}" style="font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea></div>
@@ -229,7 +234,8 @@ on('bk-restore', el => {
   const day = (el.closest('[data-bk]') as HTMLElement).dataset.bk!;
   return busy(el, async () => {
     const res = await apiCall('GET', '/api/backups/' + day);
-    if (applyBackup(backupFromRecords(res.records || []))) return;
+    if (!Array.isArray(res.records) || !res.records.length) throw new Error('Server-Sicherung ist leer oder ungueltig. Es wurde nichts ersetzt.');
+    if (await applyBackup(backupFromRecords(res.records))) return;
     invalidate(); nav.render(); toast(t('data.restoredServer', { d: fmtDate(day) })); syncNotify();
   });
 });
@@ -237,14 +243,14 @@ on('backup-file', () => shareBackupFile(() => nav.rerender()));
 on('backup-copy', async () => {
   const txt = backupText();
   try { await navigator.clipboard.writeText(txt); markBackedUp(); toast(t('data.backupCopied')); nav.rerender(); }
-  catch (e) { const ta = document.getElementById('bk-in') as HTMLTextAreaElement | null; if (ta) { ta.value = txt; ta.focus(); ta.select(); } toast(t('common.copyManual')); }
+  catch (e) { const ta = document.getElementById('bk-in') as HTMLTextAreaElement | null; if (ta) { const details = ta.closest('details'); if (details) details.open = true; ta.value = txt; ta.focus(); ta.select(); } toast(t('common.copyManual')); }
 });
-on('backup-load', el => {
+on('backup-load', async el => {
   const raw = val('bk-in'); if (!raw) { toast(t('data.restoreEmpty')); return; }
   let data: any; try { data = parseBackupText(raw); } catch (e) { toast(t('data.restoreInvalid')); return; }
   if (!isBackup(data)) { toast(t('data.restoreNoBackup')); return; }
   if (!armed(el, t('data.replaceAll'))) return;
-  if (applyBackup(data)) return;
+  if (await applyBackup(data)) return;
   invalidate(); nav.render(); toast(t('data.restored'));
 });
 onChange('bk-file', el => {
@@ -253,3 +259,12 @@ onChange('bk-file', el => {
 });
 on('app-update', () => checkForUpdate(true));
 void isPlan;
+
+on('bk-previous', async el => {
+  const raw = localStorage.getItem('ec_restore_previous');
+  if (!raw) { toast('Kein vorheriger Stand vorhanden.'); return; }
+  if (!armed(el, 'Aktuellen Stand ersetzen? Nochmals tippen.')) return;
+  const data = parseBackupText(raw);
+  if (await applyBackup(data)) return;
+  invalidate(); nav.render(); toast('Vorheriger Stand wiederhergestellt.');
+});

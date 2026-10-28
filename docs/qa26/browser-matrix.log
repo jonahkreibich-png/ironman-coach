@@ -1,0 +1,52 @@
+
+Running 36 tests using 1 worker
+
+(node:18032) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[2/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[3/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[4/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[5/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:35:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+[6/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:43:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[7/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:53:1 ÔÇ║ Datenbank-Sync speichert neue Vorlagen getrennt pro Konto und loescht sie per Tombstone
+[8/36] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:66:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+[9/36] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ swim: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[10/36] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ bike: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[11/36] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ run: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[12/36] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ strength: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+(node:14184) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+[13/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[14/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[15/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[16/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[17/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:35:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+[18/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:43:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[19/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:53:1 ÔÇ║ Datenbank-Sync speichert neue Vorlagen getrennt pro Konto und loescht sie per Tombstone
+[20/36] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:66:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+[21/36] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ swim: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[22/36] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ bike: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[23/36] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ run: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[24/36] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ strength: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+(node:24444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[25/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[26/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[27/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[28/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[29/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:35:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+[30/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:43:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[31/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:53:1 ÔÇ║ Datenbank-Sync speichert neue Vorlagen getrennt pro Konto und loescht sie per Tombstone
+[32/36] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:66:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+[33/36] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ swim: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[34/36] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ bike: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[35/36] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ run: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[36/36] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ strength: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+  36 passed (3.8m)

@@ -1,3 +1,4 @@
+import { storage as localStorage } from "./persistence";
 /* Kommende Wochen neu planen (Auftrag 4 C3): nach geänderten Berücksichtigungen, Können oder Zeiten.
    Erledigte Einheiten und vergangene Wochen bleiben, ebenso vom Nutzer als „fest“ markierte Einheiten.
    Die Änderung erscheint mit Begründung im Coach-Chat. */

@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô server/test/coach-results-flow.test.ts (7 tests) 107ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  17:44:21
+   Duration  1.87s (transform 836ms, setup 21ms, collect 1.45s, tests 107ms, environment 0ms, prepare 111ms)
+

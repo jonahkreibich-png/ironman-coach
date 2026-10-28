@@ -1,5 +1,20 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.8.0', items: [
+    'Plan mit Trainingsdashboard zum Einklappen. Einheiten bleiben direkt abhakbar; Verschieben und Tauschen funktionieren ueber mehrere Wochen.',
+    'Trainingsvorlagen fuer Schwimmen, Rad, Laufen und Kraft: Vorschau, Ersetzen oder Ergaenzen bestehender Einheiten und neue Einheiten aus Vorlagen.',
+    'Extraeinheiten direkt mit allen Werten erfassen, Kraft ohne Kilometer. Wiederholen fehlgeschlagener Speicherungen behaelt neue Eintraege.'
+  ] },
+  { version: '3.7.2', items: [
+    'Speichern wird erst nach bestaetigtem Browserspeicher abgeschlossen. Nicht gespeicherte Aenderungen bleiben sichtbar; fehlgeschlagene Lesevorgaenge ersetzen keine vorhandenen Daten.',
+    'Backups werden vor dem Wiederherstellen geprueft. Der vorherige Stand bleibt als Rueckfallkopie erhalten.',
+    'Verschobene Einheiten behalten Beschreibung und Werte. Veraltete Tagesverweise werden entfernt; absolvierte Einheiten bleiben geschuetzt.'
+  ] },
+  { version: '3.7.1', items: [
+    'Heute und Coach verwenden dieselbe aktuelle Trainingsampel. Vor einer KI-Frage werden neue Einträge synchronisiert; ohne Verbindung antwortet der Regel-Coach mit den Daten auf deinem Gerät.',
+    'Neuplanung schützt vergangene und bereits erledigte Einheiten. Beim Verlängern des Plans werden auch die Abstände zur vorherigen Woche berücksichtigt.',
+    'Manuelle Messkorrekturen werden vollständiger übernommen. Die Auswertung großer Trainingshistorien ist schneller.'
+  ] },
   { version: '3.7.0', items: [
     'Scores zuverlässiger: Watt zählen nur von Wattmesser oder Smart-Trainer, die Geschwindigkeit von der Rolle zählt nie, Laufband weniger, GPS-Fehler gar nicht. Jeder Score startet vorsichtig, steht als „vorläufig“ da, bis 5 brauchbare Einheiten oder ein Test da sind, und bewegt sich ohne Test höchstens etwa 3 Punkte pro Woche. „Warum?“ zeigt je Einheit, ob sie gezählt hat.',
     'Neue Frage unter Mehr → Berücksichtigungen: Rolle mit Watt (Smart-Trainer) oder einfache Rolle.',

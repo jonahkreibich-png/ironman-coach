@@ -1,3 +1,4 @@
+import { storage as localStorage } from "../persistence";
 /* Plan-Generator (regelbasiert). Nur in der Testumgebung sichtbar (FEATURES.generator).
    Vorschau aus Profil und Hauptziel, dann Übernahme: vergangene Tage bleiben, ab heute gilt der neue Plan. */
 import { STATE, PLAN, HAS_PLAN, PLAN_KEY, readPlan, profile } from '../store';

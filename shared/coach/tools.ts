@@ -5,7 +5,7 @@ import * as C from '../core';
 import { validateWeeks, isIntense, weekMinutes } from '../rules';
 import { GOALS, type GoalType } from '../goals';
 import { isMinor, progressionOf } from '../profile';
-import type { EngineCtx } from './engine';
+import { readinessOf, type EngineCtx } from './engine';
 import { checkPlanCode } from './plancode';
 import { rulesOf, hardViolations, describe as ruleText } from '../constraints';
 import { parseFor, parseRules } from '../ruleparse';
@@ -104,11 +104,12 @@ export function runTool(ctx: EngineCtx, name: string, input: any, opts: { propos
   }
   if (name === 'get_analysis') {
     const a = analyze(ctx, 'view');
-    return { result: JSON.stringify({ load: a.load, insights: a.insights.slice(0, 8).map(i => ({ title: i.title, why: i.why, tip: i.tip, tone: i.tone })) }), isError: false, changes: [] };
+    return { result: JSON.stringify({ readiness: readinessOf(ctx), load: a.load, insights: a.insights.slice(0, 8).map(i => ({ title: i.title, why: i.why, tip: i.tip, tone: i.tone })) }), isError: false, changes: [] };
   }
   if (name === 'move_session' || name === 'modify_session' || name === 'cancel_session') {
     const hit = findSession(weeks, input.session_id || '');
     if (!hit) return err(`Die Einheit "${input.session_id}" gibt es nicht. Hole dir mit get_data die IDs.`);
+    if (ctx.state.sessions?.[hit.s.id]?.completed) return err('Bereits absolvierte Einheiten werden nicht mehr geaendert.');
     if (hit.d.date < today) return err('Vergangene Einheiten werden nicht mehr geändert.');
     const reason = String(input.reason || '').slice(0, 200);
     let a: any;

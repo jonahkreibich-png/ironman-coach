@@ -319,7 +319,7 @@ export default {
     } catch (e: any) {
       const status = e instanceof HttpError ? e.status : 500;
       // Keine Datensätze oder Schlüssel loggen, nur die Meldung
-      if (status === 500) { console.error('Fehler:', e && e.message); await logError(env, 'server', e && e.message, req.method + ' ' + url.pathname); }
+      if (status === 500) { console.error('Fehler:', scrub(e && e.message)); await logError(env, 'server', e && e.message, req.method + ' ' + url.pathname); }
       return json({ error: status === 500 ? 'Da ist etwas schiefgelaufen. Bitte gleich noch einmal versuchen.' : e.message }, status, cors);
     }
   },

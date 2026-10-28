@@ -1,0 +1,132 @@
+
+Running 120 tests using 1 worker
+
+(node:27228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok   1 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform (459ms)
+  ok   2 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ run: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.1s)
+  ok   3 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ bike: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.1s)
+  ok   4 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ swim: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.3s)
+  ok   5 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ strength: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.7s)
+  ok   6 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern (676ms)
+  ok   7 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:26:1 ÔÇ║ Langsames Speichern sperrt Eingaben und schliesst keinen neu geoeffneten Entwurf (1.1s)
+  ok   8 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:39:1 ÔÇ║ Fehlgeschlagener Extra-Speichervorgang behaelt Formular und dupliziert beim Wiederholen nicht (823ms)
+  ok   9 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten (1.2s)
+  -   10 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:21:1 ÔÇ║ Bildschirme werden aus dem Code gefunden
+  -   11 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, leer
+  -   12 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, normal
+  -   13 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, voll
+  -   14 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, fehler
+  -   15 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, leer
+  -   16 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, normal
+  -   17 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, voll
+  -   18 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, leer
+  -   19 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, normal
+  -   20 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, voll
+  -   21 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, fehler
+  -   22 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, leer
+  -   23 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, normal
+  -   24 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, voll
+  -   25 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, leer
+  -   26 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, normal
+  -   27 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, voll
+  -   28 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, fehler
+  -   29 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, leer
+  -   30 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, normal
+  -   31 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, voll
+  -   32 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, leer
+  -   33 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, normal
+  -   34 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, voll
+  -   35 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, fehler
+  -   36 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, leer
+  -   37 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, normal
+  -   38 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, voll
+  -   39 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, leer
+  -   40 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, normal
+  -   41 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, voll
+  -   42 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, fehler
+  -   43 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, leer
+  -   44 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, normal
+  -   45 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, voll
+  -   46 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 320 px: Tab-Beschriftungen einzeilig
+  -   47 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 375 px: Tab-Beschriftungen einzeilig
+  -   48 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 390 px: Tab-Beschriftungen einzeilig
+  -   49 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 430 px: Tab-Beschriftungen einzeilig
+  -   50 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ zoom130 px: Tab-Beschriftungen einzeilig
+  -   51 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   52 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   53 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   54 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   55 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   56 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   57 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   58 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   59 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   60 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+(node:12796) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  61 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform (913ms)
+  ok  62 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ run: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.2s)
+  ok  63 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ bike: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.4s)
+  ok  64 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ swim: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.4s)
+  ok  65 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ strength: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.8s)
+  ok  66 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern (1.2s)
+  ok  67 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:26:1 ÔÇ║ Langsames Speichern sperrt Eingaben und schliesst keinen neu geoeffneten Entwurf (2.0s)
+  ok  68 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:39:1 ÔÇ║ Fehlgeschlagener Extra-Speichervorgang behaelt Formular und dupliziert beim Wiederholen nicht (1.5s)
+  ok  69 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten (3.6s)
+  ok  70 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:21:1 ÔÇ║ Bildschirme werden aus dem Code gefunden (10ms)
+  ok  71 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, leer (3.3s)
+  ok  72 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, normal (10.1s)
+  ok  73 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, voll (11.2s)
+  ok  74 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, fehler (10.1s)
+  ok  75 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, leer (3.5s)
+  ok  76 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, normal (9.8s)
+  ok  77 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, voll (11.5s)
+  ok  78 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, leer (3.5s)
+  ok  79 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, normal (10.3s)
+  ok  80 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, voll (11.5s)
+  ok  81 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, fehler (10.5s)
+  ok  82 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, leer (3.5s)
+  ok  83 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, normal (9.9s)
+  ok  84 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, voll (11.6s)
+  ok  85 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, leer (3.5s)
+  ok  86 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, normal (10.3s)
+  ok  87 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, voll (11.4s)
+  ok  88 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, fehler (10.8s)
+  ok  89 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, leer (3.5s)
+  ok  90 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, normal (10.2s)
+  ok  91 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, voll (11.1s)
+  ok  92 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, leer (3.5s)
+  ok  93 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, normal (10.3s)
+  ok  94 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, voll (11.6s)
+  ok  95 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, fehler (10.7s)
+  ok  96 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, leer (3.7s)
+  ok  97 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, normal (9.3s)
+  ok  98 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, voll (12.2s)
+  ok  99 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, leer (3.4s)
+  ok 100 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, normal (9.7s)
+  ok 101 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, voll (11.1s)
+  ok 102 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, fehler (10.5s)
+  ok 103 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, leer (3.3s)
+  ok 104 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, normal (9.5s)
+  ok 105 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, voll (10.9s)
+  ok 106 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 320 px: Tab-Beschriftungen einzeilig (193ms)
+  ok 107 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 375 px: Tab-Beschriftungen einzeilig (191ms)
+  ok 108 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 390 px: Tab-Beschriftungen einzeilig (200ms)
+  ok 109 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 430 px: Tab-Beschriftungen einzeilig (200ms)
+  ok 110 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ zoom130 px: Tab-Beschriftungen einzeilig (191ms)
+  ok 111 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.9s)
+  ok 112 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 113 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.7s)
+  ok 114 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.7s)
+  ok 115 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 116 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 117 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 118 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.7s)
+  ok 119 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 120 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.5s)
+
+  Slow test file: [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts (5.5m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  51 skipped
+  69 passed (6.0m)

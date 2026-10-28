@@ -1,9 +1,10 @@
+import { readinessDate } from '../../shared/readiness';
 /* Kleine Hilfen: DOM, Datum, Zahlen. */
 export const $ = (s: string): any => document.querySelector(s);
 export const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o));
 export function esc(s: unknown): string { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string)); }
 export function ymd(d: Date): string { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-export function todayStr(): string { return ymd(new Date()); }
+export function todayStr(): string { return readinessDate(); }
 export function addDays(s: string, n: number): string { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return ymd(d); }
 export function daysBetween(a: string, b: string): number { return Math.round((+new Date(b + 'T12:00:00') - +new Date(a + 'T12:00:00')) / 86400000); }
 export const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];

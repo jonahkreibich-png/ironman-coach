@@ -54,10 +54,24 @@ export async function getRecords(env: Env, uid: number, kind: string, keys?: (st
   return out;
 }
 
+/** Vorhandene revisionsbasierte Datenhaltung: inklusive Tombstones, pro Nutzer. */
+export async function recordsRevision(env: Env, uid: number): Promise<number> {
+  const row = await env.DB.prepare('SELECT COALESCE(MAX(rev),0) AS rev FROM records WHERE user_id = ?').bind(uid).first();
+  return Number(row?.rev || 0);
+}
+export class RecordsChangedError extends Error {
+  constructor() { super('Records changed during analysis'); this.name = 'RecordsChangedError'; }
+}
 export interface Change { kind: string; key: string; data?: any; updatedAt: number; deleted?: boolean }
 /* Schreibt Datensätze. Die neueste Änderung pro Datensatz gewinnt (updatedAt). */
-export async function putRecords(env: Env, uid: number, changes: Change[]): Promise<void> {
+export async function putRecords(env: Env, uid: number, changes: Change[], expectedRevision?: number): Promise<void> {
   const stmts: any[] = [];
+  // Im selben atomaren Batch pruefen. Der vorhandene PK 'rev' ist garantiert belegt;
+  // bei Konflikt bricht sein INSERT den gesamten Batch ab, bevor ein Write erfolgt.
+  // Ein separater SELECT vor batch() liesse wieder eine Read/Write-Luecke offen.
+  if (expectedRevision !== undefined) stmts.push(env.DB.prepare(
+    "INSERT INTO meta(k,v) SELECT 'rev','0' WHERE COALESCE((SELECT MAX(rev) FROM records WHERE user_id = ?),0) <> ?"
+  ).bind(uid, expectedRevision));
   for (const c of changes) {
     stmts.push(env.DB.prepare("UPDATE meta SET v = CAST(v AS INTEGER) + 1 WHERE k = 'rev'"));
     stmts.push(env.DB.prepare(
@@ -67,8 +81,14 @@ export async function putRecords(env: Env, uid: number, changes: Change[]): Prom
        WHERE excluded.updated_at > records.updated_at`
     ).bind(uid, c.kind, c.key, c.deleted ? null : JSON.stringify(c.data), Math.round(c.updatedAt), c.deleted ? 1 : 0));
   }
-  // D1 führt einen Batch als Transaktion aus. In Paketen, damit einzelne Batches klein bleiben.
-  for (let i = 0; i < stmts.length; i += 200) await env.DB.batch(stmts.slice(i, i + 200));
+  // Ein Batch ist eine D1-Transaktion: Aenderungen und Revisionen muessen
+  // auch oberhalb von 100 Datensaetzen bei einem Fehler gemeinsam zurueckrollen.
+  if (stmts.length) try { await env.DB.batch(stmts); }
+  catch (e) {
+    const message = String(e) + ' ' + String((e as any)?.cause || '');
+    if (expectedRevision !== undefined && /UNIQUE constraint failed: meta\.k/i.test(message)) throw new RecordsChangedError();
+    throw e;
+  }
 }
 
 /* Auftrag 18: Datensatz erneut ausliefern (neue Revision), z. B. wenn eine Änderung eines alten Geräts nicht angenommen wurde */

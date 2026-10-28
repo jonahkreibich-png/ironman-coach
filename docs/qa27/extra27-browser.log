@@ -1,0 +1,35 @@
+
+Running 26 tests using 1 worker
+
+(node:25504) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform (464ms)
+  ok  2 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ run: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.2s)
+  ok  3 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ bike: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.2s)
+  ok  4 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ swim: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.3s)
+  ok  5 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ strength: Extra direkt mit Istwerten abbrechen, speichern und neu laden (1.5s)
+  ok  6 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern (732ms)
+  ok  7 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:26:1 ÔÇ║ Langsames Speichern sperrt Eingaben und schliesst keinen neu geoeffneten Entwurf (1.1s)
+  ok  8 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:39:1 ÔÇ║ Fehlgeschlagener Extra-Speichervorgang behaelt Formular und dupliziert beim Wiederholen nicht (745ms)
+  ok  9 [chromium-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ swim: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (1.6s)
+  ok 10 [chromium-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ bike: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (1.6s)
+  ok 11 [chromium-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (1.4s)
+  ok 12 [chromium-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ strength: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (1.6s)
+  ok 13 [chromium-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:12:1 ÔÇ║ C bleibt bei 320/390/1440px hell/dunkel bedienbar und berechnet Ausfaelle/Extras korrekt (1.3s)
+(node:18208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 14 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:3:1 ÔÇ║ Dashboard einklappen bleibt nach Reload erhalten; keine kryptische Istkurzform (900ms)
+  ok 15 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ run: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.3s)
+  ok 16 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ bike: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.6s)
+  ok 17 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ swim: Extra direkt mit Istwerten abbrechen, speichern und neu laden (2.5s)
+  ok 18 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:8:53 ÔÇ║ strength: Extra direkt mit Istwerten abbrechen, speichern und neu laden (3.1s)
+  ok 19 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:22:1 ÔÇ║ Sportwechsel behaelt Werte je Sport ohne Laufkilometer in Kraft zu speichern (1.3s)
+  ok 20 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:26:1 ÔÇ║ Langsames Speichern sperrt Eingaben und schliesst keinen neu geoeffneten Entwurf (2.1s)
+  ok 21 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-extra27.spec.ts:39:1 ÔÇ║ Fehlgeschlagener Extra-Speichervorgang behaelt Formular und dupliziert beim Wiederholen nicht (1.6s)
+  ok 22 [webkit-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ swim: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (3.1s)
+  ok 23 [webkit-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ bike: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (3.0s)
+  ok 24 [webkit-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (3.0s)
+  ok 25 [webkit-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ strength: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss (3.1s)
+  ok 26 [webkit-iphone] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:12:1 ÔÇ║ C bleibt bei 320/390/1440px hell/dunkel bedienbar und berechnet Ausfaelle/Extras korrekt (2.6s)
+
+  26 passed (51.4s)

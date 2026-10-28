@@ -1,3 +1,4 @@
+import {effectiveCustomBuckets} from './custom-state26';
 /* Auftrag 18, Punkt 6: freiwillige Hinweise – Zyklus (nur wenn eingetragen, Hinweise statt Regeln) und Laufschuh-Kilometer (ab 600 km). */
 import * as C from './core';
 
@@ -29,7 +30,7 @@ export function shoeKm(state: any, weeks: any[], s: ShoeSetting | null | undefin
     const a = st.activityId ? (state.activities || {})[st.activityId] : null; if (a) used.add(a.id);
     const v = parseFloat(String(((st.metrics || {}).km) ?? (a && a.km) ?? '').replace(',', '.')); if (v > 0) km += v; else if (x.plannedKm) km += x.plannedKm;
   }); });
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]: any) => { if (d >= s.since! && d <= today) (l || []).forEach((c: any) => { if (c && c.sport === 'run' && c.completed !== false) { const v = parseFloat(String((c.metrics || {}).km || '').replace(',', '.')); if (v > 0) km += v; } }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]: any) => { if (d >= s.since! && d <= today) (l || []).forEach((c: any) => { if (c && c.sport === 'run' && c.completed !== false) { const v = parseFloat(String((c.metrics || {}).km || '').replace(',', '.')); if (v > 0) km += v; } }); });
   C.recordedActivities(state).forEach((a: any) => { if (a && a.sport === 'run' && !a.sessionId && !used.has(a.id) && a.date >= s.since! && a.date <= today && a.km > 0) km += a.km; });
   return Math.round(km);
 }

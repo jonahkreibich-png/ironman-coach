@@ -3,6 +3,8 @@
    2. der Nutzer den Schalter in den Einstellungen eingeschaltet und
    3. der Weitergabe von Gesundheitsdaten zugestimmt hat (Einwilligungs-Bildschirm).
    Ohne das läuft nur die Regel-Engine. Budget: Monatsbudget und Höchstzahl an Nachrichten pro Tag. */
+import { readinessSnapshot, withheldReadiness, guardReadinessAnswer } from '../../shared/readiness';
+import * as C from '../../shared/core';
 import { claimFacts, stripUnsupported } from '../../shared/coach/claims';
 import Anthropic from '@anthropic-ai/sdk';
 import { type Env, berlinDate, putRecords, getRecord, userEntitlements } from './store';
@@ -24,11 +26,26 @@ import { loadState } from './coach';
 
 /* Oura-Daten dürfen laut Oura-API-Vertrag (gültig ab 08.06.2026, Abschnitt 4(d)) nicht an KI-Modelle gehen. Sie werden vor jedem KI-Aufruf entfernt. */
 export const NO_AI_SOURCES = ['oura'];
+/* Alte Planbegründungen haben keine verlässliche Feld-Provenienz. Bei gesperrten
+   Quellen werden ihre freien Texte in einer Kopie entfernt; die App behält das Original. */
+function withoutPlanNarrative(value: any): any {
+  if (Array.isArray(value)) return value.map(withoutPlanNarrative);
+  if (!value || typeof value !== 'object') return value;
+  const narrative = new Set(['reason', 'description', 'what', 'title', 'why', 'note', 'notes', 'focus', 'label', 'blockName', 'text', 'summary', 'explanation', 'rationale', 'instructions', 'instruction', 'hint', 'tip', 'details']);
+  return Object.fromEntries(Object.entries(value).map(([key, v]) => [key, narrative.has(key) && typeof v === 'string' ? 'Trainingsangabe (Begründung nicht für die KI freigegeben)' : withoutPlanNarrative(v)]));
+}
 export function aiSafeCtx(ctx: EngineCtx): EngineCtx {
   let trend = ctx.state.trend || [];
   for (const s of NO_AI_SOURCES) trend = withoutSource(trend, s);
   const acts = Object.fromEntries(Object.entries(ctx.state.activities || {}).filter(([, a]: any) => !a || !NO_AI_SOURCES.includes(a.source)));
-  return { ...ctx, state: { ...ctx.state, trend, activities: acts } };
+  const withheld = !!ctx.readinessWithheld || (ctx.state.trend || []).some((p: any) => NO_AI_SOURCES.some(src => hasSource(p, src))) || Object.values(ctx.state.activities || {}).some((a: any) => a && NO_AI_SOURCES.some(src => a.source === src || a.sources?.includes(src)));
+  const snapshot = withheld ? withheldReadiness(ctx.today) : readinessSnapshot(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.profile, ctx.today);
+  const coachMsgs = Object.fromEntries(Object.entries(ctx.state.coachMsgs || {}).filter(([, m]: any) => !m?.aiExcluded && !(withheld && m?.from !== 'user')));
+  const redactPlan = withheld || Object.values(ctx.state.adjustments || {}).some((a: any) => a?.aiExcluded);
+  const baseWeeks = redactPlan ? withoutPlanNarrative(ctx.baseWeeks) : ctx.baseWeeks;
+  const adjustments = redactPlan ? withoutPlanNarrative(ctx.state.adjustments || {}) : ctx.state.adjustments;
+  const planMeta = redactPlan ? withoutPlanNarrative(ctx.planMeta) : ctx.planMeta;
+  return { ...ctx, baseWeeks, planMeta, readinessWithheld: withheld, readinessSnapshot: snapshot, state: { ...ctx.state, trend, activities: acts, coachMsgs, adjustments, coachNotes: withheld ? {} : ctx.state.coachNotes } };
 }
 
 /* Gespräche und Wochenplanung: Sonnet 5.5 (halb so teuer wie Opus 5.5, reicht fürs Coaching); günstiges Modell für Routine (Briefings, Kommentare, Essensfotos) */
@@ -156,8 +173,7 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
       tools, tool_choice: { type: 'auto' }, messages
     };
     if (live && round > 0) live.reset();
-    const res = stream ? await stream(params, live!.delta) : await create(params);
-    if (live && !stream) { const tx = (res.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim(); if (tx) live.delta(tx); }
+    const res = stream ? await stream(params, () => {}) : await create(params);
     await addUsage(env, uid, MODELS.strong, res.usage || {}, round === 0);
     if (res.stop_reason === 'refusal') { finalText = 'Dazu kann ich dir keine Antwort geben. Frag mich gern etwas zu deinem Training.'; break; }
     messages.push({ role: 'assistant', content: res.content });
@@ -181,7 +197,9 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
   // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen; unbelegte Sätze werden nicht gezeigt
   let shown = finalText || 'Erledigt.'; try { shown = stripUnsupported(shown, claimFacts(ctx)) || shown; } catch (e) { /* unverändert */ }
-  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown });
+  shown = guardReadinessAnswer(shown, text, ctx0);
+  if (live) { live.reset(); shown.split(/(?<=\s)/).forEach(t => live.delta(t)); }
+  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown, aiExcluded: shown.startsWith('Ampel der App:') });
   out.status = await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today)));
   return out;
 }
@@ -237,6 +255,11 @@ export async function decideProposal(env: Env, uid: number, msgId: string, accep
   if (accept && rec.data.proposal.evidenceSignature) {
     const current = await loadState(env, uid);
     if (rec.data.proposal.evidenceSignature !== evidenceSignature(current.state, current.baseWeeks)) throw new HttpError(409, 'Die Trainingsdaten wurden geändert. Bitte den aktualisierten Vorschlag prüfen.');
+  }
+  if (accept) for (const c of rec.data.proposal.changes || []) {
+    if (c.kind !== 'adjust' || !c.data?.sessionId) continue;
+    const session = await getRecord(env, uid, 'session', c.data.sessionId);
+    if (session?.data?.completed) throw new HttpError(409, 'Diese Einheit ist inzwischen absolviert. Bitte einen aktuellen Vorschlag anfordern.');
   }
   const t = Math.max(Date.now(), rec.updatedAt + 1);
   const changes = accept ? (rec.data.proposal.changes || []).map((c: any, i: number) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })) : [];

@@ -12,6 +12,7 @@ import { sleepNeed } from '../profile';
 export interface ClaimFacts {
   /** längste Strecke Kraul am Stück (Einzelwert), bestätigt (in 2 Einheiten) und eigene Angabe im Profil */
   crawlBest: number; crawlConfirmed: number; crawlProfile: number;
+  pullBest?: number; pullConfirmed?: number; pullProfile?: number;
   /** längste wirklich gelaufene / gefahrene Strecke (km) und Dauer (min), längste Schwimmstrecke (m) der letzten 6 Wochen */
   runKm: number; bikeKm: number; runMin: number; bikeMin: number; swimM: number;
   /** Auftrag 18: Ursachen-Daten der Tage, um die es geht (Ursache und Wirkung müssen am selben Tag belegt sein) */
@@ -20,6 +21,7 @@ export interface ClaimFacts {
 export function claimFacts(ctx: EngineCtx, date?: string): ClaimFacts {
   const pr = C.swimProofs(ctx.state, ctx.baseWeeks || [], ctx.today, 84);
   const crawls = pr.map((p: any) => p.crawl).filter(Boolean) as number[];
+  const pulls = pr.map((p: any) => p.pull).filter(Boolean) as number[];
   const items = doneItems(ctx, C.addDays(ctx.today, -42), ctx.today).map(d => ({ d, v: valsOf(d) }));
   const max = (sport: string, k: 'km' | 'min' | 'meters') => Math.max(0, ...items.filter(x => x.d.sport === sport).map(x => Number((x.v as any)[k]) || 0));
   const sk: any = (ctx.profile && ctx.profile.skills) || {};
@@ -27,6 +29,7 @@ export function claimFacts(ctx: EngineCtx, date?: string): ClaimFacts {
   let days: DayFacts[] = [];
   try { days = causeDays(ctx, date); } catch (e) { days = []; }
   return { crawlBest: Math.max(0, ...crawls), crawlConfirmed: C.confirmedOf(crawls), crawlProfile: ev && ev.manual ? Number(sk.swimCrawlM) || 0 : 0,
+    pullBest: Math.max(0,...pulls), pullConfirmed: C.confirmedOf(pulls), pullProfile: sk.swimEvidence?.pull?.manual ? Number(sk.swimPullM) || 0 : 0,
     runKm: max('run', 'km'), bikeKm: max('bike', 'km'), runMin: max('run', 'min'), bikeMin: max('bike', 'min'), swimM: max('swim', 'meters'), days };
 }
 
@@ -156,11 +159,17 @@ export function unsupportedClaims(text: string, f: ClaimFacts): string[] {
     const s = full.replace(PLAN_PART, ' ');
     if (!ACHIEVED.test(s)) continue;
     // Schwimmen: Meter Kraul (am Stück), Stufen mit Stück-Länge
-    if (/kraul|am stück|schwimm|stufe|-m-stücke|bahn/i.test(s)) {
-      const ms = [...s.matchAll(/(\d{2,4})(?:\s*m\b|-m-Stück)/gi)].map(m => +m[1]);
-      const stage = /neue stufe|eine stufe weiter|kannst du jetzt|bestätigt|deine (schwimm-)?stufe|-m-stück/i.test(s);
-      const allowed = stage ? Math.max(f.crawlConfirmed, f.crawlProfile) : Math.max(f.crawlBest, f.crawlProfile, /geschwommen|bahn/i.test(s) && !/kraul|am stück/i.test(s) ? f.swimM : 0);
-      if (ms.some(m => m > allowed + 0.5) || (/bestmarke|bestwert|rekord/i.test(s) && ms.some(m => m > f.crawlBest))) out.push(full);
+    if (/kraul|pull|buoy|am stück|schwimm|stufe|-m-stücke|bahn/i.test(s)) {
+      // Equipment belongs to its own clause. A mixed sentence must satisfy both ceilings.
+      for (const clause of s.split(/[,;]|\bund\b/i)) {
+        const ms=[...clause.matchAll(/(\d{2,4})(?:\s*m\b|-m-Stück)/gi)].map(m=>+m[1]);
+        const pull=/pull|buoy/i.test(clause) && !/ohne\s+(?:den\s+)?pull/i.test(clause);
+        const best=pull?(f.pullBest||0):f.crawlBest, confirmed=pull?(f.pullConfirmed||0):f.crawlConfirmed, profile=pull?(f.pullProfile||0):f.crawlProfile;
+        const stage=/neue stufe|eine stufe weiter|kannst du jetzt|bestätigt|deine (schwimm-)?stufe|-m-stück/i.test(clause);
+        const total=!pull && !/kraul|am stück|ohne.*pull/i.test(clause) && /geschwommen|bahn/i.test(clause);
+        const allowed=stage?confirmed:Math.max(best,profile,total?f.swimM:0);
+        if (ms.some(m=>m>allowed+0.5) || (/bestmarke|bestwert|rekord/i.test(clause) && ms.some(m=>m>best))) {out.push(full);break;}
+      }
       continue;
     }
     // Laufen und Rad: Kilometer und Minuten, die als gemacht behauptet werden

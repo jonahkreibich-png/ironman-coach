@@ -109,7 +109,7 @@ describe('Rad, Schwimmen, Kraft, Form', () => {
   });
   test('Schwimmen: CSS aus langen Serien, Meter pro Zug aus den Zügen pro Bahn', () => {
     const swims = [2, 5, 8, 11, 14, 17].map(d => ({ ...run(d), sport: 'swim', km: 1.6, speedKmh: null, avgHr: null, efficiency: null,
-      swim: { poolLengthM: 25, lengths: 64, activeLengths: 64, strokesPerLength: 18, metersPerStroke: 1.39, pace100: 125, byStroke: {}, longestContinuousM: 600, strokeRate: 30 } } as unknown as Activity));
+      swim: { poolLengthM: 25, lengths: 64, activeLengths: 64, strokesPerLength: 18, metersPerStroke: 1.39, pace100: 125, byStroke: { freestyle: 1600 }, longestContinuousM: 600, longestCrawlM: 600, strokeRate: 30 } } as unknown as Activity));
     const [s] = sportScores({ ...base, activities: swims }, ['swim']);
     // Auftrag 20: der vorsichtige Startwert zieht anfangs noch eine Sekunde mit
     expect(s.parts.find(p => p.key === 'css')!.value).toMatch(/^2:0[89]\/100 m$/);

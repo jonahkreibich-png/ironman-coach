@@ -1,98 +1,11 @@
-# Für Jonah
+# Produktionsfreigabe liegt vor
 
-Nur das, was du selbst tun musst.
+Der Testlauf hat 2398 Unit-/Servertests und 449 Browserpruefungen bestanden. Testbereitstellung und Testsicherung sind geprueft. Du hast die Veroeffentlichung des neuen Coach-Auftrags freigegeben.
 
-## Neu am 24.10. (Auftrag 20)
+Die Produktionssicherung scheitert innerhalb dieser Sitzung an der fehlgeschlagenen DNS-Aufloesung der Cloudflare-API. Es wurde noch nichts auf Produktion veroeffentlicht. Den vollstaendigen vorhandenen Ablauf deshalb in normaler Windows PowerShell starten:
 
-- **App einmal neu öffnen** (bei „Neue Version“ neu laden). Erst ab Version 3.7.0 kann das Handy Plan und Profil wieder ändern.
-- **Radtest am 28.10. draußen auf flacher Strecke machen** (Puls mitlaufen lassen). Auf deiner Rolle zählt für den Score nur der Puls, nicht die Geschwindigkeit. Erst danach ist dein Rad-Score nicht mehr „vorläufig“.
-- **Krank-Eintrag beenden:** In der App stehst du seit 07.10. als „krank“. Wenn du wieder fit bist, auf Heute „Ich bin wieder gesund“ tippen. Solange ist der Plan pausiert und deine Einheiten zählen für die Scores weniger.
-- **Falls du doch einen Smart-Trainer bekommst:** unter Mehr → Berücksichtigungen bei „Rolle“ umstellen, dann zählen die Watt.
+```powershell
+node "C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\scripts\veroeffentlichen.mjs"
+```
 
-## Neu am 24.10. (Auftrag 19)
-
-- **Plan-Tab:** Deine Wahl C ist drin. Tag antippen klappt ihn auf, darunter steht kurz, was zu tun ist.
-- **Krank oder verletzt:** Auf Heute direkt antippen, die App passt den Plan an.
-- **App einmal neu öffnen** (bei „Neue Version“ neu laden). Erst ab Version 3.6.0 kann das Handy Plan und Profil wieder ändern; bis dahin kommt der neue Plan vom Server.
-- **Freiwillig:** Unter Berücksichtigungen „Hügel, Laufbahn, Laufband“ in der Nähe ankreuzen, dann gibt es passende Berg- und Bahn-Einheiten.
-
-## Neu am 23.10. (Auftrag 18)
-
-- **App einmal neu öffnen** (bei „Neue Version“ neu laden). Wichtig: Erst mit der neuen Version (3.5.0) kann das Handy Plan und Profil wieder ändern. Ein Gerät mit alter Version bekommt automatisch den neuen Plan vom Server.
-- **Ruhetag ist jetzt Donnerstag.** Willst du lieber zweimal pro Woche laufen, gib unter Berücksichtigungen einen weiteren Lauftag frei (z. B. Dienstag) oder sag Claude Bescheid.
-- **Freiwillig:** Unter Mehr → Einstellungen → „Laufschuhe und Zyklus“ kannst du deine Laufschuh-km zählen lassen.
-
-## Neu am 22.10. (Auftrag 17)
-
-Nichts Pflicht. App einmal neu öffnen (bei „Neue Version“ neu laden).
-- **Schwimmen:** Trag nach jeder Schwimmeinheit „Kraul am Stück“ ein (was du wirklich geschafft hast). Die nächste Stufe (100-m-Stücke) kommt, sobald du 100 m in 2 Einheiten einträgst.
-- **Ruhetag:** Deine Woche hat keinen festen Ruhetag (Mo Training, Di-So Einheiten, wie von dir vorgegeben). Willst du einen, sag Claude welchen Tag.
-
-## Stand 20.10.2026
-
-**Abschluss 17:35:** Die Änderungen sind jetzt unter https://coach-app-efc7.pages.dev veröffentlicht. App und Backend sind bei Cloudflare bestätigt; die Datenbanksicherung liegt lokal vor. Bei noch alter Anzeige die App neu öffnen beziehungsweise neu laden. Die folgenden Hinweise sind ältere Zwischenstände.
-
-**Aktualisierung 17:10:** Die Anmeldung funktioniert, die vier korrigierten Browsertests sind bestanden und das Testdeployment ist bei Cloudflare als erfolgreich bestätigt. Testversion: https://stamio-test.pages.dev. Die echte App ist noch unverändert; ihre Veröffentlichung erfordert „Freigeben“ gemäß `scripts/release.md`. Die folgenden früheren Hinweise zu den lokalen Zugriffssperren beschreiben den ursprünglichen Zwischenstand.
-
-Die neuen Funktionen liegen lokal auf `entwicklung`. Deine veröffentlichte App ist noch unverändert. Hier sind lokale Browserzugriffe und die Cloudflare-Prüfung gesperrt; die ausstehenden Prüfungen und das Testdeployment müssen in einer entsprechend freigeschalteten Entwicklungsumgebung erfolgen. Erst danach gilt die bestehende Produktionsfreigabe aus `scripts/release.md`. Keine neuen Schlüssel oder kostenpflichtigen Dienste erforderlich.
-
-## Neu am 18.10. (Auftrag 16)
-
-**KI im Coach (kostenlos):** Im Coach erscheint einmal die Karte „KI-Antworten im Coach (kostenlos)“. Tipp auf „Einverstanden“, wenn du sie willst. Papa und Mama sehen die Karte auch, bei Mama legt die App dabei automatisch ein Konto an. Den Verbrauch siehst du unter Mehr → Daten und Geräte → „Kostenlose KI (Verbrauch)“. Heute ist das Gratis-Kontingent durch meine Tests fast leer, bis 2 Uhr nachts antwortet deshalb oft der Regel-Coach.
-
-## Auftrag 15 (18.10.)
-
-**Mama:** nichts zu tun. Sie öffnet die App einfach (bei „Neue Version“ einmal neu laden). Die Läufe verschwinden dann von selbst aus ihrem Plan, ab heute neu verteilt, Erledigtes bleibt. Verbinden geht jetzt direkt: Mehr → Verbindungen → z. B. Oura oder Dropbox → „Verbinden“ → anmelden → „Erlauben“. Die App legt dabei ein Konto für sie an.
-
-**Wenn mehr Leute Oura oder Dropbox verbinden** (erst dann nötig):
-- **Oura** lässt eine neue App nur von wenigen Nutzern verbinden (die App rechnet mit 10). Ab dann sehen neue Nutzer „Oura ist gerade nicht verfügbar“. Freigabe: auf cloud.ouraring.com anmelden → oben „API Applications“ (bzw. Developer) → deine App öffnen → Prüfung/Freigabe beantragen (Zweck: Trainings-App für Familie und Freunde, Daten nur für den Nutzer selbst). Nach der Freigabe sag Claude Bescheid, dann wird die Grenze aufgehoben.
-- **Dropbox:** Im Dropbox App Console (dropbox.com/developers/apps → deine App → Settings) steht „Development users“. Sobald dort 50 stehen, „Apply for production“ antippen (kostenlos, ein kurzes Formular). Bis 500 Nutzer geht es auch ohne.
-
-**Optional, nur für die Test-Umgebung:** Oura ist dort „gerade nicht verfügbar“, weil dort keine Oura-Schlüssel gesetzt sind. Wenn du Oura auch in der Test-App willst: in deiner Oura-App als zweite Redirect-Adresse `https://stamio-test.pages.dev/api/connect/oura/callback` eintragen, dann im Ordner `ironman-coach`: Client ID kopieren und `node scripts/set-secret.mjs OURA_CLIENT_ID` ausführen, danach Client Secret kopieren und `node scripts/set-secret.mjs OURA_CLIENT_SECRET`.
-
-## A. Schwimm-Hilfsmittel eintragen (1 Minute, du und Papa, neu am 17.10.)
-
-Mehr → Berücksichtigungen → Können und Ausrüstung → **Schwimm-Hilfsmittel** antippen (Kickbrett, Pull Buoy, Flossen, Paddles, Frontschnorchel). Nur was ihr habt (oder im Bad leihen könnt), kommt in die Einheiten. Bis dahin plant die App ohne Hilfsmittel. Der Coach erinnert euch auch.
-
-## B. HealthFit muss deine Trainings nach Dropbox schicken (5 min, neu am 17.10.)
-
-Die App liest Dropbox richtig, aber dort liegt nur eine Datei (16.10.). So bekommst du die Trainings rüber:
-1. HealthFit öffnen → unten **Einstellungen** (Zahnrad) → **Automatischer Export** → **Dropbox** einschalten (anmelden, falls gefragt), Format **FIT**.
-2. Bei „Exportieren ab“ ein Datum vor deinen letzten Trainings wählen (falls es die Einstellung gibt), sonst die letzten Trainings einzeln: Training antippen → Teilen (Pfeil) → **Dropbox**.
-3. iPhone: Einstellungen → Allgemein → **Hintergrundaktualisierung** für HealthFit an. HealthFit nach dem Training einmal kurz öffnen, dann geht der Export sicher raus.
-4. In der App: Mehr → Verbindungen → Dropbox → „Jetzt abrufen“. Dort steht jetzt auch, wie viele FIT-Dateien die App in deiner Dropbox findet.
-
-Klappt Dropbox nicht: HealthFit → Einstellungen → **Intervals.icu** einschalten und in der App intervals.icu verbinden (Athleten-ID und API-Schlüssel unter intervals.icu → Settings → Developer Settings).
-
-## 1. Claude als Premium-KI (nur wenn du willst, kostet Geld)
-
-Nicht nötig: Ohne Schlüssel antwortet die kostenlose KI (Workers AI), sonst der Regel-Coach. Mit Schlüssel antwortet stattdessen Claude, die Regeln und Zahlen bleiben dieselben.
-
-**Was es kostet** (Schätzung mit deinen echten Daten, Sonnet 5.5 für Gespräche, Haiku 5.5 für kurze Texte):
-
-| Nutzung | pro Monat |
-|---|---|
-| 1 Frage pro Tag | ca. 1,50 $ |
-| 3 Fragen pro Tag | ca. 4 $ |
-| 8 Fragen pro Tag | ca. 9 $ |
-
-Eine Frage kostet etwa 3 bis 4 Cent, halb so viel wie mit Opus. Mitteilungen umformulieren, Regeln lesen und Essensfotos kosten zusammen unter 30 Cent im Monat. Die App hört beim Monatsbudget auf (einstellbar 2, 5, 10 oder 20 $) und antwortet dann wieder kostenlos mit dem Regel-Coach.
-
-**In 3 Schritten:**
-
-1. Auf **console.anthropic.com** anmelden, unter „Billing“ Guthaben aufladen (z. B. 5 $; das kaufst du selbst, Claude kauft nichts) und dort ein Monatslimit setzen. Dann unter „API Keys“ einen Schlüssel anlegen und **kopieren** (beginnt mit `sk-ant-`).
-2. Im Ordner `ironman-coach` im Terminal: `node scripts/set-secret.mjs ANTHROPIC_API_KEY echt` (nimmt den Schlüssel aus der Zwischenablage, zeigt ihn nicht an). Zum Ausprobieren in der Test-App ohne `echt`.
-3. In der App: Mehr → Einstellungen → KI-Coach → Einwilligung lesen und bestätigen, Schalter an, Budget wählen.
-
-## 2. Namen wählen (wenn du magst)
-
-[NAMEN.md](NAMEN.md): 10 freie Namen, Empfehlung „Tempendo“. Vor der Wahl in der Instagram-App nach dem Namen suchen. Dann Claude den Namen sagen; die Adresse bleibt gleich.
-
-## 3. Termine für Sprint, Olympisch, Halb-Ironman
-
-Sobald du sie kennst: Mehr → Profil und Ziele → Ziel antippen → Datum eintragen. Der Plan baut sie dann als B/C-Ziele ein.
-
-## Noch offen von vorher
-
-- **App-Schlüssel der Anbieter** (Oura, Dropbox …) nur für Dienste, die du nutzt: [VERBINDUNGEN.md](VERBINDUNGEN.md).
-- **In 4 Wochen** fragt Claude, ob die alte App (alter Server, alte Datenbank, GitHub Pages) gelöscht werden darf. Vorher wird sie gesichert.
+Der Helfer prueft erneut alle Standardtests und sichert/prueft beide Umgebungen vor dem jeweiligen Deploy. Jeder Fehler stoppt. Deine Freigabe ist bereits dokumentiert; keine erneute Bestaetigung notwendig.

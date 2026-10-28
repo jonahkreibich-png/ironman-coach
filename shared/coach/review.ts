@@ -1,3 +1,4 @@
+import {effectiveCustomBuckets} from '../custom-state26';
 /* Trainings-Bewertung des kostenlosen Coachs (Auftrag 12): „Wie war mein Training heute?“, „Wie war mein Lauf?“, „Wie war meine Woche?“,
    „Wie war das Schwimmen gestern?“, „Vergleich mit letzter Woche“ – auch umgangssprachlich und mit Tippfehlern.
    Wertet erledigte Einheiten mit allen Feldern und Uhrdaten aus: Vorgabe (Dauer, Zone, Pace/Watt/km/h, Wiederholungen), ähnliche frühere
@@ -10,7 +11,7 @@ import * as W from '../workouts';
 import type { EngineCtx } from './engine';
 import { readinessFacts } from './engine';
 import { fieldsOf } from '../fields';
-import { actualMetrics, effectiveActivity, crawlOf } from '../results';
+import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea } from '../results';
 import { HR_ZONES } from '../sports';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
@@ -36,29 +37,31 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
     if (!st || !st.completed) return;
     const act = st.activityId ? acts[st.activityId] || null : Object.values(acts).find((a: any) => a && !a.mergedInto && a.sessionId === s.id) || null;
     if (act) usedActs.add(act.id);
-    out.push({ key: s.id, date: d.date, sport: s.sport, title: s.title, planned: s, st, act, custom: false });
+    out.push({ key: s.id, date: d.date, sport: s.sport, title: s.sport === 'strength' ? actualStrength(st, act).title : s.title, planned: s, st, act, custom: false });
   }));
-  Object.entries(ctx.state.customWorkouts || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => {
+  Object.entries(effectiveCustomBuckets(ctx.state) || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => {
     if (d < from || d > to || w.completed === false) return;
     const act = w.activityId ? acts[w.activityId] || null : null; if (act) usedActs.add(act.id);
-    out.push({ key: w.id, date: d, sport: w.sport, title: w.title || SPORT[w.sport] || 'Einheit', planned: null, st: w, act, custom: true });
+    out.push({ key: w.id, date: d, sport: w.sport, title: w.sport === 'strength' ? actualStrength(w, act).title : w.title || SPORT[w.sport] || 'Einheit', planned: null, st: w, act, custom: true });
   }));
   C.recordedActivities(ctx.state).forEach((a: any) => {
     if (!a || a.mergedInto || usedActs.has(a.id) || a.date < from || a.date > to || a.sessionId) return;
-    out.push({ key: a.id, date: a.date, sport: a.sport, title: a.name || SPORT[a.sport] || 'Einheit', planned: null, st: {}, act: a, custom: true });
+    out.push({ key: a.id, date: a.date, sport: a.sport, title: a.sport === 'strength' ? actualStrength({}, a).title : a.name || SPORT[a.sport] || 'Einheit', planned: null, st: {}, act: a, custom: true });
   });
   return out.sort((a, b) => a.date.localeCompare(b.date) || (a.act && b.act ? a.act.startMs - b.act.startMs : 0));
 }
 
 /* Werte einer Einheit: Uhr/Datei zuerst, sonst die Felder */
-export interface Vals { conflicts: string[]; min: number | null; km: number | null; meters: number | null; hr: number | null; pace: number | null; speed: number | null; power: number | null; cadence: number | null; dec: number | null;
+export interface Vals { area: StrengthArea | null; areaSource: 'area' | 'exercises' | 'unknown'; exercises: any[]; longestPull: number | null; conflicts: string[]; min: number | null; km: number | null; meters: number | null; hr: number | null; pace: number | null; speed: number | null; power: number | null; cadence: number | null; dec: number | null;
   splits: { km: number; pace: string; hr: number | null }[]; hrZones: number[] | null; intervals: any; pattern: Pattern | null; spl: number | null; dps: number | null; longest: number | null; pace100: number | null; crawlShare: number | null;
   rpe: number | null; feel: number | null; deviation: string; notes: string; technique: string; tempC: number | null; ascent: number | null; indoor: boolean; bikeType: string | null; fromWatch: boolean }
 export function valsOf(d: Done): Vals {
   const f = fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport); const a = d.act ? effectiveActivity(d.act, d.st) : {};
   const sw = a.swim || {};
+  const strength = actualStrength(d.st, d.act);
   const sp = d.sport === 'bike' ? (a.speedKmh ?? f.speed ?? (f.km && f.min ? f.km / (f.min / 60) : null)) : null;
   return {
+    area: strength.area, areaSource: strength.source, exercises: strength.exercises, longestPull: num(actualMetrics(d.st, d.act).longestPull),
     conflicts: actualMetrics(d.st, d.act)._issues || [],
     min: a.min ?? f.min, km: d.sport === 'swim' ? null : (a.km ?? f.km), meters: d.sport === 'swim' ? (a.km ? Math.round(a.km * 1000) : f.meters) : null,
     hr: a.avgHr ?? f.hr, pace: d.sport === 'run' ? (a.paceSecKm ?? f.paceSec) : null, speed: sp ? Math.round(sp * 10) / 10 : null, power: a.avgPower ?? f.power, cadence: a.avgCadence ?? f.cadence, dec: a.decouplingPct ?? f.decoupling,
@@ -107,7 +110,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (v.km) facts.push(`${de(v.km)} km`); if (v.meters) facts.push(`${v.meters} m`);
   if (v.pace) facts.push(`${mmss(v.pace)}/km`); if (v.speed && d.sport === 'bike') facts.push(`${de(v.speed)} km/h`); if (v.power) facts.push(`${Math.round(v.power)} W`);
   if (v.hr && d.sport !== 'strength') facts.push(`Puls ${Math.round(v.hr)}`);
-  const head = `${d.title} (${fmtD(d.date)})${facts.length ? ': ' + facts.join(', ') : ''}.`;
+  const head = `${d.sport === 'strength' ? actualStrength(d.st, d.act).title : d.title} (${fmtD(d.date)})${facts.length ? ': ' + facts.join(', ') : ''}.`;
 
   // Dauer gegen Vorgabe
   if (s && s.plannedMinutes && v.min) {
@@ -197,21 +200,30 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     // Auftrag 17: geplant gegen geschafft, nur eingetragene oder gemessene Strecke (nie das Soll)
     const target = Math.max(0, ...(s?.spec?.steps || []).filter((x: any) => x.mode === 'crawl').map((x: any) => Number(x.m) || 0));
     if (target && v.longest != null && v.longest < target) better.push(`Geplant: ${target} m Kraul am Stück. Geschafft: ${v.longest} m. Das ${target}-m-Ziel ist noch nicht erreicht; die nächste Stufe kommt erst, wenn es in 2 Einheiten klappt. Bis dahin Stücke, die du sauber schaffst.`);
-    else if (target && v.longest != null && v.longest >= target) good.push(`Geplant ${target} m Kraul am Stück, geschafft ${v.longest} m.`);
+    else if (target && v.longest != null && v.longest >= target) good.unshift(`Geplant ${target} m Kraul am Stück, geschafft ${v.longest} m.`);
     if (target && v.longest == null) missing.push(`längste Strecke Kraul am Stück (geplant waren ${target} m, das zählt nicht als Ergebnis)`);
     if (v.spl) good.push(`${de(v.spl)} Züge pro Bahn${v.dps ? ` (${de(v.dps, 2)} m pro Zug)` : ''}.`);
     if (v.longest && !(target && v.longest >= target)) {
       // Bestmarke nur gegen frühere echte Werte (Einheiten davor), nicht gegen das Profil oder den Plan
       const before = C.swimProofs(ctx.state, ctx.baseWeeks, C.addDays(d.date, -1), 84).filter((x: any) => x.key !== d.key).map((x: any) => x.crawl || 0);
       const prev = Math.max(0, ...before);
-      if (v.longest >= 25) good.push(`${v.longest} m Kraul am Stück${prev && v.longest > prev ? `, neue Bestmarke (vorher ${prev} m)` : prev && v.longest === prev ? ' wie zuletzt' : ''}.`);
+      if (v.longest >= 25) good.unshift(`${v.longest} m Kraul am Stück${prev && v.longest > prev ? `, neue Bestmarke (vorher ${prev} m)` : prev && v.longest === prev ? ' wie zuletzt' : ''}.`);
     }
     if (v.crawlShare != null && v.crawlShare < 70) better.push(`Kraul-Anteil ${Math.round(v.crawlShare)} %: Stück für Stück mehr Kraul, Brust nur zum Erholen.`);
     if (v.technique) better.push(`Technik-Thema „${v.technique}“: ${/bein|sinken|wasserlage|kopf/i.test(v.technique) ? 'Kopf ruhig und Blick nach unten, dann kommen die Beine hoch' : /atm/i.test(v.technique) ? 'unter Wasser lang ausatmen, beim Drehen nur einatmen' : 'eine Sache pro Bahn üben'}.`);
-    if (!v.spl && !v.longest) missing.push('Züge pro Bahn oder Kraul am Stück');
+    if (v.longestPull != null && v.longestPull > 0) good.unshift(`${v.longestPull} m mit Pull Buoy am Stück (eigener Nachweis, kein Kraulnachweis ohne Hilfsmittel).`);
+    if (!v.spl && !v.longest && !v.longestPull) missing.push('Züge pro Bahn oder Kraul am Stück');
     if (!v.min && !v.meters) missing.push('Dauer oder Meter');
   }
-  if (d.sport === 'strength' && !v.min) missing.push('Dauer');
+  if (d.sport === 'strength') {
+    if (!v.min) missing.push('Dauer');
+    if (!v.area) missing.push('tatsächlich trainierter Kraftbereich');
+    if (!v.exercises.length) missing.push('tatsächlich absolvierte Übungen');
+    else good.unshift('Eingetragen: ' + v.exercises.map((e: any) => [e.name, e.sets != null ? e.sets + ' Sätze' : '', e.reps ? e.reps + ' Wdh/Dauer' : '', e.kg != null ? e.kg + ' kg' : ''].filter(Boolean).join(', ')).join('; ') + '.');
+    const plannedArea = s?.area || s?.spec?.area;
+    if (v.area && plannedArea && v.area !== plannedArea && STRENGTH_AREA_LABEL[plannedArea as StrengthArea]) better.unshift(`Geplant war ${STRENGTH_AREA_LABEL[plannedArea as StrengthArea]}, eingetragen ist ${STRENGTH_AREA_LABEL[v.area]}. Die ursprünglichen Übungen sind damit nicht als absolviert belegt.`);
+    if (/schmerz|beschwerd|zieht|verletz/i.test(v.notes + ' ' + v.deviation)) better.unshift('Die gemeldeten Beschwerden bleiben relevant. Eine Belastbarkeit lässt sich daraus nicht ableiten; bei anhaltenden oder zunehmenden Beschwerden abklären lassen.');
+  }
   if ((d.sport === 'run' || d.sport === 'bike') && !v.min && !v.km) missing.push('Dauer oder Strecke');
   if (d.sport === 'run' && !v.pace && v.hr) missing.push('Pace oder Strecke');
   // Auftrag 17: Strecke gegen Vorgabe (nach den wichtigeren Punkten, damit Technik-Hinweise nicht verdrängt werden) (nur mit eingetragener oder gemessener Strecke)

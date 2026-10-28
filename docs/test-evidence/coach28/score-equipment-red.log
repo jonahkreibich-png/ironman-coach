@@ -1,0 +1,68 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts (29 tests | 4 failed) 78ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > 50 m Kraul: Brett und Buoy im Wechsel mit eigener Aufgabe, ohne l├ñngere Kraulstrecken 5ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > ohne Material: keine Serie mit Material, kein Schwerpunkt daf├╝r 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 2: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 3: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 4: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Stufe 5: Pull-Buoy-St├╝cke nie l├ñnger als die Stufe 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > l├ñngere Pull-St├╝cke brauchen eine eigene best├ñtigte Pull-Distanz 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material []: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["board"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["buoy"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["board","buoy"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 0ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > Material ["fins","snorkel"]: nur vorhandene Hilfsmittel, gleiche Kraulgrenze 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > normales Training bei 50 m: Brett und Buoy ├╝ber die Schwerpunkte, kurze Serien 1ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > 12 Wochen: best├ñtigte 50 m bleiben, Brett und Buoy kommen regelm├ñ├ƒig, aber nicht beide in jeder Einheit 41ms
+   Ô£ô Schwimmtechnik mit vorhandenem Material und best├ñtigtem K├Ânnen > eigene Pace mit Pausen: weniger Meter in derselben Zeit, wenn jemand mehr Pause braucht 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > Brust ist kein Kraulrekord ohne Hilfsmittel 6ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > unbekannter Stil ist kein Kraulrekord ohne Hilfsmittel 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > Pull Buoy ist kein Kraulrekord ohne Hilfsmittel 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > verifizierte Kraulstrecke ersetzt die allgemeine Gesamtstrecke 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > Brust-Pace aktualisiert keine Kraul-CSS 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > Pull Buoy-Pace aktualisiert keine Kraul-CSS 1ms
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel swim.gear erlauben keine unaided CSS-Pace 6ms
+     ÔåÆ expected 158.7406521882918 to be 159.99999999999994 // Object.is equality
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel swim.equipment erlauben keine unaided CSS-Pace 1ms
+     ÔåÆ expected 158.7406521882918 to be 159.99999999999994 // Object.is equality
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel activity.gear erlauben keine unaided CSS-Pace 1ms
+     ÔåÆ expected 158.7406521882918 to be 159.99999999999994 // Object.is equality
+   ├ù Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel activity.equipment erlauben keine unaided CSS-Pace 1ms
+     ÔåÆ expected 158.7406521882918 to be 159.99999999999994 // Object.is equality
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > deaktivierte Objekt-Hilfsmittel schlie├ƒen eine echte Kraul-Pace nicht aus 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > Warum erkl├ñrt ausgeschlossene Hilfsmittel-Pace statt sie als CSS-Nachweis anzuzeigen 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > ein blo├ƒer Schwimmtest-Titel macht die durchschnittliche Pace nicht zum CSS-Test 1ms
+   Ô£ô Schwimm-Scores unterscheiden Leistungsnachweise > manuelles Pull-Ergebnis wird nicht zur Kraul-CSS oder zum Kraulrekord 1ms
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 4 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel swim.gear erlauben keine unaided CSS-Pace
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel swim.equipment erlauben keine unaided CSS-Pace
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel activity.gear erlauben keine unaided CSS-Pace
+ FAIL  tests/unit/swim-equipment-quality.test.ts > Schwimm-Scores unterscheiden Leistungsnachweise > aktive Objekt-Hilfsmittel activity.equipment erlauben keine unaided CSS-Pace
+AssertionError: expected 158.7406521882918 to be 159.99999999999994 // Object.is equality
+
+- Expected
++ Received
+
+- 159.99999999999994
++ 158.7406521882918
+
+ ÔØ» tests/unit/swim-equipment-quality.test.ts:129:37
+    127|     const target: any = scope === 'swim' ? a.swim : a;
+    128|     target[field] = { pull: true, fins: false };
+    129|     expect(score([a]).parts[0].raw).toBe(score([]).parts[0].raw);
+       |                                     ^
+    130|     expect(score([a]).why.join(' ')).toMatch(/ignoriert.*Hilfsmittel/);
+    131|   });
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/4]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 25 passed (29)
+   Start at  22:02:04
+   Duration  980ms (transform 427ms, setup 24ms, collect 587ms, tests 78ms, environment 0ms, prepare 112ms)
+

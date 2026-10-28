@@ -1,0 +1,19 @@
+
+Running 3 tests using 1 worker
+
+
+
+(node:8576) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/3] [chromium-desktop] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+
+(node:16080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[2/3] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+(node:13996) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[3/3] [webkit-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+  3 passed (12.3s)

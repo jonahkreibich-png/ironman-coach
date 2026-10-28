@@ -1,0 +1,11 @@
+
+Running 2 tests using 1 worker
+
+(node:13072) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten (1.2s)
+(node:12444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 2 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten (3.4s)
+
+  2 passed (9.3s)

@@ -1,0 +1,4 @@
+
+> endurance-coach@3.8.0 typecheck
+> tsc --noEmit -p tsconfig.json
+

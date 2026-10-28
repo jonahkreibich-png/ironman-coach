@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô tests/unit/plan-c-launcher27.test.ts (2 tests) 101ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  22:07:30
+   Duration  411ms (transform 26ms, setup 24ms, collect 11ms, tests 101ms, environment 0ms, prepare 106ms)
+

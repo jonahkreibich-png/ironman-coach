@@ -1,0 +1,67 @@
+
+Running 51 tests using 1 worker
+
+
+
+(node:17168) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ swim: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[2/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ bike: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[3/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[4/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ strength: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[5/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:12:1 ÔÇ║ C bleibt bei 320/390/1440px hell/dunkel bedienbar und berechnet Ausfaelle/Extras korrekt
+[6/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[7/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[8/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[9/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[10/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:37:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+[11/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:45:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[12/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:55:1 ÔÇ║ Datenbank-Sync speichert neue Vorlagen getrennt pro Konto und loescht sie per Tombstone
+[13/51] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:68:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+[14/51] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ swim: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[15/51] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ bike: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[16/51] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ run: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[17/51] [chromium-desktop] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ strength: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+
+(node:1620) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[18/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ swim: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[19/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ bike: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[20/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[21/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ strength: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[22/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:12:1 ÔÇ║ C bleibt bei 320/390/1440px hell/dunkel bedienbar und berechnet Ausfaelle/Extras korrekt
+[23/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[24/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[25/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[26/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[27/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:37:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+[28/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:45:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[29/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:55:1 ÔÇ║ Datenbank-Sync speichert neue Vorlagen getrennt pro Konto und loescht sie per Tombstone
+[30/51] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:68:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+[31/51] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ swim: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[32/51] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ bike: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[33/51] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ run: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[34/51] [chromium-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ strength: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+(node:5832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[35/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ swim: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[36/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ bike: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[37/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ run: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[38/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:6:53 ÔÇ║ strength: Dashboard C behaelt Haken, Istkorrektur, Neustart und Vorlagenabschluss
+[39/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-dashboard27.spec.ts:12:1 ÔÇ║ C bleibt bei 320/390/1440px hell/dunkel bedienbar und berechnet Ausfaelle/Extras korrekt
+[40/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[41/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[42/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[43/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[44/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:37:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+[45/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:45:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[46/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:55:1 ÔÇ║ Datenbank-Sync speichert neue Vorlagen getrennt pro Konto und loescht sie per Tombstone
+[47/51] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:68:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+[48/51] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ swim: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[49/51] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ bike: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[50/51] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ run: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+[51/51] [webkit-mobile] ÔÇ║ tests\e2e\template-crud26.spec.ts:33:53 ÔÇ║ strength: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload
+  51 passed (3.4m)

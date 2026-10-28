@@ -1,10 +1,11 @@
+import {customDraft} from './custom-draft27';
 /* Felder statt Notizfeld (Auftrag 7, Punkt 3): gemeinsamer Baustein für geplante Einheiten und Extra-Einheiten.
    Je Sportart die Werte aus shared/fields.ts, jedes Feld mit Quelle (Uhr, intervals.icu, aus Notiz, von Hand), änderbar.
    Darunter für alle: RPE, Gefühl, „geplant vs. gemacht“ und eine optionale Notiz. Automatisch: Pulszone und CTL/ATL/TSB des Tages. */
-import { STATE, BASE_WEEKS, saveSoon, saveState, profile } from '../store';
+import { findCustomRecord, STATE, BASE_WEEKS, saveSoon, saveState, profile } from '../store';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, srcBadge, more, refreshSheet, timeField, readTime, secToMmss } from '../kit';
+import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, secToMmss } from '../kit';
 import { SPORT_FIELDS, FEEL, zoneVerdict, loadOn, type FieldDef } from '../../../shared/fields';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
@@ -19,11 +20,12 @@ export type Target = { kind: 'session' | 'custom'; id: string; date: string; spo
 /* Datensatz der Einheit (Zustand einer geplanten Einheit oder die Extra-Einheit selbst) */
 function rec(tg: Target): any {
   if (tg.kind === 'session') { if (!STATE.sessions[tg.id]) STATE.sessions[tg.id] = { completed: false, notes: '' }; return STATE.sessions[tg.id]; }
-  return ((STATE.customWorkouts || {})[tg.date] || []).find((w: any) => w.id === tg.id) || null;
+  return customDraft(tg.id) || findCustomRecord(tg.id);
 }
 function put(tg: Target, next: any) {
+  const draft=customDraft(tg.id);if(tg.kind==='custom' && draft){Object.keys(draft).forEach(k=>delete draft[k]);Object.assign(draft,next);return;}
   if (tg.kind === 'session') { STATE.sessions[tg.id] = next; return; }
-  const list = STATE.customWorkouts[tg.date] || []; const i = list.findIndex((w: any) => w.id === tg.id); if (i >= 0) list[i] = next;
+  for (const list of Object.values(STATE.customWorkouts||{}) as any[][]) { const i=list.findIndex((w:any)=>w.id===tg.id); if(i>=0){list[i]=next;return;} }
 }
 const attrs = (tg: Target) => `data-tk="${tg.kind}" data-tid="${esc(tg.id)}" data-tdate="${tg.date}" data-tsport="${tg.sport}"`;
 const tgOf = (el: HTMLElement): Target => ({ kind: el.dataset.tk as any, id: el.dataset.tid!, date: el.dataset.tdate!, sport: el.dataset.tsport! });
@@ -86,15 +88,34 @@ export function fieldsBlock(tg: Target): string {
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
 /* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
-const rev = (tg: Target) => { const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
+const rev = (tg: Target) => { if(customDraft(tg.id))return; const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
+// Beim Tippen sichern, ohne Formular/Fokus neu aufzubauen. Fachliche
+// Neubewertung und Meldungen folgen weiterhin erst beim bestaetigten change.
+onInput('fd', el => {
+  const tg=tgOf(el), st=rec(tg); if(!st)return;
+  let value:any=(el as HTMLInputElement).value.trim();
+  if(el.dataset.pace || el.dataset.tf){const sec=readTime(el);if(sec!=null && isNaN(sec))return;value=sec?secToMmss(sec):'';}
+  put(tg,setSessionMetricManual(st,el.dataset.k!,value));saveSoon();
+});
+onInput('fd-top',(el,ev)=>CHANGE['fd-top'](el,ev));
+onInput('fd-split',(el,ev)=>{
+  const value=(el as HTMLInputElement).value.trim();
+  if(el.dataset.f==='pace' && value && !/^(\d{1,2})[:.,]?(\d{2})$/.test(value.replace(/\s/g,'')))return;
+  return CHANGE['fd-split'](el,ev);
+});
+onInput('fd-ex',(el,ev)=>{
+  const f=el.dataset.f!,value=(el as HTMLInputElement).value.trim();
+  if(['sets','kg','restSec'].includes(f)){try{strengthNumber(value,f,f!=='kg',f==='sets');}catch(_){return;}}
+  return CHANGE['fd-ex'](el,ev);
+});
 onChange('fd', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const k = el.dataset.k!;
   let v: any = (el as HTMLInputElement).value.trim();
   if (el.dataset.pace || el.dataset.tf) { const s = readTime(el); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } v = s ? secToMmss(s) : ''; }
   put(tg, setSessionMetricManual(st, k, v));
   saveSoon(); if (el.tagName === 'SELECT' || k === 'hr') refreshSheet(); nav.rerender();
-  if ((k === 'hr' || k === 'pace' || /^test|^css|^crawl25|^breast200/.test(k)) && checkTestResult()) { saveState(); refreshSheet(); nav.rerender(); }
-  if ((k === 'longestCrawl' || k === 'longestPull') && checkSwimSkill()) { saveState(); refreshSheet(); nav.rerender(); }
+  if (!customDraft(tg.id) && (k === 'hr' || k === 'pace' || /^test|^css|^crawl25|^breast200/.test(k)) && checkTestResult()) { saveState(); refreshSheet(); nav.rerender(); }
+  if (!customDraft(tg.id) && (k === 'longestCrawl' || k === 'longestPull') && checkSwimSkill()) { saveState(); refreshSheet(); nav.rerender(); }
   rev(tg);
 });
 onChange('fd-top', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; st[el.dataset.k!] = (el as HTMLInputElement).value; saveSoon(); });

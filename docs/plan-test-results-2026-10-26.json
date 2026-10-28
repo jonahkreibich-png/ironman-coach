@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-27",
+  "scope": "Plan tab and four-sport universal templates; awaiting design selection",
+  "productionChanged": false,
+  "version": "3.7.2",
+  "typecheck": {
+    "passed": true,
+    "originalFolderRecheck": true
+  },
+  "build": {
+    "passed": true,
+    "originalFolderRecheck": true,
+    "warning": "existing chunk >500kB"
+  },
+  "unit": {
+    "passed": 2225,
+    "failed": 0,
+    "skipped": 63,
+    "success": true,
+    "maxWorkers": 2,
+    "excluded": [
+      "server/test/api.test.ts"
+    ],
+    "reasonExcluded": "Local HTTP fetch EACCES; separate first broad API suite failed readiness"
+  },
+  "targetedUnit": {
+    "passed": 64,
+    "files": 5
+  },
+  "browser": {
+    "newMatrix": {
+      "passed": 36,
+      "projects": [
+        "chromium-desktop",
+        "chromium-mobile",
+        "webkit-mobile"
+      ]
+    },
+    "strengthenedSubset": {
+      "passed": 15,
+      "includes": "all sports individual session editing and actual past-date move"
+    },
+    "storage": {
+      "firstRunPassed": 20,
+      "firstRunFailed": 2,
+      "failedReason": "legacy tests lacked new explicit move preview confirmation",
+      "changedTestsRetainedOriginalAssertions": true,
+      "rerunPassed": 2
+    },
+    "existingEditor": {
+      "passed": 4
+    },
+    "originalFolderRecheck": {
+      "passed": 6
+    },
+    "transport": "Actual built app, actual IndexedDB, actual Worker with in-memory SQLite/D1 adapter and in-process browser routing; no normal HTTP"
+  },
+  "simulation": {
+    "profiles": 10,
+    "virtualWeeks": 165,
+    "actions": 2970,
+    "jsonRestarts": 165,
+    "notPhysicalBrowserRestart": true
+  },
+  "previews": {
+    "variants": [
+      "A",
+      "B",
+      "C"
+    ],
+    "assertions": 556,
+    "templateFlows": 72,
+    "engines": [
+      "chromium",
+      "webkit"
+    ],
+    "inMemorySynthetic": true,
+    "productionModulesImported": false
+  },
+  "limitations": [
+    "Normal HTTP API/E2E not successfully completed; fetch denied EACCES",
+    "Firefox not installed",
+    "No real iOS device test",
+    "No real Cloudflare test deployment in this task",
+    "Design choice required before final design integration"
+  ],
+  "review": {
+    "independent": true,
+    "remainingP1P2InReviewedFixes": 0
+  },
+  "sourceHashes": {
+    "shared/care.ts": "0c3f29fed5659d952e29c02b1acb7014bb8910c24ff4d657ff003fa66b359e7f",
+    "shared/coach/review.ts": "00af297f4fb433dadabf765d296f7fffd5783564c512f249c771cd2b3b4308fc",
+    "shared/core.ts": "b21ff96448ce843020cef94c19ba52a4051f1db5de2e0b16168a404f4ecc45e2",
+    "shared/custom-locations26.ts": "f59e0fdeaa42bb0653d35bbd8b8a464be863a27fe89f421fe716b14869344272",
+    "shared/custom-state26.ts": "5489d00c94fd48a90b124be4edc28d369d91f8ff3ddff4f5897508448629e173",
+    "shared/kinds.ts": "cf55abeaf7c3da621500d0244add77944b09c2316dde62fc3503b2ddacf42e5c",
+    "shared/plan-actions26.ts": "e14f7382772afa3d3933b70cfcd1a2c6b7775f56a6c39d941db7622ee5743071",
+    "shared/plan-summary26.ts": "854eb1d432bd39c46c09a63426de125a17ed2b38bfe413e22b96036cee683965",
+    "shared/plangen.ts": "fa3f4956a2b8ded6f39fe8c5964a9ff4f8639490a51a88ec122a500c810b7358",
+    "shared/replan.ts": "e99a2628ffe016ac0e783d277198f9e1dedd040d2e8cff89c68ad7742ba01913",
+    "shared/results.ts": "87fb1ff4824060452d88c5ce18a95db182f34d110eb516f2bd8b8904933e3e32",
+    "shared/scores.ts": "fd2943eaef0424e6db3d4a77bd903f4de7155c1577a4cb06b62a2908534d7b7c",
+    "shared/training-templates26.ts": "950b2291b95ac2a87ae087e7472f8f47a494d23755570a5ec92432669b008e2f",
+    "shared/trends.ts": "eab97e1b7661fff189f535db884f9e3e68bcc32973b29983c6716a6733808cac",
+    "web/src/backup-validation.ts": "e97eaff547d89ecb56dc0df32df95869163667a6d5649b09318fa6f13729f35d",
+    "web/src/data.ts": "af338c98e3bf383e28430dc5b4fed7b4e9717f663a3b32c25627eb5e0a68a514",
+    "web/src/domain.ts": "de2f40ebe49400d97eaa4a97d7c5fe6588041c15ad956e34d2752a00153b6fb6",
+    "web/src/main.ts": "c13bedc7d63aa6666084c7a28e2130bf48795e75ae1ae4a8bb9caad9fc8916f1",
+    "web/src/store.ts": "7c83be52aa174c95e2a2fdae203ba27f9318f54bbf325cc2570c1625736f5ce2",
+    "web/src/sync.ts": "9c90a18abba6c2f9d3169625773053ded0d2567bab3d30c61e087f40394d7f62",
+    "web/src/views/custom.ts": "fedd7b5cc6f7d79f4f5c5eed2fd901f5c853973421e0d597e919262912c65113",
+    "web/src/views/essen.ts": "6495a2ae9e6e2c108e41c2ac731add0303b4141eb1bfd7fc840479483ef1ba14",
+    "web/src/views/fieldsui.ts": "a946138c418f11aa96211905be3bcdaabdd052276e1a139f34b40f68782b1d76",
+    "web/src/views/mehr.ts": "40913217b365ec55ea52f47795cf498c2194e50eba9b62182ac9700579ceb87d",
+    "web/src/views/plan.ts": "43688dbf3a6940b639fcad45c1edb6d71c21a119772868f174f959268e7d9886",
+    "web/src/views/planedit.ts": "f766d426c5eb5a5560a46972a723e4243248a06bb817f6904b3aafdbfc1e16e9",
+    "web/src/views/session.ts": "4ccd980732fc0be4d376b81f61cfb00c2658c5ef1f4126a771ff42082fe3180b",
+    "web/src/views/templates.ts": "19ee0e82029b30230e63487c2163e3882fad27c0db64597be373c5ab537321c2",
+    "tests/e2e/auftrag5.spec.ts": "2b08e157fe3e441af3ec0760481e83cc7327a5767b8e966754f9380873a669ad",
+    "tests/e2e/plan-templates26.spec.ts": "8dfc009742cf7b2e260193b0e745d4eb9f40952060e555e5c0a86e0a7422d520",
+    "tests/e2e/storage-recovery24.spec.ts": "b445af10e48117875733e8ac5b3b307ba347d21b6901bdeec84b7d0895b9d610",
+    "tests/e2e/template-crud26.spec.ts": "1cda00a5d0c55db65848fe9785c6be769e8c02c683f9df85447d75d8c5cea912",
+    "tests/unit/plan-actions26.test.ts": "f336208cf734886a4df7037132f9fd4548c4493c37ec7688cae1b7ff991ec980",
+    "tests/unit/plan-longitudinal26.test.ts": "c0a40759d501b6f043d306d297c971968c83d279a26b3d13dbba448266dbb6ff",
+    "tests/unit/plan-summary26.test.ts": "55dcf83e0b10aaf5bd8890c5f185dad5bcb82d582932e4a96569cd57341e747d",
+    "tests/unit/template-persistence26.test.ts": "2af52c61b6d7b9ebec332b5493ac71238b230d4bb234540f8e79d180cd480020",
+    "tests/unit/training-templates26.test.ts": "c4b7e8eba579bdadf3e933df497cdfc91905ca2d8930b0bd387bfcedb2db8aa9",
+    "playwright.plan26.config.ts": "ed8a5499ad59bea8e3bd7661a6eb358bd166708926cbb3046507768c3986d2cd",
+    "vitest.config.ts": "734584170c87bbb9ba24b890996495c436acb2d6b8009e278b1a202b4b056e37"
+  }
+}

@@ -1,10 +1,11 @@
 /* Auftrag 16: Coach-„Skill“ für die kostenlose KI (Cloudflare Workers AI) – und genauso für Claude, wenn hinterlegt.
    Enthält: Anweisung (System-Prompt), kompakte Zusammenfassung des Nutzers, Werkzeuge im OpenAI-Format und den Zahlen-Wächter.
    Harte Regeln und Zahlen kommen immer aus der Regel-Engine (Werkzeuge, Zusammenfassung); die KI formuliert nur.
-   Oura-Daten sind vorher entfernt (aiSafeCtx auf dem Server), auch die Ampel wird ohne sie berechnet. */
+   Oura-Daten sind vorher entfernt (aiSafeCtx auf dem Server), eine unvollständige Ampel wird niemals neu berechnet. */
 import * as C from '../core';
 import type { EngineCtx } from './engine';
-import { readinessFallback } from './engine';
+import { readinessOf } from './engine';
+import { readinessContextLine } from '../readiness';
 import { ageOf, isMinor } from '../profile';
 import { mainGoal } from '../goals';
 import { rulesOf, describe as ruleText } from '../constraints';
@@ -28,6 +29,7 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
   const L = [
     `Du bist der Coach in der Trainings-App „${appName}“: ein erfahrener Ausdauer-Coach für Laufen, Radfahren, Schwimmen, Triathlon und Kraft. Heute ist ${ctx.today} (${dd(ctx.today)}).`,
     'So antwortest du:',
+    '- Beantworte zuerst die konkrete Frage in einem direkten Satz. Begruende kurz mit aktuellen Daten; weitere Analyse nur, wenn sie fuer diese Frage hilft. Trenne Empfehlung, Messung, Eingabe und Schaetzung.',
     '- Immer auf Deutsch, in der du-Form, kurz: höchstens 5 Sätze (etwa 80 Wörter), außer der Athlet will ausdrücklich mehr. Kein Markdown, keine Überschriften, keine Tabellen, keine Sternchen.',
     '- Ehrlich und konkret wie ein guter Trainer. Lob nur, wenn es stimmt. Wenn etwas nicht gut war, sag es freundlich.',
     '- Nutze nur die Daten unten und die Ergebnisse der Werkzeuge. Erfinde nichts: keine Zahlen, Einheiten, Termine, Messwerte oder Wettkämpfe. Puls, Pace, Watt, Minuten und Zonen übernimmst du genau so, wie sie dort stehen.',
@@ -64,7 +66,14 @@ export function compactContext(ctx: EngineCtx): string {
   const GEAR: Record<string, string> = { board: 'Kickbrett', buoy: 'Pull Buoy', fins: 'Flossen', paddles: 'Paddles', snorkel: 'Schnorchel' };
   if ((p.sports || []).includes('swim')) {
     L.push('AUSRÜSTUNG SCHWIMMEN: ' + ((sk.swimGear || []).map((g: string) => GEAR[g] || g).join(', ') || 'keine'));
-    try { const pr = C.swimProofs(ctx.state, ctx.baseWeeks || [], today, 84).map((x: any) => x.crawl).filter(Boolean); L.push(`KÖNNEN SCHWIMMEN (IST): Kraul am Stück bestätigt ${C.confirmedOf(pr) || sk.swimCrawlM || 'unbekannt'} m${pr.length ? `, bester eingetragener Wert ${Math.max(...pr)} m` : ''}; die nächste Stufe gibt es erst, wenn die längere Strecke in 2 Einheiten geschafft ist.`); } catch (e) { /* ohne Nachweise */ }
+    try {
+      const pr=C.swimProofs(ctx.state,ctx.baseWeeks||[],today,42);
+      for (const [key,label] of [['crawl','Kraul ohne Hilfsmittel'],['pull','Kraul mit Pull Buoy']] as const) {
+        const vals=pr.map(x=>x[key]).filter(Boolean) as number[];
+        L.push(label+': Bestwert '+(vals.length?Math.max(...vals)+' m':'unbekannt')+', bestätigt '+(C.confirmedOf(vals)?C.confirmedOf(vals)+' m':'unbekannt')+' (zwei Einheiten).');
+      }
+      L.push('Profilangabe (eigene oder abgeleitete Angabe, kein zusätzlicher Ergebnisnachweis): Kraul '+(sk.swimCrawlM??'unbekannt')+' m; Pull Buoy '+(sk.swimPullM??'unbekannt')+' m. Neue Trainingsstufe erst nach zwei Ergebnisnachweisen.');
+    } catch (e) { /* ohne Nachweise */ }
   }
   const g = mainGoal(ctx.goals, today);
   if (g) {
@@ -93,8 +102,8 @@ export function compactContext(ctx: EngineCtx): string {
     const v = valsOf(d);
     const vals = [v.min ? `${Math.round(v.min)} min` : null, v.km ? `${String(Math.round(v.km * 10) / 10).replace('.', ',')} km` : null, v.meters ? `${v.meters} m` : null, v.pace ? `${mmss(v.pace)}/km` : null, v.power ? `${Math.round(v.power)} W` : null, v.hr ? `Puls ${Math.round(v.hr)}` : null, v.rpe != null ? `Anstrengung ${v.rpe}/10` : null].filter(Boolean).join(', ');
     const crawlSoll = d.planned && d.sport === 'swim' ? Math.max(0, ...((d.planned.spec && d.planned.spec.steps) || []).filter((x: any) => x.mode === 'crawl').map((x: any) => x.m || 0)) : 0;
-    const swimIst = d.sport === 'swim' ? (v.longest != null ? `, Kraul am Stück ${v.longest} m` : ', Kraul am Stück nicht eingetragen') : '';
-    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}`);
+    const swimIst = d.sport === 'swim' ? (v.longest != null ? `, Kraul am Stück ${v.longest} m` : ', Kraul am Stück nicht eingetragen') + (v.longestPull != null ? ', Pull Buoy am Stück '+v.longestPull+' m' : ', Pull Buoy am Stück nicht eingetragen') : '';
+    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}${d.sport === 'strength' ? ", Bereich IST: "+(v.area||"unbekannt")+", Übungen IST: "+JSON.stringify(v.exercises) : ''}`);
   });
   days.filter((d: any) => d.date >= from && d.date < today).forEach((d: any) => d.sessions.forEach((s: any) => {
     if (s.sport === 'rest' || s.cancelled || (st[s.id] || {}).completed) return;
@@ -103,8 +112,7 @@ export function compactContext(ctx: EngineCtx): string {
   if (!done.length) L.push('- keine erledigte Einheit eingetragen');
   // Ampel (ohne Oura-Werte, die sind vorher entfernt)
   try {
-    const R = C.readinessFor(ctx.state.trend || [], ctx.state.illnessPeriods || [], today, readinessFallback(ctx));
-    L.push('AMPEL HEUTE: ' + (C.illnessAt(ctx.state.illnessPeriods, today) ? 'krank gemeldet' : C.readinessLine(R)) + ((ctx as any).ouraHidden ? ' (Werte von Oura gibt die App nicht an die KI weiter; die vollständige Ampel steht auf der Seite „Heute“.)' : ''));
+    L.push('AMPEL HEUTE: ' + readinessContextLine(readinessOf(ctx)));
   } catch (e) { L.push('AMPEL HEUTE: keine Werte'); }
   return L.join('\n');
 }

@@ -1,0 +1,1100 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/plan26-work
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 4 virtual weeks
+SIM24 {"id":"SIMULATED-beginner","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":13,"partial":6,"missed":2,"corrections":2,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":14,"engineCalls":7,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":1951.0978000000002,"phases":["base"]}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > beginner: 12 virtual weeks, seed 2612
+SIM26 {"profile":"beginner","weeks":12,"seed":2612,"actions":216,"restarts":12,"synthetic":true}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 4 virtual weeks
+SIM24 {"id":"SIMULATED-experienced","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":32,"partial":7,"missed":5,"corrections":2,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":61,"engineCalls":7,"maxDailySessions":2,"maxWeeklyMinutes":570,"elapsedMs":9788.5836,"phases":["base"]}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > advanced: 13 virtual weeks, seed 2613
+SIM26 {"profile":"advanced","weeks":13,"seed":2613,"actions":234,"restarts":13,"synthetic":true}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 4 virtual weeks
+SIM24 {"id":"SIMULATED-high-volume","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":35,"partial":12,"missed":7,"corrections":2,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":64,"engineCalls":7,"maxDailySessions":2,"maxWeeklyMinutes":796,"elapsedMs":10843.3918,"phases":["base"]}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > performance: 14 virtual weeks, seed 2614
+SIM26 {"profile":"performance","weeks":14,"seed":2614,"actions":252,"restarts":14,"synthetic":true}
+
+ Ô£ô tests/unit/intents.test.ts (71 tests) 32074ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×mein knie tut wehÔÇ£ ÔåÆ pain  480ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×die Wade zwicktÔÇ£ ÔåÆ pain  523ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Achillessehne ziehtÔÇ£ ÔåÆ pain  534ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Ich habe am Mittwoch keine ZeitÔÇ£ ÔåÆ no-time-day  376ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×am freitag kann ich nichtÔÇ£ ÔåÆ no-time-day  392ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Samstag geht nichtÔÇ£ ÔåÆ no-time-day  410ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Verschieb den langen Lauf auf SonntagÔÇ£ ÔåÆ move-session  349ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×verschiebe das rad auf samstagÔÇ£ ÔåÆ move-session  535ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Wie l├ñuft es mit meinem Ziel?ÔÇ£ ÔåÆ goal  436ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×schaffe ich meine zielzeitÔÇ£ ÔåÆ goal  422ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Wie war meine Woche?ÔÇ£ ÔåÆ week  465ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Was hat sich verbessert?ÔÇ£ ÔåÆ improved  499ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Was steht heute an?ÔÇ£ ÔåÆ today  565ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×was mache ich morgenÔÇ£ ÔåÆ tomorrow  521ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×Wie ist meine Ampel?ÔÇ£ ÔåÆ readiness  462ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wie habe ich geschlafenÔÇ£ ÔåÆ sleep  433ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wie viel schlaf brauche ichÔÇ£ ÔåÆ sleep-need  402ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×meine HRVÔÇ£ ÔåÆ hrv  485ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wie ist mein ruhepulsÔÇ£ ÔåÆ rhr  501ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×welche Zonen habe ichÔÇ£ ÔåÆ zones  439ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×was ist zone 2ÔÇ£ ÔåÆ what-zone2  389ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×welches tempo soll ich laufenÔÇ£ ÔåÆ pace  351ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×was soll ich essenÔÇ£ ÔåÆ nutrition  415ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×verpflegung im wettkampfÔÇ£ ÔåÆ race-fuel  449ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wann ist mein n├ñchster wettkampfÔÇ£ ÔåÆ next-race  440ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×warum so oft radÔÇ£ ÔåÆ plan-why  644ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×welche kraft├╝bungenÔÇ£ ÔåÆ strength  520ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wie lerne ich kraulenÔÇ£ ÔåÆ swim-learn  411ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wann mache ich den testÔÇ£ ÔåÆ test  526ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wann ist die n├ñchste erholungswocheÔÇ£ ÔåÆ recovery-week  453ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×das ist mir zu vielÔÇ£ ÔåÆ too-hard  467ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×zu leicht, ich kann mehrÔÇ£ ÔåÆ too-easy  398ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×es ist so hei├ƒÔÇ£ ÔåÆ heat  400ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×es regnetÔÇ£ ÔåÆ rain  407ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×ich bin im urlaubÔÇ£ ÔåÆ travel  381ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×keine motivation heuteÔÇ£ ÔåÆ motivation  349ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×ich war zus├ñtzlich laufenÔÇ£ ÔåÆ extra  452ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wie verbinde ich garminÔÇ£ ÔåÆ connect  525ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×ich will abnehmenÔÇ£ ÔåÆ weight  413ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×wie ist das mit dem gewichtÔÇ£ ÔåÆ weight  354ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×neues zielÔÇ£ ÔåÆ goal-change  425ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×halloÔÇ£ ÔåÆ greet  419ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×dankeÔÇ£ ÔåÆ thanks  432ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×hilfeÔÇ£ ÔåÆ help  430ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×ich bin total m├╝deÔÇ£ ÔåÆ tired  520ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×heute f├ñllt ausÔÇ£ ÔåÆ skip-today  582ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×l├ñngste einheitÔÇ£ ÔåÆ longest  825ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×morgen ist spielÔÇ£ ÔåÆ game  721ms
+   Ô£ô Formulierungen und Tippfehler > ÔÇ×ich will abnehmenÔÇ£: Jugendliche ÔåÆ Schutz-Antwort, Erwachsene ÔåÆ Gewicht  4027ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Krank: R├╝ckfrage mit Knopf, keine Aktion ohne Best├ñtigung  565ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Knie: Ber├╝cksichtigung anlegen und heute locker  593ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Mittwoch keine Zeit: Einheiten wandern auf freie Tage derselben Woche  473ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Langen Lauf auf Sonntag: konkreter Vorschlag mit Datum  735ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Intervalle bei roter Ampel: nein, mit Grund  520ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Unbekanntes: ehrlich, mit passenden Vorschl├ñgen als Kn├Âpfe  491ms
+   Ô£ô Antworten mit echten Daten und Aktionen > Ohne Teamsport: kein Fu├ƒball oder Spieltag in den Antworten  618ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 4 virtual weeks
+SIM24 {"id":"SIMULATED-student-football","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":29,"partial":8,"missed":6,"corrections":2,"football":11,"events":{"extra-football":1,"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":31,"engineCalls":7,"maxDailySessions":2,"maxWeeklyMinutes":251,"elapsedMs":14971.217700000005,"phases":["base"]}
+
+ Ô£ô tests/unit/continue.test.ts (17 tests) 37495ms
+   Ô£ô Plan geht weiter (kein Neustart) > CTL z├ñhlt nicht, wenn Einheiten in den Daten fehlen (CTL viel niedriger als das Training)  381ms
+   Ô£ô Fragebogen bei vorhandenem Plan > alle Test-Personen: zweiter Fragebogen setzt den ersten Plan fort  33466ms
+   Ô£ô Bausteine > transitionPlan ohne Kalibrierung im alten Plan: nichts Erfundenes  1778ms
+   Ô£ô Bausteine > weit entferntes Ziel: Phasen ├╝ber den ganzen Weg, kein Wettkampf in den ausgegebenen Wochen, Grundlage zuerst  1619ms
+ Ô£ô tests/unit/constraints.test.ts (20 tests) 39908ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > jugend-langdistanz  657ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > erfahren-md-marathon  1067ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > vater-regeln  3859ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > marathon-anfaenger  1027ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > rad-event  598ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > olympisch-erfahren  1250ms
+   Ô£ô Keine harte Regel verletzt: alle Test-Personen, 16 Wochen > langdistanz-profi  2486ms
+   Ô£ô Vater-Profil: 3 L├ñufe gew├╝nscht, nur Sa/So erlaubt ÔåÆ klarer Hinweis mit zwei L├Âsungen, Plan hat 2 L├ñufe  7762ms
+   Ô£ô L├Âsung ÔÇ×Laufen auch am Montag erlaubenÔÇ£ wirkt: Regel wird erweitert, Konflikt verschwindet  14099ms
+   Ô£ô Weiche Regel: langer Lauf lieber sonntags; ist Sonntag ein Rennen, ausnahmsweise ein anderer Tag mit Erkl├ñrung  734ms
+   Ô£ô Urlaub: im Zeitraum kein Training, Pr├╝fungszeit nur kurz und locker  1279ms
+   Ô£ô H├Âchstdauer: Mo-Fr h├Âchstens 45 min wird eingehalten  4081ms
+   Ô£ô Knie: keine Lauf-Intervalle im Plan, Tipp gegen Bergablaufen  500ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 4 virtual weeks
+SIM24 {"id":"SIMULATED-irregular","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":13,"partial":6,"missed":22,"corrections":2,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":14,"engineCalls":7,"maxDailySessions":2,"maxWeeklyMinutes":501,"elapsedMs":5738.711300000003,"phases":["base"]}
+
+ Ô£ô tests/unit/personas.test.ts (25 tests) 4752ms
+   Ô£ô Test-Person jugend-langdistanz > erste 4 Planwochen: alle Planungsregeln eingehalten  311ms
+   Ô£ô Test-Person vater-regeln > erste 4 Planwochen: alle Planungsregeln eingehalten  438ms
+   Ô£ô Besonderheiten der Personen > Erfahrener: Marathon (B) und Mitteldistanz (A) beide im Plan, Watt in der Beschreibung bei FTP, Intervalle auf der Rolle  2418ms
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > football-triathlon: 15 virtual weeks, seed 2615
+SIM26 {"profile":"football-triathlon","weeks":15,"seed":2615,"actions":270,"restarts":15,"synthetic":true}
+
+ Ô£ô tests/unit/auftrag15.test.ts (13 tests) 4216ms
+   Ô£ô Nur gew├ñhlte Sportarten > alle Kombinationen: Plan nur mit gew├ñhlten Sportarten (Fitness und Ziele mit anderen Sportarten)  2613ms
+   Ô£ô Nur gew├ñhlte Sportarten > Mamas alter Plan mit L├ñufen wird ab heute neu geplant, ohne Neuanfang: Vergangenes und Erledigtes bleibt, ab heute kein Laufen  319ms
+   Ô£ô Gleiche Sportart nicht an zwei Tagen hintereinander > tri-wenig-tage: keine gleiche Sportart an Folgetagen ohne Begr├╝ndung, auch nicht So ÔåÆ Mo; Ausnahmen locker, kurz, mit Grund  304ms
+ Ô£ô tests/unit/auftrag12.test.ts (34 tests) 12198ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > jugend-langdistanz  395ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > erfahren-md-marathon  311ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > vater-regeln  536ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > rad-event  617ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > olympisch-erfahren  1277ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > langdistanz-profi  2777ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > anfaenger-ohne-kraul  959ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > laeufer-ohne-rad  336ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > teamsport-ohne-spiele  700ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > fuenfzig-wenig-zeit  2327ms
+   Ô£ô Prognose f├╝r alle Test-Personen: immer da, nie unrealistisch > triathlet-50m-freiwasser  1557ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 4 virtual weeks
+SIM24 {"id":"SIMULATED-manual-corrections","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":31,"partial":6,"missed":7,"corrections":4,"football":0,"events":{"retroactive-correction":4,"manual-load-anchor":1,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":32,"engineCalls":9,"maxDailySessions":2,"maxWeeklyMinutes":570,"elapsedMs":2944.1834000000017,"phases":["base"]}
+
+stdout | tests/unit/history-performance24.test.ts > Wachsende synthetische Historie > 500 Trainings und 1500 Nachrichten: korrekte, begrenzte Auswertung
+QA24 performance {"synthetic":true,"trainings":500,"messages":1500,"historyDays":250,"contextChars":23636,"phasesMs":[{"activities":4,"load":7,"scores":60,"context":19},{"activities":1,"load":3,"scores":36,"context":13},{"activities":1,"load":3,"scores":33,"context":11}],"samplesMs":[90,53,47],"medianMs":53,"heapDeltaMiB":11.8,"note":"Node-Laufzeit; Heap-Differenz ist kein Spitzenverbrauch. Keine Browser-/D1-Latenz."}
+
+ Ô£ô tests/unit/auftrag11.test.ts (11 tests) 1253ms
+stdout | tests/unit/history-performance24.test.ts > Wachsende synthetische Historie > 5000 Trainings und 15000 Nachrichten: korrekte, begrenzte Auswertung
+QA24 performance {"synthetic":true,"trainings":5000,"messages":15000,"historyDays":2500,"contextChars":23694,"phasesMs":[{"activities":11,"load":42,"scores":424,"context":122},{"activities":7,"load":26,"scores":319,"context":107},{"activities":7,"load":25,"scores":330,"context":102}],"samplesMs":[598,459,464],"medianMs":464,"heapDeltaMiB":62.3,"note":"Node-Laufzeit; Heap-Differenz ist kein Spitzenverbrauch. Keine Browser-/D1-Latenz."}
+
+ Ô£ô tests/unit/history-performance24.test.ts (2 tests) 1745ms
+   Ô£ô Wachsende synthetische Historie > 5000 Trainings und 15000 Nachrichten: korrekte, begrenzte Auswertung  1543ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 4 virtual weeks
+SIM24 {"id":"SIMULATED-missing-data","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":9,"partial":3,"missed":6,"corrections":2,"football":0,"events":{"missing-measurements":9,"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":10,"engineCalls":7,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":3464.472499999996,"phases":["base"]}
+
+ Ô£ô tests/unit/auftrag19-bibliothek.test.ts (56 tests) 1011ms
+ Ô£ô tests/unit/auftrag20-plan.test.ts (11 tests) 662ms
+   Ô£ô Auftrag 20: Koppellauf und gro├ƒer Tag > Triathlon-Nutzer: Koppellauf 10-15 min, h├Âchstens einer in 3 Wochen, nie in Grundlage/Erholung, Tag danach ohne langen oder harten Lauf  653ms
+ Ô£ô tests/unit/auftrag16.test.ts (35 tests) 55442ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > lockerer langer Lauf mit automatischen Runden: kein Wort von Intervallen, ÔÇ×gleichm├ñ├ƒigÔÇ£ wird best├ñtigt  931ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > Jonahs Lauf als langer Lauf geplant: gleichm├ñ├ƒig, Zone 2 gelobt, nicht ÔÇ×nur Zone 2ÔÇ£  2722ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > langer Lauf, ab km 8 deutlich schneller: ÔÇ×Du bist ab km 8 deutlich schneller geworden ÔÇªÔÇ£  2861ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > langer Lauf, aber Tempowechsel gemessen (Fahrtspiel): Messung widerspricht dem Plan, freundlich  2736ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > geplante Intervalle, Runden von Hand: 5 von 5, L├ñnge passt, Puls in den Belastungen  2472ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > geplante Intervalle, nur automatische Runden: trotzdem erkannt (Verlauf)  2641ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > geplante Intervalle, aber gleichm├ñ├ƒig gelaufen: ehrlich sagen, warum nichts zu sehen ist  2401ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > Kommentar nach der Einheit nennt bei einem lockeren Lauf keine Intervalle  2458ms
+   Ô£ô Bewertung: Art der Einheit kommt aus dem Plan > H├╝gel ohne Plan (eigene Einheit): erkannt und als harte Einheit gez├ñhlt  2677ms
+   Ô£ô Kostenlose KI: Werkzeug vorher, ├änderungsw├╝nsche, W├ñchter > Bewertungsfragen bekommen review_training, Tagesfragen explain_day (mit Datum, Sportart, Zeitgrenze)  23305ms
+   Ô£ô Kostenlose KI: Werkzeug vorher, ├änderungsw├╝nsche, W├ñchter > Anweisung und Zusammenfassung: Coach-Regeln, Profil, Ziel, Phase, heute, n├ñchste Tage, letzte 7 Tage, Ampel  1274ms
+   Ô£ô Regel-Coach: Fehler aus dem Vergleich behoben > ÔÇ×Schreib mir ein Gedicht ├╝ber PizzaÔÇ£ ist weder Krankheit noch Gewicht  2704ms
+   Ô£ô Regel-Coach: Fehler aus dem Vergleich behoben > ÔÇ×mir ist ├╝belÔÇ£ bleibt Krankheit  2950ms
+   Ô£ô Regel-Coach: Fehler aus dem Vergleich behoben > ÔÇ×10 min k├╝rzerÔÇ£ hei├ƒt minus 10 (nicht auf 10)  2993ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 4 virtual weeks
+SIM24 {"id":"SIMULATED-plateau","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":30,"partial":11,"missed":5,"corrections":2,"football":0,"events":{"seeded-history":28,"unchanged-performance":28,"manual-load-anchor":1,"retroactive-correction":2,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":59,"engineCalls":7,"maxDailySessions":2,"maxWeeklyMinutes":575,"elapsedMs":7002.082699999999,"phases":["base"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 4 virtual weeks
+SIM24 {"id":"SIMULATED-pause-return","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":0,"completed":12,"partial":4,"missed":14,"corrections":1,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":1,"pause-day":14,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":1,"score-check":1},"failures":[],"sessions":13,"engineCalls":6,"maxDailySessions":2,"maxWeeklyMinutes":324,"elapsedMs":1996.5800000000017,"phases":["base"]}
+
+ Ô£ô tests/unit/longterm.test.ts (51 tests) 915ms
+   Ô£ô Personen-Besonderheiten > Einsteigerin nur Brust: Schwimm-Stufen mit Brust und Kraul-Technik  417ms
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > little-time: 16 virtual weeks, seed 2616
+SIM26 {"profile":"little-time","weeks":16,"seed":2616,"actions":288,"restarts":16,"synthetic":true}
+
+ Ô£ô tests/unit/extra.test.ts (10 tests) 13177ms
+   Ô£ô Harte Extra-Einheit pr├╝ft die n├ñchste harte Einheit > Extra-Lauf mit hohem Puls ÔåÆ Vorschlag, die Intervalle morgen locker zu machen; ├£bernehmen ├ñndert den Plan  600ms
+   Ô£ô Harte Extra-Einheit pr├╝ft die n├ñchste harte Einheit > lockerer Extra-Lauf ÔåÆ kein Vorschlag  897ms
+   Ô£ô Harte Extra-Einheit pr├╝ft die n├ñchste harte Einheit > hohe Anstrengung (RPE 8) z├ñhlt auch ohne Puls  2921ms
+   Ô£ô Woche zu voll ÔåÆ Entlastung > viele Extra-Einheiten ÔåÆ Vorschlag, die lockeren Einheiten bis Sonntag zu k├╝rzen (nie Schl├╝sseleinheiten)  2657ms
+   Ô£ô Woche zu voll ÔåÆ Entlastung > ohne Extras keine Entlastung  2896ms
+   Ô£ô Extra-Einheiten z├ñhlen ├╝berall mit > Belastung (eigene CTL/ATL), Bewertung und Scores  3130ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 4 virtual weeks
+SIM24 {"id":"SIMULATED-ambitious-short","weeks":4,"days":28,"checkpoints":4,"replans":1,"extensions":2,"completed":13,"partial":3,"missed":2,"corrections":2,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":2,"taper-week":1,"fatigue":1,"invalid-import-outlier":1,"equipment-change":1,"score-check":1},"failures":[],"sessions":14,"engineCalls":7,"maxDailySessions":1,"maxWeeklyMinutes":183,"elapsedMs":2431.0169000000024,"phases":["build","taper","specific"]}
+
+ Ô£ô tests/unit/auftrag18-regeln.test.ts (27 tests) 643ms
+ Ô£ô server/test/ai.test.ts (28 tests) 497ms
+ Ô£ô server/test/wai.test.ts (26 tests) 5104ms
+   Ô£ô Mehrere Nutzer > Einladung, getrennte Daten, Kopplung bleibt beim eigenen Nutzer  511ms
+   Ô£ô Zugang und Reihenfolge > ohne Workers AI (kein Binding): nicht verf├╝gbar, die App antwortet selbst (403)  367ms
+   Ô£ô Zugang und Reihenfolge > mit Einwilligung: kostenlose KI aktiv, Antwort kommt von der KI, Verbrauch wird gez├ñhlt  361ms
+   Ô£ô Kontingent > h├Âchstens 30 Fragen pro Person und Tag, danach Regel-Coach  885ms
+ Ô£ô tests/unit/review.test.ts (91 tests | 31 skipped) 64184ms
+   Ô£ô Test-Personen mit gespielten Einheiten > jugend-langdistanz: ÔÇ×Wie war meine Woche?ÔÇ£  988ms
+   Ô£ô Test-Personen mit gespielten Einheiten > jugend-langdistanz: ÔÇ×Wie war mein letztes Training?ÔÇ£  1653ms
+   Ô£ô Test-Personen mit gespielten Einheiten > jugend-langdistanz: ÔÇ×Vergleich mit letzter WocheÔÇ£  2399ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-rad-lauf: ÔÇ×Wie war meine Woche?ÔÇ£  879ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-rad-lauf: ÔÇ×Wie war mein letztes Training?ÔÇ£  956ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-rad-lauf: ÔÇ×Vergleich mit letzter WocheÔÇ£  945ms
+   Ô£ô Test-Personen mit gespielten Einheiten > einsteiger-sprint: ÔÇ×Wie war meine Woche?ÔÇ£  1403ms
+   Ô£ô Test-Personen mit gespielten Einheiten > einsteiger-sprint: ÔÇ×Wie war mein letztes Training?ÔÇ£  1212ms
+   Ô£ô Test-Personen mit gespielten Einheiten > einsteiger-sprint: ÔÇ×Vergleich mit letzter WocheÔÇ£  1141ms
+   Ô£ô Test-Personen mit gespielten Einheiten > erfahren-md-marathon: ÔÇ×Wie war meine Woche?ÔÇ£  3406ms
+   Ô£ô Test-Personen mit gespielten Einheiten > erfahren-md-marathon: ÔÇ×Wie war mein letztes Training?ÔÇ£  2848ms
+   Ô£ô Test-Personen mit gespielten Einheiten > erfahren-md-marathon: ÔÇ×Vergleich mit letzter WocheÔÇ£  3051ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-regeln: ÔÇ×Wie war meine Woche?ÔÇ£  6011ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-regeln: ÔÇ×Wie war mein letztes Training?ÔÇ£  4801ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-regeln: ÔÇ×Vergleich mit letzter WocheÔÇ£  5092ms
+   Ô£ô Test-Personen mit gespielten Einheiten > marathon-anfaenger: ÔÇ×Wie war meine Woche?ÔÇ£  1151ms
+   Ô£ô Test-Personen mit gespielten Einheiten > marathon-anfaenger: ÔÇ×Wie war mein letztes Training?ÔÇ£  943ms
+   Ô£ô Test-Personen mit gespielten Einheiten > marathon-anfaenger: ÔÇ×Vergleich mit letzter WocheÔÇ£  1340ms
+   Ô£ô Test-Personen mit gespielten Einheiten > rad-event: ÔÇ×Wie war meine Woche?ÔÇ£  933ms
+   Ô£ô Test-Personen mit gespielten Einheiten > rad-event: ÔÇ×Wie war mein letztes Training?ÔÇ£  766ms
+   Ô£ô Test-Personen mit gespielten Einheiten > rad-event: ÔÇ×Vergleich mit letzter WocheÔÇ£  421ms
+   Ô£ô Test-Personen mit gespielten Einheiten > olympisch-erfahren: ÔÇ×Wie war meine Woche?ÔÇ£  480ms
+   Ô£ô Test-Personen mit gespielten Einheiten > olympisch-erfahren: ÔÇ×Wie war mein letztes Training?ÔÇ£  446ms
+   Ô£ô Test-Personen mit gespielten Einheiten > olympisch-erfahren: ÔÇ×Vergleich mit letzter WocheÔÇ£  563ms
+   Ô£ô Test-Personen mit gespielten Einheiten > langdistanz-profi: ÔÇ×Wie war meine Woche?ÔÇ£  873ms
+   Ô£ô Test-Personen mit gespielten Einheiten > langdistanz-profi: ÔÇ×Wie war mein letztes Training?ÔÇ£  627ms
+   Ô£ô Test-Personen mit gespielten Einheiten > langdistanz-profi: ÔÇ×Vergleich mit letzter WocheÔÇ£  2559ms
+   Ô£ô Test-Personen mit gespielten Einheiten > m├╝de (RPE 8 locker, Gef├╝hl sehr m├╝de) ÔåÆ N├ñchste Tage vorsichtig, Knopf ÔÇ×lockererÔÇ£  3677ms
+   Ô£ô Test-Personen mit gespielten Einheiten > Werte fehlen ÔåÆ sagen, was fehlt, und Eintragen anbieten  1052ms
+   Ô£ô Test-Personen mit gespielten Einheiten > Nichtkrauler (Sprint-Einsteiger): Schwimmen wird bewertet, ohne Kraul-Lob  1483ms
+   Ô£ô Test-Personen mit gespielten Einheiten > ohne erledigte Einheit: ehrliche Antwort mit Weg zum Eintragen  628ms
+   Ô£ô Test-Personen mit gespielten Einheiten > nach jeder erledigten Einheit: Bewertung automatisch (Engine), abschaltbar  5573ms
+   Ô£ô Test-Personen mit gespielten Einheiten > reviewAnswer gibt bei normalen Fragen nichts zur├╝ck (andere Absichten bleiben)  2862ms
+ Ô£ô server/test/healthfit.test.ts (16 tests) 5940ms
+   Ô£ô Mehrere Nutzer > Einladung, getrennte Daten, Kopplung bleibt beim eigenen Nutzer  433ms
+   Ô£ô HealthFit ├╝ber Dropbox, echte FIT-Datei > Datei ÔåÆ App ÔåÆ selbst hinzugef├╝gte Einheit bekommt die Felder mit Quelle, keine Extra-Einheit, Status zeigt letzte Datei  1731ms
+   Ô£ô HealthFit ├╝ber Dropbox, echte FIT-Datei > ohne passende Einheit: Extra-Einheit; dieselbe Einheit aus intervals.icu und als Datei ergibt keine Dublette  532ms
+   Ô£ô HealthFit ├╝ber Dropbox, echte FIT-Datei > intervals.icu zuerst, HealthFit danach: die Datei f├╝llt dieselbe Extra-Einheit  408ms
+   Ô£ô Verst├ñndliche Fehler > Dropbox-App mit ÔÇ×App folderÔÇ£: HealthFit-Ordner unsichtbar ÔåÆ Status ÔÇ×FehlerÔÇ£ mit Grund, Verbindung bleibt  324ms
+   Ô£ô Verst├ñndliche Fehler > kaputte Datei: Grund im Status, die anderen Dateien kommen trotzdem an; fehlgeschlagener Download wird wiederholt  466ms
+   Ô£ô Verst├ñndliche Fehler > CPU-Grenze: eine Datei pro Aufruf, die ├╝brigen warten; der Zeitplan holt alle 5 min die n├ñchste  449ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 12 virtual weeks
+SIM24 {"id":"SIMULATED-beginner","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":33,"partial":12,"missed":6,"corrections":6,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":34,"engineCalls":20,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":6162.335999999996,"phases":["base"]}
+
+ ÔØ» tests/unit/storage-longitudinal24.test.ts (2 tests | 1 failed) 69680ms
+   ├ù 4 Nutzer x 180 Tage: Speichern, Korrigieren, Verschieben, Neustarts und Backup bleiben konsistent 69670ms
+     ÔåÆ Test timed out in 60000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   Ô£ô Konflikt am selben Feld bewahrt beide Werte, getrennte Felder/Tage gehen nicht verloren 9ms
+ Ô£ô tests/unit/analysis.test.ts (33 tests | 30 skipped) 563ms
+   Ô£ô Analyse: Grundtests (ohne echte Daten) > Krankheit hat Vorrang vor allem  322ms
+ Ô£ô tests/unit/simulation-scheduling24.test.ts (1 test) 635ms
+   Ô£ô longitudinal simulation allows pending event-loop work before it finishes  634ms
+ Ô£ô tests/unit/constraints-repro.test.ts (1 test) 660ms
+   Ô£ô Vater-Profil: L├ñufe nur Sa/So, nie Mi; Schwimmen nur Do; dienstags gar nichts  660ms
+ Ô£ô server/test/connect.test.ts (17 tests) 352ms
+ Ô£ô tests/unit/auftrag17-befunde.test.ts (3 tests) 477ms
+   Ô£ô Auftrag 17: Befunde aus dem gro├ƒen Test > empfindliche Schulter: keine Paddles im Plan und kein Hinweis auf Paddles, die es nicht gibt  414ms
+ Ô£ô tests/unit/auftrag11b.test.ts (15 tests) 441ms
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > irregular: 17 virtual weeks, seed 2617
+SIM26 {"profile":"irregular","weeks":17,"seed":2617,"actions":306,"restarts":17,"synthetic":true}
+
+ Ô£ô server/test/sync-integrity.test.ts (11 tests) 465ms
+ Ô£ô tests/unit/variety.test.ts (58 tests) 4343ms
+   Ô£ô Rad und Lauf: Fortschritt der Schl├╝sseleinheiten > Rad: Sweet Spot ÔåÆ Schwelle/Over-Unders ÔåÆ kurz: VO2max, lang: Wettkampftempo  2374ms
+   Ô£ô Rad und Lauf: Fortschritt der Schl├╝sseleinheiten > Lauf: Aufbau Schwelle, spezifisch Wettkampftempo (Halbmarathon-Tempo vor Mittel-, 10-km-Tempo vor Olympisch)  788ms
+   Ô£ô Rad und Lauf: Fortschritt der Schl├╝sseleinheiten > fester Wochenaufbau (Mi Rad hart, Fr Spiel, 17 Jahre): Do nie hart, langer Lauf locker ohne Laufziel, h├Âchstens Spiel + 1 harte Einheit  814ms
+ Ô£ô server/test/isolation.test.ts (11 tests) 170ms
+ Ô£ô tests/unit/backup-integrity24.test.ts (9 tests) 6272ms
+   Ô£ô ungueltiges Backup wird abgewiesen: 0  1496ms
+   Ô£ô ungueltiges Backup wird abgewiesen: 1  2740ms
+   Ô£ô ungueltiges Backup wird abgewiesen: 2  409ms
+   Ô£ô ungueltiges Backup wird abgewiesen: 3  398ms
+   Ô£ô ungueltiges Backup wird abgewiesen: 4  355ms
+ Ô£ô tests/unit/coach-sync24.test.ts (10 tests) 6565ms
+   Ô£ô Coach wartet auf bestaetigte aktuelle Daten > erst Check-in hochladen und bestaetigen, danach genau eine Chatanfrage  4891ms
+   Ô£ô Coach wartet auf bestaetigte aktuelle Daten > unvollstaendige 50-Seiten-Antwort wird nicht als aktueller Serverstand verwendet  612ms
+   Ô£ô Coach wartet auf bestaetigte aktuelle Daten > fehlgeschlagener Sync antwortet lokal mit aktuellem Zustand ohne Modellanfrage  578ms
+ Ô£ô tests/unit/onboarding.test.ts (8 tests) 280ms
+ Ô£ô tests/unit/template-persistence26.test.ts (4 tests) 242ms
+ Ô£ô server/test/signup.test.ts (10 tests) 177ms
+ Ô£ô tests/unit/plangen.test.ts (7 tests) 3510ms
+   Ô£ô Plan erzeugen > Olympische Distanz: alle Wochen, Regeln eingehalten, Wettkampf am Zieltag  950ms
+   Ô£ô Plan erzeugen > Jugendlicher mit Teamsport Mo/Fr: Termine bleiben, kein harter Tag direkt neben dem Spiel, Steigerung Ôëñ 8 %  932ms
+   Ô£ô Plan erzeugen > Fehlende Schwellen: Einstiegstests in den ersten zwei Wochen  427ms
+   Ô£ô Plan erzeugen > Marathon mit 16 Jahren: Hinweis aufs Mindestalter  348ms
+   Ô£ô Plan erzeugen > Zeitfenster aus dem Profil werden eingehalten  362ms
+   Ô£ô Plan erzeugen > ├£bergang: vergangene Wochen bleiben, neuer Plan ab n├ñchstem Montag  468ms
+stderr | server/test/feedback.test.ts > Auftrag 14: Status neu ÔåÆ in Arbeit ÔåÆ erledigt oder verworfen; Z├ñhler ÔÇ×neuÔÇ£ z├ñhlt nur offene, Melder sieht den Status, auch eigene Meldungen
+Push fehlgeschlagen: Invalid character
+
+stderr | server/test/feedback.test.ts > Auftrag 14: Status neu ÔåÆ in Arbeit ÔåÆ erledigt oder verworfen; Z├ñhler ÔÇ×neuÔÇ£ z├ñhlt nur offene, Melder sieht den Status, auch eigene Meldungen
+Push fehlgeschlagen: Invalid character
+
+ Ô£ô server/test/feedback.test.ts (9 tests) 133ms
+ Ô£ô tests/unit/trends.test.ts (16 tests) 3036ms
+   Ô£ô Zeitraum und zu wenig Daten > Zeitraum ├ñndert die Grundlage (4 Wochen weniger Punkte als 1 Jahr)  2878ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 12 virtual weeks
+SIM24 {"id":"SIMULATED-experienced","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":91,"partial":26,"missed":19,"corrections":6,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"synthetic-personal-best":1,"goal-change":1},"failures":[],"sessions":120,"engineCalls":21,"maxDailySessions":2,"maxWeeklyMinutes":570,"elapsedMs":15595.746499999994,"phases":["base","build"]}
+
+ Ô£ô tests/unit/fit.test.ts (10 tests) 233ms
+ Ô£ô tests/unit/storage-durability24.test.ts (5 tests) 660ms
+   Ô£ô Schreibfehler werden als fehlgeschlagen zurueckgegeben, alter Stand bleibt erhalten  315ms
+ Ô£ô tests/unit/publication24.test.ts (15 tests) 445ms
+ Ô£ô server/test/oauth-flow.test.ts (11 tests) 359ms
+ Ô£ô server/test/analysis.test.ts (9 tests) 357ms
+ Ô£ô server/test/account.test.ts (8 tests) 154ms
+ Ô£ô server/test/quality-sync.test.ts (5 tests) 108ms
+ Ô£ô server/test/error-privacy24.test.ts (13 tests) 116ms
+ Ô£ô server/test/rules-ai.test.ts (8 tests) 137ms
+ Ô£ô server/test/coach-results-flow.test.ts (5 tests) 132ms
+ Ô£ô tests/unit/coach.test.ts (37 tests) 109ms
+ Ô£ô tests/unit/auftrag19-scores.test.ts (14 tests) 66ms
+ Ô£ô tests/unit/plan-actions26.test.ts (15 tests) 683ms
+   Ô£ô keeps structured prescriptions behind the block editor and skips generic week scaling  658ms
+ Ô£ô server/test/multiuser.test.ts (4 tests) 232ms
+ Ô£ô tests/unit/auftrag17-sollist.test.ts (16 tests) 76ms
+ Ô£ô server/test/scheduled.test.ts (7 tests) 108ms
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > frequent-changes: 18 virtual weeks, seed 2618
+SIM26 {"profile":"frequent-changes","weeks":18,"seed":2618,"actions":324,"restarts":18,"synthetic":true}
+
+ Ô£ô tests/unit/rules-intense.test.ts (2 tests) 96ms
+ Ô£ô tests/unit/training-templates26.test.ts (27 tests) 334ms
+   Ô£ô sport-specific pace editor > shows swim seconds per 100 m, stores normalized pace, and reopens without drift  317ms
+ Ô£ô server/test/version-gate.test.ts (6 tests) 112ms
+ Ô£ô tests/unit/extension-intensity24.test.ts (1 test) 90ms
+ Ô£ô tests/unit/swim-equipment-quality.test.ts (15 tests) 64ms
+ Ô£ô tests/unit/auftrag14.test.ts (75 tests) 2089ms
+   Ô£ô Intensit├ñt als feste Regel > 5/10 km: VO2max im Aufbau; Rad-Event: lange Anstiege; Halbmarathon: Schwelle und Wettkampftempo  335ms
+ Ô£ô tests/unit/auftrag20-scores.test.ts (20 tests) 70ms
+ Ô£ô tests/unit/ruleparse.test.ts (87 tests) 72ms
+stdout | tests/unit/adjustments.test.ts > Belastung und Anpassungen (Phase 4)
+Belastung
+T├ñglich
+Lauf-Intervalle und Leiste
+Verpasste Schl├╝sseleinheit
+W├Âchentlich
+
+ Ô£ô tests/unit/adjustments.test.ts (1 test) 42ms
+ Ô£ô tests/unit/i18n.test.ts (5 tests) 89ms
+ Ô£ô tests/unit/scores.test.ts (19 tests) 61ms
+ Ô£ô tests/unit/fitness-quality.test.ts (9 tests) 68ms
+ Ô£ô tests/unit/auftrag18-ursachen.test.ts (15 tests) 57ms
+ Ô£ô tests/unit/weekpattern.test.ts (17 tests) 30ms
+ Ô£ô tests/unit/auftrag11c.test.ts (25 tests) 78ms
+ Ô£ô tests/unit/readiness-browser-fixture24.test.ts (2 tests) 31ms
+ Ô£ô tests/unit/tests8.test.ts (13 tests) 28ms
+ Ô£ô tests/unit/storage-pwa24.test.ts (2 tests) 259ms
+ Ô£ô tests/unit/actual-results-quality.test.ts (19 tests) 42ms
+ Ô£ô tests/unit/auftrag9.test.ts (8 tests) 27ms
+ Ô£ô tests/unit/repair.test.ts (3 tests) 27ms
+ Ô£ô tests/unit/stages-edit.test.ts (5 tests) 24ms
+ Ô£ô tests/unit/merge.test.ts (8 tests) 23ms
+ Ô£ô tests/unit/readiness-consistency.test.ts (8 tests) 158ms
+ Ô£ô tests/unit/load-quality.test.ts (19 tests) 25ms
+ Ô£ô tests/unit/training-date24.test.ts (3 tests) 19ms
+ Ô£ô tests/unit/plandiff.test.ts (4 tests) 29ms
+ Ô£ô tests/unit/glossary.test.ts (5 tests) 19ms
+ Ô£ô tests/unit/engine-rules.test.ts (5 tests) 19ms
+ Ô£ô tests/unit/fields.test.ts (18 tests) 14ms
+ Ô£ô tests/unit/ladder.test.ts (5 tests) 11ms
+ Ô£ô tests/unit/scorefilter-history24.test.ts (1 test) 16ms
+ Ô£ô tests/unit/swim-evidence.test.ts (11 tests) 9ms
+ Ô£ô tests/unit/data-consistency24.test.ts (3 tests) 8ms
+ Ô£ô tests/unit/prognosis-race.test.ts (9 tests) 10ms
+stdout | tests/unit/readiness.test.ts > Tagesampel (Phase 3)
+R├╝ckfall
+Pers├Ânlicher Normalbereich
+Krankheit
+Verlauf
+
+ Ô£ô tests/unit/readiness.test.ts (1 test) 8ms
+ Ô£ô tests/unit/strength-templates.test.ts (9 tests) 7ms
+ Ô£ô tests/unit/feed.test.ts (3 tests) 5ms
+ Ô£ô tests/unit/session-move-integrity24.test.ts (4 tests) 38ms
+ Ô£ô tests/unit/persistence-journal24.test.ts (6 tests) 5ms
+ Ô£ô tests/unit/zones-nutrition.test.ts (5 tests) 5ms
+ Ô£ô tests/unit/chart-gaps.test.ts (2 tests) 4ms
+ Ô£ô tests/unit/plan-summary26.test.ts (8 tests) 6ms
+ Ô£ô tests/unit/ui-actions.test.ts (2 tests) 5ms
+ Ô£ô tests/unit/startup25.test.ts (3 tests) 3ms
+ Ô£ô tests/unit/adjustment-clock25.test.ts (2 tests) 2ms
+ Ô£ô tests/unit/test-runner-scheduling24.test.ts (2 tests) 2ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 12 virtual weeks
+SIM24 {"id":"SIMULATED-high-volume","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":104,"partial":32,"missed":24,"corrections":6,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":133,"engineCalls":20,"maxDailySessions":2,"maxWeeklyMinutes":796,"elapsedMs":17340.583800000008,"phases":["base"]}
+
+ Ôåô tests/unit/zz-audit.test.ts (1 test | 1 skipped)
+ Ôåô tests/unit/zz-dbg.test.ts (1 test | 1 skipped)
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > many-extras: 19 virtual weeks, seed 2619
+SIM26 {"profile":"many-extras","weeks":19,"seed":2619,"actions":342,"restarts":19,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > missed-training: 20 virtual weeks, seed 2620
+SIM26 {"profile":"missed-training","weeks":20,"seed":2620,"actions":360,"restarts":20,"synthetic":true}
+
+ Ô£ô tests/unit/auftrag18-many.test.ts (76 tests) 119788ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n22-run-half  839ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n23-run-marathon  812ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n24-tri-supersprint  907ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n26-tri-olympic  688ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n27-tri-middle  2345ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n28-tri-long  2822ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n29-duathlon  1391ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n30-aquathlon  900ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n36-run-marathon  434ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n37-tri-supersprint  809ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n38-tri-sprint  1490ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n39-tri-olympic  481ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n40-tri-middle  5380ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n41-tri-long  4474ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n43-aquathlon  482ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n44-bike-event  312ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n45-swim-goal  441ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n48-tri-sprint  2531ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n49-tri-long  2625ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n50-bike-event  639ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n52-run-marathon  1171ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n54-run-half  704ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n55-tri-middle  996ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n56-duathlon  1519ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n58-laeufer-6x  429ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n59-urlaub-bad  4291ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n62-kraul-50  570ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n63-tri-fussball  677ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n66-teen-fussball-hm  526ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n66-teen-fussball-hm: 3 Wochen mit Abweichungen, Coach-Texte ohne Ursache ohne Daten  22738ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n67-tri-koppel: 3 Wochen mit Abweichungen, Coach-Texte ohne Ursache ohne Daten  39591ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n68-10k-6-wochen: 3 Wochen mit Abweichungen, Coach-Texte ohne Ursache ohne Daten  2935ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > n69-wettkampf-nach-spiel: 3 Wochen mit Abweichungen, Coach-Texte ohne Ursache ohne Daten  7059ms
+   Ô£ô Auftrag 18: 69 Test-Nutzer, ganzer Plan gegen alle Trainingsregeln > Sonderf├ñlle im Detail  1061ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 12 virtual weeks
+SIM24 {"id":"SIMULATED-student-football","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":85,"partial":23,"missed":24,"corrections":6,"football":31,"events":{"extra-football":3,"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":89,"engineCalls":20,"maxDailySessions":2,"maxWeeklyMinutes":289,"elapsedMs":19858.512499999997,"phases":["base"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 12 virtual weeks
+SIM24 {"id":"SIMULATED-irregular","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":34,"partial":17,"missed":65,"corrections":6,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":35,"engineCalls":20,"maxDailySessions":2,"maxWeeklyMinutes":501,"elapsedMs":8305.2494,"phases":["base"]}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > corrections: 21 virtual weeks, seed 2621
+SIM26 {"profile":"corrections","weeks":21,"seed":2621,"actions":378,"restarts":21,"synthetic":true}
+
+ Ô£ô tests/unit/plan-longitudinal26.test.ts (10 tests) 133669ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > beginner: 12 virtual weeks, seed 2612  2781ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > advanced: 13 virtual weeks, seed 2613  12371ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > performance: 14 virtual weeks, seed 2614  15851ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > football-triathlon: 15 virtual weeks, seed 2615  14391ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > little-time: 16 virtual weeks, seed 2616  14733ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > irregular: 17 virtual weeks, seed 2617  14105ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > frequent-changes: 18 virtual weeks, seed 2618  15085ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > many-extras: 19 virtual weeks, seed 2619  14248ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > missed-training: 20 virtual weeks, seed 2620  13956ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > corrections: 21 virtual weeks, seed 2621  16144ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 12 virtual weeks
+SIM24 {"id":"SIMULATED-manual-corrections","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":90,"partial":19,"missed":21,"corrections":12,"football":0,"events":{"retroactive-correction":12,"manual-load-anchor":1,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":91,"engineCalls":26,"maxDailySessions":2,"maxWeeklyMinutes":570,"elapsedMs":11081.477500000008,"phases":["base","build"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 12 virtual weeks
+SIM24 {"id":"SIMULATED-missing-data","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":31,"partial":9,"missed":11,"corrections":6,"football":0,"events":{"missing-measurements":31,"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":32,"engineCalls":20,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":3905.243199999997,"phases":["base"]}
+
+ Ô£ô tests/unit/explain.test.ts (111 tests) 127013ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was genau soll ich morgen auf dem Rad machen?  2263ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Wie l├ñuft das Training am Freitag ab?  2094ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was genau soll ich am Sonntag auf dem Rad machen?  3203ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was genau soll ich am Sonntag beim Laufen machen?  2988ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was mache ich am Sonntag?  2681ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was genau soll ich am Montag bei der Kraft machen?  2650ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was genau soll ich am Dienstag beim Schwimmen machen?  3011ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Was genau soll ich am Dienstag auf dem Rad machen?  3025ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > jugend-langdistanz: Erkl├ñr mir das Training am Dienstag  2582ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-rad-lauf: Was genau soll ich heute beim Laufen machen?  667ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-rad-lauf: Was genau soll ich morgen bei der Kraft machen?  679ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-rad-lauf: Was genau soll ich morgen auf dem Rad machen?  359ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-rad-lauf: Was genau soll ich am Samstag auf dem Rad machen?  338ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-rad-lauf: Was genau soll ich am Sonntag bei der Kraft machen?  330ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Was genau soll ich morgen beim Schwimmen machen?  326ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Wie l├ñuft das Training am Freitag ab?  374ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Was genau soll ich am Samstag auf dem Rad machen?  603ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Was genau soll ich am Sonntag beim Laufen machen?  1186ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Was mache ich am Sonntag?  1133ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Was genau soll ich am Dienstag beim Laufen machen?  1607ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > einsteiger-sprint: Erkl├ñr mir das Training am Dienstag  1216ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich heute beim Schwimmen machen?  3065ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich heute beim Laufen machen?  2650ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich morgen bei der Kraft machen?  2767ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich morgen beim Laufen machen?  2365ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Wie l├ñuft das Training am Freitag ab?  1844ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich am Samstag auf dem Rad machen?  1646ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich am Samstag beim Schwimmen machen?  1401ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich am Sonntag beim Laufen machen?  1577ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was mache ich am Sonntag?  1617ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Was genau soll ich am Dienstag auf dem Rad machen?  2238ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > erfahren-md-marathon: Erkl├ñr mir das Training am Dienstag  1590ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was genau soll ich heute bei der Kraft machen?  2607ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was genau soll ich morgen beim Schwimmen machen?  3080ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Wie l├ñuft das Training am Freitag ab?  2369ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was genau soll ich am Samstag auf dem Rad machen?  2909ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was genau soll ich am Samstag beim Laufen machen?  2628ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was genau soll ich am Sonntag beim Laufen machen?  2891ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was mache ich am Sonntag?  2298ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Was genau soll ich am Montag bei der Kraft machen?  2355ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > vater-regeln: Erkl├ñr mir das Training am Dienstag  2031ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Was genau soll ich morgen beim Laufen machen?  488ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Wie l├ñuft das Training am Freitag ab?  501ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Was genau soll ich am Samstag beim Laufen machen?  540ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Was genau soll ich am Sonntag beim Laufen machen?  538ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Was genau soll ich am Sonntag bei der Kraft machen?  562ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Was mache ich am Sonntag?  480ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Was genau soll ich am Dienstag beim Laufen machen?  485ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > marathon-anfaenger: Erkl├ñr mir das Training am Dienstag  434ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > rad-event: Was genau soll ich morgen auf dem Rad machen?  327ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > rad-event: Wie l├ñuft das Training am Freitag ab?  320ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > rad-event: Was genau soll ich am Samstag auf dem Rad machen?  343ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > rad-event: Was genau soll ich am Sonntag bei der Kraft machen?  411ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > rad-event: Was genau soll ich am Sonntag auf dem Rad machen?  323ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > rad-event: Was mache ich am Sonntag?  302ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich heute beim Schwimmen machen?  656ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich morgen bei der Kraft machen?  647ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich morgen beim Laufen machen?  599ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Wie l├ñuft das Training am Freitag ab?  619ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich am Samstag auf dem Rad machen?  571ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich am Samstag beim Schwimmen machen?  616ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich am Sonntag beim Laufen machen?  588ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich am Sonntag auf dem Rad machen?  610ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was mache ich am Sonntag?  773ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich am Montag auf dem Rad machen?  628ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Was genau soll ich am Dienstag beim Schwimmen machen?  692ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > olympisch-erfahren: Erkl├ñr mir das Training am Dienstag  591ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich morgen beim Schwimmen machen?  1394ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich morgen beim Laufen machen?  1398ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Freitag auf dem Rad machen?  1263ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Freitag bei der Kraft machen?  1369ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Wie l├ñuft das Training am Freitag ab?  1551ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Samstag auf dem Rad machen?  1287ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Sonntag beim Laufen machen?  1237ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Sonntag beim Schwimmen machen?  1137ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was mache ich am Sonntag?  1486ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Montag auf dem Rad machen?  1067ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Montag bei der Kraft machen?  1220ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Dienstag beim Schwimmen machen?  1375ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Was genau soll ich am Dienstag beim Laufen machen?  1262ms
+   Ô£ô Fragen nach dem Ablauf (alle Test-Personen) > langdistanz-profi: Erkl├ñr mir das Training am Dienstag  1269ms
+   Ô£ô Lage des Tages > krank: heute kein Training, Knopf ÔÇ×Wieder gesundÔÇ£  1206ms
+   Ô£ô Lage des Tages > Wiedereinstieg nach Krankheit: Vorschlag ÔÇ×lockerÔÇ£, erst nach Ja ge├ñndert  1249ms
+   Ô£ô Lage des Tages > Ampel rot (Ruhepuls hoch, HFV tief): Vorschlag ganz locker, ÔÇ×neinÔÇ£ l├ñsst alles  1030ms
+   Ô£ô Lage des Tages > Ampel gr├╝n mit Werten: Ruhepuls und HFV werden genannt  848ms
+   Ô£ô Lage des Tages > ÔÇ×Ich hab nur 20 minÔÇ£: gek├╝rzter Vorschlag mit Struktur, nach Ja wirklich k├╝rzer  922ms
+   Ô£ô Lage des Tages > kein Schwimmen an dem Tag: ehrliche Antwort mit n├ñchstem Schwimmtermin  1158ms
+   Ô£ô Lage des Tages > Verschieben bleibt Verschieben (keine Erkl├ñrung)  1102ms
+   Ô£ô Struktur jeder Einheit > alle geplanten Einheiten der Test-Personen haben eine Struktur mit Hauptteil  5987ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 12 virtual weeks
+SIM24 {"id":"SIMULATED-plateau","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":88,"partial":29,"missed":12,"corrections":6,"football":0,"events":{"seeded-history":28,"unchanged-performance":84,"manual-load-anchor":1,"retroactive-correction":6,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":3,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":117,"engineCalls":20,"maxDailySessions":2,"maxWeeklyMinutes":575,"elapsedMs":6024.946999999986,"phases":["base"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 12 virtual weeks
+SIM24 {"id":"SIMULATED-pause-return","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":0,"completed":38,"partial":14,"missed":38,"corrections":4,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":4,"pause-day":35,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":4,"score-check":3,"availability-change":1,"goal-change":1},"failures":[],"sessions":39,"engineCalls":18,"maxDailySessions":2,"maxWeeklyMinutes":324,"elapsedMs":2172.141799999983,"phases":["base","build"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 12 virtual weeks
+SIM24 {"id":"SIMULATED-ambitious-short","weeks":12,"days":84,"checkpoints":12,"replans":5,"extensions":2,"completed":38,"partial":11,"missed":6,"corrections":6,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":6,"taper-week":2,"fatigue":2,"invalid-import-outlier":1,"equipment-change":1,"score-check":3,"recovery-week":2,"availability-change":1,"goal-change":1},"failures":[],"sessions":39,"engineCalls":20,"maxDailySessions":1,"maxWeeklyMinutes":183,"elapsedMs":2761.2329000000027,"phases":["build","taper","specific","race","base"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 24 virtual weeks
+SIM24 {"id":"SIMULATED-beginner","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":2,"completed":69,"partial":22,"missed":10,"corrections":12,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":5,"score-check":6,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":70,"engineCalls":41,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":3940.102200000023,"phases":["base","build","specific","taper"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 24 virtual weeks
+SIM24 {"id":"SIMULATED-experienced","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":0,"completed":169,"partial":46,"missed":45,"corrections":12,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":5,"score-check":6,"availability-change":1,"synthetic-personal-best":1,"goal-change":1},"failures":[],"sessions":198,"engineCalls":42,"maxDailySessions":2,"maxWeeklyMinutes":570,"elapsedMs":5081.8661999999895,"phases":["base","build","specific","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 24 virtual weeks
+SIM24 {"id":"SIMULATED-high-volume","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":0,"completed":206,"partial":60,"missed":47,"corrections":12,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":6,"score-check":6,"availability-change":1,"goal-change":1},"failures":[],"sessions":235,"engineCalls":41,"maxDailySessions":2,"maxWeeklyMinutes":796,"elapsedMs":6056.593300000008,"phases":["base","build"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 24 virtual weeks
+SIM24 {"id":"SIMULATED-student-football","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":0,"completed":174,"partial":39,"missed":43,"corrections":12,"football":63,"events":{"extra-football":6,"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":6,"score-check":6,"availability-change":1,"goal-change":1},"failures":[],"sessions":181,"engineCalls":41,"maxDailySessions":2,"maxWeeklyMinutes":289,"elapsedMs":8308.608399999997,"phases":["base"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 24 virtual weeks
+SIM24 {"id":"SIMULATED-irregular","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":0,"completed":74,"partial":30,"missed":122,"corrections":12,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":6,"score-check":6,"availability-change":1,"goal-change":1},"failures":[],"sessions":75,"engineCalls":41,"maxDailySessions":2,"maxWeeklyMinutes":501,"elapsedMs":3459.6682999999903,"phases":["base","build"]}
+
+ Ô£ô tests/unit/auftrag15-many.test.ts (62 tests) 181732ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n01-fitness  1540ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n02-fitness  3590ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n03-fitness  3262ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n04-fitness  3551ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n05-fitness  5071ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n06-fitness  3373ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n07-fitness  4122ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n08-fitness  2552ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n09-fitness  4346ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n10-fitness  3783ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n11-fitness  6520ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n12-fitness  1803ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n13-fitness  1537ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n14-fitness  1404ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n15-fitness  8052ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n16-fitness  4084ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n17-fitness  4047ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n18-fitness  1321ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n19-fitness  1999ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n20-run-5k  1576ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n21-run-10k  2489ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n22-run-half  5311ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n23-run-marathon  5904ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n24-tri-supersprint  3372ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n25-tri-sprint  3925ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n26-tri-olympic  7860ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n27-tri-middle  13734ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n28-tri-long  13806ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n29-duathlon  4164ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n30-aquathlon  2334ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n31-bike-event  2358ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n32-swim-goal  1596ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n33-run-5k  1354ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n34-run-10k  1931ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n35-run-half  1878ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n36-run-marathon  3086ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n37-tri-supersprint  1942ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n38-tri-sprint  3599ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n39-tri-olympic  4167ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n40-tri-middle  7084ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n41-tri-long  2770ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n42-duathlon  526ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n43-aquathlon  611ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n44-bike-event  675ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n45-swim-goal  638ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n46-fitness  463ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n48-tri-sprint  1165ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n49-tri-long  3818ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n50-bike-event  1104ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n51-swim-goal  760ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n52-run-marathon  1799ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n54-run-half  506ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n55-tri-middle  1520ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n56-duathlon  929ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n57-mama  380ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n58-laeufer-6x  1105ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n59-urlaub-bad  2271ms
+   Ô£ô Auftrag 15: 60 Test-Nutzer komplett durchgespielt > n60-team-tri  780ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 24 virtual weeks
+SIM24 {"id":"SIMULATED-manual-corrections","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":0,"completed":168,"partial":35,"missed":46,"corrections":24,"football":0,"events":{"retroactive-correction":24,"manual-load-anchor":1,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":5,"score-check":6,"availability-change":1,"goal-change":1},"failures":[],"sessions":169,"engineCalls":53,"maxDailySessions":2,"maxWeeklyMinutes":570,"elapsedMs":4913.892999999982,"phases":["base","build","specific","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 24 virtual weeks
+SIM24 {"id":"SIMULATED-missing-data","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":2,"completed":63,"partial":19,"missed":19,"corrections":12,"football":0,"events":{"missing-measurements":63,"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":5,"score-check":6,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":64,"engineCalls":41,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":2651.771800000017,"phases":["base","build","specific","taper"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 24 virtual weeks
+SIM24 {"id":"SIMULATED-plateau","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":0,"completed":164,"partial":56,"missed":31,"corrections":12,"football":0,"events":{"seeded-history":28,"unchanged-performance":168,"manual-load-anchor":1,"retroactive-correction":12,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":6,"score-check":6,"availability-change":1,"goal-change":1},"failures":[],"sessions":193,"engineCalls":41,"maxDailySessions":2,"maxWeeklyMinutes":575,"elapsedMs":3586.2962999999872,"phases":["base","build"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 24 virtual weeks
+SIM24 {"id":"SIMULATED-pause-return","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":2,"completed":99,"partial":28,"missed":48,"corrections":10,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":10,"pause-day":35,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":6,"score-check":6,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":100,"engineCalls":39,"maxDailySessions":2,"maxWeeklyMinutes":324,"elapsedMs":1935.3956999999937,"phases":["base","build","specific","taper","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 24 virtual weeks
+SIM24 {"id":"SIMULATED-ambitious-short","weeks":24,"days":168,"checkpoints":24,"replans":8,"extensions":2,"completed":83,"partial":29,"missed":9,"corrections":12,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":12,"taper-week":2,"fatigue":5,"invalid-import-outlier":1,"equipment-change":1,"score-check":6,"recovery-week":5,"availability-change":1,"goal-change":1},"failures":[],"sessions":84,"engineCalls":41,"maxDailySessions":1,"maxWeeklyMinutes":183,"elapsedMs":1529.9671999999846,"phases":["build","taper","specific","race","base"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 52 virtual weeks
+SIM24 {"id":"SIMULATED-beginner","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":2,"completed":161,"partial":43,"missed":25,"corrections":26,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":162,"engineCalls":88,"maxDailySessions":2,"maxWeeklyMinutes":192,"elapsedMs":8675.86499999999,"phases":["base","build","specific","taper","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 52 virtual weeks
+SIM24 {"id":"SIMULATED-experienced","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":3,"completed":374,"partial":98,"missed":85,"corrections":26,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"synthetic-personal-best":1,"goal-change":1,"taper-week":3},"failures":[],"sessions":403,"engineCalls":89,"maxDailySessions":3,"maxWeeklyMinutes":570,"elapsedMs":13846.6967,"phases":["base","build","specific","race","taper"]}
+
+ Ô£ô tests/unit/chat.test.ts (338 tests) 221677ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  1494ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: verschieben auf erlaubten Tag mit Best├ñtigung  3084ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  2307ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: n├ñchste Einheit auf 20 min  2638ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet  2535ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: heute lieber locker  2197ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: h├ñrter machen (oder begr├╝ndet ablehnen)  2643ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: streichen mit Best├ñtigung  2344ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich  2459ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  4312ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Tage tauschen  2830ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Tag frei heute  2922ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  2995ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche  3453ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Woche leichter  2794ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  2269ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: nicht gut ÔåÆ nur locker  936ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  1954ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  5590ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  5603ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Verletzung stark ÔåÆ Pause und Arzt  4962ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  3395ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  2615ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Pr├╝fungszeit ÔåÆ wenig Training  2940ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  3438ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  2637ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  2907ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  2462ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Wunschzeit ├ñndern  3416ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: R├╝ckg├ñngig stellt alles wieder her  1729ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen  1484ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Frage beantwortet (heute)  1710ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Frage beantwortet (Warum locker)  1453ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  615ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: verschieben auf erlaubten Tag mit Best├ñtigung  552ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  785ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: n├ñchste Einheit auf 20 min  492ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet  416ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: heute lieber locker  444ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: h├ñrter machen (oder begr├╝ndet ablehnen)  425ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: streichen mit Best├ñtigung  399ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich  366ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  423ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Tage tauschen  350ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Tag frei heute  615ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  638ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche  592ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Woche leichter  457ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  525ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: nicht gut ÔåÆ nur locker  350ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  659ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  684ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  820ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Verletzung stark ÔåÆ Pause und Arzt  647ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  551ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  607ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Pr├╝fungszeit ÔåÆ wenig Training  635ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  583ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  603ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  563ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  608ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Wunschzeit ├ñndern  519ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: R├╝ckg├ñngig stellt alles wieder her  370ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen  311ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-rad-lauf: Frage beantwortet (Warum locker)  340ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  960ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: verschieben auf erlaubten Tag mit Best├ñtigung  745ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  558ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: n├ñchste Einheit auf 20 min  654ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet  725ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: heute lieber locker  840ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: h├ñrter machen (oder begr├╝ndet ablehnen)  718ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: streichen mit Best├ñtigung  777ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich  598ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  813ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Tage tauschen  656ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Tag frei heute  621ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  838ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche  669ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Woche leichter  590ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  614ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: nicht gut ÔåÆ nur locker  590ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  1130ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  1286ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  1246ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Verletzung stark ÔåÆ Pause und Arzt  1156ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  1249ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  1190ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Pr├╝fungszeit ÔåÆ wenig Training  999ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  868ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  926ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  1054ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  615ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Wunschzeit ├ñndern  908ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: R├╝ckg├ñngig stellt alles wieder her  582ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen  437ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Frage beantwortet (heute)  489ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > einsteiger-sprint: Frage beantwortet (Warum locker)  548ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  1687ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: verschieben auf erlaubten Tag mit Best├ñtigung  1430ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  2154ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: n├ñchste Einheit auf 20 min  1083ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet  1077ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: heute lieber locker  1033ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: h├ñrter machen (oder begr├╝ndet ablehnen)  946ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen mit Best├ñtigung  1008ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich  1000ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  1218ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Tage tauschen  1149ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Tag frei heute  1046ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  605ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche  457ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Woche leichter  349ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  433ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: nicht gut ÔåÆ nur locker  390ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  647ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  759ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  700ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Verletzung stark ÔåÆ Pause und Arzt  666ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  584ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  646ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Pr├╝fungszeit ÔåÆ wenig Training  664ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  635ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  589ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  576ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  633ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Wunschzeit ├ñndern  634ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: R├╝ckg├ñngig stellt alles wieder her  369ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen  323ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Frage beantwortet (heute)  301ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Frage beantwortet (Warum locker)  320ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  592ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: verschieben auf erlaubten Tag mit Best├ñtigung  583ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  1020ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: n├ñchste Einheit auf 20 min  509ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet  513ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: heute lieber locker  505ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: h├ñrter machen (oder begr├╝ndet ablehnen)  591ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen mit Best├ñtigung  555ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich  532ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  596ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Tage tauschen  523ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Tag frei heute  722ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  684ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche  494ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Woche leichter  507ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  558ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: nicht gut ÔåÆ nur locker  566ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  939ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  1024ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  1015ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Verletzung stark ÔåÆ Pause und Arzt  979ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  900ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  915ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Pr├╝fungszeit ÔåÆ wenig Training  840ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  842ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  821ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  715ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  727ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Wunschzeit ├ñndern  844ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: R├╝ckg├ñngig stellt alles wieder her  468ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen  430ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Frage beantwortet (heute)  429ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Frage beantwortet (Warum locker)  435ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  333ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > olympisch-erfahren: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  301ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  423ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: verschieben auf erlaubten Tag mit Best├ñtigung  341ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: h├ñrter machen (oder begr├╝ndet ablehnen)  314ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  332ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  329ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  549ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  564ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  557ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Verletzung stark ÔåÆ Pause und Arzt  526ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  483ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  550ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Pr├╝fungszeit ÔåÆ wenig Training  492ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  489ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  412ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  462ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  498ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Wunschzeit ├ñndern  507ms
+   Ô£ô D2: genau der Beispiel-Dialog: ÔÇ×Ich hab Mittwoch keine ZeitÔÇ£ ÔåÆ ÔÇ×Donnerstag oder Samstag?ÔÇ£ ÔåÆ ÔÇ×SamstagÔÇ£  379ms
+   Ô£ô A4 im Chat: Verschieben gegen eine harte Regel wird abgelehnt, erlaubte Tage werden angeboten  477ms
+   Ô£ô D1: jede Nachricht bekommt eine Antwort (100 zuf├ñllige Nachrichten) > keine Ausnahme, nie leer, nie Floskel  3960ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 52 virtual weeks
+SIM24 {"id":"SIMULATED-high-volume","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":3,"completed":426,"partial":121,"missed":94,"corrections":26,"football":0,"events":{"seeded-history":28,"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":455,"engineCalls":88,"maxDailySessions":3,"maxWeeklyMinutes":796,"elapsedMs":14146.930399999983,"phases":["base","build","specific","taper","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 52 virtual weeks
+SIM24 {"id":"SIMULATED-student-football","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":0,"completed":382,"partial":95,"missed":87,"corrections":26,"football":142,"events":{"extra-football":13,"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":13,"score-check":13,"availability-change":1,"goal-change":1},"failures":[],"sessions":396,"engineCalls":88,"maxDailySessions":2,"maxWeeklyMinutes":289,"elapsedMs":18078.465999999986,"phases":["base"]}
+
+ Ô£ô tests/unit/auftrag17-many.test.ts (67 tests) 256780ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n01-fitness  4984ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n02-fitness  7300ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n03-fitness  6537ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n04-fitness  9520ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n05-fitness  12839ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n06-fitness  4191ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n07-fitness  6058ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n08-fitness  4526ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n09-fitness  7680ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n10-fitness  3705ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n11-fitness  8702ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n12-fitness  4593ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n13-fitness  6219ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n14-fitness  6113ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n15-fitness  9021ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n16-fitness  3757ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n17-fitness  4600ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n18-fitness  2115ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n19-fitness  4145ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n20-run-5k  3772ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n21-run-10k  4442ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n22-run-half  8171ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n23-run-marathon  6899ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n24-tri-supersprint  4595ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n25-tri-sprint  4426ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n26-tri-olympic  7641ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n27-tri-middle  7652ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n28-tri-long  7299ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n29-duathlon  2045ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n30-aquathlon  1283ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n31-bike-event  1032ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n32-swim-goal  1052ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n33-run-5k  859ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n34-run-10k  1189ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n35-run-half  1143ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n36-run-marathon  1371ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n37-tri-supersprint  1152ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n38-tri-sprint  2458ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n39-tri-olympic  2765ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n40-tri-middle  9291ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n41-tri-long  5221ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n42-duathlon  1043ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n43-aquathlon  1064ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n44-bike-event  1227ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n45-swim-goal  1258ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n46-fitness  910ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n47-run-10k  455ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n48-tri-sprint  2028ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n49-tri-long  8333ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n50-bike-event  1779ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n51-swim-goal  1381ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n52-run-marathon  3107ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n53-fitness  500ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n54-run-half  1125ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n55-tri-middle  3705ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n56-duathlon  2090ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n57-mama  990ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n58-laeufer-6x  3084ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n59-urlaub-bad  4395ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n60-team-tri  1709ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n61-kraul-25  1724ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n62-kraul-50  4503ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n63-tri-fussball  5978ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n64-auslasser-korrigierer  1309ms
+   Ô£ô Auftrag 17: 65 Test-Nutzer mit Abweichungen und Korrekturen > n65-widerspruechlich  704ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 52 virtual weeks
+SIM24 {"id":"SIMULATED-irregular","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":2,"completed":154,"partial":60,"missed":256,"corrections":26,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":155,"engineCalls":88,"maxDailySessions":2,"maxWeeklyMinutes":501,"elapsedMs":9738.305999999982,"phases":["base","build","specific","race","taper"]}
+
+ Ô£ô tests/unit/auftrag19-gross.test.ts (55 tests) 261172ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u01-fitness-watch  8694ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u02-fitness-manual  8366ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u03-fitness-power  13153ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u04-fitness-hr  11169ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u05-run-5k-watch  3309ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u06-run-5k-manual  1586ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u07-run-5k-power  8319ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u08-run-5k-hr  4088ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u09-run-10k-watch  5967ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u10-run-10k-manual  2756ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u11-run-10k-power  4748ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u12-run-10k-hr  3130ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u13-run-half-watch  9598ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u14-run-half-manual  7412ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u15-run-half-power  7278ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u16-run-half-hr  4959ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u17-run-marathon-watch  7836ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u18-run-marathon-manual  8754ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u19-run-marathon-power  8816ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u20-run-marathon-hr  5541ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u21-tri-supersprint-watch  6259ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u22-tri-supersprint-manual  3953ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u23-tri-supersprint-power  4742ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u24-tri-supersprint-hr  3606ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u25-tri-sprint-watch  6816ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u26-tri-sprint-manual  2463ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u27-tri-sprint-power  5743ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u28-tri-sprint-hr  2347ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u29-tri-olympic-watch  7865ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u30-tri-olympic-manual  2920ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u31-tri-olympic-power  6317ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u32-tri-olympic-hr  2849ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u33-tri-middle-watch  6651ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u34-tri-middle-manual  2777ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u35-tri-middle-power  5088ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u36-tri-middle-hr  2691ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u37-tri-long-watch  8195ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u38-tri-long-manual  3561ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u39-tri-long-power  6705ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u40-tri-long-hr  4394ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u41-duathlon-watch  2321ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u42-duathlon-manual  1608ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u43-duathlon-power  2610ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u44-duathlon-hr  1317ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u45-bike-event-watch  1851ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u46-bike-event-manual  1679ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u47-bike-event-power  2086ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u48-bike-event-hr  1304ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u49-swim-goal-watch  1806ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u50-swim-goal-manual  1677ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u51-swim-goal-power  1906ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u52-swim-goal-hr  1646ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u53-wie-jonah  3899ms
+   Ô£ô Auftrag 19: 54 neue Test-Nutzer komplett > u54-zwei-laufziele  4033ms
+ Ô£ô tests/unit/auftrag20-gross.test.ts (51 tests) 275181ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v01-tri-olympic-basicTrainer  18329ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v02-tri-olympic-smartTrainer  31086ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v03-tri-olympic-few  38183ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v04-tri-olympic-outlier  21451ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v05-tri-olympic-pause  18772ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v06-tri-olympic-test  9660ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v07-tri-olympic-treadmill  8510ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v08-tri-olympic-gps  10786ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v09-tri-olympic-nohr  4135ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v10-tri-olympic-power  8568ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v11-run-half-basicTrainer  1742ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v12-run-half-smartTrainer  1661ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v13-run-half-few  2019ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v14-run-half-outlier  1527ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v15-run-half-pause  1144ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v16-run-half-test  1164ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v17-run-half-treadmill  1612ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v18-run-half-gps  1291ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v19-run-half-nohr  1758ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v20-run-half-power  1465ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v21-tri-sprint-basicTrainer  3946ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v22-tri-sprint-smartTrainer  2773ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v23-tri-sprint-few  2045ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v24-tri-sprint-outlier  1625ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v25-tri-sprint-pause  1477ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v26-tri-sprint-test  3157ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v27-tri-sprint-treadmill  1868ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v28-tri-sprint-gps  3811ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v29-tri-sprint-nohr  2474ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v30-tri-sprint-power  1808ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v31-bike-event-basicTrainer  2969ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v32-bike-event-smartTrainer  2250ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v33-bike-event-few  1484ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v34-bike-event-outlier  1449ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v35-bike-event-pause  2801ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v36-bike-event-test  2145ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v37-bike-event-treadmill  3521ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v38-bike-event-gps  3228ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v39-bike-event-nohr  1824ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v40-bike-event-power  1848ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v41-tri-middle-basicTrainer  5297ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v42-tri-middle-smartTrainer  2967ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v43-tri-middle-few  2920ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v44-tri-middle-outlier  4657ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v45-tri-middle-pause  4127ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v46-tri-middle-test  8018ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v47-tri-middle-treadmill  4184ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v48-tri-middle-gps  2779ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v49-tri-middle-nohr  2334ms
+   Ô£ô Auftrag 20: 50 neue Test-Nutzer (Scores und Dauer) > v50-tri-middle-power  4526ms
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 52 virtual weeks
+SIM24 {"id":"SIMULATED-manual-corrections","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":3,"completed":361,"partial":87,"missed":98,"corrections":52,"football":0,"events":{"retroactive-correction":52,"manual-load-anchor":1,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":3},"failures":[],"sessions":362,"engineCalls":114,"maxDailySessions":3,"maxWeeklyMinutes":570,"elapsedMs":15414.8934,"phases":["base","build","specific","race","taper"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 52 virtual weeks
+SIM24 {"id":"SIMULATED-missing-data","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":2,"completed":149,"partial":49,"missed":38,"corrections":26,"football":0,"events":{"missing-measurements":149,"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":150,"engineCalls":88,"maxDailySessions":1,"maxWeeklyMinutes":192,"elapsedMs":7449.13949999999,"phases":["base","build","specific","taper","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 52 virtual weeks
+SIM24 {"id":"SIMULATED-plateau","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":2,"completed":332,"partial":99,"missed":78,"corrections":26,"football":0,"events":{"seeded-history":28,"unchanged-performance":364,"manual-load-anchor":1,"retroactive-correction":26,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":12,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":361,"engineCalls":88,"maxDailySessions":2,"maxWeeklyMinutes":575,"elapsedMs":9808.430999999982,"phases":["base","build","specific","race","taper"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 52 virtual weeks
+SIM24 {"id":"SIMULATED-pause-return","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":2,"completed":230,"partial":63,"missed":83,"corrections":24,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":24,"pause-day":35,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"recovery-week":15,"score-check":13,"availability-change":1,"goal-change":1,"taper-week":1},"failures":[],"sessions":231,"engineCalls":86,"maxDailySessions":2,"maxWeeklyMinutes":324,"elapsedMs":7014.403300000005,"phases":["base","build","specific","taper","race"]}
+
+stdout | tests/unit/longitudinal24.test.ts > SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 52 virtual weeks
+SIM24 {"id":"SIMULATED-ambitious-short","weeks":52,"days":364,"checkpoints":52,"replans":15,"extensions":2,"completed":177,"partial":51,"missed":27,"corrections":26,"football":0,"events":{"manual-load-anchor":1,"retroactive-correction":26,"taper-week":2,"fatigue":10,"invalid-import-outlier":1,"equipment-change":1,"score-check":13,"recovery-week":12,"availability-change":1,"goal-change":1},"failures":[],"sessions":178,"engineCalls":88,"maxDailySessions":1,"maxWeeklyMinutes":183,"elapsedMs":4742.938999999955,"phases":["build","taper","specific","race","base"]}
+
+ Ô£ô tests/unit/longitudinal24.test.ts (43 tests) 305998ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 4 virtual weeks  1996ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 4 virtual weeks  9831ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 4 virtual weeks  10845ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 4 virtual weeks  14980ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 4 virtual weeks  5747ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 4 virtual weeks  2945ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 4 virtual weeks  3479ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 4 virtual weeks  7003ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 4 virtual weeks  2030ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 4 virtual weeks  2432ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 12 virtual weeks  6167ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 12 virtual weeks  15597ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 12 virtual weeks  17341ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 12 virtual weeks  19862ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 12 virtual weeks  8313ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 12 virtual weeks  11083ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 12 virtual weeks  3909ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 12 virtual weeks  6026ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 12 virtual weeks  2173ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 12 virtual weeks  2768ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 24 virtual weeks  3941ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 24 virtual weeks  5082ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 24 virtual weeks  6057ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 24 virtual weeks  8309ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 24 virtual weeks  3460ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 24 virtual weeks  4914ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 24 virtual weeks  2652ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 24 virtual weeks  3587ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 24 virtual weeks  1939ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 24 virtual weeks  1531ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-beginner: 52 virtual weeks  8676ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-experienced: 52 virtual weeks  13849ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-high-volume: 52 virtual weeks  14148ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-student-football: 52 virtual weeks  18079ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-irregular: 52 virtual weeks  9739ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-manual-corrections: 52 virtual weeks  15417ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-missing-data: 52 virtual weeks  7450ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-plateau: 52 virtual weeks  9809ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-pause-return: 52 virtual weeks  7015ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > SIMULATED-ambitious-short: 52 virtual weeks  4744ms
+   Ô£ô SIMULATED deterministic longitudinal trajectories (no real accounts) > same seed replays the same executed history  1009ms
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/storage-longitudinal24.test.ts > 4 Nutzer x 180 Tage: Speichern, Korrigieren, Verschieben, Neustarts und Backup bleiben konsistent
+Error: Test timed out in 60000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ÔØ» tests/unit/storage-longitudinal24.test.ts:6:1
+      4| import {mergeStored} from '../../web/src/storage-merge';
+      5| import * as C from '../../shared/core';
+      6| test('4 Nutzer x 180 Tage: Speichern, Korrigieren, Verschieben, NeustaÔÇª
+       | ^
+      7|  let actions=0,restarts=0;
+      8|  for(let user=0;user<4;user++){
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/1]ÔÄ»
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Unhandled Errors ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Unhandled Error ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+Error: [vitest-worker]: Timeout calling "onTaskUpdate"
+ ÔØ» Object.onTimeoutError ../../node_modules/vitest/dist/chunks/rpc.-pEldfrD.js:53:10
+ ÔØ» Timeout._onTimeout ../../node_modules/vitest/dist/chunks/index.B521nVV-.js:59:62
+ ÔØ» listOnTimeout node:internal/timers:685:17
+ ÔØ» processTimers node:internal/timers:618:7
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ Test Files  1 failed | 107 passed | 2 skipped (110)
+      Tests  1 failed | 2224 passed | 63 skipped (2288)
+     Errors  1 error
+   Start at  14:36:31
+   Duration  308.04s (transform 23.45s, setup 4.96s, collect 122.00s, tests 2270.44s, environment 17ms, prepare 19.94s)
+
+JSON report written to C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/plan26-work/scratch/plan26-unit-confirmed.json

@@ -1,0 +1,24 @@
+
+> endurance-coach@3.8.0 build
+> vite build
+
+vite v6.4.4 building for production...
+transforming...
+Ô£ô 136 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/web/src/views/templates.ts is dynamically imported by C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/web/src/views/planedit.ts but also statically imported by C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/web/src/main.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+../dist/manifest.webmanifest          0.92 kB
+../dist/sw.js                         3.46 kB
+../dist/index.html                    6.06 kB Ôöé gzip:   1.25 kB
+../dist/assets/main-9HRYZPpH.css     52.48 kB Ôöé gzip:  11.36 kB
+../dist/assets/index-AZAAxBJO.js      9.08 kB Ôöé gzip:   3.57 kB
+../dist/assets/main-Bv_3G6E4.js   1,185.06 kB Ôöé gzip: 405.67 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Ô£ô built in 1.84s

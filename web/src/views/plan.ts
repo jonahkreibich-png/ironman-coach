@@ -1,10 +1,11 @@
+import {renderPlanDashboard} from './plan-dashboard27';
 /* Plan: Woche wählen, Tage mit Einheiten, Anpassungen mit Rückgängig. Hauptaktion: Einheit antippen. */
-import { STATE, PLAN, UI, saveState, rebuildPlanIndex, currentWeekIdx, findDay, saveUi } from '../store';
+import { STATE, PLAN, UI, saveState, rebuildPlanIndex, currentWeekIdx, findDay, saveUi, effectiveCustomWorkouts } from '../store';
 import { esc, fmtDate, dowShort, dowLong, addDays, todayStr } from '../util';
 import { t, num, hours } from '../../../shared/i18n';
 import { on, sec, ic, pill, empty, more } from '../kit';
-import { metaLine, statusIcon } from './session';
-import { editBar, editing } from './planedit';
+import { metaLine, statusIcon, sessionTitle } from './session';
+import { editBar, editing, canUndoGroups } from './planedit';
 import { sportIc } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
 import { shortPlan } from '../../../shared/workouts';
@@ -15,6 +16,7 @@ import { nav } from '../nav';
 import { toast } from '../toast';
 import { weekMinutes, weekVolume } from '../../../shared/rules';
 import { renderTimeline } from './timeline';
+import { daySummary, weekSummary } from '../../../shared/plan-summary26';
 
 export function adjustmentGroups() {
   const groups: Record<string, any> = {};
@@ -30,7 +32,7 @@ export function adjustmentGroups() {
 /* Auftrag 18, Punkt 3: Wochenleiste bleibt bei der gewählten Woche (mittig), öffnet bei der aktuellen Woche, Knopf „Heute“.
    Darunter eine Zeile zur Woche (Phase, Ziel, Stunden) und die 7 Tage als kurze Liste; Details beim Antippen der Einheit. */
 const isTest = (s: any) => !!s && ((s.spec && s.spec.kind === 'test') || /(^|\s)(Lauftest|Radtest|Schwimmtest|Test)\b|Kraul-Check/.test(s.title || ''));
-const liveS = (d: any) => (d.sessions || []).filter((s: any) => s.sport !== 'rest' && !s.removed && !s.cancelled);
+const liveS = (d: any) => daySummary(d, { ...STATE, customWorkouts: effectiveCustomWorkouts() }).active.map(s => s.session);
 function weekChip(x: any, i: number, sel: number, cw: number): string {
   const ss = x.days.flatMap(liveS);
   const test = ss.some(isTest), race = ss.some((s: any) => s.race);
@@ -47,7 +49,7 @@ function planRow(s: any): string {
   const check = status === 'done' || status === 'open' || status === 'missed'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   const badge = s._adj && s._adj.length ? ' ' + pill(s.movedFrom ? t('st.moved') : t('st.adjusted'), 'warn') : '';
-  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(s.title)}</span>${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
+  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
 }
 
 export function renderPlan(): string {
@@ -57,11 +59,17 @@ export function renderPlan(): string {
   if (UI.planWeek == null || !PLAN.weeks[UI.planWeek]) UI.planWeek = currentWeekIdx();
   const cw = currentWeekIdx();
   const w = PLAN.weeks[UI.planWeek];
-  let done = 0, total = 0;
-  w.days.forEach((d: any) => { const s = dayStats(d); done += s.done; total += s.total; });
+  const effectiveState = { ...STATE, customWorkouts: effectiveCustomWorkouts() };
+  const summaries = PLAN.weeks.map((week: any) => weekSummary(week, effectiveState));
+  const currentSummary = summaries[UI.planWeek];
+  const { done, total } = currentSummary;
   const explain: string[] = (PLAN.meta && PLAN.meta.explain) || [];
   // Umfang und Steigerung zur letzten Aufbauwoche (eigenes Training ohne Teamsport)
-  const vol = weekVolume(PLAN.weeks, UI.planWeek);
+  const min = currentSummary.ownPlannedMinutes;
+  let refIndex = UI.planWeek - 1;
+  while (refIndex >= 0 && (PLAN.weeks[refIndex].isRecoveryWeek || summaries[refIndex].ownPlannedMinutes <= 0)) refIndex--;
+  const refMin = refIndex >= 0 ? summaries[refIndex].ownPlannedMinutes : null;
+  const vol = { min, pct: refMin ? Math.round((min / refMin - 1) * 100) : null };
   const volH = (Math.round(vol.min / 6) / 10).toString().replace('.', ',');
   const volTxt = vol.pct == null ? '' : t('plan.volumeVs', { h: volH, p: (vol.pct > 0 ? '+' : vol.pct < 0 ? '−' : '±') + Math.abs(vol.pct) });
   let h = renderTimeline(PLAN.meta && PLAN.meta.timeline, today, { from: w.startDate, to: w.endDate });
@@ -70,31 +78,37 @@ export function renderPlan(): string {
   h += `<div class="wkbar"><div class="wkbar-s" id="wkbar" role="tablist" aria-label="${esc(t('plan.weekBar'))}">${PLAN.weeks.map((x: any, i: number) => weekChip(x, i, UI.planWeek!, cw)).join('')}</div><button class="btn ghost sm wkbar-today" data-act="plan-today">${esc(t('plan.todayBtn'))}</button></div>`;
   const head = w.headline || [t('plan.weekShort', { n: w.weekNumber }), t('tl.' + (w.phase || 'base'))].join(' · ');
   h += `<div class="card wk-sum"><div class="spread wk-head"><div class="wk-l"><div class="lbl"><i class="wkc-dot tl-${esc(w.phase || 'base')}"></i>${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div><div class="week-head" data-week-head>${esc(head)}</div>${volTxt ? `<div class="xs muted" data-week-volume>${esc(volTxt)}</div>` : ''}</div>
-    <div class="wk-r" data-week-count><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(vol.min / 60))}</div></div></div>
+    <div class="wk-r" data-week-count><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(currentSummary.plannedMinutes / 60))}${currentSummary.unknownPlannedMinutes ? ' + ?' : ''}</div></div></div>
     ${w.important ? `<div class="hint" style="margin-top:6px"><b>${esc(t('plan.thisWeek'))}:</b> ${esc(w.important)}</div>` : ''}
     ${w.focus ? more(t('plan.weekMore'), `<p class="small">${esc(w.focus)}</p>`) : ''}</div>`;
+  h += renderPlanDashboard(currentSummary, UI.planDashboardOpen !== false);
   h += editBar(w);
   // Auftrag 19, Punkt 3 (Jonahs Wahl: C): Balken je Tag oben, darunter jeder Tag als Zeile, heute aufgeklappt
   h += weekMix(w, today);
   h += `<button class="btn ghost block" data-act="custom-add" data-date="${UI.planDate && w.days.some((d: any) => d.date === UI.planDate) ? UI.planDate : (w.days.some((d: any) => d.date === today) ? today : w.startDate)}" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('plan.addExtra'))}</button>`;
-  h += sec(t('plan.adjustments'), adjustmentsList(), t('plan.last30'));
-  return h;
+  h += `<section class="sec" data-plan-adjustments><button class="btn ghost block spread" data-act="plan-adjustments" aria-expanded="${!!UI.planAdjustmentsOpen}" aria-controls="plan-adjustments-body">${esc(t("plan.adjustments"))}<span class="xs muted">${esc(t("plan.last30"))} ${ic("down")}</span></button><div id="plan-adjustments-body" ${UI.planAdjustmentsOpen ? "" : "hidden"}>${adjustmentsList()}</div></section>`;
+  return '<div class="plan-c" data-plan-design="C">' + h + '</div>';
 }
 /* ---------- Auftrag 19, Punkt 3: Woche als Balken und aufklappbare Tage ---------- */
-interface DayInfo { d: any; list: any[]; customs: any[]; rest: boolean; before: boolean; min: number; hard: boolean; race: boolean }
+interface DayInfo { d: any; list: any[]; customs: any[]; summary: ReturnType<typeof daySummary>; rest: boolean; before: boolean; min: number; hard: boolean; race: boolean }
 function dayInfo(d: any): DayInfo {
-  const list = d.sessions.map((s: any) => ({ ...s, date: d.date })).filter((s: any) => s.sport !== 'rest' && !s.removed);
-  const customs = (STATE.customWorkouts || {})[d.date] || [];
+  const summary = daySummary(d, { ...STATE, customWorkouts: effectiveCustomWorkouts() });
+  const list = summary.planned.map(s => s.session);
+  const customs = summary.extras.map(s => s.session);
   const before = d.sessions.some((s: any) => s.sport === 'rest' && s.title === 'Vor dem Planstart');
-  const live = list.filter((s: any) => !s.cancelled);
-  return { d, list, customs, rest: !list.length && !customs.length, before, min: live.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0),
+  const live = summary.active.map(s => s.session);
+  return { d, list, customs, summary, rest: !list.length && !customs.length, before, min: summary.plannedMinutes,
     hard: live.some((s: any) => isHardSession(s) && !s.race && s.sport !== 'football'), race: live.some((s: any) => s.race) };
 }
-function dayRows(x: DayInfo, today: string): string {
-  const { d, list, customs } = x;
-  return list.map((s: any) => editing() && d.date >= today && !s.race ? editRow(s) : planRow(s) + whatLine(s)).join('')
-    + customs.map((c: any) => `<div class="pr"><button class="pr-b" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}">${sportIc(c.sport || 'multi')}<span class="pr-t"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')}</span>${c.metrics && c.metrics.min ? `<span class="pr-m">${esc(duration(+String(c.metrics.min).replace(',', '.') || 0))}</span>` : ''}</button></div>`).join('')
-    + (d.moved || []).map((m: any) => `<div class="pr-x">${esc(t('plan.movedTo', { t: m.title, d: `${dowShort(m.to)} ${fmtDate(m.to)}` }))}</div>`).join('');
+function dayRows(x: DayInfo, _today: string): string {
+  const { d, list } = x;
+  return list.map((s: any) => editing() && !sessState(s.id).completed && !s.race ? editRow(s) : planRow(s) + whatLine(s)).join('')
+    + x.summary.extras.map(row => {
+      const c = row.session;
+      if (editing() && !row.completed && !row.cancelled) return editRow(c);
+      const amount = row.completed ? row.actualMinutes : row.plannedMinutes;
+      return `<div class="pr"><button class="pr-b" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}">${sportIc(c.sport || 'multi')}<span class="pr-t"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')} ${pill(row.completed ? t('sess.isDone') : 'Geplant', row.completed ? 'good' : '')}</span><span class="pr-m">${amount == null ? '?' : esc(duration(amount))}</span></button></div>`;
+    }).join('') + `<button class="btn ghost sm" data-act="template-add" data-date="${d.date}">${ic('plus')} Trainingsvorlage einf\u00fcgen</button>`;
 }
 /* kurz, was man tun soll (aus dem Aufbau der Einheit; Teamsport und Wettkampf ohne) */
 function whatLine(s: any): string {
@@ -115,16 +129,16 @@ function weekMix(w: any, today: string): string {
   const infos = w.days.map(dayInfo);
   const max = Math.max(60, ...infos.map((x: DayInfo) => x.min));
   const bars = infos.map((x: DayInfo) => {
-    const segs = x.list.filter((s: any) => !s.cancelled).map((s: any) => `<i style="height:${((s.plannedMinutes || 0) / max * 100).toFixed(1)}%;background:${SPORT_COLOR[s.sport] || 'var(--rest)'}"></i>`).join('');
+    const segs = x.summary.active.map(({ session: s, plannedMinutes }: any) => `<i style="height:${((plannedMinutes || 0) / max * 100).toFixed(1)}%;background:${SPORT_COLOR[s.sport] || 'var(--rest)'}"></i>`).join('');
     return `<button class="pm-c ${x.d.date === today ? 'today' : ''} ${x.d.date === sel ? 'on' : ''}" data-act="plan-pick" data-date="${x.d.date}" aria-label="${esc(dowLong(x.d.date) + ' ' + fmtDate(x.d.date))}"><span class="pm-b">${x.rest ? `<span class="pm-rest">${ic('moon')}</span>` : segs}</span>${x.hard ? `<span class="pm-hard">${ic('bolt')}</span>` : ''}<span class="pm-l">${esc(dowShort(x.d.date).slice(0, 2))}</span></button>`;
   }).join('');
   const days = infos.map((x: DayInfo) => {
     // beim Bearbeiten sind alle Tage offen (man will die ganze Woche sehen)
     const open = editing() || x.d.date === sel;
     const sum = x.rest ? `<span class="muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span>`
-      : x.list.map((s: any) => `<span class="pm-si" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('') + `<span class="pm-st">${esc(shortTitles(x))}</span>`;
+      : !x.summary.active.length ? `<span class="muted">${esc(t('st.cancelled'))}</span>` : x.summary.active.map(({ session: s, completed }: any) => `<span title="${esc(completed ? t('sess.isDone') : s.title)}" class="pm-si" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('') + `<span class="pm-st">${esc(shortTitles(x))}</span>`;
     return `<div class="cday ${x.d.date === today ? 'today' : ''} ${open ? 'open' : ''} ${x.rest ? 'rest' : ''}" id="day-${x.d.date}" data-day="${x.d.date}">
-      <button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m">${x.min ? esc(mins(x.min)) : ''}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span><span class="chev">${ic('down')}</span></button>
+      <button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m" data-planned-minutes="${x.min}" aria-label="Soll ${x.min}${x.summary.unknownPlannedMinutes ? ' + ?' : ''} min; Ist ${x.summary.actualMinutes} min${x.summary.unknownActualMinutes ? '; Dauer offen bei weiteren Einheiten' : ''}">${x.min ? esc(mins(x.min)) : ''}${x.summary.unknownPlannedMinutes ? ' + ?' : ''}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span><span class="chev">${ic('down')}</span></button>
       ${open ? `<div class="cday-b">${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div>` : ''}</div>`;
   }).join('');
   return `<div class="card pmix" data-plan-mix><div class="pm-bars">${bars}</div></div><div class="list cdays">${days}</div>`;
@@ -132,7 +146,7 @@ function weekMix(w: any, today: string): string {
 /* kurze Namen für die eingeklappte Zeile: „Lauf · Rad“ */
 function shortTitles(x: DayInfo): string {
   const nm: Record<string, string> = { run: t('sport.run'), bike: t('sport.bike'), swim: t('sport.swim'), strength: t('sport.strength'), football: t('sport.football') };
-  return x.list.map((s: any) => s.race ? s.title : (nm[s.sport] || s.title)).join(' · ');
+  return x.summary.active.map(({ session: s, completed, source }) => (s.race || source === 'custom' ? s.title : (nm[s.sport] || s.title)) + (completed ? ' ✓' : '')).join(' · ');
 }
 
 /* gewählte Woche in der Leiste mittig halten, ohne die Seite zu bewegen */
@@ -161,13 +175,37 @@ function adjustmentsList(): string {
 }
 
 // Tag antippen klappt ihn auf, nochmal antippen klappt zu
-on('plan-pick', el => { const d = el.dataset.date!; UI.planDate = UI.planDate === d ? '' : d; saveUi(); nav.rerender(); });
+// Local accordion changes retain the app, week strip and focused control. A full
+// nav.rerender destroys those nodes and forces global scroll restoration.
+export function refreshPlanSelection(): void {
+  const w = PLAN.weeks[UI.planWeek]; if (!w) return;
+  const today = todayStr(), selected = selDay(w, today);
+  w.days.forEach((d: any) => {
+    const day = document.getElementById('day-' + d.date); if (!day) return;
+    const open = editing() || d.date === selected;
+    day.classList.toggle('open', open);
+    day.querySelector('.cday-h')?.setAttribute('aria-expanded', String(open));
+    const body = day.querySelector('.cday-b');
+    if (open && !body) {
+      const x = dayInfo(d);
+      day.insertAdjacentHTML('beforeend', `<div class="cday-b">${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div>`);
+    } else if (!open) body?.remove();
+  });
+  document.querySelectorAll<HTMLElement>('.pm-c[data-date]').forEach(bar => bar.classList.toggle('on', bar.dataset.date === selected));
+}
+on('plan-pick', el => { const d = el.dataset.date!; UI.planDate = UI.planDate === d ? '' : d; saveUi(); refreshPlanSelection(); });
+on('plan-adjustments', el => {
+  UI.planAdjustmentsOpen = !UI.planAdjustmentsOpen; saveUi();
+  el.setAttribute('aria-expanded', String(UI.planAdjustmentsOpen));
+  const body = document.getElementById('plan-adjustments-body'); if (body) body.hidden = !UI.planAdjustmentsOpen;
+});
 on('plan-week', el => { UI.planWeek = +el.dataset.i!; UI.planDate = null; saveUi(); nav.rerender(); });
 on('plan-today', () => { UI.planWeek = currentWeekIdx(); UI.planDate = todayStr(); saveUi(); nav.rerender(); scrollToPlanDay(); });
 on('adj-undo', el => {
   const id = (el.closest('[data-group]') as HTMLElement).dataset.group;
   const g: any = adjustmentGroups().find((x: any) => x.id === id); if (!g) return;
   const undo = !g.items.every((a: any) => a.undone);
+  if (!canUndoGroups([g.id])) return;
   g.items.forEach((a: any) => { STATE.adjustments[a.id] = { ...a, undone: undo }; });
   rebuildPlanIndex(); saveState(); nav.rerender(); toast(undo ? t('plan.undone') : t('plan.redone'));
 });
@@ -177,3 +215,9 @@ export function scrollToPlanDay() {
   if (el) { el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); }
 }
 void num; void more; void dowLong; void weekMinutes;
+
+on('plan-dashboard-toggle', el => {
+ UI.planDashboardOpen = UI.planDashboardOpen === false; saveUi();
+ el.setAttribute('aria-expanded', String(UI.planDashboardOpen));
+ const body=document.getElementById('plan-dashboard-body'); if(body)body.hidden=!UI.planDashboardOpen;
+});

@@ -12,12 +12,13 @@ import { sleepNeed } from '../profile';
 import { rulesOf } from '../constraints';
 import { parseFor } from '../ruleparse';
 import { doneItems } from './review';
-import { actualMetrics } from '../results';
+import { actualMetrics, evidenceSignature } from '../results';
 
 export type Trigger = 'morning' | 'activity' | 'weekly' | 'view';
 export interface Insight { id: string; kind: 'load' | 'recovery' | 'trend' | 'technique' | 'consistency' | 'illness'; tone: 'good' | 'info' | 'warn' | 'bad'; score: number; title: string; why: string; tip: string }
 export interface Analysis {
   date: string; trigger: Trigger; at: number;
+  inputVersion: string; modelVersion: string;
   load: { ctl: number | null; atl: number | null; tsb: number | null; acwr: number | null; ctl28: number | null; source: string | null };
   insights: Insight[]; top: Insight[];
   /** kleine Änderungen: werden automatisch übernommen (mit Mitteilung und Rückgängig) */
@@ -190,5 +191,36 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
 
   // harte Regeln gelten auch hier: automatische Änderungen verschieben nichts und machen nichts härter
   void rulesOf; void parseFor;
-  return { date: today, trigger, at: ctx.now, load: { ctl, atl, tsb, acwr, ctl28, source: src }, insights: ins, top, auto: autoNew.map((a, k) => ({ ...a, createdAt: ctx.now + k, date: today, from_analysis: true })), proposals, messages };
+  return { date: today, trigger, at: ctx.now, inputVersion: evidenceSignature({...st,profile:{skills:{profile:prof,today,trend:st.trend,illness:st.illnessPeriods,nutrition:st.nutrition,weekNotes:st.weekNotes,settings:st.settings,goals:ctx.goals,scoreAdjust:st.scoreAdjust}}},ctx.baseWeeks), modelVersion:'analysis-v1', load: { ctl, atl, tsb, acwr, ctl28, source: src }, insights: ins, top, auto: autoNew.map((a, k) => ({ ...a, createdAt: ctx.now + k, date: today, from_analysis: true })), proposals, messages };
+}
+
+/** Ein vorhandener Anlass bleibt ein Hinweis; fachliche Korrekturen machen alte Vorschlaege ueberholt. */
+export function swimReviewMessages(ctx: EngineCtx, update: any | null): CoachMsg[] {
+ const all=Object.values(ctx.state.coachMsgs||{}) as any[];
+ const previous=all.filter(m=>String(m.id||'').startsWith('msg-swim-legacy-') && m.proposal?.skillsOnly);
+ const messages:CoachMsg[]=[];
+ const retire=(except?:string)=>{for(const m of previous)if(m.id!==except && m.proposal.status==='open')messages.push({...m,important:false,unread:false,proposal:{...m.proposal,status:'superseded'}});};
+ if(!update?.reviewOnly){retire();return messages;}
+ const skills=update.skills||{}, current=ctx.profile.skills||{};
+ // Die Ereigniskennung beschreibt den Vorschlag, nicht jeden fremden Pulswert oder jeden App-Start.
+ const key=evidenceSignature({profile:{skills:{fromCrawl:current.swimCrawlM,fromPull:current.swimPullM,toCrawl:skills.swimCrawlM,toPull:skills.swimPullM,mode:skills.swimCrawl}}});
+ const matching=previous.find(m=>m.proposal.evidenceKey===key)||previous.find(m=>{
+  if(m.proposal.evidenceKey)return false;
+  const old=m.proposal.changes?.find((c:any)=>c.kind==='profile')?.data?.skills;
+  return old && old.swimCrawlM===skills.swimCrawlM && old.swimPullM===skills.swimPullM;
+ });
+ const id=matching?.id || 'msg-swim-legacy-'+key;
+ retire(id);
+ if(matching && ['accepted','rejected'].includes(matching.proposal.status))return messages;
+ const old=matching;
+ const changes=[{kind:'profile',key:'main',data:{skills}},...(update.adjustments||[]).map((a:any)=>{
+  const aid='swim-review-'+key+'-'+a.sessionId;
+  const before=old?.proposal.changes?.find((c:any)=>c.key===aid);
+  return {kind:'adjust',key:aid,data:{...a,id:aid,group:'swim-review-'+key,createdAt:before?.data?.createdAt??ctx.now,date:ctx.today}};
+ })];
+ const details=[...new Set((update.adjustments||[]).map((a:any)=>String(a.what||'')).filter(Boolean))].slice(0,12) as string[];
+ const m:CoachMsg={...(old||{}),id,at:old?.at??ctx.now,date:old?.date??ctx.today,kind:'proposal',from:'coach',title:'Schwimmen: bitte pruefen',text:update.text,details,important:true,unread:old?.unread??true,
+  proposal:{status:'open',skillsOnly:true,evidenceKey:key,evidenceSignature:evidenceSignature(ctx.state,ctx.baseWeeks),changes}};
+ if(JSON.stringify(m)!==JSON.stringify(old))messages.push(m);
+ return messages;
 }

@@ -1,3 +1,4 @@
+import {effectiveCustomBuckets} from './custom-state26';
 /* Auftrag 13, Punkt 3: Trends im Bereich „Fortschritt“. Jeder Trend: eine große Zahl, eine kurze Veränderung, ein Satz
    (was er bedeutet und ob es gut ist) und der Verlauf. Zeitraum 4 Wochen / 3 Monate / 1 Jahr. Trends ohne genug Daten
    zeigen „ab X … verfügbar“ statt einer wackligen Zahl. Extra-Einheiten zählen überall mit (sie stecken in activities). */
@@ -270,16 +271,17 @@ function swimCards(I: TrendInput, from: string): TrendCard[] {
   mk('swimpace', 'Pace pro 100 m', a => a.swim!.pace100, '/100 m', true, v => mmss(v), 'Du schwimmst schneller pro 100 m.', 'Etwas langsamer pro 100 m, z. B. mehr Technik oder Müdigkeit.', 3, 'pace100');
   mk('dps', 'Meter pro Zug', a => a.swim!.metersPerStroke, 'm', false, v => de(v, 2), 'Mehr Meter pro Zug: dein Zug wird länger und effizienter.', 'Weniger Meter pro Zug: auf langes Gleiten achten.');
   mk('spl', 'Züge pro Bahn', a => a.swim!.strokesPerLength, '', true, v => de(v, 1), 'Weniger Züge pro Bahn: bessere Wasserlage und mehr Vortrieb.', 'Mehr Züge pro Bahn: ruhiger und länger ziehen.');
-  const cont = s.filter(a => a.swim!.longestContinuousM).map(a => ({ date: a.date, v: a.swim!.longestContinuousM! }));
-  const fieldCont = (Object.entries(I.state.customWorkouts || {}) as any[]).flatMap(([d, l]: any) => (l || []).filter((w: any) => w.sport === 'swim' && num((w.metrics || {}).longestCrawl) && d >= from).map((w: any) => ({ date: d, v: num(w.metrics.longestCrawl)! })));
-  const all = sorted([...cont, ...fieldCont]);
-  if (!all.length) out.push(lock('crawl', 'swim', 'Längste Strecke Kraul am Stück', 1, 0, 'Schwimmeinheit mit diesem Wert'));
-  else {
-    const best = Math.max(...all.map(p => p.v)); const before = all.filter(p => p.date < C.addDays(I.today, -14)).map(p => p.v);
-    const prev = before.length ? Math.max(...before) : null;
-    out.push({ id: 'crawl', group: 'swim', title: 'Längste Strecke Kraul am Stück', value: String(Math.round(best)), unit: 'm', delta: prev != null && best > prev ? `▲ neu (vorher ${Math.round(prev)} m)` : undefined,
-      text: best >= 400 ? 'Ab 400 m am Stück trägt deine Kraul-Ausdauer für Wettkämpfe.' : 'Jede längere Strecke am Stück ist ein Meilenstein. Ruhig atmen, langsam steigern.', tone: prev != null && best > prev ? 'good' : 'info', spark: all.map(p => p.v),
-      chart: { pts: all.map(p => ({ date: p.date, v: p.v })), series: [{ key: 'v', name: 'Kraul am Stück (m)', color: 'var(--swim)' }], fmt: 'num' } });
+  // Same corrected, completed evidence as coach and progression; each activity counts once.
+  const proofState = { ...I.state, activities: { ...Object.fromEntries(I.activities.map(a => [a.id, a])), ...(I.state.activities || {}) } };
+  const proofs = C.swimProofs(proofState, I.weeks, I.today, PERIOD_DAYS[I.period]).filter(p => p.date >= from);
+  for (const [id, key, title] of [['crawl', 'crawl', 'Längste Strecke Kraul am Stück'], ['pull', 'pull', 'Längste Strecke mit Pull Buoy am Stück']] as const) {
+    const all = proofs.filter(p => p[key] != null).map(p => ({date:p.date,v:p[key] as number}));
+    if (!all.length) { out.push(lock(id,'swim',title,1,0,'Schwimmeinheit mit diesem Wert')); continue; }
+    const best=Math.max(...all.map(p=>p.v)), confirmed=C.confirmedOf(all.map(p=>p.v));
+    const before=all.filter(p=>p.date<C.addDays(I.today,-14)).map(p=>p.v); const prev=before.length?Math.max(...before):null;
+    out.push({id,group:'swim',title,value:String(Math.round(best)),unit:'m',delta:prev!=null&&best>prev?'Neu (vorher '+Math.round(prev)+' m)':undefined,
+      text:'Bestwert '+best+' m; bestätigt in zwei Einheiten: '+(confirmed?confirmed+' m':'noch keine Strecke')+'. Längere Trainingsstücke erst nach Wiederholung.',
+      tone:prev!=null&&best>prev?'good':'info',spark:all.map(p=>p.v),chart:{pts:all,series:[{key:'v',name:title,color:'var(--swim)'}],fmt:'num'}});
   }
   return out;
 }

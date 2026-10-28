@@ -1,0 +1,27 @@
+
+Running 1 test using 1 worker
+
+(node:27900) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet (386ms)
+
+
+  1) [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet 
+
+    Error: expect(received).toMatch(expected)
+
+    Expected pattern: /Sch.tzwert/
+    Received string:  " Einsteiger"
+
+      103 |
+      104 | test('Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet',async({page})=>{
+    > 105 |  await coachData28(page,'choice');await open(page,'/?go=fortschritt');const levels=await page.locator('.score .lvl').allTextContents();expect(levels.length).toBeGreaterThan(0);for(const label of levels)expect(label).toMatch(/Sch.tzwert/);await page.locator('[data-act="score-open"]').first().click();await expect(page.locator('[data-score-sheet]')).toContainText(/Sch.tzwert/);
+          |                                                                                                                                                                                                                         ^
+      106 | });
+      107 |
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\scratch\coach28-work\tests\e2e\auftrag7.spec.ts:105:217
+
+    Error Context: scratch\coach28\browser-results\auftrag7-Coach28-Score-ohn-9b15e--Schaetzwert-gekennzeichnet-chromium-iphone\error-context.md
+
+  1 failed
+    [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet 

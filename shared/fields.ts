@@ -63,7 +63,7 @@ const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)
 export interface Fields { min: number | null; km: number | null; meters: number | null; paceSec: number | null; pace100: number | null; hr: number | null; maxHr: number | null;
   decoupling: number | null; efficiency: number | null; cadence: number | null; vertRatio: number | null; vo2max: number | null; cardioRecovery: number | null;
   power: number | null; maxPower: number | null; maxCadence: number | null; speed: number | null; indoor: boolean | null; bikeType: string | null;
-  spl: number | null; rate: number | null; dps: number | null; longestCrawl: number | null; crawlShare: number | null; technique: string;
+  spl: number | null; rate: number | null; dps: number | null; longestCrawl: number | null; longestPull: number | null; crawlShare: number | null; technique: string;
   area: string | null; exercises: ExerciseDone[]; kind: string | null; splits: Split[]; rpe: number | null; feel: number | null; deviation: string; notes: string }
 export function fieldsOf(st: any, sport?: string): Fields {
   const m = (st && st.metrics) || {};
@@ -75,7 +75,7 @@ export function fieldsOf(st: any, sport?: string): Fields {
     min, km, meters, paceSec: pace, pace100: p100, hr: num(m.hr), maxHr: num(m.maxHr), decoupling: num(m.decoupling), efficiency: num(m.efficiency), cadence: num(m.cadence),
     vertRatio: num(m.vertRatio), vo2max: num(m.vo2max), cardioRecovery: num(m.cardioRecovery), power: num(m.power), maxPower: num(m.maxPower), maxCadence: num(m.maxCadence), speed,
     indoor: m.indoor === 'in' ? true : m.indoor === 'out' ? false : null, bikeType: m.bikeType || null,
-    spl: num(m.spl), rate: num(m.rate), dps: num(m.dps), longestCrawl: num(m.longestCrawl), crawlShare: num(m.crawlShare), technique: String(m.technique || ''),
+    spl: num(m.spl), rate: num(m.rate), dps: num(m.dps), longestCrawl: num(m.longestCrawl), longestPull: num(m.longestPull), crawlShare: num(m.crawlShare), technique: String(m.technique || ''),
     area: m.area || null, exercises: Array.isArray(m.exercises) ? m.exercises : [], kind: m.kind || null, splits: Array.isArray(m.splits) ? m.splits : [],
     rpe: num(st && st.rpe), feel: num(st && st.feel), deviation: String((st && st.deviation) || ''), notes: String((st && (st.notes ?? st.description)) || '')
   };
@@ -132,8 +132,9 @@ export function fieldsFromNote(text: string, sport: string): { metrics: Record<s
   if (sport === 'swim') {
     const all = [...t.matchAll(/(\d{2,4})\s*m(?![a-zäöüß/])/g)].map(x => +x[1]).filter(x => x >= 200 && x <= 6000);
     if (all.length) set('meters', String(all[0]));
-    const lc = /(\d+(?:[.,]\d+)?)\s*m\b[^,;]{0,40}?am st(?:ue|ü)ck/.exec(t); if (lc) set('longestCrawl', lc[1].replace(',', '.'));
-    else if (/durchgehend\s*(\d+)\s*m\s*kraul/.test(t)) set('longestCrawl', /durchgehend\s*(\d+)\s*m\s*kraul/.exec(t)![1]);
+    const distances = swimDistancesFromText(t, true);
+    if (distances.crawl) set('longestCrawl', String(distances.crawl));
+    if (distances.pull) set('longestPull', String(distances.pull));
     set('spl', pick(new RegExp(D + '\\s*z(?:ue|ü)ge\\s*pro\\s*bahn'), t));
     const tech = /(problem[^.]*|atmung[^.]*|beine sinken[^.]*)/.exec(t); if (tech) set('technique', tech[1].trim().slice(0, 80));
   } else {
@@ -292,4 +293,23 @@ export function applyTestUpdate(profile: any, u: TestUpdate): any {
   const done = Object.keys(u.thresholds || {});
   th.estimated = (th.estimated || []).filter((k: string) => !done.includes(k));
   return { ...profile, thresholds: th, ...(u.skills && Object.keys(u.skills).length ? { skills: { ...(profile.skills || {}), ...u.skills } } : {}), appliedTests: [...(profile.appliedTests || []), u.sessionId] };
+}
+
+/** Only explicit distance clauses; totals and repeated intervals never establish a continuous record. */
+export function swimDistancesFromText(text: string, continuousOnly = false): { crawl?: number; pull?: number } {
+ const t=text.toLowerCase(); const out: {crawl?:number;pull?:number}={};
+ if (/\d+\s*[x×]\s*\d|\b(?:insgesamt|gesamtstrecke|intervalle?n?|wiederholungen?|pausen?)\b/.test(t)) return out;
+ for (const clause of t.split(/;|\bund\b|\baber\b/)) {
+  const continuous=/am st(?:ü|ue)ck|durchgehend|durchgeschwommen|durchschwimmen/.test(clause);
+  if (continuousOnly && !continuous) continue;
+  // A continuous distance alone does not identify the stroke or absence of aids.
+  if (/brust|breaststroke|rücken|ruecken|backstroke|butterfly|schmetterling/.test(clause)) continue;
+  if (!/kraul|freistil|freestyle|front.crawl|pull/.test(clause)) continue;
+  if (/kickbrett|board|flossen|fins?|paddles?|schnorchel|snorkel/.test(clause)) continue;
+  const m=/(\d+(?:[.,]\d+)?)\s*(?:m|meter)\b/.exec(clause); if (!m) continue;
+  const v=Number(m[1].replace(',','.')); if (!(v>0 && v<=5000)) continue;
+  const key=/pull/.test(clause) && !/ohne\s+(?:den\s+)?pull/.test(clause)?'pull':'crawl';
+  out[key]=Math.max(out[key]||0,v);
+ }
+ return out;
 }

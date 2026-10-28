@@ -1,0 +1,59 @@
+
+Running 22 tests using 1 worker
+
+
+
+(node:11136) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:38:1 ÔÇ║ A: angemeldeter Testnutzer, Werte, Reload, geschlossene App und neue leere Sitzung
+[2/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:51:1 ÔÇ║ LocalStorage-Quota: bestaetigte IndexedDB-Werte ueberleben Neustart
+[3/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:57:1 ÔÇ║ B: beide Speicher blockiert, kein falscher Erfolg; Backup rettet ungespeicherte Eingaben
+[4/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:68:1 ÔÇ║ C: synthetisches Datei-Backup vollstaendig herunterladen und isoliert importieren
+[5/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload
+  1) [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload 
+
+    Test timeout of 30000ms exceeded.
+
+    Error Context: test-results\storage-in-process\storage-recovery24-D-E-meh-f8a0d--Werte-mit-auch-nach-Reload-chromium-iphone\error-context.md
+
+
+(node:1592) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[6/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:87:1 ÔÇ║ Netzwerk-/Datenbankfehler wird angezeigt, lokale Werte bleiben nach Reload und werden nachgesendet
+[7/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:105:1 ÔÇ║ zwei offene Tabs behalten gleichzeitig geaenderte Einheiten nach Neustart
+[8/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:116:1 ÔÇ║ Werte werden schon beim Tippen gespeichert, ohne das Feld vorher zu verlassen
+[9/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:125:1 ÔÇ║ Speicherbestaetigungen bauen den eigenen Bildschirm nicht endlos neu auf
+[10/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:143:1 ÔÇ║ Fehler beim Laden der Verbindungen endet sichtbar und wiederholt sich erst auf Wunsch
+[11/22] [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:157:1 ÔÇ║ Verzoegerter Speicherstart zeigt Ladestatus und wartet auf die echte App
+(node:26304) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[12/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:38:1 ÔÇ║ A: angemeldeter Testnutzer, Werte, Reload, geschlossene App und neue leere Sitzung
+[13/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:51:1 ÔÇ║ LocalStorage-Quota: bestaetigte IndexedDB-Werte ueberleben Neustart
+[14/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:57:1 ÔÇ║ B: beide Speicher blockiert, kein falscher Erfolg; Backup rettet ungespeicherte Eingaben
+[15/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:68:1 ÔÇ║ C: synthetisches Datei-Backup vollstaendig herunterladen und isoliert importieren
+[16/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload
+  2) [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload 
+
+    Test timeout of 30000ms exceeded.
+
+    Error Context: test-results\storage-in-process\storage-recovery24-D-E-meh-f8a0d--Werte-mit-auch-nach-Reload-webkit-iphone\error-context.md
+
+
+(node:920) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[17/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:87:1 ÔÇ║ Netzwerk-/Datenbankfehler wird angezeigt, lokale Werte bleiben nach Reload und werden nachgesendet
+[18/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:105:1 ÔÇ║ zwei offene Tabs behalten gleichzeitig geaenderte Einheiten nach Neustart
+[19/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:116:1 ÔÇ║ Werte werden schon beim Tippen gespeichert, ohne das Feld vorher zu verlassen
+[20/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:125:1 ÔÇ║ Speicherbestaetigungen bauen den eigenen Bildschirm nicht endlos neu auf
+[21/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:143:1 ÔÇ║ Fehler beim Laden der Verbindungen endet sichtbar und wiederholt sich erst auf Wunsch
+[22/22] [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:157:1 ÔÇ║ Verzoegerter Speicherstart zeigt Ladestatus und wartet auf die echte App
+  2 failed
+    [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload 
+    [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload 
+  20 passed (1.9m)

@@ -1,0 +1,116 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô tests/unit/review.test.ts (93 tests | 31 skipped) 6964ms
+   Ô£ô Test-Personen mit gespielten Einheiten > jugend-langdistanz: ÔÇ×Wie war meine Woche?ÔÇ£  343ms
+   Ô£ô Test-Personen mit gespielten Einheiten > erfahren-md-marathon: ÔÇ×Wie war meine Woche?ÔÇ£  301ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-regeln: ÔÇ×Wie war meine Woche?ÔÇ£  397ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-regeln: ÔÇ×Wie war mein letztes Training?ÔÇ£  385ms
+   Ô£ô Test-Personen mit gespielten Einheiten > vater-regeln: ÔÇ×Vergleich mit letzter WocheÔÇ£  392ms
+   Ô£ô Test-Personen mit gespielten Einheiten > nach jeder erledigten Einheit: Bewertung automatisch (Engine), abschaltbar  600ms
+   Ô£ô Test-Personen mit gespielten Einheiten > reviewAnswer gibt bei normalen Fragen nichts zur├╝ck (andere Absichten bleiben)  387ms
+ Ô£ô tests/unit/analysis.test.ts (39 tests | 30 skipped) 436ms
+ Ô£ô tests/unit/trends.test.ts (17 tests) 363ms
+   Ô£ô Zeitraum und zu wenig Daten > Zeitraum ├ñndert die Grundlage (4 Wochen weniger Punkte als 1 Jahr)  344ms
+ Ô£ô server/test/coach-results-flow.test.ts (7 tests) 112ms
+ Ô£ô tests/unit/auftrag17-sollist.test.ts (19 tests) 66ms
+ Ô£ô tests/unit/swim-equipment-quality.test.ts (29 tests) 69ms
+ Ô£ô tests/unit/auftrag20-scores.test.ts (20 tests) 62ms
+ Ô£ô tests/unit/fitness-quality.test.ts (17 tests) 49ms
+ Ô£ô tests/unit/scores.test.ts (19 tests) 40ms
+ Ô£ô tests/unit/actual-results-quality.test.ts (27 tests) 37ms
+ Ô£ô tests/unit/auftrag9.test.ts (19 tests) 29ms
+ Ô£ô tests/unit/fields.test.ts (32 tests) 15ms
+ Ô£ô tests/unit/swim-evidence.test.ts (12 tests) 10ms
+ Ô£ô tests/unit/chat.test.ts (343 tests) 82382ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  403ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  486ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  492ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  488ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Verletzung stark ÔåÆ Pause und Arzt  472ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  447ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  499ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Pr├╝fungszeit ÔåÆ wenig Training  471ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  468ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  397ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  325ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  347ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > jugend-langdistanz: Wunschzeit ├ñndern  435ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  402ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: verschieben auf erlaubten Tag mit Best├ñtigung  323ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  529ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  333ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Tage tauschen  302ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Tag frei heute  380ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  358ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  463ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  516ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  547ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Verletzung stark ÔåÆ Pause und Arzt  528ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  487ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  523ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Pr├╝fungszeit ÔåÆ wenig Training  560ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  545ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  459ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  463ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  497ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > erfahren-md-marathon: Wunschzeit ├ñndern  496ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  450ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: verschieben auf erlaubten Tag mit Best├ñtigung  433ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: heute k├╝rzer ÔåÆ ja ÔåÆ Minuten kleiner  792ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: n├ñchste Einheit auf 20 min  423ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: l├ñnger, wenn erlaubt; sonst ehrlich begr├╝ndet  442ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: heute lieber locker  432ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: h├ñrter machen (oder begr├╝ndet ablehnen)  450ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen mit Best├ñtigung  427ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen, dann ÔÇ×neinÔÇ£: nichts ├ñndert sich  428ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  457ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Tage tauschen  416ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Tag frei heute  497ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit ohne Tag ÔåÆ R├╝ckfrage heute/Woche ÔåÆ heute  493ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: keine Zeit diese Woche ÔåÆ wenig-Zeit-Woche  422ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Woche leichter  426ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  435ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: nicht gut ÔåÆ nur locker  430ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  842ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  864ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  855ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Verletzung stark ÔåÆ Pause und Arzt  835ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  821ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  838ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Pr├╝fungszeit ÔåÆ wenig Training  781ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  777ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  781ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  635ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  666ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Wunschzeit ├ñndern  827ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: R├╝ckg├ñngig stellt alles wieder her  440ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: unklare Nachricht ÔåÆ gezielte R├╝ckfrage mit Kn├Âpfen  393ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Frage beantwortet (heute)  393ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > vater-regeln: Frage beantwortet (Warum locker)  419ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: keine Zeit an einem Tag mit Einheit ÔåÆ Tag w├ñhlen ÔåÆ verschoben  418ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: verschieben auf erlaubten Tag mit Best├ñtigung  369ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: h├ñrter machen (oder begr├╝ndet ablehnen)  324ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: streichen, ÔÇ×lieber verschiebenÔÇ£, Tag w├ñhlen  329ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: krank ÔåÆ ja ÔåÆ Krankheitsphase; dann gesund  310ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Knie tut weh ÔåÆ mittel ÔåÆ schonender Plan ohne Lauf-Intervalle  504ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Schmerzen ohne K├Ârperteil ÔåÆ wo? ÔåÆ Knie ÔåÆ mittel ÔåÆ schonender Plan  525ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Schmerzen woanders ÔåÆ wie stark ÔåÆ leicht  532ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Verletzung stark ÔåÆ Pause und Arzt  557ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Urlaub mit Daten ÔåÆ kein Training im Zeitraum  468ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Urlaub ohne Daten ÔåÆ R├╝ckfrage ÔåÆ n├ñchste Woche  496ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Pr├╝fungszeit ÔåÆ wenig Training  504ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neue Regel ÔÇ×ab jetzt mittwochs kein LaufenÔÇ£  688ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neue Regel ÔÇ×donnerstags gar nichtsÔÇ£ wirkt sofort  421ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neues Ziel mit Monat ÔåÆ Sonntag, Plan angepasst  501ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: neues Ziel ohne Datum ÔåÆ R├╝ckfrage ÔåÆ Datum  504ms
+   Ô£ô D6: Gespr├ñche (alle Test-Personen ├ù alle Abl├ñufe) > langdistanz-profi: Wunschzeit ├ñndern  499ms
+   Ô£ô D2: genau der Beispiel-Dialog: ÔÇ×Ich hab Mittwoch keine ZeitÔÇ£ ÔåÆ ÔÇ×Donnerstag oder Samstag?ÔÇ£ ÔåÆ ÔÇ×SamstagÔÇ£  347ms
+   Ô£ô A4 im Chat: Verschieben gegen eine harte Regel wird abgelehnt, erlaubte Tage werden angeboten  460ms
+   Ô£ô D1: jede Nachricht bekommt eine Antwort (100 zuf├ñllige Nachrichten) > keine Ausnahme, nie leer, nie Floskel  3742ms
+
+ Test Files  14 passed (14)
+      Tests  632 passed | 61 skipped (693)
+   Start at  17:45:25
+   Duration  83.50s (transform 1.20s, setup 161ms, collect 3.59s, tests 90.63s, environment 2ms, prepare 1.50s)
+

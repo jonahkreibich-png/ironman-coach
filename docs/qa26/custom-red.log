@@ -1,0 +1,38 @@
+
+Running 2 tests using 1 worker
+
+
+
+(node:19492) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/2] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:43:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[2/2] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:66:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+  1) [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:66:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('[data-training-blocks]')
+    Expected substring: "SYNTHETIC Baustein"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" locator('[data-training-blocks]') with timeout 5000ms
+      - waiting for locator('[data-training-blocks]')
+
+
+      67 |  await prepare(page);await page.addInitScript(()=>{if(!sessionStorage.getItem('__custom26')){const d=JSON.parse(localStorage.getItem('ec_state_v2')!);d.customWorkouts={'2026-10-14':[{id:'custom-draft26',sport:'run',title:'SYNTHETIC Zusatz',description:'SYNTHETIC Notiz',plannedMinutes:20,completed:false,metrics:{min:'11'},metricsManual:{min:true}}]};localStorage.setItem('ec_state_v2',JSON.stringify(d));sessionStorage.setItem('__custom26','1');}});
+      68 |  await open(page,'/?go=plan');await page.locator('[data-act="custom-open"][data-cid="custom-draft26"]').click();await page.locator('[data-act="template-insert"]').click();await page.locator('[data-act="tpl-pick"][data-id="t-run"]').click();await page.locator('[data-act="tpl-confirm"]').click();await acceptWarnings(page);
+    > 69 |  await page.locator('[data-act="custom-open"][data-cid="custom-draft26"]').click();await expect(page.locator('[data-training-blocks]')).toContainText('SYNTHETIC Baustein');await close(page);
+         |                                                                                                                                         ^
+      70 |  await page.locator('[data-act="edit-toggle"]').click();await page.locator('[data-act="sess-edit"][data-sid="custom-draft26"]').click();await page.locator('#ed-day').selectOption(targetDate);await page.locator('[data-act="edit-move"]').click();await page.locator('[data-act="edit-preview-confirm"]').click();await acceptWarnings(page);
+      71 |  await page.locator('[data-act="plan-week"][data-i="3"]').click();await page.locator('[data-act="custom-open"][data-cid="custom-draft26"]').click();await expect(page.locator('[data-training-blocks]')).toContainText('SYNTHETIC Baustein');const min=page.locator('[data-ch="fd"][data-k="min"]').first();await min.fill('17');await min.blur();await expect(page.locator('#storage-status')).toBeHidden();await page.locator('[data-act="custom-complete"]').click();await expect(page.locator('#storage-status')).toBeHidden();await page.reload();
+      72 |  await page.locator('[data-act="custom-open"][data-cid="custom-draft26"]').click();await expect(page.locator('[data-training-blocks]')).toContainText('SYNTHETIC Baustein');await expect(page.locator('[data-ch="fd"][data-k="min"]').first()).toHaveValue('17');await expect(page.locator('[data-act="template-insert"]')).toHaveCount(0);
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\scratch\plan26-work\tests\e2e\plan-templates26.spec.ts:69:137
+
+    Error Context: test-results\plan26\plan-templates26-Zusatzent-0c581-t-am-neuen-Tag-und-Neustart-chromium-desktop\error-context.md
+
+
+  1 failed
+    [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:66:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart 
+  1 passed (10.7s)

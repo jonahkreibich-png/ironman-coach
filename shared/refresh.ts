@@ -10,12 +10,23 @@ import { speedTrend, bikeSpeedsOf, mainKind, BIKE_KIND_LABEL, type BikeKind } fr
 
 const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
 
-export function refreshFuture(weeks: any[], profile: any, today: string): { weeks: any[]; changed: number; example: string | null } {
+export function refreshFuture(weeks: any[], profile: any, today: string, state?: any): { weeks: any[]; changed: number; example: string | null } {
   let changed = 0; let example: string | null = null;
+  // Locks and edits live in adjustments, not necessarily in the unmodified base plan.
+  const protectedIds = new Set<string>();
+  const protectedSession = (s: any) => s && (s.race || s.fixed || s.locked || s.pinned || s.frozen || s._done || s.completed || s.cancelled);
+  if (state) {
+    C.planDays(C.applyAdjustments(weeks, state.adjustments || {})).forEach((d: any) => (d.sessions || []).forEach((s: any) => {
+      if (protectedSession(s) || state.sessions?.[s.id]?.completed) protectedIds.add(s.id);
+    }));
+    for (const a of C.activeAdjustments(state.adjustments || {}) as any[]) {
+      if (a.from_user && (a.sessionId || a.session?.id)) protectedIds.add(a.sessionId || a.session.id);
+    }
+  }
   const out = weeks.map((w: any) => ({ ...w, days: (w.days || []).map((d: any) => {
     if (d.date <= today) return d;
     return { ...d, sessions: (d.sessions || []).map((s: any) => {
-      if (!s || !s.spec || s.race || s.fixed || !['run', 'bike', 'swim'].includes(s.sport)) return s;
+      if (!s || !s.spec || protectedSession(s) || protectedIds.has(s.id) || !['run', 'bike', 'swim'].includes(s.sport)) return s;
       const old = s.spec.ctx || {};
       const ctx = { ...paceCtx(profile, !!old.indoor, old.bikeName ?? null, today), indoor: old.indoor, bikeName: old.bikeName };
       if (JSON.stringify({ ...old, indoor: undefined, bikeName: undefined }) === JSON.stringify({ ...ctx, indoor: undefined, bikeName: undefined })) return s;

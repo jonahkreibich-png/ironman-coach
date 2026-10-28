@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach
+
+ Ô£ô tests/unit/plan-summary26.test.ts (8 tests) 5ms
+ Ô£ô tests/unit/publication24.test.ts (15 tests) 162ms
+ Ô£ô tests/unit/plan-dashboard27.test.ts (3 tests) 3ms
+
+ Test Files  3 passed (3)
+      Tests  26 passed (26)
+   Start at  16:56:26
+   Duration  976ms (transform 293ms, setup 61ms, collect 440ms, tests 169ms, environment 0ms, prepare 322ms)
+

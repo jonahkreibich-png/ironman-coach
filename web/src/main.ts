@@ -1,11 +1,13 @@
+import { storage, storageMessage, STORAGE_TAB } from './persistence';
+import { storage as localStorage } from "./persistence";
 /* Einstieg: Tabs (Heute, Plan, Coach, Fortschritt, Mehr), Unterseiten unter „Mehr“, Aktionen, Deep Links. */
 import { guardLeave } from './staged';
 import './styles.css';
 import './design.css';
-import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi } from './store';
+import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
-import { ACTIONS, CHANGE, on, ic, closeSheet, sheetOpen  } from './kit';
+import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen  } from './kit';
 import { CHARTS, chartTap } from './charts';
 import { effStatus } from './domain';
 import { D, invalidate } from './data';
@@ -18,6 +20,7 @@ import { renderMehr } from './views/mehr';
 import { renderLexikon, setLexiconQuery } from './views/lexikon';
 import { renderWerte, openCheckin } from './views/werte';
 import { renderStrength } from './views/strength';
+import {renderTrainingTemplates,openTemplatePicker,openSessionPrescriptionEditor} from './views/templates';
 import { renderEssen } from './views/essen';
 import { renderProfil } from './views/profil';
 import { renderVerbindungen, handleOAuthReturn, loadConnections } from './views/verbindungen';
@@ -44,6 +47,41 @@ import { checkSwimSkill } from './testupdate';
 export const canGenerate = () => FEATURES.generator || entitled('generator');
 
 initErrorLog();
+const storageBanner = document.createElement('div');
+storageBanner.id = 'storage-status'; storageBanner.setAttribute('role', 'status');
+storageBanner.className = 'banner warn';
+const updateStorageBanner = () => {
+  storageBanner.textContent = storageMessage(); storageBanner.hidden = storage.status === 'saved';
+  if (storage.status === 'error') {
+    const button = document.createElement('button'); button.className = 'btn'; button.textContent = 'Backup exportieren';
+    button.onclick = () => nav.go('daten'); storageBanner.appendChild(button);
+  }
+};
+document.body.insertBefore(storageBanner, document.getElementById('app'));
+const syncBanner = document.createElement('div'); syncBanner.id = 'global-sync-status'; syncBanner.className = 'banner warn'; syncBanner.hidden = true; syncBanner.setAttribute('role','status');
+const syncLabel = document.createElement('span'); syncLabel.setAttribute('data-global-sync-label',''); syncBanner.appendChild(syncLabel); document.body.insertBefore(syncBanner, document.getElementById('app'));
+storage.onChange = updateStorageBanner; updateStorageBanner();
+let knownPlan = JSON.stringify(readPlan());
+let otherTabRender = false;
+const refreshFromOtherTab = async () => {
+  try {
+    await storage.refresh();
+    if (refreshStoredState()) {
+      const plan = readPlan(), raw = JSON.stringify(plan);
+      if (plan && raw !== knownPlan) { knownPlan = raw; replacePlanInPlace(plan); }
+      rebuildPlanIndex(); invalidate();
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) otherTabRender = true;
+      else nav.rerender();
+    }
+  } catch (_) { storage.block('ec_state_v2'); }
+};
+window.addEventListener('storage', e => { if (e.key === STORAGE.state || e.key === STORAGE.plan) void refreshFromOtherTab(); });
+if ('BroadcastChannel' in window) {
+  const channel = new BroadcastChannel('stamio-storage');
+  channel.onmessage = e => { if (e.data?.tab !== STORAGE_TAB) void refreshFromOtherTab(); };
+}
+
+document.addEventListener('focusout', () => { if (otherTabRender) { otherTabRender = false; setTimeout(() => nav.rerender(), 0); } });
 
 type Tab = 'heute' | 'plan' | 'coach' | 'fortschritt' | 'mehr';
 const TABS: { id: Tab; icon: string; render: () => string }[] = [
@@ -54,7 +92,7 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
   { id: 'mehr', icon: 'grid', render: renderMehr }
 ];
 const SUBS: Record<string, () => string> = {
-  lexikon: renderLexikon, strength: renderStrength, werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
+  lexikon: renderLexikon, strength: renderStrength, vorlagen: renderTrainingTemplates, werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
   daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback, generator: () => canGenerate() ? renderGenerator() : renderMehr()
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
@@ -79,7 +117,7 @@ function coachUnread(): number {
 
 function renderTop() {
   const sub = UI.tab === 'mehr' || !HAS_PLAN ? UI.sub : null;
-  const title = sub ? t('sub.' + sub) : HAS_PLAN ? t('tab.' + UI.tab) : APP.name;
+  const title = sub === 'vorlagen' ? 'Trainingsvorlagen' : sub ? t('sub.' + sub) : HAS_PLAN ? t('tab.' + UI.tab) : APP.name;
   byId('top').innerHTML = sub
     ? `<button class="icon-btn" data-act="back" aria-label="${esc(t('common.back'))}">${ic('back')}</button><h1 class="top-title">${esc(title)}</h1><span style="width:40px"></span>`
     : `<h1 class="top-title"><span class="mark" aria-hidden="true">${esc(APP.mark)}</span>${esc(title)}</h1>${HAS_PLAN && UI.tab === 'heute' ? `<button class="icon-btn" data-act="checkin-open" aria-label="${esc(t('heute.enterValues'))}">${ic('heart')}</button>` : '<span style="width:40px"></span>'}`;
@@ -149,6 +187,13 @@ document.addEventListener('click', async e => {
   if (el.tagName === 'A') e.preventDefault();
   try { await fn(el, e); } catch (err: any) { toast(err && err.message ? err.message : String(err)); throw err; }
 });
+document.addEventListener('input', async e => {
+  const el = e.target as HTMLElement, ds = el.dataset || {};
+  const name = ds.ch || (ds.sm ? 'sess-metric' : ds.sf ? 'sess-field' : '');
+  if (!name || !INPUT[name]) return;
+  try { await INPUT[name](el, e); } catch (err: any) { toast(err?.message || String(err)); }
+});
+
 document.addEventListener('change', async e => {
   const el = e.target as HTMLElement;
   const ds = el.dataset || ({} as DOMStringMap);
@@ -203,3 +248,7 @@ if (isSyncOn()) { loadMe().then(() => { if (UI.tab === 'mehr') rerender(); }); l
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); rerender(); } });
 void checkForUpdate;
+
+on('template-add',el=>openTemplatePicker({date:el.dataset.date||todayStr()}));
+on('template-insert',el=>openTemplatePicker({date:el.dataset.date!,sessionId:el.dataset.sid!}));
+on('template-edit',el=>openSessionPrescriptionEditor(el.dataset.sid!,el.dataset.date!));

@@ -1,3 +1,4 @@
+import {effectiveCustomWorkouts} from './store';
 /* Fachlogik der App: Trend, Krankheit, Einheiten-Status, Zonen, Ampel, Scores, Leistungswerte. */
 import * as CoachCore from '../../shared/core';
 import { STATE, PLAN, SESS } from './store';
@@ -77,7 +78,7 @@ export function dayStats(d) {
   const skipped = st.filter(x => x === 'skipped').length;
   const sick = st.filter(x => x === 'sick').length;
   const missed = st.filter(x => x === 'missed').length;
-  const custom = (STATE.customWorkouts[d.date] || []).length;
+  const custom = (effectiveCustomWorkouts()[d.date] || []).length;
   return { total: real.length, done, skipped, sick, missed, custom, open: real.length - done - skipped - sick - missed };
 }
 
@@ -167,7 +168,7 @@ export function computeScore(sport) {
     if (status === 'done') delta += QUALITY_DELTA[st.quality || 'ok'];
     else if (status === 'missed') delta -= 1.2;
   });
-  Object.entries(STATE.customWorkouts || {}).forEach(([date, list]) => {
+  Object.entries(effectiveCustomWorkouts() || {}).forEach(([date, list]) => {
     if (date <= calDate) return;
     list.forEach(w => { if (w.sport === sport) delta += QUALITY_DELTA[w.quality || 'ok']; });
   });
@@ -202,7 +203,7 @@ export function perfEntries(sport) {
     const st = STATE.sessions[s.id];
     if (st && st.completed && hasMetrics(st.metrics)) map[s.date] = normMetrics(st.metrics, s.date, sport, s.title);
   });
-  Object.entries(STATE.customWorkouts || {}).forEach(([d, list]) => list.forEach(w => {
+  Object.entries(effectiveCustomWorkouts() || {}).forEach(([d, list]) => list.forEach(w => {
     if (w.sport === sport && hasMetrics(w.metrics)) map[d] = normMetrics(w.metrics, d, sport, w.title);
   }));
   const out = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));

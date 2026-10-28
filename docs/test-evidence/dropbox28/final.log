@@ -1,0 +1,14 @@
+
+Running 4 tests using 1 worker
+
+(node:23856) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+  ok 2 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:61:1 ÔÇ║ Trends: Zeitraum umschalten, Karte antippen zeigt Verlauf, zu wenig Daten ÔåÆ ÔÇ×ab X verf├╝gbarÔÇ£ (536ms)
+(node:5528) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -  3 [webkit-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen
+  ok 4 [webkit-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:61:1 ÔÇ║ Trends: Zeitraum umschalten, Karte antippen zeigt Verlauf, zu wenig Daten ÔåÆ ÔÇ×ab X verf├╝gbarÔÇ£ (1.1s)
+
+  1 skipped
+  3 passed (7.0s)

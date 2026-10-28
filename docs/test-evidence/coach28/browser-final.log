@@ -1,0 +1,168 @@
+
+Running 158 tests using 1 worker
+
+(node:24644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok   1 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:6:1 ÔÇ║ Einheit: Felder je Sportart, RPE und Gef├╝hl, Pulszone automatisch, Notiz wird in Felder ├╝bertragen (1.0s)
+  ok   2 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:27:1 ÔÇ║ Plan: Einheit zeigt den Ablauf in Schritten (Aufw├ñrmen, Hauptteil, Ausklang) (328ms)
+  ok   3 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:36:1 ÔÇ║ Coach ohne KI: ÔÇ×Was genau soll ich heute machen?ÔÇ£ ÔåÆ Schritte mit Zahlen (1.2s)
+  ok   4 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:44:1 ÔÇ║ Coach: Bereich ÔÇ×Was der Coach gerade siehtÔÇ£ mit Begr├╝ndung und Tipp (288ms)
+  ok   5 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:52:1 ÔÇ║ Fortschritt: Umfang pro Woche zeigt bei langem Plan h├Âchstens 12 Wochen (392ms)
+  ok   6 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:62:1 ÔÇ║ Fragebogen bei vorhandenem Plan: Hinweis ÔÇ×Plan geht weiterÔÇ£, vergangene Wochen bleiben (366ms)
+  ok   7 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:89:1 ÔÇ║ Coach28: tatsaechlicher Kraftbereich wird korrigiert, bewertet und nach Neustart behalten (2.4s)
+  ok   8 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:93:1 ÔÇ║ Coach28: hundert Meter mit und ohne Pull Buoy bleiben getrennt in Bewertung und Speicher (2.4s)
+  ok   9 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:97:1 ÔÇ║ Coach28: drei alte Schwimmhinweise werden ein Vorschlag, abgelehnt bleibt nach Neustart erledigt (392ms)
+  ok  10 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:100:1 ÔÇ║ Coach28: konkrete Sportwahlfrage wird direkt und ohne Planmutation beantwortet (1.2s)
+  ok  11 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet (370ms)
+  -   12 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:21:1 ÔÇ║ Bildschirme werden aus dem Code gefunden
+  -   13 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, leer
+  -   14 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, normal
+  -   15 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, voll
+  -   16 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, fehler
+  -   17 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, leer
+  -   18 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, normal
+  -   19 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, voll
+  -   20 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, leer
+  -   21 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, normal
+  -   22 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, voll
+  -   23 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, fehler
+  -   24 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, leer
+  -   25 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, normal
+  -   26 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, voll
+  -   27 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, leer
+  -   28 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, normal
+  -   29 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, voll
+  -   30 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, fehler
+  -   31 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, leer
+  -   32 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, normal
+  -   33 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, voll
+  -   34 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, leer
+  -   35 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, normal
+  -   36 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, voll
+  -   37 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, fehler
+  -   38 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, leer
+  -   39 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, normal
+  -   40 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, voll
+  -   41 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, leer
+  -   42 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, normal
+  -   43 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, voll
+  -   44 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, fehler
+  -   45 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, leer
+  -   46 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, normal
+  -   47 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, voll
+  -   48 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 320 px: Tab-Beschriftungen einzeilig
+  -   49 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 375 px: Tab-Beschriftungen einzeilig
+  -   50 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 390 px: Tab-Beschriftungen einzeilig
+  -   51 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 430 px: Tab-Beschriftungen einzeilig
+  -   52 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ zoom130 px: Tab-Beschriftungen einzeilig
+  -   53 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   54 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   55 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   56 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   57 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   58 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   59 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   60 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  -   61 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, hell: Plan, alle Wochen mit echten Zus├ñtzen
+  -   62 [chromium-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen
+  ok  63 [chromium-iphone] ÔÇ║ tests\e2e\load-values.spec.ts:4:1 ÔÇ║ Belastungswerte speichern, Widerspr├╝che kennzeichnen und zur Automatik zur├╝ckkehren (923ms)
+  ok  64 [chromium-iphone] ÔÇ║ tests\e2e\load-values.spec.ts:26:1 ÔÇ║ ung├╝ltige und r├╝ckdatierte Eingaben ver├ñndern keine fremden Tageswerte (371ms)
+  ok  65 [chromium-iphone] ÔÇ║ tests\e2e\readiness24.spec.ts:9:33 ÔÇ║ Ampel Heute und Coach gleich; Korrektur und Neustart bleiben konsistent (320px) (1.8s)
+  ok  66 [chromium-iphone] ÔÇ║ tests\e2e\readiness24.spec.ts:9:33 ÔÇ║ Ampel Heute und Coach gleich; Korrektur und Neustart bleiben konsistent (768px) (1.8s)
+  ok  67 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:38:1 ÔÇ║ A: angemeldeter Testnutzer, Werte, Reload, geschlossene App und neue leere Sitzung (2.6s)
+  ok  68 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:51:1 ÔÇ║ LocalStorage-Quota: bestaetigte IndexedDB-Werte ueberleben Neustart (440ms)
+  ok  69 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:57:1 ÔÇ║ B: beide Speicher blockiert, kein falscher Erfolg; Backup rettet ungespeicherte Eingaben (752ms)
+  ok  70 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:68:1 ÔÇ║ C: synthetisches Datei-Backup vollstaendig herunterladen und isoliert importieren (1.4s)
+  ok  71 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload (3.4s)
+  ok  72 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:87:1 ÔÇ║ Netzwerk-/Datenbankfehler wird angezeigt, lokale Werte bleiben nach Reload und werden nachgesendet (3.4s)
+  ok  73 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:105:1 ÔÇ║ zwei offene Tabs behalten gleichzeitig geaenderte Einheiten nach Neustart (929ms)
+  ok  74 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:116:1 ÔÇ║ Werte werden schon beim Tippen gespeichert, ohne das Feld vorher zu verlassen (448ms)
+  ok  75 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:125:1 ÔÇ║ Speicherbestaetigungen bauen den eigenen Bildschirm nicht endlos neu auf (913ms)
+  ok  76 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:143:1 ÔÇ║ Fehler beim Laden der Verbindungen endet sichtbar und wiederholt sich erst auf Wunsch (917ms)
+  ok  77 [chromium-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:157:1 ÔÇ║ Verzoegerter Speicherstart zeigt Ladestatus und wartet auf die echte App (6.5s)
+  ok  78 [chromium-iphone] ÔÇ║ tests\e2e\strength-templates.spec.ts:4:1 ÔÇ║ Kraftvorlage erstellen, bearbeiten, starten und unabh├ñngig abschlie├ƒen (4.5s)
+  ok  79 [chromium-iphone] ÔÇ║ tests\e2e\strength-templates.spec.ts:52:1 ÔÇ║ Vorlage validieren und in geplanter Krafteinheit ├╝bernehmen und speichern (1.4s)
+(node:13616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  80 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:6:1 ÔÇ║ Einheit: Felder je Sportart, RPE und Gef├╝hl, Pulszone automatisch, Notiz wird in Felder ├╝bertragen (1.9s)
+  ok  81 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:27:1 ÔÇ║ Plan: Einheit zeigt den Ablauf in Schritten (Aufw├ñrmen, Hauptteil, Ausklang) (809ms)
+  ok  82 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:36:1 ÔÇ║ Coach ohne KI: ÔÇ×Was genau soll ich heute machen?ÔÇ£ ÔåÆ Schritte mit Zahlen (1.5s)
+  ok  83 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:44:1 ÔÇ║ Coach: Bereich ÔÇ×Was der Coach gerade siehtÔÇ£ mit Begr├╝ndung und Tipp (417ms)
+  ok  84 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:52:1 ÔÇ║ Fortschritt: Umfang pro Woche zeigt bei langem Plan h├Âchstens 12 Wochen (446ms)
+  ok  85 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:62:1 ÔÇ║ Fragebogen bei vorhandenem Plan: Hinweis ÔÇ×Plan geht weiterÔÇ£, vergangene Wochen bleiben (976ms)
+  ok  86 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:89:1 ÔÇ║ Coach28: tatsaechlicher Kraftbereich wird korrigiert, bewertet und nach Neustart behalten (3.0s)
+  ok  87 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:93:1 ÔÇ║ Coach28: hundert Meter mit und ohne Pull Buoy bleiben getrennt in Bewertung und Speicher (3.0s)
+  ok  88 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:97:1 ÔÇ║ Coach28: drei alte Schwimmhinweise werden ein Vorschlag, abgelehnt bleibt nach Neustart erledigt (860ms)
+  ok  89 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:100:1 ÔÇ║ Coach28: konkrete Sportwahlfrage wird direkt und ohne Planmutation beantwortet (1.4s)
+  ok  90 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet (602ms)
+  ok  91 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:21:1 ÔÇ║ Bildschirme werden aus dem Code gefunden (5ms)
+  ok  92 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, leer (3.1s)
+  ok  93 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, normal (8.0s)
+  ok  94 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, voll (8.9s)
+  ok  95 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, hell, fehler (7.9s)
+  ok  96 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, leer (3.1s)
+  ok  97 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, normal (8.2s)
+  ok  98 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 320 px, dunkel, voll (9.6s)
+  ok  99 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, leer (3.3s)
+  ok 100 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, normal (8.1s)
+  ok 101 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, voll (8.7s)
+  ok 102 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, hell, fehler (7.7s)
+  ok 103 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, leer (3.2s)
+  ok 104 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, normal (8.1s)
+  ok 105 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 375 px, dunkel, voll (9.0s)
+  ok 106 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, leer (3.3s)
+  ok 107 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, normal (8.1s)
+  ok 108 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, voll (8.9s)
+  ok 109 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, hell, fehler (7.8s)
+  ok 110 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, leer (3.4s)
+  ok 111 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, normal (7.9s)
+  ok 112 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 390 px, dunkel, voll (8.9s)
+  ok 113 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, leer (3.3s)
+  ok 114 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, normal (8.2s)
+  ok 115 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, voll (9.3s)
+  ok 116 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, hell, fehler (8.4s)
+  ok 117 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, leer (3.2s)
+  ok 118 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, normal (8.4s)
+  ok 119 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ 430 px, dunkel, voll (9.4s)
+  ok 120 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, leer (3.1s)
+  ok 121 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, normal (8.1s)
+  ok 122 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, voll (9.1s)
+  ok 123 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, hell, fehler (8.2s)
+  ok 124 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, leer (3.1s)
+  ok 125 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, normal (8.1s)
+  ok 126 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:134:7 ÔÇ║ zoom130 px, dunkel, voll (9.2s)
+  ok 127 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 320 px: Tab-Beschriftungen einzeilig (222ms)
+  ok 128 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 375 px: Tab-Beschriftungen einzeilig (206ms)
+  ok 129 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 390 px: Tab-Beschriftungen einzeilig (209ms)
+  ok 130 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ 430 px: Tab-Beschriftungen einzeilig (204ms)
+  ok 131 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:184:34 ÔÇ║ zoom130 px: Tab-Beschriftungen einzeilig (208ms)
+  ok 132 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 133 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 320 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 134 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.5s)
+  ok 135 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 375 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 136 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 137 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 390 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 138 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 139 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ 430 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 140 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, hell: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 141 [webkit-iphone] ÔÇ║ tests\e2e\layout.spec.ts:199:5 ÔÇ║ zoom130 px, dunkel: Plan, alle Wochen mit echten Zus├ñtzen (2.6s)
+  ok 142 [webkit-iphone] ÔÇ║ tests\e2e\load-values.spec.ts:4:1 ÔÇ║ Belastungswerte speichern, Widerspr├╝che kennzeichnen und zur Automatik zur├╝ckkehren (1.8s)
+  ok 143 [webkit-iphone] ÔÇ║ tests\e2e\load-values.spec.ts:26:1 ÔÇ║ ung├╝ltige und r├╝ckdatierte Eingaben ver├ñndern keine fremden Tageswerte (709ms)
+  ok 144 [webkit-iphone] ÔÇ║ tests\e2e\readiness24.spec.ts:9:33 ÔÇ║ Ampel Heute und Coach gleich; Korrektur und Neustart bleiben konsistent (320px) (2.3s)
+  ok 145 [webkit-iphone] ÔÇ║ tests\e2e\readiness24.spec.ts:9:33 ÔÇ║ Ampel Heute und Coach gleich; Korrektur und Neustart bleiben konsistent (768px) (2.5s)
+  ok 146 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:38:1 ÔÇ║ A: angemeldeter Testnutzer, Werte, Reload, geschlossene App und neue leere Sitzung (7.3s)
+  ok 147 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:51:1 ÔÇ║ LocalStorage-Quota: bestaetigte IndexedDB-Werte ueberleben Neustart (1.1s)
+  ok 148 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:57:1 ÔÇ║ B: beide Speicher blockiert, kein falscher Erfolg; Backup rettet ungespeicherte Eingaben (1.3s)
+  ok 149 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:68:1 ÔÇ║ C: synthetisches Datei-Backup vollstaendig herunterladen und isoliert importieren (3.1s)
+  ok 150 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:73:1 ÔÇ║ D/E: mehrfaches Verschieben nimmt Beschreibung und Werte mit, auch nach Reload (7.3s)
+  ok 151 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:87:1 ÔÇ║ Netzwerk-/Datenbankfehler wird angezeigt, lokale Werte bleiben nach Reload und werden nachgesendet (6.1s)
+  ok 152 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:105:1 ÔÇ║ zwei offene Tabs behalten gleichzeitig geaenderte Einheiten nach Neustart (1.7s)
+  ok 153 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:116:1 ÔÇ║ Werte werden schon beim Tippen gespeichert, ohne das Feld vorher zu verlassen (1.1s)
+  ok 154 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:125:1 ÔÇ║ Speicherbestaetigungen bauen den eigenen Bildschirm nicht endlos neu auf (1.4s)
+  ok 155 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:143:1 ÔÇ║ Fehler beim Laden der Verbindungen endet sichtbar und wiederholt sich erst auf Wunsch (1.3s)
+  ok 156 [webkit-iphone] ÔÇ║ tests\e2e\storage-recovery24.spec.ts:157:1 ÔÇ║ Verzoegerter Speicherstart zeigt Ladestatus und wartet auf die echte App (6.7s)
+  ok 157 [webkit-iphone] ÔÇ║ tests\e2e\strength-templates.spec.ts:4:1 ÔÇ║ Kraftvorlage erstellen, bearbeiten, starten und unabh├ñngig abschlie├ƒen (4.4s)
+  ok 158 [webkit-iphone] ÔÇ║ tests\e2e\strength-templates.spec.ts:52:1 ÔÇ║ Vorlage validieren und in geplanter Krafteinheit ├╝bernehmen und speichern (2.6s)
+
+  51 skipped
+  107 passed (6.5m)

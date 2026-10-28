@@ -1,0 +1,54 @@
+{
+  "version": "3.7.1",
+  "status": "published-and-verified",
+  "authorizedByUser": true,
+  "testDeployUploaded": true,
+  "productionDeployUploaded": true,
+  "deployments": {
+    "test": {
+      "id": "c70b9d7b-7a44-4ef8-b744-2df6c3599000",
+      "status": "success",
+      "createdOn": "2026-10-24T20:31:59.233502Z"
+    },
+    "production": {
+      "id": "667f40aa-d199-45bf-bb0e-c7da4d27b923",
+      "status": "success",
+      "createdOn": "2026-10-24T20:32:38.340909Z",
+      "url": "https://coach-app-efc7.pages.dev"
+    }
+  },
+  "releaseChecks": {
+    "status": "passed",
+    "evidence": "Successful final output of the publication script supplied by Jonah; Cloudflare deployment success independently checked.",
+    "exactTestCountsProvided": false
+  },
+  "backups": [
+    {
+      "file": "data-export\\test-vor-3.7.1-2026-10-24T20-11-37-508Z.sql",
+      "bytes": 16716658,
+      "sha256": "d1495f46b00d372ab35b09b3d14c25d199f2a42b1ebbc9e7844b6f4dbd2d0a80"
+    },
+    {
+      "file": "data-export\\production-vor-3.7.1-2026-10-24T20-11-37-508Z.sql",
+      "bytes": 18124254,
+      "sha256": "4c840b2d555562b9bad848d047e6be8661e074740c3467b1cda180ea31bb0d53"
+    }
+  ],
+  "productionBackupDownloaded": true,
+  "backupRestoreChecks": "passed in local in-memory SQLite",
+  "previousLocalDiagnosticTests": {
+    "passed": 2182,
+    "skipped": 6,
+    "unhandledErrors": 0,
+    "rpcTimeouts": 0,
+    "blockedFile": "server/test/api.test.ts",
+    "exitCode": 1,
+    "publisherCasesPassed": 15
+  },
+  "sessionLimitations": [
+    "Wrangler OAuth refresh unavailable",
+    "SQL export download unavailable",
+    "local test server access denied",
+    "public app health verification unavailable"
+  ]
+}

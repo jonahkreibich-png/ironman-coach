@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-25",
+  "version": "3.7.2",
+  "originalFailure": {
+    "reportedByUser": {
+      "passed": 384,
+      "failed": 1,
+      "skipped": 113
+    },
+    "file": "tests/e2e/auftrag15-many.spec.ts",
+    "case": "n21-run-10k: alle Bildschirme sauber",
+    "engine": "WebKit",
+    "observed": "App remained empty for the 5000 ms assertion window",
+    "rootCause": "Unconfirmed: no original JavaScript exception, failed resource or current screen recorded"
+  },
+  "beforeFix": {
+    "isolatedRepeats": 6,
+    "passed": 6,
+    "failed": 0,
+    "log": "scratch/storage-many27-reproduce.log"
+  },
+  "confirmedMismatch": "Storage opening permits 10000 ms; old assertion allowed 5000 ms",
+  "changes": [
+    "Explicit loading/ready/error state after storage read and initial rendering",
+    "Visible loading status outside main app; no empty defaults on read failure",
+    "Visible module/render startup failure",
+    "Many-user test waits for ready, retains content/layout/data assertions and captures startup diagnostics"
+  ],
+  "verification": {
+    "unit": {
+      "passed": 16,
+      "files": 4,
+      "failed": 0
+    },
+    "storageBrowser": {
+      "passed": 34,
+      "failed": 0,
+      "engines": [
+        "Chromium",
+        "WebKit"
+      ],
+      "includesDelayedIndexedDBSuccess": true,
+      "log": "scratch/storage-startup27-browser-green.log"
+    },
+    "manyUsersWebKit": {
+      "passed": 15,
+      "skipped": 45,
+      "failed": 0,
+      "includesN21": true,
+      "log": "scratch/storage-many27-webkit.log"
+    },
+    "typecheck": "passed",
+    "build": "passed; existing chunk-size warning",
+    "normalHttpReleaseSuite": "pending",
+    "transport": "Isolated compiled assets with actual in-process Worker and synthetic SQLite D1"
+  },
+  "authorizationStillValid": true,
+  "published": false,
+  "productionDataModified": false,
+  "sourceHashes": {
+    "web/src/startup.ts": "cd8d225f281b5631880d9a5c5171fbfe28869e4e1390530ac2a6fda0e1d80864",
+    "web/src/bootstrap.ts": "73ccacbe41185a65c67f631ebb129726d7c25298065cb111dfd238502af1ca12",
+    "web/index.html": "017c8bb7c39521bf8db78a9272c2b5d66bc89bbfedf27b8f8ec55a2b16932aae",
+    "tests/e2e/auftrag15-many.spec.ts": "5875bb4ae331bc86bdf42fbcf2fcbc3d70748c9918f7a990acb1be2188c60d71",
+    "tests/unit/startup25.test.ts": "cf34ab9ee4e6d75985f20c7d4ac475b349668c56dd9592f00abc9b24106e650c"
+  }
+}

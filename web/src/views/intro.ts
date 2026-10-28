@@ -1,3 +1,4 @@
+import { storage as localStorage } from "../persistence";
 /* Einfacher Start für neue Tester (Auftrag 5 E3/E4/E6):
    - Einladung als Link (…/?invite=ABCD-EFGH): Antippen, Name eingeben, fertig. Auf dem iPhone in Safari zuerst die App auf den
      Home-Bildschirm legen; die installierte App teilt sich den Speicher nicht mit Safari, deshalb kopiert die App den Code und

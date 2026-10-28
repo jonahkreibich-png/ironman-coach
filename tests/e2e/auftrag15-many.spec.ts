@@ -3,7 +3,8 @@
    Berücksichtigungen. Geprüft: nichts ragt aus dem Bildschirm, keine Fehler in der Konsole, keine Betreiber-Infos oder Fachbegriffe wie
    Server/API/Secret, zentrales Lexikon separat geprüft, Ampel-Farbe passt zum Wert, keine nicht gewählte Sportart im Plan der nächsten Tage.
    Chromium für alle 60, WebKit (iPhone) für jeden vierten. */
-import { test, expect, type Page } from '@playwright/test';
+import {test,expect} from './storage-harness';
+import {type Page} from '@playwright/test';
 import { manyUsers, MANY_TODAY } from '../../fixtures/manyusers';
 import { simulate } from '../helpers/many-sim';
 // Zentrales Lexikon statt Erklärblöcken je Karte: siehe lexikon.spec.ts.
@@ -46,9 +47,18 @@ for (const [i, u] of USERS.entries()) {
       localStorage.setItem('ec_plan', p as string); localStorage.setItem('ec_state_v2', s as string); sessionStorage.setItem('__m', '1');
     }, [JSON.stringify(sim.plan), JSON.stringify(st)]);
     await page.clock.setFixedTime(new Date(`${today}T07:30:00+01:00`));
+    const failedRequests: string[] = [];
+    page.on('requestfailed', r => failedRequests.push(r.url()+': '+r.failure()?.errorText));
     const found: string[] = [];
     for (const sc of SCREENS) {
       await page.goto('/?go=' + sc);
+      try {
+        await expect(page.locator('#app'), 'App bereit: '+sc).toHaveAttribute('data-app-state','ready',{timeout:15000});
+      } catch(error) {
+        const startup=await page.locator('#app').evaluate(el=>({state:el.getAttribute('data-app-state'),phase:el.getAttribute('data-app-error')})).catch(()=>null);
+        await test.info().attach('Startdiagnose-'+sc,{body:JSON.stringify({screen:sc,url:page.url(),startup,errors,failedRequests},null,2),contentType:'application/json'});
+        throw error;
+      }
       await expect(page.locator('#app')).not.toBeEmpty();
       await page.waitForTimeout(80);
       (await problems(page)).forEach(p => found.push(`${sc}: ${p}`));

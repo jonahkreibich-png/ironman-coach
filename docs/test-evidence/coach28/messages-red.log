@@ -1,0 +1,82 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/analysis.test.ts (37 tests | 4 failed | 33 skipped) 5ms
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-09-21: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-09-25: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-09-30: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-10-03: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-10-06: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-10-09: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-10-11: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 2026-10-13: l├ñuft, h├Âchstens 3 Top-Erkenntnisse, jede mit Begr├╝ndung und Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > w├ñhrend der Erk├ñltung (9.10.) steht die Krankheit oben
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 13.10.: Wiedereinstieg und gesunkene Fitness werden erkannt, keine ├£berlastung
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 13.10.: Belastung entspricht intervals.icu (CTL 22, ATL 3)
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > nach der Krankheit hei├ƒt es ÔÇ×noch nicht ganz erholtÔÇ£ statt ÔÇ×Erm├╝dung steigtÔÇ£
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Ende September (Schnupfen, Ruhepuls hoch) erkennt die Analyse Erm├╝dung
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > aerobe Effizienz aus den Lauf-Feldern, mit Bezug zum Ziel 4:30/km bei Puls 120
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Technik-Problem aus der Schwimm-Notiz wird zum Tipp
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Entkopplung der l├ñngeren Einheiten wird bewertet
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > ausgelassene Einheiten (ohne Krankheitstage) werden gez├ñhlt
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > 3 lockere L├ñufe in Folge mit zu hohem Puls ÔåÆ Erkenntnis mit Puls-Grenze 155 (aerobe Schwelle)
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > ÔÇª und kleine ├änderung automatisch: Puls-Grenze im n├ñchsten lockeren Lauf, mit Mitteilung und R├╝ckg├ñngig-Bezug
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > ÔÇª die automatische ├änderung kommt nur einmal
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > lockere L├ñufe mit Puls unter 155: keine Warnung
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > ACWR ├╝ber 1,5 ÔåÆ ÔÇ×Belastung steigt zu schnellÔÇ£ ganz oben
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Gef├╝hl ÔÇ×sehr m├╝deÔÇ£ und hohe RPE bei lockeren Einheiten ÔåÆ ÔÇ×Einheiten f├╝hlen sich schwer anÔÇ£
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > mehrere M├╝digkeitszeichen ÔåÆ Vorschlag: n├ñchste Woche 15 % leichter (nicht automatisch)
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > ÔÇª Annehmen k├╝rzt die Ausdauer-Einheiten der n├ñchsten Woche, Lernstufen bleiben
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Schwimm-Fortschritt aus den Feldern: Kraul am St├╝ck von 12,5 m auf 25 m
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Wochen-Ausl├Âser schreibt ÔÇ×Was der Coach gerade siehtÔÇ£ als Nachricht
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Ansicht in der App: keine Lob-Nachrichten, nur Warnungen
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > Top 3: h├Âchstens 2 Erkenntnisse derselben Art
+   Ôåô Analyse mit echten Daten (30 F├ñlle) > automatische ├änderungen verschieben, streichen oder versch├ñrfen nie etwas
+   Ôåô Analyse: Grundtests (ohne echte Daten) > neuer Nutzer ohne Daten: kein Fehler
+   Ôåô Analyse: Grundtests (ohne echte Daten) > zu wenig Schlaf wird erkannt
+   Ôåô Analyse: Grundtests (ohne echte Daten) > Krankheit hat Vorrang vor allem
+   ├ù Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > alte dreifache Hinweise werden ueberholt, Text bleibt kurz, Details bleiben separat 4ms
+     ÔåÆ (0 , swimReviewMessages) is not a function
+   ├ù Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > unveraenderter Anlass erzeugt keine neue ID; irrelevante Daten erneuern nur den Leseschutz 0ms
+     ÔåÆ (0 , swimReviewMessages) is not a function
+   ├ù Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > abgelehnter Anlass bleibt erledigt, veraenderter Vorschlag ist neuer Anlass 0ms
+     ÔåÆ (0 , swimReviewMessages) is not a function
+   ├ù Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > korrigierte Daten lassen offene alte Vorschlaege nicht als aktuelle Fakten stehen 0ms
+     ÔåÆ (0 , swimReviewMessages) is not a function
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 4 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/analysis.test.ts > Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > alte dreifache Hinweise werden ueberholt, Text bleibt kurz, Details bleiben separat
+TypeError: (0 , swimReviewMessages) is not a function
+ ÔØ» tests/unit/analysis.test.ts:104:284
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/4]ÔÄ»
+
+ FAIL  tests/unit/analysis.test.ts > Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > unveraenderter Anlass erzeugt keine neue ID; irrelevante Daten erneuern nur den Leseschutz
+TypeError: (0 , swimReviewMessages) is not a function
+ ÔØ» tests/unit/analysis.test.ts:105:141
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/4]ÔÄ»
+
+ FAIL  tests/unit/analysis.test.ts > Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > abgelehnter Anlass bleibt erledigt, veraenderter Vorschlag ist neuer Anlass
+TypeError: (0 , swimReviewMessages) is not a function
+ ÔØ» tests/unit/analysis.test.ts:106:126
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[3/4]ÔÄ»
+
+ FAIL  tests/unit/analysis.test.ts > Synthetische Schwimmhinweise: ein Anlass, ein offener Hinweis > korrigierte Daten lassen offene alte Vorschlaege nicht als aktuelle Fakten stehen
+TypeError: (0 , swimReviewMessages) is not a function
+ ÔØ» tests/unit/analysis.test.ts:107:132
+
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[4/4]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 33 skipped (37)
+   Start at  21:55:09
+   Duration  1.09s (transform 558ms, setup 20ms, collect 805ms, tests 5ms, environment 0ms, prepare 98ms)
+

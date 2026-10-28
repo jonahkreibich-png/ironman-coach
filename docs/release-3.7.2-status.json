@@ -1,0 +1,43 @@
+{
+  "version": "3.7.2",
+  "date": "2026-10-25",
+  "status": "published-and-verified",
+  "authorizedByUser": true,
+  "testDeployUploaded": true,
+  "productionDeployUploaded": true,
+  "deployments": {
+    "test": {
+      "id": "f5396d83-919a-4673-94c3-7a87fa83b379",
+      "createdOn": "2026-10-25T11:33:16.390708Z",
+      "status": "success",
+      "url": "https://f5396d83.stamio-test.pages.dev"
+    },
+    "production": {
+      "id": "e201c835-7591-41a9-946e-5640ec9fa2c6",
+      "createdOn": "2026-10-25T11:34:06.067277Z",
+      "status": "success",
+      "url": "https://e201c835.coach-app-efc7.pages.dev"
+    }
+  },
+  "releaseChecks": {
+    "status": "passed",
+    "evidence": "Successful final publication-script output supplied by Jonah; local last-run.json passed; both Cloudflare deployment statuses independently verified.",
+    "exactFinalTestCountsProvided": false,
+    "liveHtmlAssetAndServiceWorkerHashes": "Verified by publication script according to successful final output; local network prevented independent live content fetch."
+  },
+  "backups": [
+    {
+      "file": "data-export/production-vor-3.7.2-2026-10-25T11-10-50-562Z.sql",
+      "bytes": 21030366,
+      "sha256": "f5b27dca686dd290d0df72ff3038bada8cee373059cc6c76dcacc263092b78db"
+    },
+    {
+      "file": "data-export/test-vor-3.7.2-2026-10-25T11-10-50-562Z.sql",
+      "bytes": 19478167,
+      "sha256": "996e36293482dd19b168544dd9500047209040f7977c9b101944b499dd3e490b"
+    }
+  ],
+  "backupRestoreChecks": "Both exports independently restored and integrity-checked in local in-memory SQLite",
+  "productionTrainingDataEditedByAssistant": false,
+  "productionDataMigrationPerformed": false
+}

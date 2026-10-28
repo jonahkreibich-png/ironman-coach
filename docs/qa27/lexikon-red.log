@@ -1,0 +1,68 @@
+
+Running 2 tests using 1 worker
+
+
+
+(node:22272) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/2] [chromium-iphone] ÔÇ║ tests\e2e\lexikon.spec.ts:4:1 ÔÇ║ Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar
+  1) [chromium-iphone] ÔÇ║ tests\e2e\lexikon.spec.ts:4:1 ÔÇ║ Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-sub="strength"]')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('[data-sub="strength"]') with timeout 5000ms
+      - waiting for locator('[data-sub="strength"]')
+
+
+      4 | test('Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar', async ({ page }) => {
+      5 |   await seed(page); await open(page, '/?go=mehr');
+    > 6 |   await expect(page.locator('[data-sub="strength"]')).toBeVisible();
+        |                                                       ^
+      7 |   await page.locator('[data-sub="lexikon"]').click();
+      8 |   await expect(page.locator('.top-title')).toHaveText('Begriffe / Lexikon');
+      9 |   const cards = page.locator('[data-lexicon-term]');
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\tests\e2e\lexikon.spec.ts:6:55
+
+    Error Context: scratch\test-results\lexikon27\lexikon-Mehr-├Âffnet-durchs-8e4ab-vorlagen-bleiben-erreichbar-chromium-iphone\error-context.md
+
+
+(node:3544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/2] [webkit-iphone] ÔÇ║ tests\e2e\lexikon.spec.ts:4:1 ÔÇ║ Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar
+  2) [webkit-iphone] ÔÇ║ tests\e2e\lexikon.spec.ts:4:1 ÔÇ║ Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-sub="strength"]')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('[data-sub="strength"]') with timeout 5000ms
+      - waiting for locator('[data-sub="strength"]')
+
+
+      4 | test('Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar', async ({ page }) => {
+      5 |   await seed(page); await open(page, '/?go=mehr');
+    > 6 |   await expect(page.locator('[data-sub="strength"]')).toBeVisible();
+        |                                                       ^
+      7 |   await page.locator('[data-sub="lexikon"]').click();
+      8 |   await expect(page.locator('.top-title')).toHaveText('Begriffe / Lexikon');
+      9 |   const cards = page.locator('[data-lexicon-term]');
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\tests\e2e\lexikon.spec.ts:6:55
+
+    Error Context: scratch\test-results\lexikon27\lexikon-Mehr-├Âffnet-durchs-8e4ab-vorlagen-bleiben-erreichbar-webkit-iphone\error-context.md
+
+
+  2 failed
+    [chromium-iphone] ÔÇ║ tests\e2e\lexikon.spec.ts:4:1 ÔÇ║ Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar 
+    [webkit-iphone] ÔÇ║ tests\e2e\lexikon.spec.ts:4:1 ÔÇ║ Mehr ├Âffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar 

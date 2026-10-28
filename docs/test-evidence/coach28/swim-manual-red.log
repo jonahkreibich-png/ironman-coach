@@ -1,0 +1,48 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ ÔØ» tests/unit/swim-evidence.test.ts (12 tests | 1 failed) 14ms
+   Ô£ô Korrigierte Schwimmnachweise > abgeleitete 100 m werden bei korrigiertem Ergebnis zu 50 m 2ms
+   Ô£ô Korrigierte Schwimmnachweise > geloeschte Nachweise entfernen die abgeleitete Behauptung 0ms
+   Ô£ô Korrigierte Schwimmnachweise > verbleibender echter 100-m-Nachweis haelt die 100 m 0ms
+   Ô£ô Korrigierte Schwimmnachweise > urspruengliche eigene Angabe bleibt nach Loeschung erhalten 0ms
+   Ô£ô Korrigierte Schwimmnachweise > manuelle Profilkorrektur bleibt auch bei wiederholtem Scan geschuetzt 0ms
+   Ô£ô Korrigierte Schwimmnachweise > direkte Coachangabe wird durch spaetere leere Scans nicht entfernt 0ms
+   Ô£ô Korrigierte Schwimmnachweise > Korrektur erstellt sichere Vorschlaege fuer kuenftige Lern- und normale Einheiten 3ms
+   Ô£ô Korrigierte Schwimmnachweise > Pull-Korrektur und manuelle Kraul-Angabe werden getrennt behandelt 0ms
+   Ô£ô Korrigierte Schwimmnachweise > neue Vorschlaege verwenden aktuelles Material und Becken statt altem Einheit-Kontext 1ms
+   Ô£ô Korrigierte Schwimmnachweise > unklare alte 100 m werden nur als pruefbarer 50-m-Vorschlag angeboten 1ms
+   Ô£ô Korrigierte Schwimmnachweise > Legacy-Pruefung erfindet bei leeren Ergebnissen oder eigenen neueren Angaben keine Korrektur 0ms
+   ├ù aktive eigene Trainings├ñnderungen bleiben bei neuer Schwimmstufe erhalten 6ms
+     ÔåÆ expected [ 'manual', 'undone', 'ordinary' ] to deeply equal [ 'undone', 'ordinary' ]
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ» Failed Tests 1 ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»
+
+ FAIL  tests/unit/swim-evidence.test.ts > aktive eigene Trainings├ñnderungen bleiben bei neuer Schwimmstufe erhalten
+AssertionError: expected [ 'manual', 'undone', 'ordinary' ] to deeply equal [ 'undone', 'ordinary' ]
+
+- Expected
++ Received
+
+  [
++   "manual",
+    "undone",
+    "ordinary",
+  ]
+
+ ÔØ» tests/unit/swim-evidence.test.ts:132:50
+    130|  const update=swimSkillUpdate(profile,weeks,adjustments,today,{crawl:1ÔÇª
+    131|  expect(update?.skills.swimCrawlM).toBe(100);
+    132|  expect(update?.adjustments.map(a=>a.sessionId)).toEqual(['undone','orÔÇª
+       |                                                  ^
+    133|  const explicit=swimSkillUpdate(profile,weeks,adjustments,today,{crawlÔÇª
+    134|  expect(explicit?.skills.swimCrawlM).toBe(100);
+
+ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/1]ÔÄ»
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+   Start at  21:58:42
+   Duration  594ms (transform 225ms, setup 21ms, collect 304ms, tests 14ms, environment 0ms, prepare 95ms)
+

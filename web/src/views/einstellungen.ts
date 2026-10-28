@@ -1,3 +1,4 @@
+import { storage as localStorage } from "../persistence";
 /* Einstellungen: Darstellung, Heute-Ansicht, Zonen und Schwellen, Ampel-Rückfallwerte, Mitteilungen, Krankheitsphasen,
    KI-Coach (Schalter, Einwilligung, Budget, Kosten) und die manuelle Score-Korrektur. */
 import { STATE, UI, saveState, saveUi, profile, saveProfile } from '../store';

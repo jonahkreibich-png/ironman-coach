@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-27",
+  "version": "3.8.0",
+  "reportedFailures": 14,
+  "rootCause": "Dashboard Unicode chevron glyph exceeds its flex box; title word splits at 300 CSS px",
+  "fix": [
+    "fixed-width existing SVG chevron",
+    "separate flexible label with responsive font size",
+    "CSS icon orientation driven by aria-expanded"
+  ],
+  "tests": {
+    "initialRegression": {
+      "failed": 1,
+      "project": "webkit-iphone"
+    },
+    "focusedRegression": {
+      "passed": 2
+    },
+    "browserFull": {
+      "passed": 69,
+      "skipped": 51,
+      "failed": 0,
+      "exitCode": 0,
+      "durationMinutes": 6,
+      "existingWebKitLayoutCases": 51,
+      "reportedCasesNowPassing": 14
+    },
+    "unit": {
+      "passed": 11,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "build": "passed",
+    "diffCheck": "passed"
+  },
+  "existingLayoutAssertionsChanged": false,
+  "localHttpProbe": "EACCES",
+  "deployed": false,
+  "productionDataChanged": false,
+  "sourceHashes": {
+    "web/src/views/plan-dashboard27.ts": "5c07def4be9b0d06924ffae87642c8126d4eb33847738bc2422308b9c1a0d3c6",
+    "web/src/views/plan.ts": "53aa9902fb8c47f922bf1f4a3416680c68961de516fb6d514bbf2446de04b185",
+    "web/src/styles.css": "a93335a9eb15eba7ec4bf805fd555412a4e6cd86eb2ad067e6abb4f6feb8cbf8",
+    "tests/e2e/layout.spec.ts": "ea5f4207e13d437e9eaf17e79048c9252c54dea2a96a74159c04a070685dfddb",
+    "tests/e2e/dashboard-title27.spec.ts": "2c3cd0181290bef85f4aebb7d6394852f0584cfb318be53cd4229a7771c94c04"
+  }
+}

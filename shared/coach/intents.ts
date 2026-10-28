@@ -35,6 +35,7 @@ function lev(a: string, b: string): number {
 const NEAR_REAL = new Set(['gedicht', 'gedichte', 'ueber', 'geduld', 'gericht', 'gerichte']);
 function wordHit(tok: string, key: string): boolean {
   if (tok === key) return true;
+  if(['schmerz','schmerzen','beschwerden'].includes(key) && tok.includes(key))return true;
   if (NEAR_REAL.has(tok)) return false;
   if (key.length >= 4 && tok.startsWith(key)) return true;
   if (key.length >= 5 && tok.length >= 5 && lev(tok.slice(0, key.length + 1), key) <= 1) return true;
@@ -121,7 +122,7 @@ export const INTENTS: Intent[] = [
       if (!toDate) return 'Auf welchen Tag soll ich sie verschieben? Schreib zum Beispiel „Verschieb den langen Lauf auf Sonntag“.';
       const w = weeksOf(ctx).find((x: any) => x.days.some((d: any) => d.date === toDate));
       const cands = (w ? w.days : []).filter((d: any) => d.date >= ctx.today && d.date !== toDate).flatMap((d: any) => live(d).map((s: any) => ({ s, date: d.date })))
-        .filter(x => (!sport || x.s.sport === sport) && (!long || C.isLong(x.s) || /lang/i.test(x.s.title)) && !x.s.fixed && !x.s.race && !((ctx.state.sessions || {})[x.s.id] || {}).completed);
+        .filter(x => !ctx.state.sessions?.[x.s.id]?.completed && (!sport || x.s.sport === sport) && (!long || C.isLong(x.s) || /lang/i.test(x.s.title)) && !x.s.fixed && !x.s.race && !((ctx.state.sessions || {})[x.s.id] || {}).completed);
       const c = cands[0];
       if (!c) return `In der Woche von ${fmtD(toDate)} finde ich keine passende Einheit zum Verschieben.`;
       const g = gid();
@@ -241,6 +242,7 @@ export function understand(ctx: EngineCtx, text: string, extra: Extra = {}): Cha
   }
   const toks = norm(raw).split(' ').filter(Boolean);
   if (!toks.length) return helpText();
+  const choice=trainingChoice(ctx,raw);if(choice)return choice;
   for (const it of INTENTS) {
     try {
       if (!it.when(toks, norm(raw))) continue;
@@ -253,3 +255,28 @@ export function understand(ctx: EngineCtx, text: string, extra: Extra = {}): Cha
 void GOALS; void A;
 /* Für die Gesprächsführung (shared/coach/dialog.ts) */
 export { has, wordHit, dayIn, sportIn, bodyIn, weeksOf, dayOf, live, fmtD, sessLine, easyToday, helpText };
+
+/** Alternative Sportarten beantworten, ohne die Frage in eine allgemeine Plananalyse umzudeuten. */
+export function trainingChoice(ctx: EngineCtx, text: string): ChatReply | null {
+ const raw=norm(text),toks=raw.split(' ');
+ if(painMention(toks))return null;
+ if(!/\boder\b/.test(raw)||!(/\bsoll\b|lieber|sinnvoller|besser/.test(raw)))return null;
+ const sports=SPORT_WORDS.filter(([words])=>has(toks,words)).map(([,sport])=>sport);
+ if(new Set(sports).size<2)return null;
+ const date=dayIn(toks,ctx.today)||ctx.today;
+ const reply=(text:string):ChatReply=>({intent:'sport-choice',text});
+ if(C.illnessAt(ctx.state.illnessPeriods||[],date))return reply('Ich empfehle dir Pause: Fuer diesen Tag bist du als krank eingetragen.');
+ const day=dayOf(ctx,date);if(!day)return reply(`Fuer ${fmtD(date)} liegt mir kein Plan vor. Wie fuehlst du dich, und welches Training hast du zuletzt gemacht?`);
+ const planned=live(day).filter((s:any)=>!(ctx.state.sessions?.[s.id]?.completed||ctx.state.sessions?.[s.id]?.skipped));
+ if(!planned.length)return reply(`Am ${fmtD(date)} empfehle ich dir Ruhetag, wie geplant. Erholung hat hier Vorrang.`);
+ const candidates=planned.filter((s:any)=>sports.includes(s.sport)&&(ctx.profile.sports||[]).includes(s.sport));
+ if(!candidates.length)return reply(`Fuer ${fmtD(date)} steht ${joinDe(planned.map(sessLine))} im Plan. Moechtest du diese Einheit ersetzen, oder zusaetzlich trainieren?`);
+ const readiness=date===ctx.today?readinessOf(ctx):null;
+ if(readiness?.level===2)return reply('Ich empfehle heute Pause oder ruhige Alltagsbewegung: Deine Trainingsampel ist rot.');
+ const chosen=(readiness?.level===1?candidates.find((s:any)=>!C.isHard(s)):null)||candidates[0];
+ const name=chosen.sport==='run'?'Laufen':chosen.sport==='swim'?'Schwimmen':chosen.sport==='bike'?'Radfahren':'Krafttraining';
+ return reply(`Fuer ${fmtD(date)} empfehle ich ${name}: Dafuer ist bereits ${sessLine(chosen)} vorgesehen.${readiness?.level===1?' Wegen der gelben Ampel nur locker.':date>ctx.today?' Beruecksichtige vorher noch deine Tagesform und eventuelle Beschwerden.':''}`);
+}
+
+/** Gemeinsame bestehende Schmerzerkennung fuer Dialog und Sportwahl. */
+export function painMention(toks:string[]):boolean {const body=bodyIn(toks);return !!((body && has(toks, ['schmerz', 'schmerzen', 'weh', 'zwickt', 'zieht', 'tut', 'verletzt', 'probleme', 'beschwerden', 'entzuendet', 'umgeknickt', 'gezerrt', 'zerrung'])) || has(toks, ['verletzt', 'verletzung', 'umgeknickt', 'zerrung', 'gezerrt', 'schmerzen', 'schmerz']));}

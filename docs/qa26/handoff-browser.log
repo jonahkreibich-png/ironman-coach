@@ -1,0 +1,22 @@
+
+Running 6 tests using 1 worker
+
+
+
+(node:24044) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/6] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:45:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[2/6] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:68:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+(node:2132) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[3/6] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:45:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[4/6] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:68:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+(node:24856) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[5/6] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:45:1 ÔÇ║ Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand
+[6/6] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:68:1 ÔÇ║ Zusatzentwurf: Vorlage sichtbar, ueber Wochen verschieben, Istwert am neuen Tag und Neustart
+  6 passed (26.2s)

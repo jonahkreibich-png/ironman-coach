@@ -1,0 +1,31 @@
+
+Running 15 tests using 1 worker
+
+
+
+(node:27000) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/15] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[2/15] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[3/15] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[4/15] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[5/15] [chromium-desktop] ÔÇ║ tests\e2e\plan-templates26.spec.ts:37:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+
+(node:19180) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[6/15] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[7/15] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[8/15] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[9/15] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[10/15] [chromium-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:37:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+
+
+(node:3660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[11/15] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ swim: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[12/15] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ bike: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[13/15] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ run: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[14/15] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:18:53 ÔÇ║ strength: Vorlage ersetzt/ergaenzt dieselbe ID und erstellt unabhaengige neue Einheit
+[15/15] [webkit-mobile] ÔÇ║ tests\e2e\plan-templates26.spec.ts:37:1 ÔÇ║ verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu laden
+  15 passed (1.8m)

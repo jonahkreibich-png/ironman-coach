@@ -1,3 +1,4 @@
+import { storage as localStorage } from "../persistence";
 /* Auftrag 13, Punkt 3: Trends im Fortschritt. Rechnung in shared/trends.ts, hier nur Anzeige:
    Zeitraum wählen, je Gruppe Karten mit großer Zahl, Veränderung und einem Satz; Antippen zeigt den Verlauf. */
 import { STATE, PLAN, BASE_WEEKS } from '../store';

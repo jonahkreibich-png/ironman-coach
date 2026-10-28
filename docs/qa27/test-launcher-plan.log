@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "checks"
+  },
+  {
+    "kind": "backup",
+    "target": "test",
+    "file": "C:\\Users\\Anwender\\Downloads\\ironman-coach-app\\ironman-coach\\data-export\\test-vor-plan-c-2026-10-27T14-31-08-880Z.sql"
+  },
+  {
+    "kind": "validate",
+    "target": "test",
+    "file": "C:\\Users\\Anwender\\Downloads\\ironman-coach-app\\ironman-coach\\data-export\\test-vor-plan-c-2026-10-27T14-31-08-880Z.sql"
+  },
+  {
+    "kind": "deploy",
+    "target": "test"
+  },
+  {
+    "kind": "verify",
+    "target": "test"
+  }
+]
+
+Ergebnis steht in PLAN-C-STATUS.txt.
+Dr�cken Sie eine beliebige Taste . . . 

@@ -1,0 +1,36 @@
+
+Running 1 test using 1 worker
+
+(node:12656) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [webkit-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten (431ms)
+
+
+  1) [webkit-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten 
+
+    Error: width=300,dark=false,expanded=true
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 4
+
+    - Array []
+    + Array [
+    +   "Word breaks: Trainingsdashboard",
+    +   "Text exceeds own or button box",
+    + ]
+
+      23 |     return problems;
+      24 |    });
+    > 25 |    expect(problems,'width='+width+',dark='+dark+',expanded='+expanded).toEqual([]);
+         |                                                                        ^
+      26 |    await expect(button).toBeVisible();await expect(page.locator('#plan-dashboard-body')).toBeVisible({visible:expanded});
+      27 |   }
+      28 |  }
+        at C:\Users\Anwender\Downloads\ironman-coach-app\ironman-coach\tests\e2e\dashboard-title27.spec.ts:25:72
+
+    Error Context: scratch\layout-dashboard27\results\dashboard-title27-Dashboar-5e239-il-bleibt-im-eigenen-Kasten-webkit-iphone\error-context.md
+
+  1 failed
+    [webkit-iphone] ÔÇ║ tests\e2e\dashboard-title27.spec.ts:4:1 ÔÇ║ Dashboardtitel bleibt bei 300/320px und Zoom ganz lesbar, Pfeil bleibt im eigenen Kasten 

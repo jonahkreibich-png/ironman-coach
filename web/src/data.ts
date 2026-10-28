@@ -1,5 +1,7 @@
+import {effectiveCustomWorkouts} from './store';
 /* Abgeleitete Daten für die Bildschirme, pro Zeichnen einmal berechnet. */
 import * as C from '../../shared/core';
+import { readinessInputs, readinessSnapshot } from '../../shared/readiness';
 import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon } from './store';
 import { todayStr } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
@@ -28,7 +30,7 @@ export function prognosisFor(goal: Goal, date: string): Prognosis | null {
   } catch (e) { return null; }
 }
 export function invalidate() { cache = null; }
-export function D(): Derived { if (!cache) { cache = compute(); afterCompute(cache); } return cache; }
+export function D(): Derived { if (!cache || cache.today !== todayStr()) { cache = compute(); afterCompute(cache); } return cache; }
 
 /* Etappenziele merken und erreichte im Coach melden (Auftrag 12). Die neue Score-Skala erklärt „Neu in dieser Version“. */
 function afterCompute(d: Derived) {
@@ -73,7 +75,7 @@ function planFacts(goal: Goal | null, today: string): PlanFacts {
     if (s.sport === 'run' && !C.isHard(s)) out.longRunPlanned = Math.max(out.longRunPlanned || 0, s.plannedMinutes || 0);
     if (s.sport === 'bike' && !C.isHard(s)) out.longRidePlanned = Math.max(out.longRidePlanned || 0, s.plannedMinutes || 0);
   });
-  Object.entries(STATE.customWorkouts || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => { if (d >= C.addDays(today, -84) && d < today && /koppel|brick/i.test(w.title || '')) out.bricksDone!++; }));
+  Object.entries(effectiveCustomWorkouts() || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => { if (d >= C.addDays(today, -84) && d < today && /koppel|brick/i.test(w.title || '')) out.bricksDone!++; }));
   return out;
 }
 
@@ -82,9 +84,8 @@ function compute(): Derived {
   const prof = profile();
   const gl = goals();
   const goal = mainGoal(gl, today);
-  const fallback: any = { ...(STATE.settings.readiness || {}), sleepNeed: sleepNeed(prof, today) };
-  try { const L = C.loadBaseline(STATE, PLAN.weeks || [], today); fallback.load = L.ctl != null && L.atl != null ? { ctl: L.ctl, atl: L.atl } : null; } catch (e) { fallback.load = null; }
-  const readiness = C.readinessFor(STATE.trend, STATE.illnessPeriods, today, fallback);
+  const fallback = readinessInputs(STATE, PLAN.weeks || [], prof, today);
+  const readiness = readinessSnapshot(STATE, PLAN.weeks || [], prof, today);
   const history = C.readinessHistory(STATE.trend, STATE.illnessPeriods, today, 14, fallback);
   const ill = C.illnessAt(STATE.illnessPeriods, today);
   const ret = returnPhase(today);
@@ -107,7 +108,7 @@ function compute(): Derived {
   return {
     today, profile: prof, goals: gl, goal, minor: isMinor(prof, today), age: ageOf(prof, today), fallback, readiness, history, ill, ret,
     activities: acts, scores, form, prognosis: prog, raceGoal: raceModeGoal(gl, today), recentRace: recentRace(gl, today), loadsBySport,
-    engine: { today, now: Date.now(), state, baseWeeks: BASE_WEEKS, planMeta: PLAN.meta || {}, profile: prof, goals: gl }
+    engine: { readinessSnapshot: readiness, today, now: Date.now(), state, baseWeeks: BASE_WEEKS, planMeta: PLAN.meta || {}, profile: prof, goals: gl }
   };
 }
 

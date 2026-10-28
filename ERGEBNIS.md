@@ -1,4 +1,139 @@
+# Freigabe erteilt, Produktionssicherung blockiert – 28.10.2026
+
+Jonah hat nach erfolgreicher Testbereitstellung 7d138192 die Produktionsveroeffentlichung beauftragt. Gespeichertes Gesamtprotokoll geprueft: 2398 Unit-/Servertests und 449 Browserpruefungen bestanden. Testsicherung erneut lokal validiert.
+
+Produktionssicherung versucht; Wrangler kann api.cloudflare.com beziehungsweise dash.cloudflare.com aus dieser Sitzung nicht per DNS aufloesen. Kein Produktionsdeploy. Der vorhandene vollstaendige Freigabehelfer muss in normaler PowerShell laufen; Befehl in FUER-JONAH.md. Freigabe liegt vor.
+
+Vorheriger Stand:
+
+# Dropbox-Testfehler korrigiert – 28.10.2026
+
+Testende lief vor abgeschlossenem Status-Neuladen; API-Antwort konnte bereits freigegeben sein. Bestehender Test wartet jetzt auf den vollstaendigen Fehlerablauf und beendet Handler geordnet. Alle bisherigen Assertions bleiben erhalten, Produktcode unveraendert.
+
+Dropbox zehnmal bestanden; gesamte Datei 3 bestanden/1 bestehender Skip, Typecheck/Build bestanden. Isolierter Browsertransport, kein neuer vollstaendiger Standardlauf und kein Deploy. Vorhandenen Testseiten-Helfer ausserhalb der Sitzung erneut starten. Details: docs/dropbox-testfix-2026-10-28.md.
+
+Vorheriger Stand:
+
+# Coach-Auftrag lokal umgesetzt – 28.10.2026
+
+Tatsaechliche Kraftuebungen/Bereiche haben Vorrang vor dem geplanten Titel. Kraul mit und ohne Pull Buoy wird getrennt und aus denselben Nachweisen ausgewertet. Schwimmhinweise werden zusammengefasst; abgelehnte Anlaesse bleiben erledigt, ueberholte Hinweise gekennzeichnet. Direkte Sportwahlfragen erhalten eine kurze Antwort; Beschwerden bleiben vorrangig.
+
+Scorequellen und Schutz manueller/absolvierter Einheiten korrigiert. Reine Profilscores heissen Schaetzwert; keine neue Skala und keine erfundene Genauigkeit. Ein einmaliger 100-m-Rekord kann weiterhin eine erst mit zwei Einheiten bestaetigte Stufe von 50 m haben.
+
+107 Browserpruefungen plus 10 nach endgueltiger Uebernahme, 632 gezielte Unit-/Serverpruefungen und zuletzt 214 Serverpruefungen bestanden. Typecheck/Build bestanden. Der breite Lauf hatte 2325 bestandene Tests und den anschliessend behobenen roten Race-Test; die regulaere HTTP-API-Suite bleibt blockiert. Kein vollstaendiges Standardgruen. Details und Protokolle: docs/coach-analyse-2026-10-28.md. Keine Produktionsdaten oder Deployments veraendert. Neuer Coach-Auftrag besitzt noch keine Produktionsfreigabe. Fruehere Freigabehinweise unten beziehen sich auf vorherige Auftraege.
+
+Vorherige Ergebnisse:
+
+# Layoutfehler vor Freigabe behoben (27.10.2026)
+
+Alle 14 gemeldeten Fehler kamen vom neuen Dashboard-Schalter: Pfeil und Titel passten bei 320/300 CSS-Pixeln in WebKit nicht in ihren Platz. SVG-Pfeil mit fester Breite und passend umbrechender Titel beheben die Ursache. Keine Speicher- oder Datenbankaenderung.
+
+69 gezielte Browserpruefungen bestanden, darunter alle 51 bestehenden WebKit-Layoutfaelle; elf Unitpruefungen, Typecheck und Build bestanden. Keine bestehenden Layoutassertions abgeschwaecht. Noch nicht veroeffentlicht: lokale HTTP-Probe bleibt EACCES; bestehender vollstaendiger Freigabehelfer muss ausserhalb dieser Sitzung laufen. Jonahs Freigabe liegt vor. Details: docs/dashboard-layoutfix-2026-10-27.md.
+
+# Lokal fertig, noch nicht veroeffentlicht: 3.8.0 (27.10.2026)
+
+Dashboard einklappbar, kryptische Istkurzform entfernt; Extraeinheiten direkt mit sportartspezifischen Werten, Kraft ohne Kilometer. Fehlgeschlagene Speicherungen behalten bei Wiederholung ihre neuen Eintraege. Formularabschluss verliert keinen neuen Entwurf.
+
+111 gezielte Browserpruefungen bestanden; Typecheck/Build und 2301 Unit-/Servertests bestanden. Eine weitere API-Suite bleibt wegen gesperrtem lokalen HTTP-Zugriff blockiert. Der Releasehelfer hat deshalb vor Backup und Deployment abgebrochen. Jonahs Freigabe liegt vor; den verbleibenden Befehl zeigt FUER-JONAH.md. Details: docs/dashboard-extra-2026-10-27.md.
+
+# Lexikon-Testfehler korrigiert - 27.10.2026
+
+Die zwei Fehler aus Jonahs 419/113/2-Lauf wurden reproduziert. Der Test erwartete noch den alten direkten Kraftvorlagen-Menuepunkt. Er prueft jetzt den echten Weg Mehr -> Trainingsvorlagen -> bestehende Kraftvorlagen. Alle Lexikonpruefungen bleiben erhalten; gespeicherte Kraftvorlage zusaetzlich auf unveraenderten Inhalt geprueft.
+
+Sechs gezielte Browserpruefungen in Chromium/WebKit bestanden, ebenso Typecheck und Build. Kein Produktcode veraendert, keine Veroeffentlichung. Den vorhandenen Teststarter in normaler PowerShell erneut starten; Ablauf und Standardtest-Gates unveraendert. Details: docs/lexikon-regression-2026-10-27.md.
+
+Vorheriger Stand:
+
+# Testseiten-Start vorbereitet - 27.10.2026
+
+C mit erhaltenem Abhaken ist lokal eingebaut. Neu: scripts/plan-c-test.mjs und PLAN-C-TESTEN.cmd fuehren ausschliesslich Testsicherung und Testbereitstellung nach vollstaendigen Standardtests aus. Fehler verhindern folgende Schritte. 24 Pruefungen des Ablaufs bestanden; echter Windows-Start mit --plan ohne Netzwerk/Deploy geprueft.
+
+Keine Test- oder Produktionsveroeffentlichung dieses Auftrags ausgefuehrt. Die Sitzung blockiert lokalen HTTP-Zugriff; Wrangler konnte OAuth nicht erneuern, weil Cloudflare Auth nicht erreichbar ist. Deshalb muss der vorbereitete Befehl in normaler PowerShell laufen; siehe FUER-JONAH.md. Ergebnis als einfaches PLAN-C-STATUS.txt statt Markdown-Dateilink.
+
+Vorheriger Stand:
+
+# Variante C eingebaut - 27.10.2026
+
+Der Plan zeigt jetzt das ausgewaehlte Dashboard mit geplanter Zeit, erfassten Istminuten und Sportverteilung. Haken zum Abschliessen, Ruecknahme und nachtraegliche Istkorrekturen bleiben erhalten; fuer alle vier Sportarten getestet. Tageskarten, Wochenwahl, Vorlagen, Verschieben und Anpassungen bleiben erreichbar.
+
+51 Plan-/Vorlagenfaelle, 22 Speicherfaelle und 67 gezielte Tests bestanden. Typecheck/Build und drei Browserpruefungen nach Uebernahme in den Originalordner erfolgreich. Gesamtlauf wegen HTTP-API-Setup nicht vollstaendig gruen; Details und vollstaendige Resultate: docs/dashboard-c-2026-10-27.md. Noch nicht veroeffentlicht.
+
+Fruehere Staende:
+
+# Plan und Trainingsvorlagen vorbereitet - 27.10.2026
+
+Vorlagen fuer Schwimmen, Rad, Laufen und Kraft koennen bestehende Einheiten mit Vorschau ersetzen/ergaenzen oder neue Einheiten anlegen. Wochenuebergreifendes Verschieben/Tauschen, Summen, Zusatztrainings und Klappen korrigiert; Istwerte und abgeschlossene Historie geschuetzt. Drei bedienbare Designvorschauen liegen unter docs/previews/plan26/index.html. Empfehlung: A. Endgueltige Gestaltung wartet auf Jonahs Auswahl.
+
+2.225 Tests mit zwei Workern bestanden (63 uebersprungen; HTTP-API-Suite separat blockiert). Darin 64 gezielte Tests; 36 neue Browserfaelle bestanden; zehn Testprofile mit 2.970 Aktionen konsistent. Drei Vorschauen mit 556 Assertions geprueft. Vollstaendige Resultate, Ursachen und Testgrenzen: docs/plan-qa-2026-10-26.md. Regulaerer HTTP-Gesamtlauf hier nicht bestaetigt. Keine Veroeffentlichung; echte App bleibt Version 3.7.2.
+
+Fruehere Auftraege:
+
+# Version 3.7.2 veroeffentlicht und geprueft
+
+Die echte App ist aktualisiert: https://coach-app-efc7.pages.dev . Jonah meldete den erfolgreichen Abschluss des Veroeffentlichungsskripts. Den erfolgreichen Test- und Produktionsdeploy habe ich unabhaengig bei Cloudflare bestaetigt; der letzte lokale Browserlauf ist ebenfalls erfolgreich. Beide SQL-Sicherungen fuer 3.7.2 liegen unter data-export und wurden erneut lokal in Memory wiederhergestellt und auf Integritaet geprueft. Status: docs/release-3.7.2-status.json.
+
+App neu oeffnen und eine angebotene Aktualisierung bestaetigen. Keine weiteren Terminalbefehle erforderlich.
+
+Die folgenden Abschnitte dokumentieren fruehere Zwischenstaende.
+
+# Aktuell: Start abgesichert, Veroeffentlichung noch angehalten
+
+Der letzte normale Release-Lauf meldete 384 bestandene, 113 uebersprungene und einen fehlgeschlagenen WebKit-Fall (leerer App-Start bei n21-run-10k). Genaue Ursache unbestaetigt; vorher sechs Wiederholungen ohne Fehler. Start jetzt sichtbar und als loading/ready/error markiert; Test wartet auf echte Bereitschaft und erfasst Diagnosen. 16 Unit-Tests, 34 Speicher-/verwandte Browserfaelle und alle 15 vorgesehenen WebKit-Nutzer bestanden; Typecheck und Build erfolgreich. Normale HTTP-Gesamtpruefung bleibt erforderlich. Keine Veroeffentlichung; Jonahs Freigabe bleibt gueltig. Details: docs/startup-qa-2026-10-25.json.
+
+Vorherige Staende:
+
+# Veroeffentlichung 3.7.2: freigegeben, technisch blockiert
+
+Jonah hat 385 bestandene und 113 uebersprungene Browserfaelle gemeldet und die Veroeffentlichung freigegeben. Upload hier am Netzwerk gescheitert: Wrangler kann OAuth nicht erneuern; der ueber Cloudflare erzeugte Testsicherungs-Export laesst sich wegen ENOTFOUND nicht herunterladen und validieren. Kein Code hochgeladen. Produktion weiterhin unveraendert (Cloudflare-Deployment vom 24.10.2026 geprueft). Keine weitere Freigabe erforderlich. Konkreter Befehl in FUER-JONAH.md; Status in docs/release-3.7.2-status.json.
+
+# Aktueller Auftrag: Datensicherheit – 25.10.2026
+
+Version 3.7.2 ist lokal vorbereitet, noch nicht veroeffentlicht. Speicher-/Lesefehler, Backup-Wiederherstellung, Tab-Abgleich und verschobene Einheiten wurden ueberarbeitet. Echte Trainingsdaten und Produktion wurden in diesem Auftrag nicht veraendert.
+
+Bericht: docs/storage-report-2026-10-25.md. Exakte Testergebnisse: docs/storage-test-results-2026-10-25.json. Zuletzt: 120 gezielte Unit-/Worker-Tests und 28 Browserfaelle bestanden; vier synthetische Nutzer mit 2.160 Neustarts konsistent. Der normale HTTP-Gesamtlauf und der native Chrome-Download sind hier noch nicht bestaetigt. Die Browserpruefung nutzte einen isolierten Transport; zwei Chrome-Exporte erfassen die Datei am Web-Share-Rand. Keine Veroeffentlichung.
+
+Die folgenden Abschnitte dokumentieren den vorherigen Auftrag.
+
 # Ergebnis
+
+## Aktuell: Version 3.7.1 veröffentlicht und geprüft
+
+Die echte App ist aktualisiert: https://coach-app-efc7.pages.dev . Erfolgreicher Skriptabschluss von Jonah gemeldet; Test- und Produktionsdeployment zusätzlich bei Cloudflare bestätigt. Beide SQL-Sicherungen liegen unter data-export und sind durch erneutes Einlesen geprüft.
+
+App neu öffnen und bei „Neue Version“ auf „Aktualisieren“ tippen. Die folgenden Abschnitte sind ältere Zwischenstände.
+
+
+## Aktuell: Version 3.7.1 zur Veröffentlichung vorbereitet
+
+Jonah hat die Veröffentlichung freigegeben. Wegen gesperrter Sicherungsdownloads, lokaler Server-/App-Zugriffe und nicht erneuerbarer lokaler Wrangler-Anmeldung wurde hier kein neuer Code veröffentlicht. Die bestehenden Cloudflare-Deployments sind unverändert.
+
+Ein Startskript ist fertig: scripts/veroeffentlichen.mjs. Es prüft zuerst alle Tests, erstellt und validiert Sicherungen, veröffentlicht und prüft die Testumgebung und danach die echte App. 15 neue Sicherheits-/Ablaufprüfungen bestanden; aktueller Gesamtlauf 2.182 bestanden, keine unbehandelten Fehler, API-Setup nur hier blockiert. Test-/Produktionsbuild und Worker-Trockenlauf erfolgreich. Den einen erforderlichen PowerShell-Befehl enthält FUER-JONAH.md; Einzelheiten in docs/release-3.7.1.md.
+
+
+## Aktuell: Testdatenfehler in den vier Ampel-Browserfällen korrigiert
+
+Die Browserfälle erwarteten bei einem Erwachsenenprofil mit 6,5 h fälschlich Gelb; nach der bestehenden Regel ergibt das Grün. Gemeinsame synthetische Fixture jetzt mit 6 h. Neue Regression vor Korrektur fehlgeschlagen, danach bestanden; zehn gezielte Ampel-/Fixture-Prüfungen grün. Vollständiger Wiederholungslauf: 2.167 bestanden, keine unbehandelten Fehler, API-Setup nur hier am lokalen Serverzugriff blockiert. Typecheck und Build erfolgreich.
+
+Jonah bestätigte nach der Korrektur 4 passed. Zusammen mit den zuvor gemeldeten 361 Erfolgen sind 365 Browserfälle über zwei Läufe bestätigt; 113 übersprungen. Kein neuer vollständiger gemeinsamer Lauf und keine Veröffentlichung. Details: docs/readiness-e2e-fixture-2026-10-24.md.
+
+
+## Nachtrag: Worker-Timeouts behoben und erneut geprüft
+
+Die vollständige parallele Wiederholung meldet 2.165 bestandene Fälle und **keine unbehandelten Fehler / keine RPC-Timeouts**. Drei neue Scheduling-Regressionen; native I/O-Pause nach jedem Test und jeder simulierten Woche. Versehentlich riesige Testnamen gekürzt. Details: docs/test-runner-2026-10-24.md.
+
+Typecheck und Build erfolgreich. Die API-Datei bleibt nur in dieser Sitzung wegen gesperrtem lokalem Serverzugriff im Setup blockiert; der Gesamtlauf endet deshalb weiterhin mit Exit 1. Browsernachweis weiter offen. Keine Veröffentlichung. Die folgenden Zwischenstände sind ältere Läufe.
+
+
+## Neuer Systemtest vom 24.10.2026 – lokal, noch nicht veröffentlicht
+
+Ampel/Coach vereinheitlicht, Chat wartet auf aktuelle Synchronisierung, vergangene Trainings gegen spätes Kürzen geschützt und Planblock-Abstände korrigiert. Außerdem Sync-Rollback, manuelle Messkorrekturen, Fehlerprotokolle und Scorefilter verbessert. Details: [Prüfbericht](docs/qa-report-2026-10-24.md).
+
+**Geprüft:** 10 künstliche Profile × 4/12/24/52 Wochen = 40 Verläufe, 920 virtuelle Wochen. Letzter Gesamtlauf: 2.162 Fälle bestanden, kein ausgeführter Fall fehlgeschlagen; 6 übersprungen. Typecheck und Build erfolgreich. Eine API-Datei scheitert im Setup am lokalen Serverzugriff; deshalb bleibt der Gesamtlauf Exit 1. 478 Browserfälle gesammelt, wegen lokalem EACCES nicht ausgeführt. Keine vollständig grüne Freigabe.
+
+5.000 Trainings/15.000 Nachrichten: gezielter lokaler Auswertungs-Median 814 → 447 ms, gleiche Scorefilter-Ergebnisse im Snapshot. Keine Messung auf dem Handy.
+
+Echte App und Daten wurden nicht verändert. Für den fehlenden lokalen API-/Browsernachweis siehe FUER-JONAH.md. Die folgenden Ergebnisse betreffen frühere Aufträge und deren damalige Veröffentlichungen.
+
 
 ## Auftrag 20: Scores zuverlässig, kleine Plan-Korrekturen (24.10.)
 

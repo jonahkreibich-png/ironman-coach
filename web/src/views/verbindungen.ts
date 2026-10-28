@@ -21,13 +21,17 @@ let NEW_KEY: { id: string; key: string } | null = null;
 let RETURN_TO: 'verbindungen' | 'onboarding' = 'verbindungen';
 
 export async function loadConnections(force = false) {
-  if (LOADING || (CONN && !force)) return;
+  if (LOADING || (!force && ACCOUNT === isSyncOn() && (CONN || ERR))) return;
+  if (ACCOUNT !== isSyncOn()) CONN = null;
+  ACCOUNT = isSyncOn();
   LOADING = true; ERR = '';
   // Auftrag 15: ohne Konto die Liste der Dienste (ohne Anmeldung); „Verbinden“ legt dann das Konto an
   try { CONN = isSyncOn() ? (await apiCall('GET', '/api/connections')).connections : (await publicCall('GET', '/api/connect/catalog')).connections; ACCOUNT = isSyncOn(); }
   catch (e: any) { ERR = isSyncOn() ? e.message : t('conn.offline'); }
   LOADING = false; nav.rerender();
 }
+function connectionRetry(): string { return ERR ? '<button class="btn ghost" data-act="conn-retry">Erneut versuchen</button>' : ''; }
+on('conn-retry', () => loadConnections(true));
 /* Stand der Liste: mit Konto (true) oder nur der Katalog (false) */
 let ACCOUNT = false;
 /* Für „Heute“: Verbindungen, die neu angemeldet werden müssen */
@@ -65,7 +69,7 @@ const sorted = (list: any[]) => [...list].sort((a, b) => (ORDER.indexOf(a.id) + 
 
 export function renderVerbindungen(): string {
   RETURN_TO = 'verbindungen';
-  if (!CONN || ACCOUNT !== isSyncOn()) { if (CONN && ACCOUNT !== isSyncOn()) CONN = null; loadConnections(); return `<div class="card">${empty(ERR || t('common.loading'))}</div>`; }
+  if (!CONN || ACCOUNT !== isSyncOn()) { if (CONN && ACCOUNT !== isSyncOn()) CONN = null; loadConnections(); return `<div class="card">${empty(ERR || t('common.loading'))}${connectionRetry()}</div>`; }
   const main = sorted(CONN.filter(c => c.availability === 'ready' || c.availability === 'partner'));
   const later = CONN.filter(c => c.availability === 'prepared');
   const reauth = CONN.filter(c => c.status === 'reauth');
@@ -82,7 +86,7 @@ export function renderVerbindungen(): string {
 /* Kurzliste für den Fragebogen (A3): dieselben Abläufe, Rückkehr in den Fragebogen */
 export function connectList(ctx: 'onboarding' | 'verbindungen'): string {
   RETURN_TO = ctx;
-  if (!CONN || ACCOUNT !== isSyncOn()) { if (CONN && ACCOUNT !== isSyncOn()) CONN = null; loadConnections(); return `<div class="hint">${esc(ERR || t('common.loading'))}</div>`; }
+  if (!CONN || ACCOUNT !== isSyncOn()) { if (CONN && ACCOUNT !== isSyncOn()) CONN = null; loadConnections(); return `<div class="hint">${esc(ERR || t('common.loading'))}${connectionRetry()}</div>`; }
   const list = sorted(CONN.filter(c => ['shortcut', 'intervals', 'garmin', 'coros', 'suunto', 'wahoo', 'dropbox', 'oura', 'whoop', 'polar', 'withings'].includes(c.id)));
   return `<div class="list" data-connect-list>${list.map(row).join('')}</div><div class="hint">${esc(t('conn.obLater'))}</div>`;
 }

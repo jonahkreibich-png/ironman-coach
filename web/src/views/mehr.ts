@@ -15,7 +15,7 @@ export function renderMehr(): string {
   const race = d.raceGoal || d.recentRace;
   let h = '';
   if (race) h += `<div class="list" style="margin-bottom:var(--s3)">${row('wettkampf', 'flag', 'var(--accent)', race.date && race.date >= d.today ? t('race.inDays', { name: race.name, n: daysUntil(d.today, race.date) }) : t('race.enterResult', { name: race.name }))}</div>`;
-  h += sec(t('mehr.daily'), `<div class="list">${row('werte', 'pulse', 'var(--info)')}${row('essen', 'food', 'var(--good)')}${li({ act: 'go-sub', data: { sub: 'strength' }, icon: ic('edit'), color: 'var(--strength)', title: 'Kraftvorlagen', sub: 'Übungen speichern und Training starten', html: false })}</div>`);
+  h += sec(t('mehr.daily'), `<div class="list">${row('werte', 'pulse', 'var(--info)')}${row('essen', 'food', 'var(--good)')}${li({ act: 'go-sub', data: { sub: 'vorlagen' }, icon: ic('edit'), color: 'var(--strength)', title: 'Trainingsvorlagen', sub: 'Schwimmen, Radfahren, Laufen und Kraft', html: false })}</div>`);
   const reauth = reauthHints().length;
   h += sec(t('mehr.setup'), `<div class="list">${row('profil', 'user', 'var(--accent)', d.goal ? t('mehr.profilGoal', { name: d.goal.name }) : '')}
     ${row('beruecksichtigungen', 'info', 'var(--warn)')}

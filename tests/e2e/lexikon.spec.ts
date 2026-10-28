@@ -1,9 +1,11 @@
-import { test, expect } from '@playwright/test';
-import { seed, open } from './helpers';
+import { test, expect } from './storage-harness';
+import { seed, open, stored } from './helpers';
+
+const legacyStrength = { id: 'lexikon-legacy', name: 'SYNTHETIC Lexikon-Kraft', updatedAt: 1, exercises: [{ name: 'Kniebeuge', sets: 3, reps: '8', kg: 20, restSec: 60 }] };
 
 test('Mehr öffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben erreichbar', async ({ page }) => {
-  await seed(page); await open(page, '/?go=mehr');
-  await expect(page.locator('[data-sub="strength"]')).toBeVisible();
+  await seed(page, { extra: d => { d.strengthTemplates = { [legacyStrength.id]: JSON.parse(JSON.stringify(legacyStrength)) }; } }); await open(page, '/?go=mehr');
+  await expect(page.locator('[data-sub="vorlagen"]')).toBeVisible();
   await page.locator('[data-sub="lexikon"]').click();
   await expect(page.locator('.top-title')).toHaveText('Begriffe / Lexikon');
   const cards = page.locator('[data-lexicon-term]');
@@ -22,8 +24,13 @@ test('Mehr öffnet durchsuchbares Lexikon nach Themen; Kraftvorlagen bleiben err
   await expect(page.locator('[data-lexicon-term="ATL/CTL"]')).toContainText('keine Verletzung voraus');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('[data-act="back"]').click();
+  await page.locator('[data-sub="vorlagen"]').click();
+  await expect(page.locator('.top-title')).toHaveText('Trainingsvorlagen');
+  await expect(page.locator('[data-training-template="legacy-strength:lexikon-legacy"]')).toContainText(legacyStrength.name);
   await page.locator('[data-sub="strength"]').click();
   await expect(page.locator('.top-title')).toHaveText('Kraftvorlagen');
+  await expect(page.locator('[data-strength-template="lexikon-legacy"]')).toContainText('Kniebeuge');
+  expect((await stored(page)).strengthTemplates[legacyStrength.id]).toEqual(legacyStrength);
 });
 
 test('normale Ansichten und Einheiten erhalten keine automatischen Begriffe-Blöcke', async ({ page }) => {

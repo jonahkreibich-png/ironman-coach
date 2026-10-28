@@ -1,0 +1,212 @@
+[
+  {
+    "path": "shared/coach/analysis.ts",
+    "before": "6c3255798a6d380c08a5a8a58c012e1150a275fb092a3ad133587e47faba23a4",
+    "after": "b94d8dd5e210e3af7ae9006ecb5eb3ea6a30f03c84e1a141dc615af2f087c113"
+  },
+  {
+    "path": "shared/coach/claims.ts",
+    "before": "3a69060a5fb889c4310daf79fe8ccc8a61be96d9d19412f4b3d1043415cf00a9",
+    "after": "29a0ca7489e1eac97e4a5f27d74833708efe926e5e90b1ba530595727517ee3a"
+  },
+  {
+    "path": "shared/coach/dialog.ts",
+    "before": "579dbb6afe0b916eced1067d958635854337194cc79f7beff34c87da1de22a53",
+    "after": "b3681108640368c42ba0a61c479fa30d59dd094db72ff47250d8fa1ce45c4590"
+  },
+  {
+    "path": "shared/coach/engine.ts",
+    "before": "341f7207b995798ca5c2c1648cf8be3df391539de96dc2bae8d15f1a861f7712",
+    "after": "958377a3253fcd85325b3ab8f90d9539d31a36daa27cbe1c34199e60777139d0"
+  },
+  {
+    "path": "shared/coach/explain.ts",
+    "before": "a82216a4103f2bd8eb66faa7c3d815f86909b30c85d2e5b90e26eb8b0a78ed3a",
+    "after": "a6495947cfc3aae5c0caeed70782a97cbc2bdbbe03af5e481d6803d1694a0eaa"
+  },
+  {
+    "path": "shared/coach/freeai.ts",
+    "before": "f549de879c9d0ef2a99a0bcc2045b7c82a593b725098662de302affba4c5ee9d",
+    "after": "ef01e7e5e8db333be4ea175e010a8a0ff7f06e5ab5a140eb9e8a93cc4230cd55"
+  },
+  {
+    "path": "shared/coach/intents.ts",
+    "before": "2f97bafc1f857412fa286d9002c19db942a320e508b96c3c65cf6897603ba339",
+    "after": "986520107a3f2d3f67e4224b95bca6304d3db9c682e49c21cd818fdf08b2a6f7"
+  },
+  {
+    "path": "shared/coach/review.ts",
+    "before": "00af297f4fb433dadabf765d296f7fffd5783564c512f249c771cd2b3b4308fc",
+    "after": "03f6975220e3ed877de1b50c4f03b0f7870a4a7b84321b3d38be18bdce2eb42b"
+  },
+  {
+    "path": "shared/coach/summary.ts",
+    "before": "ccf3728362ac37e82d094336e2c429ce8c435b0552644e5139555cb13cb73f75",
+    "after": "73845be03733ce8ff25fcfa0f423974e40822447ac65ae1d8199a6107d689dec"
+  },
+  {
+    "path": "shared/core.ts",
+    "before": "b21ff96448ce843020cef94c19ba52a4051f1db5de2e0b16168a404f4ecc45e2",
+    "after": "d1a6e7ef0de3911cf29bac847077b09a467cc3aaebbf220b7eab84997a7c763e"
+  },
+  {
+    "path": "shared/fields.ts",
+    "before": "7255e449f84743fc0b21a99078891abed81c1976d98a57c896387e14b9f47b68",
+    "after": "e300ff20589a9edecd1fe3404c52c39431c7ecc22c8cb0be5647e625d60857aa"
+  },
+  {
+    "path": "shared/refresh.ts",
+    "before": "32ce61739c4209fb78066b47b5791305bb9f2dc8fcd123a7ce18402c1c534124",
+    "after": "a27ec910eb9382c96e20db408671df94683bcc2381d86b98c967369085f03dc4"
+  },
+  {
+    "path": "shared/results.ts",
+    "before": "87fb1ff4824060452d88c5ce18a95db182f34d110eb516f2bd8b8904933e3e32",
+    "after": "c20302f339f5bf17c1a3a826176d39129cce66c3a9474827aa28a0451f214412"
+  },
+  {
+    "path": "shared/scores.ts",
+    "before": "fd2943eaef0424e6db3d4a77bd903f4de7155c1577a4cb06b62a2908534d7b7c",
+    "after": "d4849db5b951545384a9563c5d4a53539fafce20d86ae31a18f09a7312eccb02"
+  },
+  {
+    "path": "shared/swimskill.ts",
+    "before": "f83aca61d7f3ea13bf6040a64f6b7820762d66403ff0c0fa39771dcdedf7dc1e",
+    "after": "86d0743a13bd156a857c83fc67ba1897757abfb5f33e87ce76c3375ce7205c45"
+  },
+  {
+    "path": "shared/trends.ts",
+    "before": "eab97e1b7661fff189f535db884f9e3e68bcc32973b29983c6716a6733808cac",
+    "after": "ef315f01580130cb3a52b998c5c074be043477e9987b4827e18d093ba13f3ab1"
+  },
+  {
+    "path": "web/src/testupdate.ts",
+    "before": "0e0ec46650260b817492682909b150aec016a0130d5034f0cf3be5cc8e658fe5",
+    "after": "d6a5c0ad40c78c728afc23203924cc8977850769124078ad98d0c1acc96fa518"
+  },
+  {
+    "path": "web/src/views/coach.ts",
+    "before": "fe5b1d44eca4f5860230f4c0ad85ef35a734070113d64f7065312661177dd59e",
+    "after": "5f8b6bd07c3ae6f59d1a2be2818c9d693ce2a4e87539c24f57e58544cb2e5c6a"
+  },
+  {
+    "path": "web/src/views/fortschritt.ts",
+    "before": "a1728545c78153e31a0484f541bfa05389e1f3781da080e70c04ad1628687de4",
+    "after": "5dd1092ef64053b8b5a60301f73886d6402f79ea4aa6d795a309635edb5d9f6a"
+  },
+  {
+    "path": "web/src/views/plan.ts",
+    "before": "53aa9902fb8c47f922bf1f4a3416680c68961de516fb6d514bbf2446de04b185",
+    "after": "ab44148372c6d965551ffaccfb571b3d5634877e00738ff518933532db92f293"
+  },
+  {
+    "path": "web/src/views/session.ts",
+    "before": "4ccd980732fc0be4d376b81f61cfb00c2658c5ef1f4126a771ff42082fe3180b",
+    "after": "fe49e57c04f103e19cb2cdf1f40502cc219c7269dbf5a45d12c1ef238e753337"
+  },
+  {
+    "path": "tests/e2e/auftrag7.spec.ts",
+    "before": "5928afd362fd71daddc5809ce62435bb82b7c6b30863e2bd834ee7a71c3fbb19",
+    "after": "5716874ab4a06f4835772486e44e5e413e72777138353f1610fd4f242a184b5d"
+  },
+  {
+    "path": "tests/helpers/many20.ts",
+    "before": "dabff2b643817bb1f0a5c0ddc659c2119f0a9f16e0209232df74f591c81bff4d",
+    "after": "e70c4eeefc2509075d0d2349e0f6a30d95cfc039fb784ee4f7274ff51ea0361c"
+  },
+  {
+    "path": "tests/unit/actual-results-quality.test.ts",
+    "before": "c31521aa74b63a6675d1026c17bcfd894e089f05ec8011384dd03fc8f665bee1",
+    "after": "e5c8492f11bdfd4f8efed7f456ccc80de5eae3ee9b9babd29f77cd9e831b7de2"
+  },
+  {
+    "path": "tests/unit/analysis.test.ts",
+    "before": "7935801ec7d636bcaa7ee9034d22eb08a6a34f82376f90303a1a4302ed009c0f",
+    "after": "c279503996f46cc8923fcd28a9f06cff2b211532418cb8db9ead54b5943f4017"
+  },
+  {
+    "path": "tests/unit/auftrag17-sollist.test.ts",
+    "before": "77b160600ec5c940dd67bf180fce2f0a5af3a4b32f9631ad41c86f732c24baf8",
+    "after": "f5319718f52e8573937640c6bd138f10bfc85791cd47629c85bb3623a5c26ecf"
+  },
+  {
+    "path": "tests/unit/auftrag20-scores.test.ts",
+    "before": "12b9215625e9ba7d8a1c761aa842a5c7a7e57b8612518ef079fe59df9bef382e",
+    "after": "6dbfa678af287d4613773360e2e94bfd79a3445680a0df2d49e1192dea219101"
+  },
+  {
+    "path": "tests/unit/auftrag9.test.ts",
+    "before": "7137e4659864077f56035f8593420f22d32693ea7d7a9b5188a8e251f1edcb44",
+    "after": "59e07dcc002637052b4c10d5eaff27e29f7e91fc91473048c69623f46a4b6528"
+  },
+  {
+    "path": "tests/unit/chat.test.ts",
+    "before": "f5162c178989c0156b154c9c592947d6e6dd34cd099372654df7a6f424e385e4",
+    "after": "919c8bf32a772012d1d31b306b4c0d679b2cf474403fa168f3e51cfc7d11b796"
+  },
+  {
+    "path": "tests/unit/fields.test.ts",
+    "before": "49ca124aa8b941c3fe6b5e85ecc727fdbe319a31602e52c9d4fe990d8a35df41",
+    "after": "db8506d39616f898d0a5877c1a734fae82501ceef6edddff35cfef6364fe3f65"
+  },
+  {
+    "path": "tests/unit/fitness-quality.test.ts",
+    "before": "4146ee1de3c69df55ceee6cec60a2041412f709eac8df0bd5d71e0d1baa63325",
+    "after": "fc0aa6f5f3cbc0f98aae0610a1c65c0629e3f5bf3105b51acb69495053665d02"
+  },
+  {
+    "path": "tests/unit/longitudinal24.test.ts",
+    "before": "27dc02f453a315c66f2b8c6c1ded8c2c0a0a10e893f03a5eba076cce1338f71d",
+    "after": "221036683f2f91ec94daac3fc76b9631a5c17ba30c508ecc6cd9a44ad35ef89a"
+  },
+  {
+    "path": "tests/unit/review.test.ts",
+    "before": "0fc16dd3d50b6c3ecf0cfb485c959adb18c88e0f28bfba727428c5dcd98b6221",
+    "after": "b62f5f413a8152c0f147f570ce16e002246178571e2ac8e163e9aa7dc7b0bdf6"
+  },
+  {
+    "path": "tests/unit/scores.test.ts",
+    "before": "5fa8cf2c788a38d9911b176b70b6b48c114e44c84773a31669d80c5b498d909e",
+    "after": "12718f69e7d73c11bb0f235a062f11262cf51475d6463097cbcaab8d098c87d2"
+  },
+  {
+    "path": "tests/unit/swim-equipment-quality.test.ts",
+    "before": "a6e977cc3f2c0c54a3be07dfba4db14c725b598156917fa45c37a457765300ff",
+    "after": "60cbcdb3cfd60ebc26d654bc2d7b4a419cb1cabc0673df611aed13c9c305e587"
+  },
+  {
+    "path": "tests/unit/swim-evidence.test.ts",
+    "before": "633cddbb4bae4329e7aed37aba098b5ea40e9f9f1a33b9812f75a758a14f852b",
+    "after": "a1317ea38e4a8452506bd30df47edbcbd23ebf7fba1c40eab5c81e3578c7db9e"
+  },
+  {
+    "path": "tests/unit/trends.test.ts",
+    "before": "3077b9b66cdabff632c91f1981895c635d467c76f0a974d5435a120897b2c34c",
+    "after": "46337a7cf5aa2372f298c30cf811060a08a37faf862bb6905b58ac00d0737ce1"
+  },
+  {
+    "path": "server/src/coach.ts",
+    "before": "b399f83f4521bd83e2f3d15291883b4f2505440283ce18de3af030ce7c8159e8",
+    "after": "37448c2b70ad750db8c4d0e5d948289f194b6211be0801e55b76961f743c2d24"
+  },
+  {
+    "path": "server/test/coach-results-flow.test.ts",
+    "before": "a52ca4e2cf8540948a62041faa5c460dc31f5b4dd1a3e3d9431f67592820dc86",
+    "after": "068458406b533d766b8abb6516e8c936fe9e7dfe8b41a9beac5db808c4633f4c"
+  },
+  {
+    "path": "docs/coach-analyse-2026-10-28.md",
+    "before": null,
+    "after": "94b0ed40b53311b7db257bd9b65f0748ceaeb563d312eb54e8c7d75c376776dc"
+  },
+  {
+    "path": "server/src/store.ts",
+    "before": "e41b35a79b76254ed8758635473469865f1405748a5fff78dd793dbf902bd4b2",
+    "after": "4633d36a4a1dac39d4cc793876c0c7e78459faa5f1ec1bee8b886d76c971e546"
+  },
+  {
+    "path": "server/test/sync-integrity.test.ts",
+    "before": "645336ca82fedeb88e29b47215d7f25f1fa66f21f730602e11b92f1001ce5817",
+    "after": "68209535fd35a0101e207862d4d5fda5610c914a92b72e30f370d4d05b22aa1a"
+  }
+]

@@ -8,7 +8,7 @@ import * as C from '../core';
 import { restDayReason } from '../trainingrules';
 import * as W from '../workouts';
 import type { EngineCtx } from './engine';
-import { readinessFacts, readinessFallback } from './engine';
+import { readinessFacts, readinessOf } from './engine';
 import { paceCtx } from '../plangen';
 import { sleepNeed, type Profile } from '../profile';
 import type { Op } from './ops';
@@ -147,8 +147,7 @@ export function explainDay(ctx: EngineCtx, date: string, sport: string | null, l
   const weekLine = w ? `${w.label || 'Woche ' + w.weekNumber}${w.block ? ` (Block ${w.block}, Woche ${w.blockWeek})` : ''}${w.phase ? `, ${PH[w.phase] || w.phase}` : ''}${w.isRecoveryWeek ? ', Erholungswoche' : ''}` : '';
   const ill = C.illnessAt(ctx.state.illnessPeriods, date);
   const ret = !ill && C.returnStageActive(ctx.state.illnessPeriods, date);
-  const fb = readinessFallback(ctx);
-  const R = date === ctx.today ? C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, date, fb) : null;
+  const R = date === ctx.today ? readinessOf(ctx, date) : null;
   const vals = R && R.point ? R.crits.filter((c: any) => c.k === 'Ruhepuls' || c.k === 'HFV').map((c: any) => `${c.k} ${c.v}${c.t && /normal/.test(c.t) ? ` (${c.t.split('·')[0].trim()})` : ''}`) : [];
   const head = `${when} (${fmtD(date)}${weekLine ? ', ' + weekLine : ''}):`;
   if (ill) return { intent: 'explain', text: `${head} Du bist krank eingetragen${ill.note ? ` (${ill.note})` : ''}. Heute kein Training, auch nicht locker. Wenn du 24 Stunden ohne Fieber und Symptome bist, tipp auf „Wieder gesund“, dann steigen wir in Stufen ein.`, options: [{ label: 'Wieder gesund', say: 'Ich bin wieder gesund' }] };
@@ -180,7 +179,15 @@ Soll ich das so ändern?`, ops, yes: 'Ja, so machen' };
     const x = structureOf(s, ctx.profile, ctx.today); if (!x) continue;
     const meta = [x.minutes ? `ca. ${x.minutes} min` : '', x.km ? (s.sport === 'swim' ? `${Math.round(x.km * 1000)} m` : `${String(x.km).replace('.', ',')} km`) : '', s.slot === 'am' ? 'morgens' : ''].filter(Boolean).join(', ');
     let text = `${s.title}${meta ? ` (${meta})` : ''}${done(s) ? ' – schon erledigt' : ''}\n${structureText(x)}`;
-    if (s.sport === 'swim' && ctx.profile.skills && ctx.profile.skills.swimCrawlM && ctx.profile.skills.swimCrawlM < 100) text += `\nDu kraulst gerade ${ctx.profile.skills.swimCrawlM} m am Stück: jede Kraul-Strecke einzeln, danach am Rand warten, bis der Atem ruhig ist. Lieber sauber als schnell.`;
+    if (s.sport === 'swim') {
+      const proofs=C.swimProofs(ctx.state,ctx.baseWeeks||[],ctx.today,42);
+      for (const [key,label] of [['crawl','Kraul ohne Hilfsmittel'],['pull','Kraul mit Pull Buoy']] as const) {
+        const values=proofs.map(p=>p[key]).filter(Boolean) as number[];
+        if (values.length) text+='\n'+label+': Bestwert '+Math.max(...values)+' m; bestätigt '+(C.confirmedOf(values)?C.confirmedOf(values)+' m':'noch keine Strecke in zwei Einheiten')+'.';
+      }
+      if (ctx.profile.skills?.swimCrawlM != null) text+='\nProfilangabe Kraul: '+ctx.profile.skills.swimCrawlM+' m (kein zusätzlicher Ergebnisnachweis).';
+      text+='\nJede Kraul-Strecke einzeln schwimmen und danach warten, bis der Atem ruhig ist.';
+    }
     blocks.push(text);
     if (done(s) || s.fixed || s.race) continue;
     const spec = specOf(s, ctx.profile, ctx.today)!;

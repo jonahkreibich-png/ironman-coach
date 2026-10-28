@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-28",
+  "file": "tests/e2e/auftrag13.spec.ts",
+  "beforeHash": "d634d06381c1059b12dfafd2ea313a3435bead44a9f5d5fe7dffb7d34419a1de",
+  "afterHash": "689b1ed8b01f2497526cc027c7bf779b8c5991b7450ef703812f3b0594ff4add",
+  "originalAssertionsPreserved": 20,
+  "repeatedDropbox": {
+    "passed": 10
+  },
+  "fileRun": {
+    "passed": 3,
+    "skipped": 1,
+    "skipReason": "Existing WebKit server-case skip unchanged"
+  },
+  "transport": "Existing in-process harness: built app + real Worker + synthetic SQLite D1",
+  "typecheck": true,
+  "build": true,
+  "productCodeChanged": false,
+  "deployed": false
+}

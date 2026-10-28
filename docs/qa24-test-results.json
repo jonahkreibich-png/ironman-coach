@@ -1,0 +1,693 @@
+{
+  "synthetic": true,
+  "total": 2173,
+  "passed": 2167,
+  "failedCases": 0,
+  "skipped": 6,
+  "files": 97,
+  "unhandledErrors": 0,
+  "rpcTimeouts": 0,
+  "durationSeconds": 183.12,
+  "exitCode": 1,
+  "results": [
+    {
+      "file": "server/test/account.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/ai.test.ts",
+      "status": "passed",
+      "passed": 28,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/analysis.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/api.test.ts",
+      "status": "failed",
+      "passed": 0,
+      "skipped": 4,
+      "message": "Server startet nicht: http://127.0.0.1:8799/\nmock push on 8798\nmock intervals on 8799, heute 2026-10-24\n"
+    },
+    {
+      "file": "server/test/coach-results-flow.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/connect.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/error-privacy24.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/feedback.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/healthfit.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/isolation.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/multiuser.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/oauth-flow.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/quality-sync.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/rules-ai.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/scheduled.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/signup.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/sync-integrity.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/version-gate.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "server/test/wai.test.ts",
+      "status": "passed",
+      "passed": 26,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/actual-results-quality.test.ts",
+      "status": "passed",
+      "passed": 19,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/adjustments.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/analysis.test.ts",
+      "status": "passed",
+      "passed": 33,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag11.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag11b.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag11c.test.ts",
+      "status": "passed",
+      "passed": 25,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag12.test.ts",
+      "status": "passed",
+      "passed": 34,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag14.test.ts",
+      "status": "passed",
+      "passed": 75,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag15-many.test.ts",
+      "status": "passed",
+      "passed": 62,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag15.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag16.test.ts",
+      "status": "passed",
+      "passed": 35,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag17-befunde.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag17-many.test.ts",
+      "status": "passed",
+      "passed": 67,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag17-sollist.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag18-many.test.ts",
+      "status": "passed",
+      "passed": 76,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag18-regeln.test.ts",
+      "status": "passed",
+      "passed": 27,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag18-ursachen.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag19-bibliothek.test.ts",
+      "status": "passed",
+      "passed": 56,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag19-gross.test.ts",
+      "status": "passed",
+      "passed": 55,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag19-scores.test.ts",
+      "status": "passed",
+      "passed": 14,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag20-gross.test.ts",
+      "status": "passed",
+      "passed": 51,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag20-plan.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag20-scores.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/auftrag9.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/chart-gaps.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/chat.test.ts",
+      "status": "passed",
+      "passed": 338,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/coach-sync24.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/coach.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/constraints-repro.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/constraints.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/continue.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/data-consistency24.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/engine-rules.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/explain.test.ts",
+      "status": "passed",
+      "passed": 111,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/extension-intensity24.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/extra.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/feed.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/fields.test.ts",
+      "status": "passed",
+      "passed": 18,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/fit.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/fitness-quality.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/glossary.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/history-performance24.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/i18n.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/intents.test.ts",
+      "status": "passed",
+      "passed": 71,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/ladder.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/load-quality.test.ts",
+      "status": "passed",
+      "passed": 19,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/longitudinal24.test.ts",
+      "status": "passed",
+      "passed": 43,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/longterm.test.ts",
+      "status": "passed",
+      "passed": 51,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/merge.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/onboarding.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/personas.test.ts",
+      "status": "passed",
+      "passed": 25,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/plandiff.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/plangen.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/prognosis-race.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/readiness-browser-fixture24.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/readiness-consistency.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/readiness.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/repair.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/review.test.ts",
+      "status": "passed",
+      "passed": 91,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/ruleparse.test.ts",
+      "status": "passed",
+      "passed": 87,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/rules-intense.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/scorefilter-history24.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/scores.test.ts",
+      "status": "passed",
+      "passed": 19,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/simulation-scheduling24.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/stages-edit.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/strength-templates.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/swim-equipment-quality.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/swim-evidence.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/test-runner-scheduling24.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/tests8.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/training-date24.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/trends.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/ui-actions.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/variety.test.ts",
+      "status": "passed",
+      "passed": 58,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/weekpattern.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/zones-nutrition.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "skipped": 0,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/zz-audit.test.ts",
+      "status": "passed",
+      "passed": 0,
+      "skipped": 1,
+      "message": ""
+    },
+    {
+      "file": "tests/unit/zz-dbg.test.ts",
+      "status": "passed",
+      "passed": 0,
+      "skipped": 1,
+      "message": ""
+    }
+  ]
+}

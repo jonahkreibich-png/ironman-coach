@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-27",
+  "localVersion": "3.8.0",
+  "published": false,
+  "tests": {
+    "focusedBrowser": {
+      "passed": 26,
+      "failed": 0
+    },
+    "storageBrowser": {
+      "passed": 34,
+      "failed": 0
+    },
+    "planBrowser": {
+      "passed": 51,
+      "failed": 0
+    },
+    "dashboardSummaryPublicationUnit": {
+      "passed": 26,
+      "failed": 0
+    },
+    "persistenceUnit": {
+      "passed": 9,
+      "failed": 0
+    },
+    "standardRelease": {
+      "exitCode": 1,
+      "passedTests": 2301,
+      "skippedTests": 6,
+      "passedFiles": 111,
+      "failedSuites": 1,
+      "failedSuite": "server/test/api.test.ts",
+      "reason": "HTTP readiness at 127.0.0.1:8799; separate minimal localhost fetch failed with EACCES",
+      "durationSeconds": 644.15
+    },
+    "standardE2E": {
+      "status": "stopped_at_local_server_start",
+      "exitCode": 1
+    }
+  },
+  "review": "No remaining concrete P1/P2 findings; two reproduced issues fixed",
+  "productionDataChanged": false,
+  "typecheck": "passed",
+  "build": "passed",
+  "releaseStatus": "not_deployed_tests_blocked",
+  "backupCreatedThisRun": false
+}

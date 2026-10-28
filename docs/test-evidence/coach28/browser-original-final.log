@@ -1,0 +1,19 @@
+
+Running 10 tests using 1 worker
+
+(node:14260) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:89:1 ÔÇ║ Coach28: tatsaechlicher Kraftbereich wird korrigiert, bewertet und nach Neustart behalten (2.5s)
+  ok  2 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:93:1 ÔÇ║ Coach28: hundert Meter mit und ohne Pull Buoy bleiben getrennt in Bewertung und Speicher (2.4s)
+  ok  3 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:97:1 ÔÇ║ Coach28: drei alte Schwimmhinweise werden ein Vorschlag, abgelehnt bleibt nach Neustart erledigt (426ms)
+  ok  4 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:100:1 ÔÇ║ Coach28: konkrete Sportwahlfrage wird direkt und ohne Planmutation beantwortet (1.2s)
+  ok  5 [chromium-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet (401ms)
+(node:23320) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  6 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:89:1 ÔÇ║ Coach28: tatsaechlicher Kraftbereich wird korrigiert, bewertet und nach Neustart behalten (3.0s)
+  ok  7 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:93:1 ÔÇ║ Coach28: hundert Meter mit und ohne Pull Buoy bleiben getrennt in Bewertung und Speicher (3.1s)
+  ok  8 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:97:1 ÔÇ║ Coach28: drei alte Schwimmhinweise werden ein Vorschlag, abgelehnt bleibt nach Neustart erledigt (869ms)
+  ok  9 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:100:1 ÔÇ║ Coach28: konkrete Sportwahlfrage wird direkt und ohne Planmutation beantwortet (1.4s)
+  ok 10 [webkit-iphone] ÔÇ║ tests\e2e\auftrag7.spec.ts:104:1 ÔÇ║ Coach28: Score ohne Leistungsnachweis ist als Schaetzwert gekennzeichnet (588ms)
+
+  10 passed (20.6s)

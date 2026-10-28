@@ -74,7 +74,7 @@ describe('Auftrag 20: Datenqualität je Wert', () => {
 describe('Auftrag 20: Startwert, wenig Daten, Ausreißer, Wochengrenze, Test', () => {
   test('ohne Einheiten: vorsichtiger Startwert aus dem Profil, vorläufig', () => {
     const s = sc('bike', []);
-    expect(s.measured).not.toBeNull();
+    expect(s.measured).toBeNull();
     expect(s.provisional).toBe(true);
     expect(s.rangeText).toMatch(/vorläufig/);
   });

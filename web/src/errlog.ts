@@ -1,3 +1,4 @@
+import { storage as localStorage } from "./persistence";
 /* Schlankes Fehlerprotokoll: nur Meldung, Stelle, Version und Ansicht. Keine Gesundheitsdaten, keine Eingaben.
    Liegt lokal (die letzten 30) und geht bei aktivem Sync an den Server. */
 import { STORAGE, APP_VERSION, API_BASE } from './config';

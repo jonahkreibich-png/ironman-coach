@@ -136,3 +136,22 @@ describe('Test-Personen mit gespielten Einheiten', () => {
     const W = played('vater-regeln'); expect(reviewAnswer(W.ctx(), 'Was steht morgen an?')).toBeNull();
   });
 });
+
+
+describe('Synthetische SOLL-/IST-Regressionen', () => {
+  test('Bewertung nennt beide Schwimmnachweise auch neben Dauer und Zugzahl', () => {
+    const W = world('einsteiger-sprint');
+    W.plan.weeks = [{ days: [{ date: W.today, sessions: [{ id: 'swim-proof', sport: 'swim', title: 'Schwimmen', plannedMinutes: 40 }] }] }] as any;
+    W.state.sessions['swim-proof'] = { completed: true, metrics: { min: '40', meters: '600', longestCrawl: '100', longestPull: '100', spl: '20' }, rpe: 4 };
+    const answer = reviewAnswer(W.ctx(), 'Wie war mein Schwimmen heute?')!;
+    expect(answer.text).toContain('100 m Kraul am Stück'); expect(answer.text).toContain('100 m mit Pull Buoy am Stück');
+  });
+  test('ohne tatsächlichen Kraftbereich wird der geplante Unterkörper nicht als Erfolg bestätigt', () => {
+    const W = world('einsteiger-sprint');
+    W.plan.weeks = [{ days: [{ date: W.today, sessions: [{ id: 'unknown-strength', sport: 'strength', area: 'lower', title: 'Kraft Unterkörper', plannedMinutes: 30 }] }] }] as any;
+    W.state.sessions['unknown-strength'] = { completed: true, metrics: { min: '30' }, rpe: 4 };
+    const answer = reviewAnswer(W.ctx(), 'Wie war mein Krafttraining heute?')!;
+    expect(answer.text).toMatch(/^Krafttraining/); expect(answer.missing).toContain('tatsächlich trainierter Kraftbereich');
+    expect(answer.good.join(' ')).not.toContain('Unterkörper');
+  });
+});

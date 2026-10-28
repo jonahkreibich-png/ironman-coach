@@ -22,7 +22,7 @@ function world(opts: { days?: number; improving?: boolean } = {}): TrendInput {
       activities.push(act({ id: 'r' + d, sport: 'run', date: d, min, km: Math.round(sp * min / 60 * 100) / 100, speedKmh: sp, paceSecKm: Math.round(3600 / sp), avgHr: 140, decouplingPct: dow === 0 ? 4 - 2 * k : null, hrZones: [600, 1800, 200, 100, 0] }));
     }
     if (dow === 6) activities.push(act({ id: 'b' + d, sport: 'bike', date: d, min: 120, km: 56, speedKmh: 28, avgHr: 130, avgPower: 170 + Math.round(20 * k) }));
-    if (dow === 3) activities.push(act({ id: 's' + d, sport: 'swim', date: d, min: 40, km: 1.5, swim: { poolLengthM: 25, lengths: 60, activeLengths: 60, strokesPerLength: 20 - 3 * k, metersPerStroke: 1.25 + 0.3 * k, pace100: 130 - 10 * k, byStroke: {}, longestContinuousM: Math.round(100 + 300 * k), strokeRate: null } }));
+    if (dow === 3) activities.push(act({ id: 's' + d, sport: 'swim', date: d, min: 40, km: 1.5, swim: { poolLengthM: 25, lengths: 60, activeLengths: 60, strokesPerLength: 20 - 3 * k, metersPerStroke: 1.25 + 0.3 * k, pace100: 130 - 10 * k, byStroke: {}, longestCrawlM: Math.round(100 + 300 * k), longestContinuousM: Math.round(100 + 300 * k), strokeRate: null } }));
     if (i % 7 === 0) nutrition[d] = { weight: 72 - k };
   }
   return { today: TODAY, period: '3m', activities, trend, illness: [], profile, state: { sessions: {}, customWorkouts: {}, trend, nutrition, settings: {}, illnessPeriods: [] }, weeks: [] };
@@ -82,4 +82,11 @@ describe('Zeitraum und zu wenig Daten', () => {
     const b = byId(trendCards({ ...I, period: '4w', state: st, activities: [...I.activities, ...legacyActivities(st, [], profile)] }), 'load');
     expect(+b.value).toBeGreaterThan(+a.value || 0);
   });
+});
+
+test('Schwimmfortschritt zeigt Pull getrennt mit Bestwert und Bestätigung',()=>{
+ const I=world({days:1}); I.activities=[]; I.weeks=[{days:[{date:TODAY,sessions:[{id:'s',sport:'swim'}]}]}];
+ I.state.sessions={s:{completed:true,metrics:{longestCrawl:100,longestPull:100}}};
+ I.state.customWorkouts={[TODAY]:[{id:'old',sport:'swim',metrics:{longestCrawl:50,longestPull:50}},{id:'draft',sport:'swim',completed:false,metrics:{longestCrawl:800,longestPull:800}}],[C.addDays(TODAY,1)]:[{id:'future',sport:'swim',metrics:{longestCrawl:900,longestPull:900}}]};
+ const cards=trendCards(I); expect(byId(cards,'crawl')).toMatchObject({value:'100'}); expect(byId(cards,'pull')).toMatchObject({value:'100'}); expect(byId(cards,'pull').text).toMatch(/Bestwert.*100.*bestätigt.*50/i);
 });

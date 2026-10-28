@@ -3,7 +3,8 @@
    (390 px / 1,3 = 300 px CSS-Breite) in WebKit geprüft, hell und dunkel, dazu geöffnete Sheets.
    Regeln: die Seite scrollt nie seitlich, kein sichtbares Element ragt über den Rand. Tabellen und Diagramme dürfen nur in ihrem
    eigenen Kasten scrollen (der Kasten selbst muss passen). */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './storage-harness';
+import { type Page } from '@playwright/test';
 import fs from 'node:fs';
 // @ts-ignore – reines JS ohne Typen
 import { makeDemo } from '../../fixtures/demo.mjs';

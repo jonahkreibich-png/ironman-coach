@@ -24,5 +24,5 @@ export default defineConfig({
     { name: 'webkit-iphone', use: { ...devices['Desktop Safari'], viewport: { width: 390, height: 844 }, hasTouch: true } }
   ],
   // Simulierte App-Schlüssel für Oura, damit „Verbinden“ im Test bis zum Erlaubnis-Bildschirm führt (der Anbieter selbst wird abgefangen)
-  webServer: { command: 'node scripts/test-server.mjs 4180', port: 4180, reuseExistingServer: !process.env.CI, timeout: 30000, env: { WORKER_ENV: JSON.stringify({ OURA_CLIENT_ID: 'test-id', OURA_CLIENT_SECRET: 'test-secret', DROPBOX_APP_KEY: 'test-dk', DROPBOX_APP_SECRET: 'test-ds', SIGNUP_PER_IP: '100000', SIGNUP_PER_HOUR: '100000' }) } }
+  webServer: { command: 'node scripts/test-server.mjs 4180', port: 4180, reuseExistingServer: false, timeout: 30000, env: { DB_FILE: ':memory:', WORKER_ENV: JSON.stringify({ OURA_CLIENT_ID: 'test-id', OURA_CLIENT_SECRET: 'test-secret', DROPBOX_APP_KEY: 'test-dk', DROPBOX_APP_SECRET: 'test-ds', SIGNUP_PER_IP: '100000', SIGNUP_PER_HOUR: '100000' }) } }
 });

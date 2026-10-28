@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach
+
+ Ô£ô tests/unit/plan-c-launcher27.test.ts (2 tests) 125ms
+ Ô£ô tests/unit/publication24.test.ts (15 tests) 174ms
+ Ô£ô tests/unit/plan-c-test-runner27.test.ts (7 tests) 6ms
+
+ Test Files  3 passed (3)
+      Tests  24 passed (24)
+   Start at  15:29:57
+   Duration  762ms (transform 55ms, setup 59ms, collect 74ms, tests 305ms, environment 0ms, prepare 340ms)
+

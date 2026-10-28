@@ -1,0 +1,56 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/dashboard27-work
+
+ Ô£ô tests/unit/training-templates26.test.ts (27 tests) 232ms
+ Ô£ô tests/unit/plan-actions26.test.ts (15 tests) 354ms
+   Ô£ô keeps structured prescriptions behind the block editor and skips generic week scaling  331ms
+ Ô£ô tests/unit/plan-summary26.test.ts (8 tests) 6ms
+ Ô£ô tests/unit/template-persistence26.test.ts (4 tests) 273ms
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > beginner: 12 virtual weeks, seed 2612
+SIM26 {"profile":"beginner","weeks":12,"seed":2612,"actions":216,"restarts":12,"synthetic":true}
+
+ Ô£ô tests/unit/plan-dashboard27.test.ts (3 tests) 3ms
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > advanced: 13 virtual weeks, seed 2613
+SIM26 {"profile":"advanced","weeks":13,"seed":2613,"actions":234,"restarts":13,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > performance: 14 virtual weeks, seed 2614
+SIM26 {"profile":"performance","weeks":14,"seed":2614,"actions":252,"restarts":14,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > football-triathlon: 15 virtual weeks, seed 2615
+SIM26 {"profile":"football-triathlon","weeks":15,"seed":2615,"actions":270,"restarts":15,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > little-time: 16 virtual weeks, seed 2616
+SIM26 {"profile":"little-time","weeks":16,"seed":2616,"actions":288,"restarts":16,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > irregular: 17 virtual weeks, seed 2617
+SIM26 {"profile":"irregular","weeks":17,"seed":2617,"actions":306,"restarts":17,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > frequent-changes: 18 virtual weeks, seed 2618
+SIM26 {"profile":"frequent-changes","weeks":18,"seed":2618,"actions":324,"restarts":18,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > many-extras: 19 virtual weeks, seed 2619
+SIM26 {"profile":"many-extras","weeks":19,"seed":2619,"actions":342,"restarts":19,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > missed-training: 20 virtual weeks, seed 2620
+SIM26 {"profile":"missed-training","weeks":20,"seed":2620,"actions":360,"restarts":20,"synthetic":true}
+
+stdout | tests/unit/plan-longitudinal26.test.ts > SIM26 independent ledger after every action and JSON restart > corrections: 21 virtual weeks, seed 2621
+SIM26 {"profile":"corrections","weeks":21,"seed":2621,"actions":378,"restarts":21,"synthetic":true}
+
+ Ô£ô tests/unit/plan-longitudinal26.test.ts (10 tests) 32025ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > beginner: 12 virtual weeks, seed 2612  1081ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > advanced: 13 virtual weeks, seed 2613  1150ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > performance: 14 virtual weeks, seed 2614  2077ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > football-triathlon: 15 virtual weeks, seed 2615  2842ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > little-time: 16 virtual weeks, seed 2616  3235ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > irregular: 17 virtual weeks, seed 2617  3620ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > frequent-changes: 18 virtual weeks, seed 2618  3785ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > many-extras: 19 virtual weeks, seed 2619  4349ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > missed-training: 20 virtual weeks, seed 2620  4756ms
+   Ô£ô SIM26 independent ledger after every action and JSON restart > corrections: 21 virtual weeks, seed 2621  5129ms
+
+ Test Files  6 passed (6)
+      Tests  67 passed (67)
+   Start at  15:15:46
+   Duration  33.19s (transform 769ms, setup 88ms, collect 752ms, tests 32.89s, environment 1ms, prepare 686ms)
+

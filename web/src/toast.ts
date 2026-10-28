@@ -1,8 +1,10 @@
+import { storage, storageMessage } from './persistence';
 /* Kurze Meldungen und „Nochmal tippen“-Bestätigung. */
 import { $ } from './util';
 
 let toastTimer: any = null;
 export function toast(msg: string): void {
+  if (/gespeichert|saved|consentSaved|revoked/i.test(msg) && storage.status !== 'saved') msg = storageMessage();
   const el = $('#toast'); if (!el) return;
   el.textContent = msg; el.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2400);

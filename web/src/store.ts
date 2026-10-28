@@ -1,3 +1,7 @@
+import { applyCustomPlanAdjustments } from '../../shared/custom-locations26';
+import { safeBackup } from './backup-validation';
+import { mergeStored } from './storage-merge';
+import { storage as localStorage } from "./persistence";
 /* Plan und Zustand der App (localStorage), Plan-Index mit Anpassungen. */
 import * as CoachCore from '../../shared/core';
 import { clone, todayStr } from './util';
@@ -17,7 +21,7 @@ export const DEFAULT_ZONES = [
   { zone: 3, label: 'Tempo', low: 90, high: 93 }, { zone: 4, label: 'Schwelle', low: 94, high: 102 }, { zone: 5, label: 'VO2max/Anaerob', low: 102, high: 999 }
 ];
 export function readPlan(): any {
-  try { return JSON.parse(localStorage.getItem(PLAN_KEY) || 'null'); } catch (e) { return null; }
+  try { return JSON.parse(localStorage.getItem(PLAN_KEY) || 'null'); } catch (e) { localStorage.block(PLAN_KEY); return null; }
 }
 const PLAN_RAW = readPlan();
 export const HAS_PLAN = !!(PLAN_RAW && Array.isArray(PLAN_RAW.weeks) && PLAN_RAW.weeks.length);
@@ -41,7 +45,7 @@ export function defaultState(): any {
     nutritionProfile: { pal: 1.4 },
     illnessPeriods: clone(PLAN.seedIllness || []),
     adjustments: {},
-    profile: null, goals: {}, activities: {}, coachMsgs: {}, coachNotes: {}, raceResults: {}, meals: {}, strengthTemplates: {},
+    profile: null, goals: {}, activities: {}, coachMsgs: {}, coachNotes: {}, raceResults: {}, meals: {}, strengthTemplates: {}, workoutTemplates: {},
     lastBackupAt: null
   };
 }
@@ -61,27 +65,33 @@ export function mergeIntoDefaults(partial: any): any {
   if (!out.nutritionProfile) out.nutritionProfile = base.nutritionProfile;
   if (!Array.isArray(out.illnessPeriods)) out.illnessPeriods = clone(PLAN.seedIllness || []);
   if (!out.adjustments || typeof out.adjustments !== 'object') out.adjustments = {};
-  ['goals', 'activities', 'coachMsgs', 'coachNotes', 'raceResults', 'meals', 'analysis', 'strengthTemplates'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
+  ['goals', 'activities', 'coachMsgs', 'coachNotes', 'raceResults', 'meals', 'analysis', 'strengthTemplates', 'workoutTemplates'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
   out.trend.sort((a, b) => a.date.localeCompare(b.date));
   return out;
 }
+let stateReadable = true;
+export function canPersist() { return stateReadable && !localStorage.blocked; }
+function readFailure(key: string) { stateReadable = false; localStorage.block(key); }
 function loadState(): any {
-  try { const raw = localStorage.getItem(LS_KEY); if (raw) return mergeIntoDefaults(JSON.parse(raw)); } catch (e) {}
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) { const data = JSON.parse(raw); if (!safeBackup(data)) throw Error('Ungueltiger Zustand'); return mergeIntoDefaults(data); } } catch (e) { readFailure(LS_KEY); return mergeIntoDefaults(null); }
   for (const k of STORAGE.legacyState) { try { const old = localStorage.getItem(k); if (old) return mergeIntoDefaults(JSON.parse(old)); } catch (e) {} }
   return mergeIntoDefaults(null);
 }
 
 /* Alle Daten des Nutzers auf diesem Gerät löschen (Nutzerwechsel, Abmelden, Zurücksetzen durch den Betreiber).
    Nur die Darstellung (hell/dunkel) bleibt. keepAuth: die Anmeldung bleibt (z. B. beim Zurücksetzen). */
-export function wipeLocalData(keepAuth = false): void {
+export async function wipeLocalData(keepAuth = false): Promise<void> {
+  localStorage.beginChange();
   try {
     // Meldungen im Ausgang bleiben (keine Gesundheitsdaten), damit „Fehler melden“ vor der Einrichtung nicht verloren geht
     const keep = new Set<string>([STORAGE.theme, 'ec_fb_outbox', ...(keepAuth ? [STORAGE.syncAuth, STORAGE.owner] : [])]);
-    Object.keys(localStorage).filter(k => /^ec_/.test(k) && !keep.has(k)).forEach(k => localStorage.removeItem(k));
-  } catch (e) {}
+    const keys = localStorage.keys().filter(k => /^ec_/.test(k) && !keep.has(k));
+    await localStorage.commit(keys.map(k => [k,null]));
+  } finally { localStorage.endChange(); }
   const fresh = mergeIntoDefaults(null);
   Object.keys(STATE).forEach(k => { delete STATE[k]; });
   Object.assign(STATE, fresh);
+  acceptPersistedState();
   Object.keys(UI).forEach(k => { delete UI[k]; });
   Object.assign(UI, { view: 'heute', tab: 'heute' });
 }
@@ -93,23 +103,45 @@ export function hasLocalData(): boolean {
 /* STATE ist ein fester Behälter. replaceState tauscht den Inhalt aus, damit alle Module dieselbe Referenz behalten. */
 export const STATE: any = loadState();
 export function replaceState(next: any): void {
+  if (next === STATE) return;
   Object.keys(STATE).forEach(k => { delete STATE[k]; });
   Object.assign(STATE, next);
 }
 
 let saveListener: (() => void) | null = null;
 export function onSave(fn: () => void): void { saveListener = fn; }
-let saveWarned = false;
-let saveTimer: any = null;
-export function saveState(): void {
-  clearTimeout(saveTimer); saveTimer = null;
-  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); }
-  catch (e) { if (!saveWarned) { saveWarned = true; toast('Dieser Browser speichert gerade nicht. Mach ein Backup unter Einstellungen.'); } }
-  if (saveListener) saveListener();
+let baseline = clone(STATE);
+export function acceptPersistedState() { baseline = clone(STATE); }
+/* Vor dem Schreiben Daten anderer Tabs einlesen, ohne eigene Aenderungen zu verlieren. */
+export function refreshStoredState(): boolean {
+  if (!canPersist()) return false;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const remote = JSON.parse(raw);
+      if (!safeBackup(remote)) throw Error('Ungueltiger Zustand');
+      const conflicts: any[] = [];
+      const merged = mergeStored(baseline, STATE, mergeIntoDefaults(remote), conflicts);
+      // Konflikte bleiben privat im persoenlichen Backup, statt einen Wert lautlos zu verlieren.
+      if (conflicts.length) merged.storageConflicts = [...(merged.storageConflicts || []), { at: Date.now(), values: conflicts }];
+      replaceState(merged); baseline = clone(mergeIntoDefaults(remote));
+    }
+    return true;
+  } catch (_) { readFailure(LS_KEY); return false; }
 }
-export function saveSoon(): void { clearTimeout(saveTimer); saveTimer = setTimeout(saveState, 350); }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer) saveState(); });
-window.addEventListener('pagehide', () => { if (saveTimer) saveState(); });
+export function saveState(remote = false): boolean {
+  if (localStorage.changing || !refreshStoredState()) return false;
+  if (saveListener && !remote) STATE._storageRevision = Math.max(Date.now(), STATE._storageRevision || 0, baseline._storageRevision || 0) + 1;
+  const ok = localStorage.setMergedItem(LS_KEY, JSON.stringify(STATE), JSON.stringify(baseline));
+  baseline = clone(STATE);
+  if (saveListener) saveListener();
+  return ok;
+}
+// Nutzereingaben nicht bis zu einem potenziell ausbleibenden pagehide aufschieben.
+export function saveSoon(): void { saveState(); }
+window.addEventListener('beforeunload', e => {
+  if (localStorage.status !== 'saved') { e.preventDefault(); e.returnValue = ''; }
+});
 
 if (PLAN.meta.scoreCalibration && STATE.scoreCalibVersion !== PLAN.meta.scoreCalibration.version) {
   STATE.scoreAdjust = { swim: 0, bike: 0, run: 0, strength: 0 };
@@ -140,7 +172,8 @@ export function rebuildPlanIndex(): void {
 rebuildPlanIndex();
 /* Neuen Plan übernehmen, ohne die Seite neu zu laden (alle Module behalten ihre Referenzen) */
 export function replacePlanInPlace(next: any): void {
-  try { localStorage.setItem(PLAN_KEY, JSON.stringify(next)); } catch (e) {}
+  if (!canPersist()) throw new Error('Plan konnte nicht sicher geladen werden.');
+  localStorage.setItem(PLAN_KEY, JSON.stringify(next));
   Object.keys(PLAN).forEach(k => { delete PLAN[k]; });
   Object.assign(PLAN, clone(next));
   if (!Array.isArray(PLAN.zonePercents) || !PLAN.zonePercents.length) PLAN.zonePercents = DEFAULT_ZONES;
@@ -243,3 +276,7 @@ export function repairOnStart(): boolean {
 { try { if (repairOnStart()) saveState(); } catch (e) { /* nie den Start verhindern */ } }
 /* Einmalig je Einheit: Werte aus alten Notizen in die Felder übertragen (Auftrag 7). Die Notiz bleibt. */
 { try { if (migrateNotes(STATE, BASE_WEEKS)) saveState(); } catch (e) { /* nie den Start verhindern */ } }
+
+/* Anzeige arbeitet mit abgeleiteten Orten; Istwerte werden am unveraenderten Original bearbeitet. */
+export function effectiveCustomWorkouts(): Record<string,any[]> { return applyCustomPlanAdjustments(STATE.customWorkouts||{},STATE.adjustments||{}); }
+export function findCustomRecord(id:string):any { return Object.values(STATE.customWorkouts||{}).flat().find((w:any)=>w.id===id)||null; }

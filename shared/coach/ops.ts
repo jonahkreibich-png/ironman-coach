@@ -1,3 +1,4 @@
+import { nextAdjustmentTime } from '../adjustment-clock';
 /* Planänderungen aus dem Coach-Chat (Auftrag 5 D3): ein kleiner Satz an Aktionen, den der regelbasierte Chat, der KI-Coach und
    die Tests gleich benutzen. Jede Aktion liefert eine Rückgängig-Information. Ausführen (applyOps) arbeitet auf einem einfachen
    Speicher-Objekt, damit App und Tests denselben Code nutzen. Neue Einschränkungen gehen ins Regel-Modell (dauerhaft). */
@@ -27,7 +28,8 @@ export function applyOps(store: OpStore, ops: Op[], now: number, today: string):
   st.adjustments = st.adjustments || {}; st.illnessPeriods = st.illnessPeriods || [];
   ops.forEach((o, k) => {
     if (o.op === 'adjust') {
-      o.adj.forEach((a, i) => { st.adjustments[a.id] = { ...a, createdAt: now + k * 10 + i, date: today, from_chat: true }; undo.adj.push(a.id); if (a.what) summary.push(a.what); });
+      const createdAt = nextAdjustmentTime(st.adjustments, now + k * 10);
+      o.adj.forEach((a, i) => { if (a.sessionId && st.sessions?.[a.sessionId]?.completed) return; st.adjustments[a.id] = { ...a, createdAt: createdAt + i, date: today, from_chat: true }; undo.adj.push(a.id); if (a.what) summary.push(a.what); });
       adjChanged = true;
     }
     if (o.op === 'illness-start') {

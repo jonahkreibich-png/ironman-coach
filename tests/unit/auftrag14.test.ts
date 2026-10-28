@@ -115,7 +115,7 @@ describe('Titel passt zur Zone', () => {
     const s = W.build({ sport: 'run', kind: 'hills', ctx, steps: [{ part: 'main', min: 49, zone: 2 }, { part: 'main', reps: 8, min: 0.25, zone: 3, restMin: 0.75 }] });
     expect(s.title).toMatch(/^Lockerer Lauf .* mit Hügelsprints$/); expect(s.zone).toBe('Zone 2');
   });
-  test.each(PLANS.map(p => [p.id, p] as const))('%s: kein Titel widerspricht der Zone', (_id, p) => {
+  for (const p of PLANS) test(p.id + ': kein Titel widerspricht der Zone', () => {
     for (const s of all(p.weeks)) expect(titleZoneIssue(s), `${s.date} ${s.title}`).toBeNull();
   });
 });
@@ -125,7 +125,8 @@ describe('Intensität als feste Regel', () => {
   // Auftrag 15: triathlet-50m-freiwasser läuft 5×, radelt 4× und schwimmt 3× pro Woche; mit „gleiche Sportart nicht an zwei Tagen hintereinander“
   // bleibt in einer Aufbauwoche kein freier Tag für einen harten Lauf (Rad und Schwimmen sind dort hart).
   const KNOWN: Record<string, string[]> = { 'zufall-6': ['missing'], 'triathlet-50m-freiwasser': ['missing'] };
-  test.each(PLANS.map(p => [p.id, p] as const))('%s: nie zwei harte Tage nebeneinander, Zahl harter Tage, 80 % locker, keine Wiederholung, Intensität je Phase', (id, p) => {
+  for (const p of PLANS) test(p.id + ': nie zwei harte Tage nebeneinander, Zahl harter Tage, 80 % locker, keine Wiederholung, Intensität je Phase', () => {
+    const id = p.id;
     const iss = checkIntensity(p.weeks, p.profile, p.today, p.opts || {}).filter(i => !(KNOWN[id] || []).includes(i.rule));
     expect(iss.map(i => i.msg)).toEqual([]);
     expect(intensityStats(p.weeks, p.profile).easyShare).toBeGreaterThanOrEqual(0.75);

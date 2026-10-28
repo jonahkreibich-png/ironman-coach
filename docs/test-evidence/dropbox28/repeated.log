@@ -1,0 +1,35 @@
+
+Running 10 tests using 1 worker
+
+(node:27616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:24832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  2 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:12464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  3 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:23884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  4 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:23168) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  5 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:9136) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  6 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:18032) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  7 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:9232) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  8 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:12812) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  9 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+(node:13392) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 10 [chromium-iphone] ÔÇ║ tests\e2e\auftrag13.spec.ts:11:3 ÔÇ║ mit Server ÔÇ║ Dropbox im Fehlerzustand: ÔÇ×FehlerÔÇ£ statt ÔÇ×nicht verbundenÔÇ£, Grund, Hilfe, letzte Datei, Jetzt abrufen (1.2s)
+
+  10 passed (31.2s)

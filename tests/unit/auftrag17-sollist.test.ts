@@ -183,3 +183,25 @@ describe('Behauptungs-Prüfer', () => {
     expect(t).not.toMatch(/100 m/); expect(t).toMatch(/Gute Einheit/); expect(t).toMatch(/Weiter so/);
   });
 });
+
+import {compactContext} from '../../shared/coach/freeai';
+import {explainDay} from '../../shared/coach/explain';
+test('Pull-Nachweise erlauben keine erfundenen unaided Behauptungen und umgekehrt',()=>{
+ const {ctx,state}=world(); state.sessions.sa17.metrics.longestPull='100'; state.sessions.di20.metrics.longestPull='100';
+ const f=claimFacts(ctx); expect(f).toMatchObject({pullBest:100,pullConfirmed:100,crawlBest:50});
+ expect(unsupportedClaims('Du hast 100 m Kraul mit Pull Buoy am Stück geschafft.',f)).toEqual([]);
+ expect(unsupportedClaims('Du hast 50 m Kraul ohne Pull Buoy und 100 m Kraul mit Pull Buoy am Stück geschafft.',f)).toEqual([]);
+ expect(unsupportedClaims('Du hast 100 m Kraul ohne Pull Buoy geschafft.',f)).not.toEqual([]);
+ expect(unsupportedClaims('Du hast 100 m Kraul mit Pull Buoy und 100 m Kraul ohne Pull Buoy geschafft.',f)).not.toEqual([]);
+ expect(unsupportedClaims('Du hast 150 m mit Pull Buoy am Stück geschafft.',f)).not.toEqual([]);
+});
+test('kompakter Kontext unterscheidet beide Bestwerte und Bestätigung von Profilangaben',()=>{
+ const {ctx,state,profile}=world(); profile.skills.swimCrawlM=200; profile.skills.swimPullM=300;
+ state.sessions.di20.metrics.longestCrawl='100'; state.sessions.di20.metrics.longestPull='100'; state.sessions.sa17.metrics.longestPull='50';
+ const text=compactContext(ctx); expect(text).toMatch(/Kraul ohne Hilfsmittel.*Bestwert 100 m.*bestätigt 50 m/); expect(text).toMatch(/Pull Buoy.*Bestwert 100 m.*bestätigt 50 m/);
+ expect(text).toMatch(/Profilangabe.*200 m.*300 m/); expect(text).toMatch(/IST erledigt.*Pull Buoy am Stück 100 m/);
+});
+test('Trainingserklärung benennt Bestwert100 statt falscher Behauptung aktuell50',()=>{
+ const {ctx,state,profile}=world(); profile.skills.swimCrawlM=50; state.sessions.di20.metrics.longestCrawl='100';
+ const text=explainDay(ctx,'2026-10-24','swim').text; expect(text).toMatch(/Bestwert 100 m.*bestätigt 50 m/); expect(text).not.toMatch(/Du kraulst gerade 50/);
+});

@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 C:/Users/Anwender/Downloads/ironman-coach-app/ironman-coach/scratch/coach28-work
+
+ Ô£ô tests/unit/fitness-quality.test.ts (17 tests) 48ms
+ Ô£ô tests/unit/swim-equipment-quality.test.ts (29 tests) 74ms
+ Ô£ô tests/unit/scores.test.ts (19 tests) 38ms
+
+ Test Files  3 passed (3)
+      Tests  65 passed (65)
+   Start at  22:02:12
+   Duration  1.25s (transform 556ms, setup 53ms, collect 1.10s, tests 160ms, environment 0ms, prepare 324ms)
+

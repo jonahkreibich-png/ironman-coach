@@ -1,6 +1,7 @@
+import {effectiveCustomBuckets} from './custom-state26';
 /* Gemeinsame Coach-Logik für App und Server (keine Abhängigkeiten, keine DOM-Zugriffe). */
 // Bewusst locker typisiert: Datensätze kommen aus Sync und Backups und sind nicht immer vollständig.
-import { GENERIC_LTHR } from './profile';
+import { GENERIC_LTHR, sleepNeed } from './profile';
 import { loadSeriesFromDaily, validDate } from './load';
 import * as W from './workouts';
 import * as K from './keysessions';
@@ -227,6 +228,24 @@ function readinessHistory(trend, illness, date, n, fallback) {
   return out;
 }
 
+function readinessInputs(state: any, weeks: any[], profile: any, date: string) {
+  const fb: any = { ...(state.settings?.readiness || {}), sleepNeed: sleepNeed(profile, date) };
+  try { const L = loadBaseline(state, weeks || [], date); fb.load = L.ctl != null && L.atl != null ? { ctl: L.ctl, atl: L.atl } : null; }
+  catch { fb.load = null; }
+  return fb;
+}
+function readinessSnapshot(state: any, weeks: any[], profile: any, date: string) {
+  const trend = [...(state.trend || [])].filter(Boolean).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const fallback = readinessInputs(state, weeks, profile, date);
+  const r = readinessFor(trend, state.illnessPeriods || [], date, fallback);
+  // Deterministischer Änderungsbeleg, kein Sync-Zeitstempel und keine Sicherheits-Signatur.
+  const input = JSON.stringify([date, trend.filter(p => p.date <= date && p.date >= addDays(date, -30)), state.illnessPeriods || [], fallback]);
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) hash = Math.imul(hash ^ input.charCodeAt(i), 16777619);
+  const sources = [...new Set([...(state.trend || []).flatMap(p => Object.values(p?._src || {})), ...Object.values(state.activities || {}).flatMap((a: any) => a ? [a.source, ...(a.sources || [])] : [])].filter(Boolean))];
+  return { ...r, date, sources, source: 'canonical-state', version: 'readiness-v1-' + (hash >>> 0).toString(16), dataDate: r.point?.date || null };
+}
+
 /* ================= Phase 4: Belastung ================= */
 /* Schwellenpuls aus Profil oder Einstellungen, sonst eine allgemeine Formel (keine Werte einer Person) */
 const LTHR_DEFAULT = GENERIC_LTHR;
@@ -319,9 +338,18 @@ function applyAdjustments(weeks, adjustments) {
       const to = dayByDate[a.to]; if (!to || to === d) continue;
       d.sessions = d.sessions.filter(x => x !== s);
       (d.moved = d.moved || []).push({ id: s.id, title: s.title, sport: s.sport, to: a.to });
-      s.movedFrom = d.date; to.sessions = to.sessions.filter(x => x.sport !== 'rest'); to.sessions.push(s); where[s.id] = to;
+      s.movedFrom = s._orig.date; s.date = a.to; to.sessions = to.sessions.filter(x => x.sport !== 'rest'); to.sessions.push(s); where[s.id] = to;
     }
   }
+  // Tagesverweise aus dem ENDGUELTIGEN Standort ableiten, nicht aus Zwischenstationen.
+  out.forEach(w => (w.days || []).forEach(d => { delete d.moved; }));
+  Object.entries(where).forEach(([id, d]) => {
+    const s = d.sessions.find(x => x.id === id);
+    if (!s || !s.movedFrom) return;
+    if (s.movedFrom === d.date) { delete s.movedFrom; return; }
+    const origin = dayByDate[s.movedFrom];
+    if (origin && !s.cancelled && !s.removed) (origin.moved = origin.moved || []).push({ id, title: s.title, sport: s.sport, to: d.date });
+  });
   return out;
 }
 /* Vom Nutzer als „fest“ markiert: die Engine ändert diese Einheit nicht mehr (Auftrag 4 C5) */
@@ -338,8 +366,8 @@ function recordedActivities(state) {
   const drafts = new Set();
   const corrections = new Map();
   Object.entries(state.sessions || {}).forEach(([id, st]) => { const aid = canonicalActivityId(state, st.activityId); if (aid) corrections.set(aid, st); corrections.set('session:' + id, st); });
-  Object.values(state.customWorkouts || {}).forEach(list => (list || []).forEach(w => { const aid = canonicalActivityId(state, w.activityId); if (aid) corrections.set(aid, w); }));
-  Object.values(state.customWorkouts || {}).forEach(list => (list || []).forEach(w => { if (w.completed === false && w.activityId) drafts.add(canonicalActivityId(state, w.activityId)); }));
+  Object.values(effectiveCustomBuckets(state) || {}).forEach(list => (list || []).forEach(w => { const aid = canonicalActivityId(state, w.activityId); if (aid) corrections.set(aid, w); }));
+  Object.values(effectiveCustomBuckets(state) || {}).forEach(list => (list || []).forEach(w => { if (w.completed === false && w.activityId) drafts.add(canonicalActivityId(state, w.activityId)); }));
   return Object.values(state.activities || {}).filter(a => a && !a.mergedInto && !drafts.has(a.id)).map(a => {
     const linked = corrections.get(a.id) || corrections.get('session:' + a.sessionId);
     return effectiveActivity(a, linked || {});
@@ -358,7 +386,7 @@ function dailyLoadEntries(state, weeks) {
     out.push({ date, sport: s.sport, key, load: sessionLoad(s, record, thrOf(state)) });
   };
   planDays(weeks).forEach(d => (d.sessions || []).forEach(s => { const st = state.sessions?.[s.id]; if (st?.completed) add(d.date, s, st, 'session:' + s.id); }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, list]) => (list || []).forEach(w => add(d, w, w, 'custom:' + w.id)));
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, list]) => (list || []).forEach(w => add(d, w, w, 'custom:' + w.id)));
   recordedActivities(state).forEach(a => {
     if (!a || a.mergedInto || seen.has('act:' + a.id)) return;
     if (a.sessionId && seen.has('session:' + a.sessionId)) return;
@@ -401,7 +429,7 @@ function loadBaseline(state, weeks, today) {
 function doneDates(state, weeks) {
   const out = new Set();
   planDays(weeks || []).forEach(d => (d.sessions || []).forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && s.sport !== 'football' && s.sport !== 'rest') out.add(d.date); }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach(c => { if (c && c.completed !== false && c.sport !== 'football') out.add(d); }));
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l || []).forEach(c => { if (c && c.completed !== false && c.sport !== 'football') out.add(d); }));
   recordedActivities(state).forEach(a => { if (a && a.sport !== 'football') out.add(a.date); });
   return [...out].sort();
 }
@@ -417,7 +445,7 @@ function trainingGap(state, weeks, date) {
   let last = null;
   const take = d => { if (d < date && (!last || d > last)) last = d; };
   planDays(weeks || []).forEach(d => (d.sessions || []).forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && s.sport !== 'football' && s.sport !== 'rest') take(d.date); }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach(c => { if (c && c.completed !== false && c.sport !== 'football') take(d); }));
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l || []).forEach(c => { if (c && c.completed !== false && c.sport !== 'football') take(d); }));
   recordedActivities(state).forEach(a => { if (a && a.sport !== 'football') take(a.date); });
   if (!last) return null;
   // nur wer vorher regelmäßig eingetragen hat (mindestens 4 Tage in den 3 Wochen davor): sonst fehlen nur Daten
@@ -442,7 +470,7 @@ function painFlag(state, weeks, date) {
   const from = addDays(date, -6);
   const texts = [];
   planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); if (st && st.deviation) texts.push(st.deviation); }); });
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.description) texts.push(w.description); }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.notes ?? w.description) texts.push(w.notes ?? w.description); }); });
   (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
   Object.values(state.weekNotes || {}).forEach(t => { if (t) texts.push(String(t)); });
   for (const t of texts) {
@@ -456,7 +484,7 @@ const painLabel = p => p && p !== 'Schmerz' ? `Schmerz (${p})` : 'Schmerz';
 function painInfo(state, weeks, date) {
   const from = addDays(date, -6); const texts = [];
   planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); if (st && st.deviation) texts.push(st.deviation); }); });
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.description) texts.push(w.description); }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.notes ?? w.description) texts.push(w.notes ?? w.description); }); });
   (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
   let best = null;
   for (const t of texts) { let m; PAIN_RE.lastIndex = 0; while ((m = PAIN_RE.exec(t))) { const v = parseFloat(m[2].replace(',', '.')); if (v <= 10 && (!best || v > best.level)) best = { part: PAIN_NAMES[m[1].toLowerCase()] || 'Schmerz', level: v }; } }
@@ -522,12 +550,12 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   const illness = state.illnessPeriods || [];
   if (illnessAt(illness, date) || returnStageActive(illness, date)) return res; // Krankheit und Wiedereinstieg haben Vorrang
   const meta = opts.planMeta || {};
-  const R = readinessFor(state.trend, illness, date, (state.settings || {}).readiness);
+  const R = readinessSnapshot(state, applyAdjustments(baseWeeks || [], state.adjustments || {}), state.profile || {}, date);
   const why = R.reasons.length ? ' (' + R.reasons.join(', ') + ')' : '';
   let weeks = applyAdjustments(baseWeeks, Object.assign({}, existing));
   const dayOf = d => planDays(weeks).find(x => x.date === d) || null;
   const live = d => { const x = dayOf(d); return x ? x.sessions.filter(s => s.sport !== 'rest' && !s.cancelled) : []; };
-  const push = a => { if (has(a.id)) return false; if (a.sessionId && isLocked(weeks, a.sessionId)) return false; a.createdAt = now + res.length; a.date = date; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
+  const push = a => { if (has(a.id)) return false; if (a.sessionId && isLocked(weeks, a.sessionId)) return false; a.createdAt = now + res.length; a.date = date; if (R.sources.includes('oura')) a.aiExcluded = true; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
   const pain = painFlag(state, weeks, date);
   const rules = rulesOf(state.profile, parseFor(date));
 
@@ -670,7 +698,9 @@ function swimProofs(state, weeks, date, days = 42) {
   const plannedTarget = s => Math.max(0, ...((s && s.spec && s.spec.steps) || []).filter(x => x.mode === 'crawl').map(x => x.m || 0)) || null;
   const pos = v => { const n = toNum(v); return n != null && n > 0 ? n : null; };
   const add = (d, key, st, act, s) => {
-    if (act) used.add(act.id);
+    const identity = canonicalActivityId(state, act?.id || st.activityId) || 'session:' + key;
+    if (used.has(identity)) return;
+    used.add(identity);
     const m = actualMetrics(st, act);
     out.push({ date: d, key, crawl: pos(m.longestCrawl), pull: pos(m.longestPull), target: plannedTarget(s), stage: s && s.stage && s.stage.ladder !== 'runwalk' ? { ladder: s.stage.ladder, n: s.stage.n } : null, manual: !act || st.metricsSrc?.longestCrawl === 'manual' || !!st.metricsManual?.longestCrawl });
   };
@@ -678,10 +708,10 @@ function swimProofs(state, weeks, date, days = 42) {
     const st = (state.sessions || {})[s.id]; if (!st || !st.completed) return;
     add(d.date, s.id, st, st.activityId ? (state.activities || {})[st.activityId] : null, s);
   }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) add(d, c.id, c, c.activityId ? (state.activities || {})[c.activityId] : null, null); }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) add(d, c.id, c, c.activityId ? (state.activities || {})[c.activityId] : null, null); }); });
   recordedActivities(state).filter(a => a.sport === 'swim' && !a.sessionId && !used.has(a.id) && a.date <= date && a.date > from).forEach(a => {
-    const c = toNum(a.swim && a.swim.longestCrawlM);
-    out.push({ date: a.date, key: a.id, crawl: c != null && c > 0 ? c : null, pull: null, target: null, stage: null, manual: false });
+    const m = actualMetrics({}, a);
+    out.push({ date: a.date, key: a.id, crawl: pos(m.longestCrawl), pull: pos(m.longestPull), target: null, stage: null, manual: false });
   });
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -694,7 +724,7 @@ function swimRate(state, weeks, date) {
   planDays(weeks).filter(d => d.date <= date && d.date > from).forEach(d => d.sessions.filter(s => s.sport === 'swim').forEach(s => {
     const st = (state.sessions || {})[s.id]; if (st && st.completed) look(st, st.activityId ? (state.activities || {})[st.activityId] : null);
   }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
   return n >= 2 ? Math.round(m / min * 10) / 10 : null;
 }
 /* Auftrag 20: eigenes Schwimm-Tempo ohne Pausen (s/100 m, von der Uhr oder eingetragen) aus erledigten Schwimmeinheiten der letzten 6 Wochen,
@@ -707,7 +737,7 @@ function swimPace100(state, weeks, date) {
   planDays(weeks).filter(d => d.date <= date && d.date > from).forEach(d => d.sessions.filter(s => s.sport === 'swim').forEach(s => {
     const st = (state.sessions || {})[s.id]; if (st && st.completed) look(st, st.activityId ? (state.activities || {})[st.activityId] : null);
   }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d <= date && d > from) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) look(c, c.activityId ? (state.activities || {})[c.activityId] : null); }); });
   recordedActivities(state).filter(a => a.sport === 'swim' && !a.sessionId && !used.has(a.id) && a.date <= date && a.date > from).forEach(a => look(null, a));
   if (vals.length < 2) return null;
   vals.sort((a, b) => a - b); return Math.round(vals[Math.floor((vals.length - 1) / 2)]);
@@ -760,7 +790,7 @@ function longestCrawl(state, weeks, date) {
     const act = st.activityId ? (state.activities || {})[st.activityId] : null;
     best = Math.max(best, toNum(actualMetrics(st, act).longestCrawl) || 0);
   }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d <= date && d > addDays(date, -56)) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) best = Math.max(best, toNum((c.metrics || {}).longestCrawl) || 0); }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d <= date && d > addDays(date, -56)) (l || []).forEach(c => { if (c && c.sport === 'swim' && c.completed !== false) best = Math.max(best, toNum((c.metrics || {}).longestCrawl) || 0); }); });
   return best;
 }
 function lastCrawlCheck(state, weeks, date) {
@@ -780,7 +810,7 @@ function ownDoneMinutes(state, weeks, mon, sun) {
     const act = st.activityId ? (state.activities || {})[st.activityId] : null; if (act) used.add(act.id);
     min += toNum(actualMetrics(st, act).min) ?? x.plannedMinutes ?? 0; n++;
   }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d >= mon && d <= sun) (l || []).forEach(c => {
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d >= mon && d <= sun) (l || []).forEach(c => {
     if (!c || c.sport === 'football' || c.completed === false) return;
     const act = c.activityId ? (state.activities || {})[c.activityId] : null; if (act) used.add(act.id);
     const m = toNum(actualMetrics(c, act).min); if (m) { min += m; n++; }
@@ -810,7 +840,7 @@ function recentLongest(state, weeks, date, sport, days = 28) {
     const st = (state.sessions || {})[x.id]; if (!st || !st.completed || x.sport !== sport || x.race) return;
     const m = toNum(actualMetrics(st, st.activityId ? (state.activities || {})[st.activityId] : null).min); if (m) best = Math.max(best, m);
   }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => { if (d < date && d >= from) (l || []).forEach(c => { if (c && c.sport === sport && c.completed !== false) { const m = toNum(actualMetrics(c, null).min); if (m) best = Math.max(best, m); } }); });
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d < date && d >= from) (l || []).forEach(c => { if (c && c.sport === sport && c.completed !== false) { const m = toNum(actualMetrics(c, null).min); if (m) best = Math.max(best, m); } }); });
   recordedActivities(state).filter(a => a.sport === sport && !a.sessionId && a.date < date && a.date >= from).forEach(a => { if (toNum(a.min)) best = Math.max(best, toNum(a.min)); });
   return best || null;
 }
@@ -1061,7 +1091,7 @@ function nutritionKcalLow(state, weeks, date, profile) {
     const min = st.completed && st.metrics && toNum(st.metrics.min) != null ? toNum(st.metrics.min) : defaultMinutes(s);
     act += (MET(s) - 1) * w * min / 60;
   });
-  ((state.customWorkouts || {})[date] || []).forEach(x => { const min = toNum((x.metrics || {}).min) != null ? toNum(x.metrics.min) : (x.plannedMinutes || defaultMinutes(x)); act += (MET(x) - 1) * w * min / 60; });
+  ((effectiveCustomBuckets(state) || {})[date] || []).forEach(x => { const min = toNum((x.metrics || {}).min) != null ? toNum(x.metrics.min) : (x.plannedMinutes || defaultMinutes(x)); act += (MET(x) - 1) * w * min / 60; });
   return Math.round((daily + act) / 50) * 50;
 }
 /* Bestwerte: Schwimm-Pace /100 m, Züge pro Bahn, Lauf-Effizienz (m pro Herzschlag). */
@@ -1080,7 +1110,7 @@ function perfEntries(state, weeks) {
     }
   };
   planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed) addE(d.date, s.sport, st.metrics, s.id); }));
-  Object.entries(state.customWorkouts || {}).forEach(([d, l]) => (l || []).forEach(w => addE(d, w.sport, w.metrics, w.id)));
+  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l || []).forEach(w => addE(d, w.sport, w.metrics, w.id)));
   return out;
 }
 function bests(entries) {
@@ -1097,7 +1127,7 @@ function bests(entries) {
 export {
   ruleOk,
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
-  addDays, illnessAt, hasRecovery, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
+  addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
   isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, ownDoneMinutes, recentOwnMinutes, recentLongest

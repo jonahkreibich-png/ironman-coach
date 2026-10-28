@@ -2,8 +2,9 @@
    Enthält Profil und Ziele, Plan der nächsten 14 Tage, Werte und Einheiten der letzten 28 Tage, Krankheiten,
    Ampel-Verlauf, letzte Anpassungen und Coach-Notizen. Nicht der ganze Datenbestand. */
 import * as C from '../core';
+import { readinessContextLine } from '../readiness';
 import { doneItems, valsOf } from './review';
-import { readinessFallback, type EngineCtx } from './engine';
+import { readinessFallback, readinessOf, type EngineCtx } from './engine';
 import { ageOf, sleepNeed } from '../profile';
 import { mainGoal, GOALS } from '../goals';
 import { PLAN_FORMAT_HINT } from './plancode';
@@ -51,14 +52,15 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   const from = C.addDays(today, -days);
   all.filter((d: any) => d.date >= from && d.date <= today).forEach((d: any) => d.sessions.filter((s: any) => s.sport !== 'rest').forEach((s: any) => {
     const st = ctx.state.sessions?.[s.id] || {};
-    L.push(json({ date: d.date, SOLL: { title: s.title, min: s.plannedMinutes ?? null, km: s.plannedKm ?? null }, status: st.completed ? 'abgeschlossen' : st.skipped ? 'ausgefallen' : 'kein Ergebnis' }));
+    L.push(json({ date: d.date, SOLL: { title: s.title, min: s.plannedMinutes ?? null, km: s.plannedKm ?? null, ...(s.sport === 'strength' ? { area: s.area ?? s.spec?.area ?? null, exercises: s.spec?.exercises || [] } : {}) }, status: st.completed ? 'abgeschlossen' : st.skipped ? 'ausgefallen' : 'kein Ergebnis' }));
   }));
   doneItems(ctx, from, today).forEach(d => {
     const v = valsOf(d);
-    L.push(json({ date: d.date, id: d.key, sport: d.sport, IST: { min: v.min, km: v.km, meters: v.meters, longestCrawlM: v.longest, pace100Sec: v.pace100, hr: v.hr, paceSecKm: v.pace, power: v.power, rpe: v.rpe, feel: v.feel, technique: v.technique || null, deviation: v.deviation || null }, notes: v.notes ? v.notes.slice(0, 120) : null, missing: 'unbekannt = nicht nachgewiesen; niemals durch SOLL ersetzen' }));
+    L.push(json({ date: d.date, id: d.key, sport: d.sport, IST: { ...(d.sport === 'strength' ? { title: d.title, area: v.area, areaSource: v.areaSource, exercises: v.exercises } : {}), min: v.min, km: v.km, meters: v.meters, longestCrawlM: v.longest, longestPullM: v.longestPull, pace100Sec: v.pace100, hr: v.hr, paceSecKm: v.pace, power: v.power, rpe: v.rpe, feel: v.feel, technique: v.technique || null, deviation: v.deviation || null }, notes: v.notes ? v.notes.slice(0, 120) : null, missing: 'unbekannt = nicht nachgewiesen; niemals durch SOLL ersetzen' }));
   });
   L.push('## Werte (Schlaf h / HFV / Ruhepuls / Temp-Abw. / Ampel)');
-  const hist = C.readinessHistory(ctx.state.trend, ctx.state.illnessPeriods, today, Math.min(days, 21), readinessFallback(ctx));
+  L.push('AMPEL HEUTE: ' + readinessContextLine(readinessOf(ctx)));
+  const hist = ctx.readinessWithheld ? (ctx.state.trend || []).filter((p: any) => p && p.date <= today && p.date >= C.addDays(today, -Math.min(days, 21))).map((p: any) => ({ date: p.date, ill: false, level: null, score: null })) : C.readinessHistory(ctx.state.trend, ctx.state.illnessPeriods, today, Math.min(days, 21), readinessFallback(ctx));
   hist.forEach(h => {
     const v = (ctx.state.trend || []).find((x: any) => x && x.date === h.date);
     if (!v) return;
@@ -69,7 +71,7 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   if (ill.length) L.push('## Krankheiten: ' + ill.map((x: any) => `${d2(x.start)}-${x.end ? d2(x.end) : 'läuft'}${x.note ? ' ' + x.note : ''}`).join('; '));
   const adj = Object.values(ctx.state.adjustments || {}).filter((a: any) => a && a.date >= C.addDays(today, -14)).sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
   if (adj.length) { L.push('## Anpassungen der App (14 Tage)'); adj.forEach((a: any) => L.push(`- ${d2(a.date)} ${a.what || ''}${a.reason ? ' (' + a.reason + ')' : ''}${a.undone ? ' [rückgängig]' : ''}`)); }
-  if (opts.scores && opts.scores.length) L.push('## Leistungs-Scores (feste Skala: 20 Einsteiger, 50 solider Hobbysportler, 70 stark, 85 Spitzenamateur, 100 Elite): ' + opts.scores.map((s: any) => `${SPORT[s.sport]} ${s.score}${s.gains && s.gains[0] ? ` (am meisten bringt: ${s.gains[0].text})` : ''}`).join(', '));
+  if (opts.scores && opts.scores.length) L.push('## Leistungs-Scores (heuristische Orientierung von 0 bis 100; Datenbasis und Unsicherheit beachten): ' + opts.scores.map((s: any) => `${SPORT[s.sport]} ${s.measured == null ? 'keine Leistungsnachweise; angezeigter Schätzwert ' : ''}${s.score}${s.provisional ? ' (vorläufig)' : ''}${s.rangeText ? ' (' + s.rangeText + ')' : ''}${s.confText ? '; ' + s.confText : ''}${s.why?.length ? '; Gründe: ' + s.why.slice(0, 3).join('; ') : ''}${s.counted ? '; berücksichtigte Einheiten: ' + s.counted.length : ''}${s.gains && s.gains[0] ? ` (am meisten bringt: ${s.gains[0].text})` : ''}`).join(', '));
   const notes = Object.values(ctx.state.coachNotes || {}).filter((n: any) => n && !n.deleted);
   if (notes.length) { L.push('## Coach-Notizen'); notes.forEach((n: any) => L.push('- ' + n.text)); }
   const mg = mainGoal(ctx.goals, today);

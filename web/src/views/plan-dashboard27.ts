@@ -1,0 +1,15 @@
+import {esc} from '../util';
+import {t,num} from '../../../shared/i18n';
+import {SPORT_COLOR,ic} from '../icons';
+import type {weekSummary} from '../../../shared/plan-summary26';
+/** Read-only view of the exact same summary used by days, counts and week navigation. */
+export function renderPlanDashboard(summary:ReturnType<typeof weekSummary>, open=true):string {
+ const sports=new Map<string,{minutes:number;unknown:number}>();
+ for(const row of summary.active){const sport=row.session.sport||'multi';const value=sports.get(sport)||{minutes:0,unknown:0};value.minutes+=row.plannedMinutes??0;if(row.plannedMinutes==null)value.unknown++;sports.set(sport,value);}
+ const order=['swim','bike','run','strength','football'];
+ const rows=[...sports].sort(([a],[b])=>(order.includes(a)?order.indexOf(a):99)-(order.includes(b)?order.indexOf(b):99));
+ return '<section class="plan-dashboard" data-plan-design-summary aria-label="Wochenuebersicht"><h2 class="plan-dashboard-title"><button class="btn ghost block spread" data-act="plan-dashboard-toggle" aria-expanded="'+open+'" aria-controls="plan-dashboard-body"><span class="plan-dashboard-label">Dein Trainingsdashboard</span><span class="chev plan-dashboard-chevron" aria-hidden="true">'+ic('down')+'</span></button></h2><div id="plan-dashboard-body" '+(open?'':'hidden')+'>'+
+ '<div class="plan-metrics"><div class="plan-metric plan-metric-primary" data-dashboard-planned="'+summary.plannedMinutes+'" data-unknown-planned="'+summary.unknownPlannedMinutes+'"><span class="lbl">Aktiv geplant</span><div class="plan-metric-value">'+esc(num(summary.plannedMinutes/60,1))+' <small>h</small></div><p>'+esc(num(summary.plannedMinutes,1))+' Minuten'+(summary.unknownPlannedMinutes?' + ?':'')+'</p><span class="xs">'+summary.total+' Einheiten'+(summary.unknownPlannedMinutes?' · Dauer offen':'')+'</span></div>'+
+ '<div class="plan-metric" data-dashboard-actual="'+summary.actualMinutes+'" data-unknown-actual="'+summary.unknownActualMinutes+'"><span class="lbl">Absolviert</span><div class="plan-metric-value">'+esc(num(summary.actualMinutes,1))+' <small>min</small></div><p>'+summary.done+'/'+summary.total+' Einheiten abgeschlossen</p><span class="xs muted">'+(summary.unknownActualMinutes?'Erfasste Zeiten; Dauer offen bei weiteren Einheiten':summary.done?'Aus erfassten Istwerten':'Noch keine Einheit abgeschlossen')+'</span></div></div>'+
+ '<div class="plan-sports"><h2>Sportverteilung <span class="xs muted">· aktive Planminuten</span></h2>'+rows.map(([sport,value])=>'<div class="plan-sport" data-dashboard-sport="'+esc(sport)+'" data-sport-minutes="'+value.minutes+'"><span>'+esc(t('sport.'+sport))+'</span><span class="plan-sport-track" aria-hidden="true"><i style="width:'+(summary.plannedMinutes?value.minutes/summary.plannedMinutes*100:0).toFixed(2)+'%;background:'+esc(SPORT_COLOR[sport]||'var(--rest)')+'"></i></span><span>'+esc(num(value.minutes,1))+(value.unknown?' + ?':'')+' min</span></div>').join('')+(!rows.length?'<p class="small muted">Noch keine Einheiten in dieser Woche.</p>':'')+'</div></div></section>';
+}

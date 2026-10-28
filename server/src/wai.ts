@@ -1,3 +1,4 @@
+import { guardReadinessAnswer } from '../../shared/readiness';
 /* Auftrag 16: kostenloser KI-Coach mit Cloudflare Workers AI (Binding „AI“, kein API-Schlüssel, Gratis-Plan: 10.000 Neurons pro Tag
    für das ganze Konto, Neustart 00:00 UTC). Reihenfolge im Chat: Claude (nur wenn Schlüssel hinterlegt und eingeschaltet) → Workers AI →
    Regel-Coach (in der App). Ist das Kontingent leer oder gibt es einen Fehler, antwortet die App selbst mit dem Regel-Coach.
@@ -9,7 +10,7 @@ import { HttpError } from './http';
 import { aiSafeCtx, type ChatResult, type ChatStream } from './ai';
 import { runTool, type ToolChange } from '../../shared/coach/tools';
 import { checkMessage } from '../../shared/coach/safety';
-import { coachSkill, compactContext, openAiTools, inventedNumbers, cleanAnswer, cleanPartial, autoTool, isChangeRequest, claimsChange, leaksInternals } from '../../shared/coach/freeai';
+import { coachSkill, compactContext, openAiTools, inventedNumbers, cleanAnswer, autoTool, isChangeRequest, claimsChange, leaksInternals } from '../../shared/coach/freeai';
 import { hasSource } from '../../shared/activity/merge';
 import type { EngineCtx, CoachMsg } from '../../shared/coach/engine';
 import { isMinor } from '../../shared/profile';
@@ -135,21 +136,14 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   // Änderungswunsch: es muss ein Werkzeug aufgerufen werden (sonst behaupten kleine Modelle nur, etwas geändert zu haben)
   const change = !pre && isChangeRequest(userMsg.text);
   let nudged = false, toolCalled = !!pre;
-  // Strom ohne Denk-Teil (<|channel>…<channel|>, <think>…</think>) an die App
-  let raw = '', sent = '';
-  const push = (t: string) => {
-    if (!live) return; raw += t;
-    const c = cleanPartial(raw);
-    if (c.startsWith(sent)) { if (c.length > sent.length) { live.delta(c.slice(sent.length)); sent = c; } }
-    else { live.reset(); sent = c; if (c) live.delta(c); }
-  };
+  // Modelltext wird erst nach der abschließenden Faktenprüfung ausgegeben.
   try {
     for (let round = 0; round < 4; round++) {
-      if (live && round > 0) { live.reset(); raw = ''; sent = ''; }
+      if (live && round > 0) live.reset();
       const last = round === 3;
       const quiet = change && !props.length && round === 0;
       const body = await env.AI.run(model, { messages, ...(last ? {} : { tools, ...(quiet ? { tool_choice: 'required' } : {}) }), max_tokens: 700, temperature: 0.3, stream: true, ...modelExtras(model) });
-      const turn = await readStream(body, t => { if (!quiet) push(t); });
+      const turn = await readStream(body, () => {});
       if (env.WAI_DEBUG) console.log('TURN', round, JSON.stringify({ c: turn.content.slice(0, 300), t: turn.toolCalls, u: turn.usage && turn.usage.neurons }));
       calls++; out.rounds = round + 1;
       if (turn.usage) { out.neurons += Number(turn.usage.neurons || 0); tin += turn.usage.prompt_tokens || 0; tout += turn.usage.completion_tokens || 0; }
@@ -194,9 +188,11 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
     await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 });
     throw new FallbackError(!final ? 'empty' : bad.length ? 'invented: ' + bad.join(', ') : claimed ? 'claimed change without proposal' : 'internals');
   }
+  final = guardReadinessAnswer(final, text, ctx0);
+  if (live) { live.reset(); final.split(/(?<=\s)/).forEach(t => live.delta(t)); }
   await addWaiUsage(env, uid, { questions: 1, calls, neurons: out.neurons, tin, tout });
   hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
-  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: final, by: 'free' } as any);
+  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: final, aiExcluded: final.startsWith('Ampel der App:'), by: 'free' } as any);
   // Vorschläge nach der Antwort, damit „bestätige ihn unten“ stimmt
   props.forEach((m, i) => out.messages.push({ ...m, at: Date.now() + 3 + i }));
   out.status = await freeStatus(env, uid, ctx.state.settings, !!o.parentNeeded);

@@ -1,3 +1,4 @@
+import { storage as localStorage } from "../persistence";
 /* „Fehler melden / Idee“ (Auftrag 4 F1, Auftrag 5 B): kurzer Text, dazu automatisch die letzten Bildschirme, App-Version, Gerät und
    die letzten Fehlermeldungen, optional ein Screenshot (ein Tipp öffnet die Fotos) und – nur wenn der Nutzer es ankreuzt – Trainingsdaten
    für genau diese Meldung. Meldungen gehen nie verloren: ohne Verbindung landen sie im Ausgang und werden beim nächsten Abgleich gesendet.

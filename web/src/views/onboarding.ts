@@ -1,3 +1,4 @@
+import { storage as localStorage } from "../persistence";
 /* Start ohne Daten und Fragebogen (Onboarding): Blöcke mit Fortschritt, überspringbar, Vorbefüllung aus verbundenen Daten,
    Pflichtfragen mit *. Am Ende „Das habe ich verstanden“ mit „Ändern“ (F2), erst dann wird der Plan gebaut.
    Auftrag 4: Zeit pro Tag statt Uhrzeiten, Häufigkeit je Sportart, Teamsport, Wunschzeit je Ziel mit Realismus-Check,
@@ -50,13 +51,13 @@ export function renderWelcome(): string {
     <div class="hint" style="text-align:center">${esc(t('welcome.privacy'))}</div>
     <button class="link" data-act="go-sub" data-sub="feedback" style="align-self:center">${esc(t('sub.feedback'))}</button></div>`;
 }
-on('welcome-load', () => {
+on('welcome-load', async () => {
   const raw = ((document.getElementById('bk-in') as HTMLTextAreaElement)?.value || '').trim();
   if (!raw) { toast(t('data.restoreEmpty')); return; }
   let data: any; try { data = parseBackupText(raw); } catch (e) { toast(t('data.restoreInvalid')); return; }
   if (!isBackup(data)) { toast(t('data.restoreNoBackup')); return; }
   if (!isPlan(data.plan)) { toast(t('welcome.noPlanInBackup')); return; }
-  applyBackup(data);
+  await applyBackup(data);
 });
 on('ob-start', () => { const d = draft(); if (!Object.keys(d.answers).length) { d.answers = { ...prefillFromData(D().activities, STATE.trend, todayStr()), ...fromProfile() }; d.block = 0; d.done = false; } saveState(); nav.go('mehr:onboarding'); });
 

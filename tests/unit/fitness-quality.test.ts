@@ -3,6 +3,9 @@ import { sportScores, estimatesAt, legacyActivities } from '../../shared/scores'
 import { defaultProfile } from '../../shared/profile';
 import { addDays } from '../../shared/core';
 import type { Activity } from '../../shared/activity/analyze';
+import { refreshFuture } from '../../shared/refresh';
+import { paceCtx } from '../../shared/plangen';
+import * as W from '../../shared/workouts';
 
 const today = '2026-10-20';
 const profile = { ...defaultProfile(), birthYear: 2000, thresholds: { ...defaultProfile().thresholds, lthrRun: 170, thresholdPaceRunSec: 300 } };
@@ -14,6 +17,37 @@ function run(id: string, days: number, extra: Partial<Activity> = {}): Activity 
 const score = (activities: Activity[], at = today) => sportScores({ ...base, today: at, activities }, ['run'])[0];
 
 describe('Qualität der Fitness-Schätzung', () => {
+  test('Zonenaktualisierung respektiert manuelle Änderungen und erledigte Ergebnisse im Zustand', () => {
+    const old = { ...profile, thresholds: { ...profile.thresholds, thresholdPaceRunSec: 360 } };
+    const make = (id: string) => ({ id, ...W.build(W.runEasy(paceCtx(old, false, null, today), 45)) });
+    const sessions = ['manual', 'locked', 'completed', 'automatic'].map(make);
+    const weeks = [{ days: [{ date: addDays(today, 1), sessions }] }];
+    const state = { sessions: { completed: { completed: true } }, adjustments: {
+      manual: { id: 'manual', sessionId: 'manual', type: 'modify', from_user: true, set: { description: 'Eigener Ablauf' }, createdAt: 1 },
+      lock: { id: 'lock', sessionId: 'locked', type: 'modify', set: { locked: true }, createdAt: 2 },
+    } };
+    const out = refreshFuture(weeks, profile, today, state);
+    expect(out.changed).toBe(1);
+    expect(out.weeks[0].days[0].sessions.slice(0, 3)).toEqual(sessions.slice(0, 3));
+    expect(out.weeks[0].days[0].sessions[3].spec.ctx).not.toEqual(sessions[3].spec.ctx);
+  });
+  test('ohne Leistungsnachweis bleibt der Startwert eine Schätzung, keine Messung', () => {
+    for (const sport of ['run', 'bike', 'swim'] as const) {
+      const [s] = sportScores({ ...base, activities: [] }, [sport]);
+      expect(s.measured).toBeNull();
+      expect(Number.isFinite(s.score)).toBe(true);
+      expect(s.provisional).toBe(true);
+    }
+  });
+  test.each(['locked', 'pinned', 'frozen', '_done', 'completed', 'cancelled'])('neue Zonen überschreiben keine %s Einheit', flag => {
+    const old = { ...profile, thresholds: { ...profile.thresholds, thresholdPaceRunSec: 360 } };
+    const edited = { id: 'manual', ...W.build(W.runEasy(paceCtx(old, false, null, today), 45)), [flag]: true, description: 'Eigene Trainingsanweisung' };
+    const ordinary = { ...edited, id: 'automatic', [flag]: false };
+    const out = refreshFuture([{ days: [{ date: addDays(today, 1), sessions: [edited, ordinary] }] }], profile, today);
+    expect(out.weeks[0].days[0].sessions[0]).toEqual(edited);
+    expect(out.changed).toBe(1);
+    expect(out.weeks[0].days[0].sessions[1].description).not.toBe(ordinary.description);
+  });
   test('ein Training bekommt unabhängig von der Anzahl identischer Runden eine Stimme', () => {
     const normal = [2, 4, 6].map(d => run('normal' + d, d));
     const lap = { kind: 'work', sec: 300, speed: 5, avgHr: 170 };

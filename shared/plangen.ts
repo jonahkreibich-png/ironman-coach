@@ -1,3 +1,4 @@
+import {effectiveCustomBuckets} from './custom-state26';
 /* Plan-Generator (regelbasiert, Auftrag 4): aus Zielen, Profil, Zeit pro Tag, Häufigkeit je Sportart, Teamsport,
    Können und Berücksichtigungen ein periodisierter Plan.
    - Das A-Ziel bestimmt die Phasen (Grundlage, Aufbau, spezifisch, Tapering), Erholungswochen alle 3-4 Wochen.
@@ -984,13 +985,13 @@ function generatePlanIn(inp: GenInput): GenResult {
   // Auftrag 19: die Umfangsbremse lässt keine Einheit weg, die für die Mindest-Häufigkeit nötig ist
   const keepN = (w: any, sport: string, allowMin?: number): number => { if (w.isRecoveryWeek || w.entry || w.reduced || w.partial || w.phase === 'taper' || w.phase === 'race') return 0; const n = ((minFreqOf(w, profile, [], { goalType: A.type }) as any)[sport]) || 0; const v = n ? freqByVolume(w, sport, n) : 0; return allowMin ? Math.min(v, Math.max(1, Math.floor(allowMin / (sport === 'bike' ? 30 : 25)))) : v; };
   // langer Lauf zuerst (kürzt nur), damit die Steigerung danach gegen die endgültigen Wochen geprüft wird (Auftrag 15)
-  enforceLongRun(weeks, lastLongRun0);
-  enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN);
+  enforceLongRun(weeks, lastLongRun0, keepIds);
+  enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds);
   // Auftrag 15: Erholungswochen spürbar leichter als die letzte normale Woche (vorher oft gleich viel, weil das Ziel über dem lag, was die Einheiten hergeben)
-  enforceRecovery(weeks, prevRef[0] || null);
+  enforceRecovery(weeks, prevRef[0] || null, keepIds);
   // Auftrag 17: Kürzungen oben können einen langen Lauf verkürzt haben; danach wieder höchstens +10 min pro Woche und der Umfang
   // wieder höchstens +10 % (beides kürzt nur, deshalb endet es)
-  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null); }
+  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds); }
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
     const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };
@@ -1007,7 +1008,7 @@ function generatePlanIn(inp: GenInput): GenResult {
   const intensityFixes = repairIntensity(weeks, profile, today, intOpts);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Ruhetage und Kürzungen können eine Woche kleiner gemacht haben: die Steigerung danach wieder höchstens +10 % (kürzt nur)
-  enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null);
+  enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Auftrag 18: Generalprobe vor Triathlons (Schwimmen, Rad, Koppellauf an einem Tag)
   trainingFixes.push(...addRaceRehearsals(weeks, profile, { ...trOpts, sports }));
@@ -1015,7 +1016,7 @@ function generatePlanIn(inp: GenInput): GenResult {
   intensityFixes.push(...repairIntensity(weeks, profile, today, intOpts));
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Umfangsbremse und Grenzen der langen Einheiten abwechselnd, bis beides passt (beides kürzt nur)
-  for (let k = 0; k < 6; k++) { enforceLongRun(weeks, lastLongRun0); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN); enforceRecovery(weeks, prevRef[0] || null); if (!capLongSessions(weeks, profile, trOpts).length) break; }
+  for (let k = 0; k < 6; k++) { enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds); if (!capLongSessions(weeks, profile, trOpts).length) break; }
   // Auftrag 19: zum Schluss noch einmal Abwechslung (spätere Schritte können dieselbe Schlüsseleinheit zwei Wochen hintereinander erzeugt haben)
   intensityFixes.push(...varyRepeats(weeks, from || start));
   // Auftrag 20: Ruhetage und Kürzungen können neue Paare derselben Sportart an Folgetagen erzeugt haben (z. B. So/Mo): ohne Verschieben
@@ -1125,12 +1126,12 @@ function keyRun(ctx: W.PaceCtx, type: GoalType, phase: Phase, wi: number): W.Spe
 const ownMin = (w: any, sport?: string) => sport ? weekMinutes(w, sport) : ownWeekMinutes(w);
 /* Auftrag 15: bei kleinem Umfang ist +10 % kleiner als eine kurze Einheit (z. B. 78 min + 15 min Kraft); dann sind bis +15 min erlaubt */
 export const SMALL_STEP = 15;
-export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev: any = null, keepN: ((w: any, sport: string, allowMin?: number) => number) | null = null) {
+export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity, prev: any = null, keepN: ((w: any, sport: string, allowMin?: number) => number) | null = null, keepIds = new Set<string>()) {
   const scaleWeek = (w: any, sport: string | undefined, f: number) => w.days.forEach((d: any) => { d.sessions = d.sessions.map((s: any) => {
-    if (s.fixed || s.race || !s.plannedMinutes || (sport && s.sport !== sport) || s.sport === 'rest' || (s.spec && s.spec.title)) return s;
+    if (keepIds.has(s.id) || s.fixed || s.race || !s.plannedMinutes || (sport && s.sport !== sport) || s.sport === 'rest' || (s.spec && s.spec.title)) return s;
     // Auftrag 19: Kraft aus dem festen Wochenaufbau bleibt so lang wie gewünscht (z. B. Ganzkörper 30 min)
     if (s.sport === 'strength' && s.pattern) return s;
-    if (s.spec && (!s.stage || (s.sport === 'swim' && f < 1))) { const r = W.rebuildScaled(s, f); return r ? { ...s, ...r, plannedKm: r.plannedKm ?? undefined } : s; }
+    if (!keepIds.has(s.id) && s.spec && (!s.stage || (s.sport === 'swim' && f < 1))) { const r = W.rebuildScaled(s, f); return r ? { ...s, ...r, plannedKm: r.plannedKm ?? undefined } : s; }
     return s;
   }); });
   // Zeitbudget pro Woche (ohne feste Termine wie Teamsport und Wettkampf)
@@ -1167,14 +1168,14 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
         scaleWeek(all[i], sport, f);
         if (ownMin(all[i], sport) >= before) {
           // Auftrag 18: der Reihe nach probieren (eine harte Einheit mit festen Intervallen lässt sich oft nicht kürzen)
-          const cands = all[i].days.flatMap((d: any) => d.sessions).filter((x: any) => x.spec && !x.stage && !x.fixed && !x.race && !x.long && !/^Langer/.test(x.title || '') && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport) && x.plannedMinutes >= 25).sort((a: any, b: any) => (+!!a.hard - +!!b.hard) || b.plannedMinutes - a.plannedMinutes);
+          const cands = all[i].days.flatMap((d: any) => d.sessions).filter((x: any) => !keepIds.has(x.id) && x.spec && !x.stage && !x.fixed && !x.race && !x.long && !/^Langer/.test(x.title || '') && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport) && x.plannedMinutes >= 25).sort((a: any, b: any) => (+!!a.hard - +!!b.hard) || b.plannedMinutes - a.plannedMinutes);
           let did = false;
           for (const cand of cands) { const rb = W.rebuildScaled(cand, (cand.plannedMinutes - 5) / cand.plannedMinutes); if (rb && rb.plannedMinutes < cand.plannedMinutes) { Object.assign(cand, rb, { plannedKm: rb.plannedKm ?? undefined }); did = true; break; } }
           // zuletzt: kurze lockere Einheiten (ab 20 min) um 5 min, sonst den Koppellauf weglassen (er ist freiwillig)
-          if (!did) for (const cand of all[i].days.flatMap((d: any) => d.sessions).filter((x: any) => x.spec && !x.stage && !x.fixed && !x.race && !x.hard && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport) && x.plannedMinutes >= 20 && !/^(Koppellauf|Wechsel-Lauf)/.test(x.title || ''))) { const rb = W.rebuildScaled(cand, (cand.plannedMinutes - 5) / cand.plannedMinutes); if (rb && rb.plannedMinutes < cand.plannedMinutes) { Object.assign(cand, rb, { plannedKm: rb.plannedKm ?? undefined }); did = true; break; } }
-          if (!did) for (const d of all[i].days) { const b = (d.sessions || []).find((x: any) => /^(Koppellauf|Wechsel-Lauf)/.test(x.title || '') && !x.fixed && !x.frozen && (!sport || x.sport === sport)); if (b) { d.sessions = d.sessions.filter((x: any) => x !== b); did = true; break; } }
+          if (!did) for (const cand of all[i].days.flatMap((d: any) => d.sessions).filter((x: any) => !keepIds.has(x.id) && x.spec && !x.stage && !x.fixed && !x.race && !x.hard && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport) && x.plannedMinutes >= 20 && !/^(Koppellauf|Wechsel-Lauf)/.test(x.title || ''))) { const rb = W.rebuildScaled(cand, (cand.plannedMinutes - 5) / cand.plannedMinutes); if (rb && rb.plannedMinutes < cand.plannedMinutes) { Object.assign(cand, rb, { plannedKm: rb.plannedKm ?? undefined }); did = true; break; } }
+          if (!did) for (const d of all[i].days) { const b = (d.sessions || []).find((x: any) => /^(Koppellauf|Wechsel-Lauf)/.test(x.title || '') && !keepIds.has(x.id) && !x.fixed && !x.frozen && (!sport || x.sport === sport)); if (b) { d.sessions = d.sessions.filter((x: any) => x !== b); did = true; break; } }
           // ganz zuletzt: die kürzeste lockere Einheit dieser Sportart fällt weg (lockere Einheiten verfallen eher als die Steigerung zu brechen)
-          if (!did) { const pool = all[i].days.flatMap((d: any) => (d.sessions || []).filter((x: any) => x.spec && !x.stage && !x.fixed && !x.frozen && !x.race && !x.hard && !x.long && !/test/i.test(x.title || '') && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport)).map((x: any) => ({ d, x }))).sort((a: any, b: any) => a.x.plannedMinutes - b.x.plannedMinutes);
+          if (!did) { const pool = all[i].days.flatMap((d: any) => (d.sessions || []).filter((x: any) => !keepIds.has(x.id) && x.spec && !x.stage && !keepIds.has(x.id) && !x.fixed && !x.frozen && !x.race && !x.hard && !x.long && !/test/i.test(x.title || '') && (!sport || x.sport === sport) && ['run', 'bike', 'swim'].includes(x.sport)).map((x: any) => ({ d, x }))).sort((a: any, b: any) => a.x.plannedMinutes - b.x.plannedMinutes);
             const same = (sp: string) => all[i].days.reduce((n: number, d: any) => n + (d.sessions || []).filter((x: any) => x.sport === sp && !x.cancelled).length, 0);
             const pick = pool.find((p: any) => same(p.x.sport) > Math.max(1, keepN ? keepN(all[i], p.x.sport, sport ? ref * maxInc : undefined) : 0));
             if (pick) { pick.d.sessions = pick.d.sessions.filter((x: any) => x !== pick.x); if (!pick.d.sessions.length) pick.d.sessions.push({ id: pick.x.id + '-rest', sport: 'rest', title: 'Ruhetag' }); did = true; } }
@@ -1185,7 +1186,7 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
   }
 }
 /* Erholungswoche: höchstens 80 % der letzten normalen Woche (eigenes Training; feste Termine, Tests und Lernstufen bleiben) */
-function enforceRecovery(weeks: any[], prev: any = null) {
+function enforceRecovery(weeks: any[], prev: any = null, keepIds = new Set<string>()) {
   const all = prev ? [prev, ...weeks] : weeks;
   for (let i = 1; i < all.length; i++) {
     const w = all[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe) continue;
@@ -1202,7 +1203,7 @@ function enforceRecovery(weeks: any[], prev: any = null) {
     }
     // reicht Kürzen nicht (kurze Einheiten, Lernstufen): eine Einheit einer Sportart weniger, die in der Woche mehrfach vorkommt
     if (ownWeekMinutes(w) > ref * 0.9) {
-      const own = w.days.flatMap((d: any) => d.sessions.map((s: any) => ({ d, s }))).filter(({ s }: any) => s && !s.fixed && !s.race && !s.cancelled && s.sport !== 'rest' && s.sport !== 'football' && !/test|Kraul-Check/i.test(s.title || ''));
+      const own = w.days.flatMap((d: any) => d.sessions.map((s: any) => ({ d, s }))).filter(({ s }: any) => s && !keepIds.has(s.id) && !s.fixed && !s.race && !s.cancelled && s.sport !== 'rest' && s.sport !== 'football' && !/test|Kraul-Check/i.test(s.title || ''));
       const many = (sp: string) => own.filter(({ s }: any) => s.sport === sp).length >= 2;
       const x = own.filter(({ s }: any) => many(s.sport) && !s.long).sort((a: any, b: any) => (a.s.plannedMinutes || 0) - (b.s.plannedMinutes || 0))[0];
       if (x) { x.d.sessions = x.d.sessions.filter((s: any) => s !== x.s); if (!x.d.sessions.length) x.d.sessions = [{ id: x.s.id + '-rest', sport: 'rest', title: 'Ruhetag' }]; }
@@ -1210,11 +1211,12 @@ function enforceRecovery(weeks: any[], prev: any = null) {
   }
 }
 /* Nach allen Kürzungen: langer Lauf höchstens +10 min gegenüber dem letzten langen Lauf einer Aufbauwoche (auch in Erholungswochen nicht länger) */
-function enforceLongRun(weeks: any[], start: number | null) {
+function enforceLongRun(weeks: any[], start: number | null, keepIds = new Set<string>()) {
   let last = start;
   for (const w of weeks) {
     const runs = w.days.flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.race && !s.stage && (s.long || /^Langer Lauf/.test(s.title || ''))));
     for (const s of runs) {
+      if (keepIds.has(s.id)) continue; // Past and completed sessions are immutable; only future work can be reduced.
       // Rundung auf 5 min kann knapp darüber landen: in kleinen Schritten nachkürzen (Auftrag 17)
       for (let k = 0; k < 4 && last != null && s.plannedMinutes > last + 10 && s.spec; k++) { const rb = W.rebuildScaled(s, (last + 10) / s.plannedMinutes * (1 - 0.03 * k)); if (rb && rb.plannedMinutes < s.plannedMinutes) Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); }
     }
@@ -1311,7 +1313,7 @@ export function continuationOf(oldPlan: any, today: string, state?: any, from?: 
     // krank in dieser Woche: ausgelassen heißt nicht „zu viel“, dann zählt der Plan
     tracked = !sick && ss.length > 0 && ss.filter((s: any) => st(s).completed || st(s).skipped).length >= ss.length * 0.6;
     doneMin = ss.filter((s: any) => st(s).completed).reduce((a: number, s: any) => a + (+((st(s).metrics || {}).min) || s.plannedMinutes || 0), 0);
-    const extra = Object.entries(state.customWorkouts || {}).filter(([d]) => d >= normal.startDate && d <= weekEnd(normal)).flatMap(([, l]: any) => l || []).filter((c: any) => c && c.sport !== 'football');
+    const extra = Object.entries(effectiveCustomBuckets(state) || {}).filter(([d]) => d >= normal.startDate && d <= weekEnd(normal)).flatMap(([, l]: any) => l || []).filter((c: any) => c && c.sport !== 'football');
     doneMin += extra.reduce((a: number, c: any) => a + (+((c.metrics || {}).min) || c.plannedMinutes || 0), 0);
   }
   const maxOf = (sport: string) => normal ? Math.max(0, ...list(normal).filter((s: any) => s.sport === sport && !/test|Kraul-Check/i.test(s.title || '')).map((s: any) => s.plannedMinutes || 0)) || null : null;

@@ -3,6 +3,7 @@
    und schreibt jede Änderung mit Grund als Nachricht in den Coach-Chat. Funktioniert ohne KI und ohne Einwilligung. */
 import { claimFacts, stripUnsupported, HR_DELTA, HEAT_C } from './claims';
 import * as C from '../core';
+import { readinessInputs, readinessSnapshot, withheldReadiness } from '../readiness';
 import { intervalsOf } from '../activity/structure';
 import { withTerms } from '../glossary';
 import type { Profile } from '../profile';
@@ -25,11 +26,16 @@ export interface CoachMsg {
   resultText?: string;
   important?: boolean;
   refs?: { sessionId?: string; activityId?: string; adjustmentIds?: string[] };
-  proposal?: { changes: any[]; status: 'open' | 'accepted' | 'rejected'; evidenceSignature?: string; skillsOnly?: boolean } | null;
+  proposal?: { changes: any[]; status: 'open' | 'accepted' | 'rejected' | 'superseded'; evidenceSignature?: string; skillsOnly?: boolean } | null;
+  evidenceKey?: string;
+  details?: string[];
+  aiExcluded?: boolean;
   readiness?: { level: number; score: number | null };
 }
 export interface EngineCtx {
   today: string; now: number;
+  readinessSnapshot?: any;
+  readinessWithheld?: boolean;
   state: any;          // sessions, customWorkouts, trend, illnessPeriods, weekNotes, adjustments, nutrition, settings, activities, coachMsgs
   baseWeeks: any[];
   planMeta: any;
@@ -43,11 +49,12 @@ const has = (ctx: EngineCtx, id: string) => !!(ctx.state.coachMsgs || {})[id];
 function msg(ctx: EngineCtx, m: Omit<CoachMsg, 'at' | 'from'> & { from?: CoachMsg['from'] }): CoachMsg { return { from: 'coach', at: ctx.now, ...m }; }
 /* Eingabe für die Ampel: eigene Grenzen, Schlafbedarf und Belastung (Fitness/Müdigkeit aus intervals.icu, sonst aus den Einheiten) */
 export function readinessFallback(ctx: EngineCtx) {
-  const fb: any = { ...(ctx.state.settings && ctx.state.settings.readiness || {}), sleepNeed: sleepNeed(ctx.profile, ctx.today) };
-  if (fb.load === undefined) { try { const L = C.loadBaseline(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.today); fb.load = L.ctl != null && L.atl != null ? { ctl: L.ctl, atl: L.atl } : null; } catch (e) { fb.load = null; } }
-  return fb;
+  return readinessInputs(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.profile, ctx.today);
 }
-export function readinessOf(ctx: EngineCtx, date = ctx.today) { return C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, date, readinessFallback(ctx)); }
+export function readinessOf(ctx: EngineCtx, date = ctx.today) {
+  if (ctx.readinessWithheld) return withheldReadiness(date);
+  return readinessSnapshot(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.profile, date);
+}
 const fallback = readinessFallback;
 function effWeeks(ctx: EngineCtx, extra?: any[]) { return C.applyAdjustments(ctx.baseWeeks, Object.assign({}, ctx.state.adjustments, Object.fromEntries((extra || []).map(a => [a.id, a])))); }
 function dayOf(weeks: any[], date: string) { return C.planDays(weeks).find((d: any) => d.date === date) || null; }
@@ -133,7 +140,7 @@ export function sessionComment(ctx: EngineCtx, act: any, s: any): string {
 }
 
 export function morningBriefing(ctx: EngineCtx, date: string, adjustments: any[]): CoachMsg {
-  const R = C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, date, fallback(ctx));
+  const R = readinessOf(ctx, date);
   const weeks = effWeeks(ctx, adjustments);
   const list = live(dayOf(weeks, date));
   const ill = C.illnessAt(ctx.state.illnessPeriods, date);
@@ -153,7 +160,7 @@ export function morningBriefing(ctx: EngineCtx, date: string, adjustments: any[]
   if (!ill) lines.push(list.length ? `Heute: ${joinDe(list.map(sessLabel))}.` : 'Heute ist kein Training geplant. Genieß den Ruhetag.');
   const zoneTip = list.find((s: any) => C.zoneBpm(s, ctx.profile.thresholds, null));
   if (zoneTip && !ill) lines.push(`Puls für ${zoneTip.title}: ${C.zoneBpm(zoneTip, ctx.profile.thresholds, null)}.`);
-  return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2, readiness: { level: R.level, score: R.score } });
+  return msg(ctx, { id: 'msg-brief-' + date, date, kind: 'briefing', title: R.level === 3 ? 'Guten Morgen' : `Ampel ${['🟢', '🟡', '🔴'][R.level] || ''}`, text: lines.join(' '), important: R.level === 2, aiExcluded: R.sources?.includes('oura'), readiness: { level: R.level, score: R.score } });
 }
 
 export function weeklyReview(ctx: EngineCtx, date: string, adjustments: any[], summary: any): CoachMsg {
@@ -211,7 +218,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
       const key = a.sessionId || a.id; seen.add(key);
       const d: Done = doneItems(ctx, a.date, a.date).find(x => x.key === key || (x.act && x.act.id === a.id)) || { key, date: a.date, sport: a.sport, title: s ? s.title : (a.name || 'Einheit'), planned: s, st: (ctx.state.sessions || {})[key] || {}, act: a, custom: !s };
       let text: string; try { text = autoReview(ctx, d, mode); } catch (e) { text = sessionComment(ctx, a, s); }
-      push(msg(ctx, { id: 'msg-review-' + key, date: a.date, kind: 'session', title: 'Bewertung: ' + (s ? s.title : (a.name || 'Einheit')), text, refs: { activityId: a.id, sessionId: a.sessionId || undefined } }));
+      push(msg(ctx, { id: 'msg-review-' + key, date: a.date, kind: 'session', title: 'Bewertung: ' + d.title, text, refs: { activityId: a.id, sessionId: a.sessionId || undefined } }));
     }
     // von Hand abgehakte Einheiten ohne Aufzeichnung (heute und gestern)
     if (mode !== 'off') for (const d of doneItems(ctx, ev.sessionIds?.length ? '1900-01-01' : C.addDays(today, -1), today)) {
@@ -238,7 +245,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     const haveValues = C.hasRecovery(p);
     // Auftrag 14: Kommen später am Morgen weitere Werte (z. B. erst Ruhepuls, dann Schlaf), wird die Morgen-Nachricht mit dem neuen Wert erneuert
     const brief: any = (ctx.state.coachMsgs || {})['msg-brief-' + today];
-    const Rnow = C.readinessFor(ctx.state.trend, ctx.state.illnessPeriods, today, ctx.state.settings.readiness);
+    const Rnow = readinessOf(ctx, today);
     const changedR = !!brief && haveValues && (!brief.readiness || brief.readiness.level !== Rnow.level || brief.readiness.score !== Rnow.score);
     const dailyDone = (Object.values(ctx.state.adjustments || {}).some((a: any) => a && a.group === 'daily-' + today) || !!brief) && !changedR;
     if ((haveValues || ev.type === 'daily') && !dailyDone) {
@@ -246,7 +253,7 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
       out.adjustments.push(...adj);
       const groups: Record<string, any[]> = {};
       adj.forEach(a => { (groups[a.group || a.id] = groups[a.group || a.id] || []).push(a); });
-      Object.entries(groups).forEach(([g, list]) => push(msg(ctx, { id: 'msg-adj-' + g, date: today, kind: 'adjust', title: 'Plan angepasst', text: adjustmentText(ctx, list, today), important: true, refs: { adjustmentIds: list.map(a => a.id) } })));
+      Object.entries(groups).forEach(([g, list]) => push(msg(ctx, { id: 'msg-adj-' + g, date: today, kind: 'adjust', aiExcluded: list.some(a => a.aiExcluded), title: 'Plan angepasst', text: adjustmentText(ctx, list, today), important: true, refs: { adjustmentIds: list.map(a => a.id) } })));
       const b = morningBriefing(ctx, today, adj);
       if (changedR) out.messages.push({ ...b, at: brief.at || b.at }); else push(b);
     }

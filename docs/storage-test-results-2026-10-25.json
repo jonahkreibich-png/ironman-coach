@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-25",
+  "preparedVersion": "3.7.2",
+  "published": true,
+  "productionDataModified": false,
+  "fullSuite": {
+    "passed": 2219,
+    "failedCases": 0,
+    "skipped": 6,
+    "total": 2225,
+    "failedSuites": [
+      {
+        "file": "server/test/api.test.ts",
+        "reason": "Server startet nicht: http://127.0.0.1:8799/\nmock push on 8798\nmock intervals on 8799, heute 2026-10-25\n"
+      }
+    ],
+    "note": "Auch nach der E2E-Nachbesserung erneut ausgefuehrt: 2219 bestanden, sechs uebersprungen; einziges fehlgeschlagenes Suite-Setup weiterhin lokaler HTTP-Mock. Gesamtkommando Exit 1."
+  },
+  "targeted": {
+    "passed": 120,
+    "failed": 0,
+    "files": 12,
+    "overlapsFullSuite": true
+  },
+  "browser": {
+    "passed": 28,
+    "failed": 0,
+    "newCases": 16,
+    "existingRelatedCases": 12,
+    "engines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "transport": "Original-Build und echter Worker via Playwright-Routen, isoliertes SQLite-D1, kein TCP/Cloudflare-Zugriff",
+    "limitations": [
+      "Chromium: zwei Exporte erfassen echte File-Nutzlast am nachgebildeten Web-Share-Empfaenger. Nativer Chromium-Download bleibt unbestaetigt; auch unabhaengiger Minimaldownload wurde hier cancelled.",
+      "WebKit prueft nativen Dateidownload und Wiederherstellung.",
+      "Vollstaendiger normaler HTTP-/Browser-Lauf und Cloudflare-Testumgebung noch offen."
+    ]
+  },
+  "simulation": {
+    "syntheticUsers": 4,
+    "daysPerUser": 180,
+    "writeCorrectionMoveCycles": 2160,
+    "restarts": 2160,
+    "consistencyAfterEachCycle": true
+  },
+  "verification": {
+    "typecheck": "passed",
+    "build": "passed; existing Vite chunk-size warning",
+    "diffCheck": "passed"
+  },
+  "review": "Unabhaengiger Reviewer + Regressionen fuer konkrete Befunde; nachfolgende Browser-RED/GREEN-Tests fuer Aktionsreihenfolge und Eingabe ohne Blur.",
+  "sourceHashes": {
+    "web/src/persistence.ts": "322d0a22825bf9ac550ddbe07d1e03b6def472151f7fd193b813089b31612aae",
+    "web/src/storage-merge.ts": "f118b37a154b9da45131cddfcd86e4696d653a119f8b146f81d4d61ad7cddd9a",
+    "web/src/store.ts": "de6dd6ab8e30c5b61161852cd7a9d51b465d9c3e23786aacc263191606a8d2dc",
+    "web/src/sync.ts": "bd5976003247d05cf7632bd50384e284fff1387ccaa9612c058149a822f6c94e",
+    "web/src/backup.ts": "49b888ce8e94b44b967817d0903d767dfd473b6b0250941768670d28518e99e5",
+    "web/src/views/fieldsui.ts": "6b6f67478cb3361f53634aa1b8b1b65d0b532326f4a0b708c112bfbf41a03dc8",
+    "shared/adjustment-clock.ts": "8f97766cca0124ed47695836ed777804f4f24978ae49f8b654c345e782b6805a",
+    "server/src/ai.ts": "2bad12d0fee8f36bd62f925cf34d1d0d3d5208022a8f5e3f560b44665cb2ee10",
+    "web/src/views/verbindungen.ts": "18ef0f8de2248ca48fbb3ab870a92c09e941dec2aef8e91ca01ebed2ebb62528",
+    "tests/e2e/storage-recovery24.spec.ts": "80464d6e72cb34367148d9c73ec26f276578996bf44a8dcfb56c0610f0307275",
+    "tests/e2e/auftrag6.spec.ts": "ae9e6c3ae52246b469f2561d840a218578fb0be0208d268fbb392649a64fffc0"
+  },
+  "reportedRegressionFollowup": {
+    "reportedByUser": {
+      "passed": 371,
+      "failed": 10,
+      "skipped": 113
+    },
+    "targetedBrowser": {
+      "passed": 12,
+      "failed": 0,
+      "skipped": 6,
+      "log": "scratch/storage-regression26-green.log"
+    },
+    "storageBrowser": {
+      "passed": 32,
+      "failed": 0,
+      "log": "scratch/storage-regression26-storage.log"
+    },
+    "redEvidence": {
+      "selfRenderLoop": "two browser failures; Chromium 75 redraws/500 ms",
+      "connectionRetryLoop": "two browser failures; WebKit 35 requests/500 ms"
+    },
+    "transport": "Isolated compiled assets and real in-process Worker/SQLite; normal HTTP suite still pending",
+    "targetedUnit": {
+      "passed": 30,
+      "files": 4,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "build": "passed; existing chunk size warning",
+    "published": false,
+    "fullUnitRun": {
+      "passed": 2219,
+      "failedCases": 0,
+      "skipped": 6,
+      "success": false,
+      "failedSetup": "server/test/api.test.ts: lokaler Mock-HTTP-Server ist in dieser Sitzung nicht erreichbar",
+      "log": "scratch/storage-regression26-all.log",
+      "durationSeconds": 225.22
+    }
+  },
+  "releaseStatusFile": "docs/release-3.7.2-status.json"
+}
