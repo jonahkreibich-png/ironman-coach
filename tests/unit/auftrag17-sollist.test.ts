@@ -205,3 +205,21 @@ test('Trainingserklärung benennt Bestwert100 statt falscher Behauptung aktuell5
  const {ctx,state,profile}=world(); profile.skills.swimCrawlM=50; state.sessions.di20.metrics.longestCrawl='100';
  const text=explainDay(ctx,'2026-10-24','swim').text; expect(text).toMatch(/Bestwert 100 m.*bestätigt 50 m/); expect(text).not.toMatch(/Du kraulst gerade 50/);
 });
+
+/* Auftrag 21: Nach einem App-Update stand bei alten Bewertungen „Korrigiert: … mit deinen geänderten Werten“, obwohl nichts geändert war.
+   Korrigiert nur bei geänderten Eingaben; neue Formulierung wird still übernommen. */
+import { reviewChange, reviewInputSig } from '../../shared/coach/review';
+describe('Auftrag 21: Bewertung nur nach geänderten Werten „korrigiert“', () => {
+  const ctx = { state: { sessions: { s1: { completed: true, metrics: { min: '40', hr: '140' }, rpe: '4' } }, activities: {}, customWorkouts: {} } };
+  test('gleiche Werte, neuer Text: still; geänderte Werte: Korrektur; alte Meldung ohne Fingerabdruck: still', () => {
+    const sig = reviewInputSig(ctx, 's1');
+    const old = { id: 'msg-review-s1', text: 'alter Text', inputSig: sig };
+    expect(reviewChange(old, 'alter Text', sig)).toBe('same');
+    expect(reviewChange(old, 'neuer Text nach Update', sig)).toBe('quiet');
+    const changed = { state: { ...ctx.state, sessions: { s1: { ...ctx.state.sessions.s1, metrics: { min: '30', hr: '140' } } } } };
+    expect(reviewChange(old, 'neuer Text', reviewInputSig(changed, 's1'))).toBe('corrected');
+    expect(reviewChange({ id: 'msg-review-s1', text: 'Lauf (Di 27.10.): 40 min.\nalter Text' }, 'Lauf (Di 27.10.): 40 min.\nneuer Text nach Update', sig)).toBe('quiet');
+    expect(reviewChange({ id: 'msg-review-s1', text: '100 m geschafft' }, 'Schwimmen (Di 27.10.): 30 min, 50 m.', sig)).toBe('corrected');
+    expect(reviewChange(null, 'Text', sig)).toBe('corrected');
+  });
+});

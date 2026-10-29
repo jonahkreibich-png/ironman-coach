@@ -13,7 +13,7 @@ import { mainGoal } from '../goals';
 import { T, pick, de, mmss, joinDe, dowName } from './texts';
 import { checkData, type SafetyHit } from './safety';
 import { underEatingCheck } from '../nutrition';
-import { doneItems, autoReview, type Done } from './review';
+import { doneItems, autoReview, type Done , reviewInputSig, reviewChange } from './review';
 import { extraChecks } from './extra';
 import { easyAfterDays } from '../periodize';
 
@@ -30,6 +30,7 @@ export interface CoachMsg {
   evidenceKey?: string;
   details?: string[];
   aiExcluded?: boolean;
+  /** Auftrag 21: Fingerabdruck der Eingaben einer Bewertung (nur geänderte Werte sind eine Korrektur) */ inputSig?: string;
   readiness?: { level: number; score: number | null };
 }
 export interface EngineCtx {
@@ -191,10 +192,14 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
   const push = (m: CoachMsg) => {
     if (out.messages.some(x => x.id === m.id)) return;
     const old = ctx.state.coachMsgs?.[m.id];
+    const sig = m.id.startsWith('msg-review-') ? reviewInputSig(ctx, m.id.slice('msg-review-'.length)) : '';
     if (old && m.id.startsWith('msg-review-')) {
-      if ((old.resultText ?? old.text) === m.text) return;
-      out.messages.push({ ...m, at: old.at || m.at, title: 'Bewertung aktualisiert: ' + (m.title || '').replace(/^Bewertung: /, ''), resultText: m.text, text: 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + m.text });
-    } else if (!has(ctx, m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text) } : m);
+      const how = reviewChange(old, m.text, sig);
+      if (how === 'same') return;
+      // Auftrag 21: nur geänderte Werte sind eine Korrektur; neue Formulierung nach einem Update ersetzt den Text still
+      if (how === 'quiet') out.messages.push({ ...old, resultText: m.text, text: /^Korrigiert:/.test(old.text || '') ? 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + m.text : m.text, inputSig: sig });
+      else out.messages.push({ ...m, at: old.at || m.at, inputSig: sig, title: 'Bewertung aktualisiert: ' + (m.title || '').replace(/^Bewertung: /, ''), resultText: m.text, text: 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + m.text });
+    } else if (!has(ctx, m.id)) out.messages.push(m.text ? { ...m, text: withTerms(m.text), ...(sig ? { inputSig: sig } : {}) } : m);
     // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen
     const last = out.messages[out.messages.length - 1];
     if (last && last.id === m.id && last.text) { try { const t = fixCoachText(stripUnsupported(last.text, claimFacts(ctx)), ctx); if (t) last.text = t; } catch (e) { /* Prüfung darf die Nachricht nicht verhindern */ } }

@@ -489,3 +489,23 @@ export function autoReview(ctx: EngineCtx, d: Done, mode: 'full' | 'short'): str
   try { return stripUnsupported(text, claimFacts(ctx, d.date)) || text; } catch (e) { return text; }
 }
 void kindOf;
+
+/* Auftrag 21: Fingerabdruck der Eingaben einer Bewertung (Werte, Gefühl, Abweichung, Aufzeichnung). „Korrigiert: … geänderten Werten“
+   nur, wenn sich dieser ändert. Neue Formulierungen nach einem App-Update aktualisieren die Bewertung still (kein falsches „Korrigiert“). */
+export function reviewInputSig(ctx: { state: any }, key: string): string {
+  const st: any = ctx.state || {};
+  const custom = Object.values(st.customWorkouts || {}).flat().find((c: any) => c && c.id === key) as any;
+  const s: any = (st.sessions || {})[key] || custom || {};
+  const act: any = (st.activities || {})[s.activityId || key] || null;
+  const pick = (x: any) => x ? { metrics: x.metrics || null, manual: x.metricsManual || null, rpe: x.rpe ?? null, feel: x.feel ?? null, deviation: x.deviation || '', completed: x.completed ?? null, skipped: !!x.skipped } : null;
+  return C.hashOf(JSON.stringify([pick(s), act ? [act.id, act.min, act.km, act.avgHr, act.avgPower, act.manual || null] : null]));
+}
+/* Was mit einer neu gerechneten Bewertung passiert: 'same' (nichts), 'quiet' (still aktualisieren), 'corrected' (mit Hinweis) */
+export function reviewChange(old: any, text: string, sig: string): 'same' | 'quiet' | 'corrected' {
+  if (!old) return 'corrected';
+  if (old.inputSig === sig) return (old.resultText ?? old.text) === text ? 'same' : 'quiet';
+  // alte Bewertung ohne Fingerabdruck: die erste Zeile nennt Einheit, Datum und Werte – gleich = nur neue Formulierung
+  const first = (t: any) => String(t || '').split('\n')[0].trim();
+  if (!old.inputSig) return (old.resultText ?? old.text) === text ? 'same' : first(old.resultText ?? old.text) === first(text) ? 'quiet' : 'corrected';
+  return 'corrected';
+}

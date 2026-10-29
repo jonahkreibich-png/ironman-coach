@@ -3,7 +3,7 @@
    kommen später Werte dazu, wird sie aktualisiert. Einstellung: ausführlich, kurz oder aus. */
 import { STATE, saveSoon } from './store';
 import { D, invalidate } from './data';
-import { doneItems, autoReview } from '../../shared/coach/review';
+import { doneItems, autoReview, reviewInputSig, reviewChange } from '../../shared/coach/review';
 import * as C from '../../shared/core';
 
 export function reviewMode(): 'full' | 'short' | 'off' { const m = (STATE.settings || {}).coachReview; return m === 'short' || m === 'off' ? m : 'full'; }
@@ -17,8 +17,12 @@ export function reviewNow(key: string, date: string): boolean {
   const d = doneItems(ctx, date, date).find(x => x.key === key); if (!d) return false;
   const id = 'msg-review-' + key; const old = STATE.coachMsgs[id];
   const text = autoReview(ctx, d, mode);
-  if (old && (old.resultText ?? old.text) === text) return false;
-  STATE.coachMsgs[id] = { ...(old || {}), id, at: old ? old.at : Date.now(), date, kind: 'session', from: 'coach', title: (old ? 'Bewertung aktualisiert: ' : 'Bewertung: ') + d.title, resultText: text, text: old ? 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + text : text, unread: true, refs: d.custom ? {} : { sessionId: key } };
+  const sig = reviewInputSig(ctx, key);
+  const how = reviewChange(old, text, sig);
+  if (how === 'same') return false;
+  // Auftrag 21: „Korrigiert“ nur bei geänderten Werten; neue Formulierung (App-Update) still übernehmen
+  if (how === 'quiet') { STATE.coachMsgs[id] = { ...old, resultText: text, text: /^Korrigiert:/.test(old.text || '') ? 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + text : text, inputSig: sig }; saveSoon(); return true; }
+  STATE.coachMsgs[id] = { ...(old || {}), id, at: old ? old.at : Date.now(), date, kind: 'session', from: 'coach', title: (old ? 'Bewertung aktualisiert: ' : 'Bewertung: ') + d.title, resultText: text, text: old ? 'Korrigiert: neu bewertet mit deinen geänderten Werten. Die alte Bewertung gilt nicht mehr.\n\n' + text : text, unread: true, inputSig: sig, refs: d.custom ? {} : { sessionId: key } };
   saveSoon();
   return true;
 }
