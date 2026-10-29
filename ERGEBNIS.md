@@ -1,3 +1,80 @@
+# Auftrag 21: mehr Werte, mehr Daten, Coach-Fehler, Jetzt abrufen, Langzeit-Simulation (28.10.)
+
+**Stand:** Fertig und live (Version 3.9.0): erst Test-Umgebung mit deinen Daten geprüft, dann echte App (Sicherung vorher in data-export, geprüft). Du musst nichts tun – App öffnen und „Aktualisieren“ tippen.
+
+## 0. Was von Codex kam
+Codex hat seit 24.10. Version 3.7.1–3.8.0 gebaut (Plan C: Dashboard im Plan, Trainingsvorlagen, sicheres Speichern, Langzeit-Simulation mit 10 Profilen, Coach-/Schwimm-Fixes), aber nichts committet. 3.8.0 lief schon live (dein Freigabe-Skript am 28.10.). Alle 2.398 Unit-Tests waren grün → unverändert als eigener Commit übernommen. Kaputt war: doppelte Schwimm-Meldungen, Pull-Buoy-Wert, interner KI-Platzhalter (unten behoben).
+
+## Was jetzt neu bzw. behoben ist
+1. **Weitere Werte** (aufklappbar, optional, automatisch von Uhr/intervals.icu, von Hand änderbar): Laufen Höhenmeter, Schrittlänge, Bodenkontaktzeit, Leistung, Temperatur, Untergrund, Schuh · Rad Normalized Power, Höhenmeter, Temperatur, Verpflegung (g/ml), „drinnen (einfache Rolle)“ · Schwimmen Ø/max. Puls, Pace Brust, SWOLF, Beckenlänge, Hilfsmittel · Teamsport Distanz, Sprints. Höhenmeter/Temperatur von Hand rechnet der Score jetzt heraus; Laufband zählt schwächer; NP wird aus der Aufzeichnung berechnet.
+2. **Scores mit mehr Daten:** alle Einheiten des letzten Jahres, ältere mit weniger Gewicht (keine harte 3-/6-Wochen-Grenze mehr), Hand = Uhr (nur Datenqualität zählt). „Warum?“ nennt z. B. „27 Läufe zählen insgesamt, davon 9 in den letzten 6 Wochen“. **Historie:** einmalig 12 Monate von intervals.icu bzw. HealthFit-Dropbox – nur als Aufzeichnungen für Scores, nichts im Plan, Handeinträge bleiben, nichts doppelt.
+3. **Schwimmen:** Hilfsmittel an jeder Einheit (Symbol + Wort); Kickbrett und Pull Buoy je etwa jede 2. Einheit, nur vorhandene. **2:50 statt 2:25:** Anpassungen (z. B. neue Stufe) behielten den alten Tempo-Kontext → werden jetzt mit dem aktuellen Tempo neu gerechnet (bei dir 27.10.: 2:25). Tempo je Lage (Kraul/Brust) aus echten Werten (Uhr je Bahn, „Ø Pace Brust“, gemischte Einheiten herausgerechnet). **Pull Buoy:** Kraul und Pull Buoy laufen über einen Weg; „bestätigt“ = 2 Nachweise (2 Einheiten oder deine Angabe + 1 Einheit). Deine 100 m mit Pull Buoy vom 27.10. werden als Bestwert gemeldet und zählen nach der 2. Einheit (Kraul: 100 m = deine Angabe + 27.10.). **Doppelte Meldungen:** jede Meldung höchstens einmal je Anlass, für alle Meldungsarten; deine 9 Duplikate werden beim nächsten Öffnen gelöscht.
+4. **„Jetzt abrufen“** bei jeder Verbindung (auch intervals.icu) und in jeder Einheit: „Abgerufen 18:42 – Lauf gefunden und eingetragen“ / „noch keine neue Aufzeichnung“. Höchstens einmal pro Minute; Anbieter-Grenzen in Worten. Garmin, COROS, Suunto, Wahoo, Polar: Weg über intervals.icu steht unter Verbindungen.
+5. **Coach:** kein „Trainingsangabe (Begründung nicht für die KI freigegeben)“ mehr (Ursache: Oura-Schutz ersetzte alle Titel); Grund beim Verschieben freiwillig; Tauschen = ein Vorschlag „Tauschen: A (Di 28.10.) ↔ B (Do 30.10.)“; jeder Vorschlag zeigt was/von/nach mit „Bestätigen“/„Ablehnen“; feste Prüfung hinter jeder Antwort (interne Texte, Wochentag aus dem Datum, Artikel wie „den Schwimmtraining“); Kraft-Bewertung ohne Textbaustein. Test-Paket: über 200 Gespräche automatisch geprüft. In der Test-Umgebung mit deinen Daten gefunden: nach dem Update standen alte Bewertungen als „Korrigiert: … geänderten Werten“ da, obwohl nichts geändert war → „Korrigiert“ gibt es jetzt nur bei geänderten Werten.
+6. **Rolle:** drinnen nie km/h; einfache Rolle: Puls + Gefühl (RPE), Smart-Trainer: Watt.
+7. **Viele Nutzer:** data-export behält 5 neueste Sicherungen je Umgebung (Rest komprimiert, 722 → 290 MB, nie in Git). Fehler aller Nutzer gruppiert im Betreiber-Posteingang (ohne Gesundheitsdaten, auch Server-Fehler). Wachstumsrechnung 100/1.000 Nutzer in STORE-PLAN.md (Abschnitt 7): Engpässe D1-Größe, gelesene Zeilen, Rechenzeit → 5 kostenlose Lösungen schon umgesetzt, Rest mit Reihenfolge beschrieben.
+
+## 8. Langzeit-Simulation
+36 erfundene Nutzer, je 13–26 Wochen (zusammen 692 Wochen): 2.493 Einheiten genau, 764 kürzer, 567 ausgelassen, 239 extra, 135 Korrekturen, 1.384 Coach-Gespräche, Krankheit, Urlaub, Tests, Wettkämpfe, Uhr ab Woche 4. Nach jeder Woche geprüft: Trainingsregeln, Scores, Stufen, Hilfsmittel, Coach-Texte, Prognose, Fehler. Endstand: **0 Befunde**, als dauerhafter Test (tests/unit/longterm21.test.ts).
+
+| Fehlerart | betroffene Nutzer | Ursache | behoben |
+|---|---|---|---|
+| Score springt nach einem Test (Rad 24 → 57) | 1 | Tests zählten ungeprüft voll, auch mit unmöglichem Wert (Dauer korrigiert, Strecke nicht) | Test > 28 % neben der Erwartung zählt erst nach Bestätigung ✓ |
+| Kraft-Score bis 101 („Elite“) bei 2×/Woche | 18 (alle mit Kraft) | mein Jahres-Fenster aus Punkt 2: Einheiten eines Jahres ÷ 6 Wochen | Rate gleitend gewichtet ✓ |
+| Score steigt am 1. Januar ohne Training | 1 sichtbar (alle über 35/unter 18) | Alter nur aus dem Geburtsjahr → Sprung am 1.1. | gleitendes Alter ✓ |
+| „Langer Lauf +15 min“ nach gekürzter Woche | 23 | vom Coach gekürzte Woche galt nicht als reduzierte Woche | gilt jetzt als reduziert ✓ |
+| Schwimm-Score fällt trotz Fortschritt | 2 | Tempo aus Zeit/Metern einer Technik-Einheit (Übungen, Pausen) zählte als Leistung | Technik-/Lern-Einheiten ohne Leistungstempo ✓ |
+| (Prüfskript) falscher Wochentag, Pausen-Woche | 36 / 3 | Fehler in meinem Prüfskript (Jahreswechsel), nicht in der App | Skript berichtigt ✓ |
+
+Gesamtzahl je Fehlerart: erster Lauf 7 Fehlerarten bei 36 Nutzern, nach den Fixes 0.
+
+**Beispiel-Verläufe** (Score je Sportart, geplante/erledigte Minuten, Kraul-Stufe):
+
+**17 Jahre, Langdistanz-Ziel, Fußball, Kraul-Anfänger, mit Fortschritt (13 Wochen)**
+
+| Woche | Schwimmen | Rad | Laufen | Kraft | Plan min | erledigt min* | Kraul am Stück (Stufe) |
+|---|---|---|---|---|---|---|---|
+| 1 | 14 | 24 | 34 | 1 | 259 | 401 | 50 m (Stufe 3) |
+| 4 | 17 | 24 | 35 | 24 | 167 | 401 | 100 m (Stufe 4) |
+| 7 | 20 | 24 | 37 | 32 | 169 | 368 | 100 m (Stufe 4) |
+| 10 | 24 | 24 | 39 | 36 | 176 | 461 | 400 m (normal) |
+| 13 | 24 | 24 | 39 | 36 | 154 | 343 | 400 m (normal) |
+
+**ca. 50, Rad und Laufen, Kraft 2×, 11 Tage Urlaub in Woche 8–9 (18 Wochen)**
+
+| Woche | Rad | Laufen | Kraft | Plan min | erledigt min* | Kraul am Stück (Stufe) |
+|---|---|---|---|---|---|---|
+| 1 | 48 | 41 | 8 | 308 | 236 | – |
+| 4 | 50 | 45 | 49 | 268 | 266 | – |
+| 7 | 51 | 45 | 63 | 267 | 215 | – |
+| 10 | 51 | 44 | 49 | 252 | 110 | – |
+| 13 | 52 | 46 | 55 | 262 | 276 | – |
+| 16 | 54 | 47 | 58 | 285 | 191 | – |
+| 18 | 54 | 49 | 63 | 216 | 237 | – |
+
+**27, Sprint-Triathlon, Teamsport, lernt Kraulen, Pause in Woche 8–9 (26 Wochen)**
+
+| Woche | Schwimmen | Rad | Laufen | Plan min | erledigt min* | Kraul am Stück (Stufe) |
+|---|---|---|---|---|---|---|
+| 1 | 14 | 27 | 34 | 148 | 393 | 25 m (Stufe 2) |
+| 4 | 16 | 28 | 32 | 127 | 206 | 25 m (Stufe 2) |
+| 7 | 19 | 28 | 31 | 135 | 261 | 50 m (Stufe 3) |
+| 10 | 22 | 27 | 30 | 132 | 144 | 100 m (Stufe 4) |
+| 13 | 26 | 28 | 31 | 113 | 205 | 200 m (normal) |
+| 16 | 26 | 28 | 31 | 109 | 192 | 400 m (normal) |
+| 19 | 26 | 29 | 31 | 130 | 131 | 400 m (normal) |
+| 22 | 26 | 29 | 33 | 106 | 244 | 400 m (normal) |
+| 25 | 26 | 30 | 38 | 114 | 286 | 400 m (normal) |
+| 26 | 26 | 31 | 38 | 111 | 173 | 400 m (normal) |
+
+*erledigt inkl. Teamsport und Extra-Einheiten; Plan ohne feste Termine wie Teamsport.
+
+
+## Tests
+Typecheck ✓ · 2.477 Unit-/Server-Tests ✓ (darunter Langzeit-Simulation 36 Nutzer, 200+ Coach-Gespräche, neue Tests zu jedem Fehler) · Build ✓ · 453 Browser-Tests in Chromium und WebKit ✓ (113 bewusst übersprungen wie bisher). In der Test-Umgebung mit deiner Datenkopie: 9 doppelte Schwimm-Hinweise vom Server auf 1 reduziert, neue Schwimm-Meldung korrekt, keine Server-Fehler.
+
+Frühere Aufträge:
+
 # Freigabe erteilt, Produktionssicherung blockiert – 28.10.2026
 
 Jonah hat nach erfolgreicher Testbereitstellung 7d138192 die Produktionsveroeffentlichung beauftragt. Gespeichertes Gesamtprotokoll geprueft: 2398 Unit-/Servertests und 449 Browserpruefungen bestanden. Testsicherung erneut lokal validiert.
