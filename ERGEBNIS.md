@@ -1,3 +1,66 @@
+# Auftrag 23: Prognosen für alle Ziele, Wunschzeit, Fortschritt einklappbar, Tab-Leiste mit Glas-Linse (30.10.)
+
+**Stand:** Fertig und live (Version 3.11.0): erst Test-Umgebung mit einer frischen Kopie deiner Daten, dann echte App (beide vorher gesichert, alle 3 Konten an einer Kopie der echten Daten fehlerfrei geladen, mit Prognosen für jedes Ziel). Du musst nichts tun – App öffnen und „Aktualisieren“ tippen.
+
+## Deine Prognosen vorher / nachher
+| Ziel | vorher (am Wettkampftag) | jetzt |
+|---|---|---|
+| Halbmarathon 4.4.27 | 2:05:53 (1:53–2:25) | **1:58** (1:52–2:07), Sicherheit mittel |
+| Ironman 15.9.29 | 13:54:54 (12:31–16:01) | **ca. 11–13 h**, wenn du den Plan durchziehst (wahrscheinlich 11:55), Sicherheit niedrig |
+
+Ironman 2029 je Disziplin: Schwimmen 1:18 (heute 1:54), Rad 6:34 (heute 7:15), Laufen 3:55 (heute 5:21).
+Deine Wunschzeit 1:50 im Halbmarathon: **ambitioniert** (knapp schneller als das schnelle Ende). Am meisten bringt eine schnellere Lauf-Schwelle (1× pro Woche Schwellenlauf).
+Dazu kommen die Platzhalter-Ziele (Sprint 13.6.27, Olympisch 29.8.27, Halb-Ironman 18.6.28), jede mit eigener Prognose.
+
+## Was war falsch
+- **Lange Zeiträume:** Die alte Rechnung nahm 10 Wochen Trend, flachte nach 16 Wochen ab und rechnete danach +2–4 % pro Jahr. Dazu galtest du wegen „11 Jahre Erfahrung“ (zählt Fußball mit) als erfahren. Ergebnis: Schwimmen in 3 Jahren nur 2:41 → 2:21/100 m, obwohl du gerade Kraulen lernst.
+- **Zwei Rechnungen für die Wunschzeit:** Das Profil nannte 1:50 „realistisch (1:49–2:11)“, der Fortschritt rechnete 2:06. Jetzt gibt es nur noch eine Rechnung.
+- **Geplante lange Läufe übersehen:** Die Prognose suchte den längsten „nicht harten“ Lauf, aber lange Läufe zählen in der App als hart. So wurde dein 105-min-Lauf am 28.2. ignoriert (gerechnet mit 50 min).
+- **Wunschzeit veränderte den Plan:** Sie verschob die Schwerpunkte, die Dauer des Wettkampfs im Plan, und „Übernehmen“ plante immer neu (auch der Coach-Chat).
+
+## So rechnet die Prognose jetzt bei langen Zeiträumen
+- Jede Sportart nähert sich einer **persönlichen Grenze**. Die hängt vom geplanten Umfang in dieser Sportart, vom Alter und vom Geschlecht ab. Pro Jahr schließt sich ein fester Teil des Abstands: Laufen 25 %, Rad 28 %, Schwimmen 40 % (Technik). **Jugendliche** ×1,25, ab 30 weniger, ab 50 deutlich weniger. Wer weit weg ist (Einsteiger), macht große Sprünge, wer nah dran ist, kleine. Das Niveau kommt aus deinen gemessenen Werten, nicht aus den Jahren.
+- Wer nur Brust schwimmt, lernt mit dem Plan Kraulen (gerechnet ab etwa einem halben Jahr).
+- Lange Einheiten und Koppeltraining wachsen schrittweise mit („wenn du den Plan durchziehst“).
+- In den ersten Monaten zählt zur Hälfte dein eigener Trend der letzten 10 Wochen.
+- **Bereich:** wird mit dem Abstand breiter (Datenlage, Zeit, wie stark man auf Training anspricht). Über 1 Jahr nur noch grob („ca. 11–13 h“), Sicherheit „niedrig“.
+- Die Prognose rechnet sich weiter bei jeder Einheit, jedem Test und jedem Wettkampf neu. „Zuletzt aktualisiert“ nennt den Tag und was sie bewegt hat (z. B. „Lauf-Schwelle 5:26 → 5:21/km“). „Warum?“ zeigt die Entwicklung je Sportart.
+
+## Vergleich mit typischen Zeiten (Männer, 30 Jahre, heute)
+| | Einsteiger | solide | stark | typische Bereiche |
+|---|---|---|---|---|
+| Halbmarathon | 2:18 | 1:50 | 1:28 | 2:05–2:35 / 1:40–1:58 / 1:18–1:35 |
+| Olympisch | 3:11 | 2:38 | 2:15 | 2:55–3:35 / 2:25–2:55 / 2:00–2:25 |
+| 70.3 | 6:47 | 5:31 | 4:43 | 6:00–7:45 / 5:00–6:10 / 4:20–5:05 |
+| Ironman | 14:45 | 11:57 | 9:55 | 13:00–16:30 / 10:45–12:45 / 9:15–10:45 |
+
+Ironman in 3, 6, 12, 24, 36 Monaten:
+- Einsteiger, 17 Jahre: 13:58 · 13:22 · 12:43 · 12:11 · 11:52
+- Einsteiger, 30 Jahre: 14:04 · 13:33 · 12:58 · 12:29 · 12:10
+- Einsteiger, 50 Jahre: 14:12 · 13:48 · 13:24 · 13:10 · 13:00
+- Solide, 30 Jahre: 11:45 · 11:30 · 11:19 · 11:10 · 11:04
+- Stark, 50 Jahre: bleibt bei etwa 9:55 (nah an der eigenen Grenze, altersbedingt leicht langsamer)
+
+Alles liegt in den typischen Bereichen, kein Wert zu schnell oder zu langsam (feste Tests).
+
+## Neu in der App
+- **Fortschritt:** eine Prognose für jedes Ziel, das nächste zuerst. Platzhalter-Termine sind als „Platzhalter-Datum“ gekennzeichnet. Laufziele zeigen auch die anderen Distanzen heute und am Renntag.
+- **Wunschzeit:** je Disziplin „nötig vs. Prognose“, Einordnung (realistisch / ambitioniert / sehr unwahrscheinlich), größter Hebel, Pacing für die Wunschzeit mit Warnung, wenn sie über deiner Leistung liegt. **Der Plan bleibt gleich.** Ausrichten nur per Knopf „Plan auf Wunschzeit ausrichten“ (nur Triathlon, mit Vorschau). Das ändert nur die Reihenfolge der Schwerpunkte, alle Sicherheitsregeln bleiben.
+- **Einklappbar:** Leistung, Trends, Prognosen (jede einzeln), Umfang, Meilensteine. Die App merkt sich den Zustand. Eingeklappt steht das Wichtigste in der Zeile (z. B. „Halbmarathon: ca. 1:52–2:07“).
+- **Tab-Leiste:** Halten (ab 0,2 s) oder über die Leiste wischen zeigt eine vergrößerte Glas-Linse. Sie federt nach, folgt dem Finger und hebt den Tab darunter hervor. Loslassen öffnet den Tab. Antippen bleibt sofort. Bei „Bewegung reduzieren“ springt sie ohne Animation. Hell und dunkel, verdeckt nichts.
+
+## Tests
+Typecheck ✓ · 2.592 Unit-Tests ✓ (neu 37: typische Zeiten je Niveau, Entwicklung 3/6/12/24/36 Monate nach Niveau, Alter und Umfang, Kraulen lernen, deine Werte, Platzhalter und Reihenfolge, „zuletzt aktualisiert“, Wunschzeit-Einordnung und Hebel, Pacing-Warnung, Plan bleibt bei Wunschzeit gleich, geplante lange Läufe) · Build ✓ · 485 Browser-Tests in Chromium und WebKit ✓ (113 wie bisher übersprungen; neu: Prognose je Ziel, Einklappen bleibt nach Neuladen, Wunschzeit speichern ohne Planänderung, Linse halten/wischen/loslassen/antippen, „Bewegung reduzieren“, Bildrate, hell/dunkel, große Schrift).
+Echte Daten (Kopie von heute): Umstellung 649 → 649, alle 3 Konten laden fehlerfrei. Die Release-Prüfung rechnet ab jetzt auch die Prognose für jedes Ziel jedes Kontos.
+Beim Veröffentlichen lief die Cloudflare-Anmeldung während des 30-minütigen Testlaufs ab. Das Skript hielt vor der ersten Sicherung an, es wurde nichts verändert. Nach dem Erneuern liefen die übrigen Schritte für denselben, schon geprüften Stand.
+
+## Offen
+- Die Glas-Linse habe ich in WebKit (der Safari-Engine) automatisch getestet, nicht auf einem echten iPhone. In WebKit ohne Grafikkarte läuft sie ab der zweiten Geste mit 60 fps (16 ms je Bild, wie ohne Linse; die App selbst braucht unter 0,1 ms). Die allererste Geste nach dem Öffnen braucht dort 22–33 ms, weil der Browser die Ebene zum ersten Mal zeichnet. Auf dem iPhone macht das die Grafikkarte.
+- Die Entwicklungskurven sind Erfahrungswerte, keine Studie. Nach deinen ersten Wettkämpfen gleicht der persönliche Korrekturfaktor sie an.
+- „Plan auf Wunschzeit ausrichten“ wirkt nur bei Triathlon-Zielen (Reihenfolge der Schwerpunkte). Laufpläne richten sich ohnehin nach dem Ziel.
+
+Frühere Aufträge:
+
 # Auftrag 22: Intervalle erfassen und auswerten, Fehler dauerhaft verhindern (30.10.)
 
 **Stand:** Fertig und live (Version 3.10.0): erst Test-Umgebung mit einer frischen Kopie deiner Daten, dann echte App (Sicherungen beider Umgebungen vorher geprüft, Rückweg-Zeitpunkt der Datenbank festgehalten). Du musst nichts tun – App öffnen und „Aktualisieren“ tippen.
@@ -48,8 +111,6 @@ Typecheck ✓ · 2.555 Unit-/Server-Tests ✓ (neu u. a.: Intervalle aus FIT-Run
 - Die 51 verwaisten Anpassungen bei dir bleiben stehen (wirken nicht).
 - Der Einrichtungscode für die Test-Umgebung in ZUGANG.local.md stimmt nicht mehr; deshalb habe ich die Test-Umgebung lesend über die Datenbank geprüft (keine Fehler). Den Daten-Check kannst du als Betreiber jederzeit selbst starten: Posteingang → „Daten-Check jetzt ausführen“ (sonst läuft er jede Nacht).
 - VoiceOver habe ich automatisch geprüft (jedes Bedienelement hat einen Namen), nicht mit einem echten iPhone.
-
-Frühere Aufträge:
 
 # Auftrag 21: mehr Werte, mehr Daten, Coach-Fehler, Jetzt abrufen, Langzeit-Simulation (28.10.)
 
@@ -126,7 +187,6 @@ Gesamtzahl je Fehlerart: erster Lauf 7 Fehlerarten bei 36 Nutzern, nach den Fixe
 ## Tests
 Typecheck ✓ · 2.477 Unit-/Server-Tests ✓ (darunter Langzeit-Simulation 36 Nutzer, 200+ Coach-Gespräche, neue Tests zu jedem Fehler) · Build ✓ · 453 Browser-Tests in Chromium und WebKit ✓ (113 bewusst übersprungen wie bisher). In der Test-Umgebung mit deiner Datenkopie: 9 doppelte Schwimm-Hinweise vom Server auf 1 reduziert, neue Schwimm-Meldung korrekt, keine Server-Fehler.
 
-Frühere Aufträge:
 
 # Freigabe erteilt, Produktionssicherung blockiert – 28.10.2026
 
