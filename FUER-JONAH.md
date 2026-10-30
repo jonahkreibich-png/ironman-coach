@@ -1,10 +1,10 @@
 # Für Jonah
 
-**Nichts zu tun.** Version 3.11.0 ist live (vorher in der Test-Umgebung mit deinen Daten geprüft, Sicherungen gemacht).
+**Nichts zu tun.** Version 3.12.0 ist live (vorher in der Test-Umgebung mit deinen Daten geprüft, Sicherungen gemacht).
 
 Beim nächsten Öffnen: bei „Neue Version“ auf „Aktualisieren“ tippen.
 
 Gut zu wissen:
-- Fortschritt: Jedes Ziel hat seine eigene Prognose. Antippen der Kopfzeile klappt ein oder aus, die App merkt es sich.
-- Wunschzeit ändert den Plan nicht. Wenn du willst: im Fortschritt „Plan auf Wunschzeit ausrichten“ (mit Vorschau).
-- Tab-Leiste: gedrückt halten oder darüber wischen, dann loslassen.
+- Tab-Leiste: Es gibt jetzt eine einzige Glas-Linse. Antippen lässt sie gleiten, Halten und Ziehen macht sie größer, Loslassen rastet am nächsten Tab ein.
+- Prognose: „Erwartet am Wettkampftag“ rechnet immer mit deiner Entwicklung bis dahin. „Warum?“ zeigt, ob sie aus deinem eigenen Trend oder aus typischer Entwicklung stammt.
+- Ein Ziel, das nicht zu deinen Sportarten passt, bekommt keine Prognose, sondern einen Hinweis im Profil.

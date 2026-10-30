@@ -1,3 +1,109 @@
+# Auftrag 24: Liquid-Leiste wie iOS 26, Prognose mit Entwicklung, nur eigene Sportarten (30.10.)
+
+**Stand:** Fertig und live (Version 3.12.0). Erst Test-Umgebung mit einer frischen Kopie deiner Daten, dann echte App. Beide waren vorher gesichert, und alle 3 Konten laden an einer Kopie der echten Daten fehlerfrei. Du musst nichts tun: App öffnen und „Aktualisieren“ tippen.
+
+## 1. Tab-Leiste
+**Was war falsch**
+- **Zwei Linsen:** Der aktive Tab hatte im Glas-Design eine eigene Fläche, die Zieh-Linse kam dazu.
+- **Ruckeln nach dem Loslassen:** Der neue Tab wurde sofort gebaut, während die Animation im selben Takt lief.
+
+**Jetzt**
+- **Genau ein Element:** Es markiert in Ruhe den aktiven Tab und wird beim Drücken zur vergrößerten Linse.
+- **Feder:** leichtes Überschwingen (etwa 4 %), Dehnung in Bewegungsrichtung je nach Tempo (bis 24 %), beim Abbremsen wieder rund. Beim Drücken 1,2× größer, beim Loslassen weiches Einrasten am nächsten Tab mit kleinem Nachfedern. Antippen gleitet mit derselben Feder.
+- **Flüssig:** nur transform und opacity. Gleiten und Einrasten laufen als Web-Animation im Compositor weiter, auch während der neue Tab gebaut wird. Den baut die App erst zwei Bilder nach dem Start der Animation (beim Finger; ein Mausklick am PC öffnet sofort).
+- **„Bewegung reduzieren“:** keine Feder, keine Vergrößerung, direkter Wechsel.
+
+**Messung in WebKit** (Safari-Engine, ohne Grafikkarte)
+
+| Fall | ms pro Bild |
+|---|---|
+| ohne Linse | 16,1 |
+| Ziehen, erste Geste | 20,5 (vorher 33) |
+| Ziehen, danach | 15,8–16,0 (60 fps) |
+
+- Rechenzeit der Linse: 0,12 ms pro Bild im Mittel, höchstens 1 ms.
+- Aufbau des neuen Tabs: 43 ms. Die Linse gleitet währenddessen weiter (im Test geprüft).
+
+**Videos** (WebKit, zum Vergleich): `docs/tabbar-vorher-webkit.webm`, `docs/tabbar-neu-webkit.webm`, `docs/tabbar-neu-webkit-zeitlupe.webm` (4× langsamer). WebM statt GIF, weil das vorhandene Werkzeug kein GIF erzeugen kann.
+
+## 2. Prognose: heute ≠ Wettkampftag
+**Ursache bei Papa:** Die Rechnung verglich den heutigen Stand mit dem von vor 70 Tagen. Damals gab es noch keine eigenen Einheiten, also verglich sie mit Standardwerten. Das sah aus wie „langsamer geworden“ und drückte die Hochrechnung. Dazu bekam, wer rechnerisch schon an seiner Grenze ist (bei Papa das Rad, ab 45), null oder sogar weniger. Die Wechsel blieben immer gleich. Ergebnis: Rad 1:28:22 → 1:28:05 und Wechsel 3:24 → 3:24, also praktisch gleich.
+
+**Regel jetzt (für alle)**
+- **Eigener Trend** zählt nur aus eigenen Daten: Vergleich mit 12, 8 oder 5 Wochen zurück, je mindestens 3 Einheiten damals und heute. Je mehr Daten, desto mehr zählt er (höchstens 70 %).
+- **Sonst typische Entwicklung:** nach Niveau (Anfänger mehr), Alter, Sportart (Schwimmtechnik bei Anfängern am meisten), geplantem Umfang und Abstand zum Wettkampf. Ohne eigenen Trend ist der Bereich breiter.
+- **Wer den Plan durchzieht, wird immer etwas besser.** Auch die Wechsel werden durch Koppeltraining schneller, Brustschwimmer werden in Brust schneller.
+- **Gleich** sind beide Werte nur in der Woche vor dem Rennen.
+- **Schlechter am Wettkampftag** nur bei einer Pause (2 Wochen keine Einheit oder krank), immer mit Begründung, z. B. „Laufen: seit etwa 4 Wochen keine Einheit … deshalb am Wettkampftag langsamer als heute“.
+- **„Warum?“** nennt je Sportart „Hochrechnung aus typischer Entwicklung“ oder „aus deinem Trend der letzten X Wochen (zählt zu Y %)“.
+
+**Echte Konten (frische Kopie von heute)**
+
+| Konto | Ziel | heute | Wettkampftag vorher (3.11) | Wettkampftag jetzt |
+|---|---|---|---|---|
+| Papa | Triathlon 18.7.27 | 3:17:33 | 3:08:48 (Rad und Wechsel gleich wie heute) | **3:08:43** (Rad 1:27:52, Wechsel 3:11) |
+| Papa | Halbmarathon 4.4.27 | 2:09:02 | 2:07:27 | **2:07:13** |
+| Mama | Schwimmen 11.7.27 (Platzhalter) | 47:01 | 43:47 | **43:35** |
+| du | Halbmarathon 4.4.27 | 2:07:30 | 1:58:16 | **1:57:37** |
+| du | Sprint 13.6.27 (Platzhalter) | 1:35:52 | 1:29:05 | **1:28:40** |
+| du | Olympisch 29.8.27 (Platzhalter) | 3:15:11 | 2:57:45 | **2:57:09** |
+| du | Halb-Ironman 18.6.28 (Platzhalter) | 6:48:50 | 5:54:49 | **5:54:19** (ca. 5:30–6:30 h) |
+| du | Ironman 15.9.29 | 14:39:44 | 11:55:13 | **11:54:38** (ca. 11–13:30 h) |
+
+Bei allen gilt „Hochrechnung aus typischer Entwicklung“: Für einen Trend gibt es noch zu wenige eigene Daten von vor 5–12 Wochen. Du und Papa seid gerade als krank eingetragen; bei Zielen in mehreren Monaten zählt das nicht (längst aufgeholt).
+
+**Alle Test-Personen** (ohne eigene Daten; S = Schwimmen, R = Rad, L = Laufen)
+
+| Test-Person | Sportarten | Ziel | heute | in 2 Wochen | am Termin | in 3 Jahren |
+|---|---|---|---|---|---|---|
+| jugend-langdistanz | SRL | Langdistanz | 16:14:24 | 16:09:45 | ca. 11–15:30 h (2028-07-16) | ca. 11–15 h |
+| jugend-langdistanz | SRL | Stadt-Sprint | 1:45:22 | 1:45:06 | 1:44:39 (2026-11-08) | ca. 1:10–1:40 h |
+| vater-rad-lauf | RL | Radmarathon 150 km | 4:08:44 | 4:08:33 | 3:58:27 (2027-03-21) | ca. 3:30–4:30 h |
+| vater-rad-lauf | RL | Silvesterlauf 10 km | 59:07 | 59:05 | 58:45 (2026-12-31) | ca. 49 min – 1:04 h |
+| laeuferin-hm | L | Halbmarathon | 2:00:18 | 2:00:12 | 1:59:30 (2026-12-20) | ca. 1:40–2:10 h |
+| laeuferin-hm | L | 10-km-Rennen | 54:31 | 54:28 | 54:22 (2026-11-14) | ca. 44–59 min |
+| einsteiger-sprint | SRL | Erster Sprint-Triathlon | 1:58:40 | 1:58:31 | 1:55:55 (2027-04-18) | ca. 1:30–2:05 h |
+| erfahren-md-marathon | SRL | Mitteldistanz | 5:54:42 | 5:54:25 | 5:44:21 (2027-06-27) | ca. 5–6:30 h |
+| erfahren-md-marathon | SRL | Frühjahrsmarathon | 3:40:05 | 3:39:55 | 3:37:26 (2027-04-11) | ca. 3–4 h |
+| vater-regeln | SRL | Olympische Distanz | 3:13:32 | 3:12:37 | 3:08:29 (2027-06-20) | ca. 2:45–3:35 h |
+| marathon-anfaenger | L | Erster Marathon | 6:38:27 | 6:36:48 | 4:59:02 (2027-10-10) | ca. 3:30–5 h |
+| marathon-anfaenger | L | Halbmarathon | 2:59:33 | 2:58:49 | – | ca. 1:35–2:25 h |
+| rad-event | R | Alpen-Radmarathon 180 km | 3:50:13 | 3:50:00 | 3:43:30 (2027-07-04) | ca. 3–4 h |
+| olympisch-erfahren | SRL | Olympische Distanz | 2:56:59 | 2:56:50 | 2:52:32 (2027-07-11) | ca. 2:30–3:20 h |
+| olympisch-erfahren | SRL | Sprint-Triathlon | 1:26:59 | 1:26:55 | 1:25:04 (2027-06-06) | ca. 1:15–1:35 h |
+| olympisch-erfahren | SRL | Stadtlauf 10 km | 51:13 | 51:10 | 50:28 (2027-04-18) | ca. 44–58 min |
+| langdistanz-profi | SRL | Ironman | 12:10:43 | 12:09:41 | 11:29:39 (2027-08-29) | ca. 9:30–13 h |
+| langdistanz-profi | SRL | Mitteldistanz | 5:48:48 | 5:48:18 | – | ca. 4:30–6 h |
+| anfaenger-ohne-kraul | SRL | Erster Sprint | 2:05:52 | 2:05:38 | 1:59:08 (2027-07-04) | ca. 1:30–2:05 h |
+| laeufer-ohne-rad | L | Halbmarathon | 1:47:02 | 1:46:49 | 1:43:16 (2027-04-11) | ca. 1:25–1:50 h |
+| teamsport-ohne-spiele | LR | Stadtlauf | 1:05:20 | 1:05:12 | 1:01:58 (2027-05-16) | ca. 47 min – 1:04 h |
+| fuenfzig-wenig-zeit | SRL | Olympisch | 3:41:44 | 3:41:28 | 3:29:41 (2027-08-22) | ca. 2:55–3:55 h |
+| triathlet-50m-freiwasser | SRL | Mitteldistanz | 6:08:43 | 6:08:22 | 5:56:32 (2027-06-27) | ca. 5–6:30 h |
+| triathlet-50m-freiwasser | SRL | Olympisch | 2:54:56 | 2:54:45 | 2:50:20 (2027-05-30) | ca. 2:25–3:15 h |
+
+In 2 Wochen ist es überall etwas schneller (Sekunden), am Termin deutlich, in 3 Jahren am meisten. Feste Tests prüfen außerdem: 8 Tage vorher praktisch gleich, Pause vor einem nahen Rennen langsamer mit Begründung, Trend mit 12 Wochen Daten zählt, Einsteiger entwickeln sich mehr als Erfahrene, Junge mehr als Ältere, mehr Umfang bringt mehr.
+
+## 3. Nur deine Sportarten
+- Prognose nur für Ziele, deren Sportarten du gewählt hast. Passt ein Ziel nicht dazu, gibt es keine Prognose. Stattdessen steht beim Ziel im Profil: „Dein Ziel enthält Laufen, das trainierst du bisher nicht – Ziel ändern oder Laufen hinzufügen?“, mit beiden Knöpfen. Im Fortschritt steht eine Zeile mit „Zum Profil“.
+- Scores zeigt die App nur noch für gewählte Sportarten. Vorher kamen die Sportarten des Ziels dazu.
+- Papa und Mama: Alle ihre Ziele passen zu ihren Sportarten. Bei Mama (Schwimmen, Rad, Kraft) kommt Laufen nirgends vor: keine Prognose, kein Score, kein Tipp, kein Test.
+- Getestet: nur eine Sportart, 2 von 3 Triathlon-Sportarten, nur Rad, nur Schwimmen, nur Laufen, Fitness-Ziel ohne Wettkampf. Keine fremde Sportart in Zeit, Teilen, „Was am meisten bringt“, Tests, Annahmen oder Scores.
+
+## Tests
+- Typecheck ✓
+- 2.626 Unit-Tests ✓ (neu 34: Feder, heute ≠ Wettkampftag, Papa-Fall, Abstand 8 Tage / 2 Wochen / 3 Jahre, Niveau, Alter, Umfang, Trend, Pause und krank, alle Test-Personen, Sportarten-Prüfung)
+- Build ✓
+- 501 Browser-Tests in Chromium und WebKit ✓ (115 wie bisher übersprungen). Neu:
+  - Leiste: Antippen mit Maus und Finger, Halten und Ziehen über alle Tabs und zurück, schnelles Wischen, Loslassen zwischen zwei Tabs (rastet am nächsten ein), Tastatur, „Bewegung reduzieren“, Bildrate. In jedem Bild geprüft: nie zwei Linsen.
+  - Prognose: Hinweis statt Prognose, kein Lauf-Score, „Warum?“, heute ≠ Wettkampftag.
+- Nebenbei gefunden und behoben: Im Fragebogen kommen die Ziele vor den Sportarten, deshalb fehlte dort die Einordnung „realistisch“. Grobe Bereiche über die Stundengrenze heißen jetzt „49 min – 1:04 h“ statt „49–1:04 h“.
+
+## Offen
+- Die Leiste habe ich in WebKit automatisch getestet, nicht auf einem echten iPhone. Haptik gibt es im Web nicht.
+- Die typischen Fortschrittsraten sind Erfahrungswerte. Sobald es 5–12 Wochen eigene Daten gibt, zählt der eigene Trend mit, nach Wettkämpfen zusätzlich der persönliche Korrekturfaktor.
+
+Frühere Aufträge:
+
 # Auftrag 23: Prognosen für alle Ziele, Wunschzeit, Fortschritt einklappbar, Tab-Leiste mit Glas-Linse (30.10.)
 
 **Stand:** Fertig und live (Version 3.11.0): erst Test-Umgebung mit einer frischen Kopie deiner Daten, dann echte App (beide vorher gesichert, alle 3 Konten an einer Kopie der echten Daten fehlerfrei geladen, mit Prognosen für jedes Ziel). Du musst nichts tun – App öffnen und „Aktualisieren“ tippen.

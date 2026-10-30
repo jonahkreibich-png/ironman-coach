@@ -56,7 +56,8 @@ export async function releaseDataCheck(src: string, today = localDate()): Promis
         stats.intervalSessions = iv;
         await step('Daten-Check', () => { const r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today }); stats.findings = r.findings.length; stats.safeFixes = r.fixes.length; });
       }
-      await step('Scores', () => { const acts = [...namedFromPlan(L.state, L.baseWeeks, C.recordedActivities(L.state)), ...legacyActivities(L.state, L.baseWeeks, L.profile)] as any[]; const sc = sportScores({ today, activities: acts, trend: L.state.trend, illness: L.state.illnessPeriods, profile: L.profile, goal: mainGoal(L.goals, today) } as any); stats.scores = sc.map(x => `${x.sport} ${x.score}`).join(', '); for (const x of sc) if (!Number.isFinite(x.score)) throw new Error(`${x.sport}: ungültig`); });
+      await step('Scores', () => { const acts = [...namedFromPlan(L.state, L.baseWeeks, C.recordedActivities(L.state)), ...legacyActivities(L.state, L.baseWeeks, L.profile)] as any[]; const chosen = ['swim', 'bike', 'run', 'strength'].filter(x => ((L.profile && L.profile.sports) || []).includes(x)); // wie die App (Auftrag 24): nur gewählte Sportarten
+        const sc = sportScores({ today, activities: acts, trend: L.state.trend, illness: L.state.illnessPeriods, profile: L.profile, goal: mainGoal(L.goals, today) } as any, chosen.length ? chosen as any : undefined); stats.scores = sc.map(x => `${x.sport} ${x.score}`).join(', '); for (const x of sc) if (!Number.isFinite(x.score)) throw new Error(`${x.sport}: ungültig`); });
       // Auftrag 23: Prognose für jedes Ziel (mit Platzhalter-Terminen) muss für jeden Nutzer rechnen und plausible Zeiten liefern
       await step('Prognosen', () => {
         const acts = [...namedFromPlan(L.state, L.baseWeeks, C.recordedActivities(L.state)), ...legacyActivities(L.state, L.baseWeeks, L.profile)] as any[];
