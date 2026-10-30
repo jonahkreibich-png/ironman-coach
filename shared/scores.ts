@@ -10,7 +10,8 @@ import { actualMetrics, crawlOf } from './results';
    gezählten Einheiten, wie sicher der Wert ist und was am meisten bringt.
    Bedingungen werden herausgerechnet: Hitze über 22 °C, Höhenmeter, Rollentrainer. Werte unter Krankheit zählen weniger. */
 import type { Activity } from './activity/analyze';
-import { intervalsOf } from './activity/structure';
+import { intervalsOf, statsOf } from './activity/structure';
+import { rowsToLaps } from './intervals';
 import type { Profile } from './profile';
 import { ageOf, ageExact } from './profile';
 import type { Goal } from './goals';
@@ -162,6 +163,9 @@ interface Raw { parts: ScorePart[]; n: number; counted: Counted[]; latest: strin
 
 /* ---------- Auftrag 19: Messungen über die ganze Geschichte für die laufende Schätzung ---------- */
 const TEST_RE = /test\b|ftp|\bcss\b|wettkampf|rennen|\brace\b|parkrun|zeitfahren/i;
+/* Auftrag 22 (Langzeit-Simulation): Wettkämpfe und sehr harte Einheiten ohne Puls sind kein „lockerer Lauf“ bzw. keine lange lockere Fahrt
+   (ein Halbmarathon zählte als längster lockerer Lauf: Score +11 in einer Woche) */
+const isRaceAct = (a: any) => !!a && (a.race === true || /wettkampf|rennen|\brace\b|parkrun|zeitfahren/i.test(a.name || '') || (a.rpe != null && a.rpe >= 9 && !a.avgHr));
 function historyActs(c: Ctx, sport: string): Activity[] {
   const seen = new Set<string>();
   return c.inp.activities.filter(a => a.sport === sport && !a.mergedInto && a.date <= c.end && (a.min == null || (Number.isFinite(a.min) && a.min >= 0)))
@@ -469,7 +473,7 @@ function runRaw(c: Ctx): Raw {
   const eff = wmedian(effs);
   const decs = runs.filter(a => a.decouplingPct != null && a.min! >= 30).map(a => ({ v: a.decouplingPct!, w: weightOf(a, inp, end) * (a.min! >= 45 ? 1 : 0.5), date: a.date }));
   const dec = wmedian(decs);
-  const easyMins = runs.filter(a => !a.avgHr || a.avgHr <= 0.9 * lthr).map(a => Math.round((a.min || 0) * longDecay(end, a.date)));
+  const easyMins = runs.filter(a => !isRaceAct(a) && (!a.avgHr || a.avgHr <= 0.9 * lthr)).map(a => Math.round((a.min || 0) * longDecay(end, a.date)));
   const skillCont = (inp.profile.skills || {}).runContinuousMin || null;
   // Auftrag 19: kurze Läufe im Fenster sind kein Beweis, dass ein längerer nicht geht: höchster Wert aus Einheiten und Fragebogen
   const runMax = easyMins.length ? Math.max(...easyMins) : null;
@@ -574,7 +578,7 @@ function bikeRaw(c: Ctx): Raw {
   const decs = rides.filter(a => a.decouplingPct != null && a.min! >= 60).map(a => ({ v: a.decouplingPct!, w: weightOf(a, inp, end), date: a.date }));
   const dec = wmedian(decs);
   const skillLong = (p.skills || {}).bikeLongestMin || null;
-  const rideMax = rides.length ? Math.max(...rides.map(a => Math.round((a.min || 0) * longDecay(end, a.date)))) : null;
+  const rideMax = rides.some(a => !isRaceAct(a)) ? Math.max(...rides.filter(a => !isRaceAct(a)).map(a =>Math.round((a.min || 0) * longDecay(end, a.date)))) : null;
   const longest = rideMax != null && skillLong != null ? Math.max(rideMax, skillLong) : rideMax ?? skillLong;
   const rideFromSkill = longest != null && longest !== rideMax;
   const usePower = !!ftp;
@@ -750,7 +754,7 @@ function rangeTextOf(range: number, provisional = false): string {
 }
 /* „Warum?“: die letzten Einheiten mit ihrem Beitrag (+/−) und dem Grund */
 const KIND_WHY: Record<string, string> = {
-  test: 'Test, zählt stark', effort: 'harte Einheit mit Puls, zählt stark', laps: 'Intervalle mit Puls', hr: 'Tempo bei bekanntem Puls',
+  test: 'Test, zählt stark', effort: 'harte Einheit mit Puls, zählt stark', laps: 'Intervalle mit Puls, zählt stark', hr: 'Tempo bei bekanntem Puls',
   rpe: 'ohne Puls, nur nach Gefühl, zählt wenig', titled: 'Watt einer Intervall-Einheit, zählt wenig', swimset: 'lange Serie, zählt gut', swimpace: 'Tempo der Einheit'
 };
 const STATUS_WHY: Record<string, string> = {
@@ -1035,12 +1039,13 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       ascentM: num(m.ascent), kcal: null, tempC: num(m.temp) ?? num(s && s.temp), hrZones: null, decouplingPct: num(m.decoupling), np: num(m.np), trainer: m.indoor === 'basic' ? 'basic' : m.indoor === 'in' ? 'smart' : null,
       efficiency: sp && hr ? Math.round(sp * 60 / hr * 100) / 100 : null,
       // Auftrag 20: eingetragene Testwerte (Puls und Tempo im Testteil) zählen wie eine Test-Runde
-      laps: testLap(sport, m), intervals: null,
+      // Auftrag 22: eingetragene Intervalle (von Hand oder intervals.icu) zählen wie Runden der Uhr, mit Datenqualität der Quelle
+      laps: [...testLap(sport, m), ...rowsToLaps(Array.isArray(m.intervals) ? m.intervals : [], sport)], intervals: Array.isArray(m.intervals) && m.intervals.length >= 2 ? statsOf(rowsToLaps(m.intervals, sport), sport === 'bike') : null,
       swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), longestCrawlM: num(m.longestCrawl), longestPullM: num(m.longestPull), strokeRate: num(m.rate) } : null,
-      rpe: num(s && s.rpe)
+      rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {})
     } as Activity);
   };
-  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, s.sport, st.metrics || {}, s.title, { ...st, zone: s.zone }, s.plannedMinutes); }));
+  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, s.sport, st.metrics || {}, s.title, { ...st, zone: s.zone, race: !!s.race }, s.plannedMinutes); }));
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
   return out;
 }

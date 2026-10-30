@@ -181,7 +181,8 @@ const normalFor = (w: any) => !w.isRecoveryWeek && !w.entry && !w.reduced && !w.
    sinnvoller Länge (Laufen/Schwimmen 25 min, Rad 30 min), zählt die Mindest-Häufigkeit erst, wenn er gewachsen ist */
 export const MIN_SESSION: Record<string, number> = { run: 25, swim: 25, bike: 30 };
 export const sportMinutes = (w: any, sport: string) => (w.days || []).flatMap((d: any) => live(d)).filter((s: any) => !s.race && s.sport === sport).reduce((a: number, s: any) => a + minOf(s), 0);
-export function freqByVolume(w: any, sport: string, need: number): number { return Math.min(need, Math.max(1, Math.floor((sportMinutes(w, sport) + 2) / (MIN_SESSION[sport] || 25)))); }
+/* Auftrag 22: kleiner Puffer (5 min), damit eine automatische Anpassung um 1-2 min die Regel nicht umkippt */
+export function freqByVolume(w: any, sport: string, need: number): number { return Math.min(need, Math.max(1, Math.floor((sportMinutes(w, sport) - 3) / (MIN_SESSION[sport] || 25)))); }
 export function countSport(w: any, sport: string): number {
   return (w.days || []).flatMap((d: any) => live(d)).filter((s: any) => !s.race && (isBrick(s) ? sport === 'run' : s.sport === sport)).reduce((a: number, s: any) => a + (isBrick(s) ? 0.5 : 1), 0);
 }
@@ -693,17 +694,30 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     }
     if (!changed) break;
   }
-  // 10) unter 18: Wochenstunden höchstens so viele wie das Alter
-  for (const w of weeks) {
+  // 10) unter 18: Wochenstunden höchstens so viele wie das Alter (Auftrag 22: am Ende noch einmal, weil spätere Schritte Minuten hinzufügen)
+  const teenCap = () => { for (const w of weeks) {
     const age = ageOf(p, w.startDate); if (age == null || age >= 18 || !fullWeek(w, o.from)) continue;
-    const all = (w.days || []).flatMap((d: any) => live(d).filter((s: any) => !s.race).map((s: any) => ({ d, s })));
-    const tot = all.reduce((a: number, { s }: any) => a + minOf(s), 0); if (tot <= age * 60) continue;
-    const flex = all.filter(({ d, s }: any) => movable(s, d.date) && s.spec && !s.stage && !isTestS(s));
-    const flexMin = flex.reduce((a: number, { s }: any) => a + minOf(s), 0); if (!flexMin) continue;
-    const f = Math.max(0.5, 1 - (tot - age * 60 + 5) / flexMin);
-    for (const { d, s } of flex) { const nx = scaled(s, f); if (nx && nx.plannedMinutes < minOf(s)) setS(d, s, nx); }
-    fixes.push(`Woche ${w.weekNumber}: kürzer (unter 18 höchstens ${age} h pro Woche)`);
-  }
+    // Auftrag 22 (Zufallstest): Runden auf 5 min und Schwimmzeit aus Metern ließen die Woche nach einem Durchgang knapp über der Grenze –
+    // deshalb bis zu 4 Durchgänge, jedes Mal mit dem neuen Stand
+    let did = false;
+    for (let pass = 0; pass < 4; pass++) {
+      const all = (w.days || []).flatMap((d: any) => live(d).filter((s: any) => !s.race).map((s: any) => ({ d, s })));
+      const tot = all.reduce((a: number, { s }: any) => a + minOf(s), 0); if (tot <= age * 60) break;
+      const flex = all.filter(({ d, s }: any) => movable(s, d.date) && s.spec && !s.stage && !isTestS(s));
+      const flexMin = flex.reduce((a: number, { s }: any) => a + minOf(s), 0); if (!flexMin) break;
+      const f = Math.max(0.5, 1 - (tot - age * 60 + 5 + pass * 5) / flexMin);
+      let any = false;
+      for (const { d, s } of flex) { const nx = scaled(s, f); if (nx && nx.plannedMinutes < minOf(s)) { setS(d, s, nx); any = true; } }
+      // kurze Einheiten lassen sich kaum kürzen (ganze Bahnen, Mindestdauer): dann die längste stärker kürzen, sonst die kürzeste lockere weglassen
+      if (!any) { const big = [...flex].sort((x: any, y: any) => minOf(y.s) - minOf(x.s))[0]; for (let g = f - 0.1; g >= 0.5 && !any; g -= 0.1) { const nx = scaled(big.s, g); if (nx && nx.plannedMinutes < minOf(big.s)) { setS(big.d, big.s, nx); any = true; } } }
+      // weglassen nur Kraft (Ausdauer-Einheiten zählen für die Mindest-Häufigkeit je Sportart)
+      if (!any) { const small = flex.filter(({ s }: any) => s.sport === 'strength' && !hardS(s)).sort((x: any, y: any) => minOf(x.s) - minOf(y.s))[0]; if (small) { removeS(small.d, small.s); fixes.push(`${small.d.date}: ${small.s.title} entfällt (unter 18 höchstens ${age} h pro Woche)`); any = true; } }
+      if (!any) break; did = true;
+    }
+    const msg = `Woche ${w.weekNumber}: kürzer (unter 18 höchstens ${age} h pro Woche)`;
+    if (did && !fixes.includes(msg)) fixes.push(msg);
+  } };
+  teenCap();
   /* Minuten einer dazugekommenen Einheit bei den anderen Einheiten derselben Sportart der Woche abziehen (Umfang bleibt gleich): zuerst lockere,
      dann die lange (nie unter 2/3), zuletzt lockere Einheiten anderer Sportarten */
   const compensate = (w: any, add: any) => {
@@ -898,6 +912,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     }
     prevRest = (w.days || []).filter((d: any) => !live(d).length).length;
   }
+  teenCap();
   return fixes;
 }
 

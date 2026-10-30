@@ -1,3 +1,4 @@
+import { localDate, localParts, type LocalParts } from '../../shared/tz';
 import { entitlements, type Entitlements } from '../../shared/features';
 /* Datenbank-Hilfen (D1). Alles ist pro Nutzer (user_id) getrennt. */
 
@@ -16,17 +17,10 @@ export interface Env {
   [k: string]: any;
 }
 
-export function berlinDate(ts?: number): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts == null ? Date.now() : ts));
-}
-export interface BerlinParts { date: string; hour: number; minute: number; dow: number }
-export function berlinParts(ts?: number): BerlinParts {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', weekday: 'short', hourCycle: 'h23' })
-    .formatToParts(new Date(ts == null ? Date.now() : ts));
-  const get = (t: string) => (parts.find(p => p.type === t) || ({} as any)).value;
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
-  return { date: berlinDate(ts), hour: parseInt(get('hour'), 10), minute: parseInt(get('minute'), 10), dow };
-}
+/* Auftrag 22: „Berlin“ heißt hier: Zeitzone des Nutzers (shared/tz.ts, je Nutzer gesetzt in server/src/tz.ts), Standard Europe/Berlin */
+export function berlinDate(ts?: number): string { return localDate(ts == null ? Date.now() : ts); }
+export type BerlinParts = LocalParts;
+export function berlinParts(ts?: number): BerlinParts { return localParts(ts == null ? Date.now() : ts); }
 export function addDaysStr(s: string, n: number): string {
   const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);

@@ -16,7 +16,7 @@ Mindestens 1 echter Ruhetag pro Woche (kein Training, höchstens Mobility). Unte
 
 ### Jugendliche: Stunden pro Woche (neu)
 
-Unter 18 nie mehr Stunden Training pro Woche als das Alter in Jahren (Teamsport zählt mit).
+Unter 18 nie mehr Stunden Training pro Woche als das Alter in Jahren (Teamsport zählt mit). Die Kürzung wird so oft wiederholt, bis die Grenze hält, auch am Ende aller Plan-Korrekturen; lässt sich nichts mehr kürzen, fällt eine Kraft-Einheit weg, nie eine Ausdauer-Einheit.
 
 - Warum: Faustregel gegen Überlastung im Wachstum.
 - Quelle: AAP (Brenner u. a.), Sport-Spezialisierung bei Jugendlichen
@@ -48,7 +48,7 @@ Höchstens 2 eigene harte Einheiten pro Woche plus Teamsport-Spiel (Einsteiger 0
 
 ### Mindest-Häufigkeit je Sportart (neu)
 
-Laufziel ab 10 km: mindestens 3 Läufe pro Woche (wenig Zeit: 2; ein Koppellauf zählt halb; Teamsport mit viel Laufen wie Fußball oder Handball zählt je Termin halb, höchstens ein Lauf pro Woche, Auftrag 20). Triathlon: jede Sportart mindestens 2× pro Woche. Muss für den Ruhetag etwas weg, fällt zuerst eine Nebeneinheit (zweite Kraft, kurzes Rad), nie die Hauptsportart des nächsten Ziels. Passt es nicht, steht es ehrlich in der Woche.
+Laufziel ab 10 km: mindestens 3 Läufe pro Woche (wenig Zeit: 2; ein Koppellauf zählt halb; Teamsport mit viel Laufen wie Fußball oder Handball zählt je Termin halb, höchstens ein Lauf pro Woche, Auftrag 20). Triathlon: jede Sportart mindestens 2× pro Woche. Muss für den Ruhetag etwas weg, fällt zuerst eine Nebeneinheit (zweite Kraft, kurzes Rad), nie die Hauptsportart des nächsten Ziels. Passt es nicht, steht es ehrlich in der Woche. Eine weitere Einheit gibt es erst, wenn der Wochenumfang der Sportart sie mit sinnvoller Länge trägt (Laufen/Schwimmen 25 min, Rad 30 min, plus 5 min Puffer, damit eine kleine automatische Anpassung die Regel nicht umkippt).
 
 - Warum: Für Anpassungen von Sehnen, Laufökonomie und Technik zählt die Häufigkeit mehr als einzelne lange Einheiten.
 - Quelle: Trainingspraxis Lauf und Triathlon (Daniels, Friel); Auftrag 19
@@ -64,7 +64,7 @@ Tempo-Teil im langen Lauf nur in den letzten 6-8 Wochen vor einem Laufziel, höc
 
 ### Schwelle regelmäßig anheben (neu)
 
-Jede Sportart bekommt ihre Qualität aus der Einheiten-Bibliothek: Laufen Grundlage Steigerungen/Hügelsprints/Tempowechsel, Aufbau Schwelle (3×8 → 3×10 → 2×15 → 20-25 min am Stück) mit kurzen Intervallen alle 2-3 Wochen, spezifisch Wettkampftempo; Rad im Wechsel Sweet Spot, Schwelle, Over-Unders, VO2max, niedrige Kadenz; Schwimmen in einer von zwei Einheiten ein kurzer harter Teil (Lernende kurze schnelle 25er). Höchstens 2 harte Einheiten plus Spiel pro Woche; die Sportart mit dem größten Rückstand bekommt öfter Qualität. Eine Stufe höher nur, wenn die letzte laut Messdaten geklappt hat; zweimal nicht geschafft: eine Stufe zurück.
+Jede Sportart bekommt ihre Qualität aus der Einheiten-Bibliothek: Laufen Grundlage Steigerungen/Hügelsprints/Tempowechsel, Aufbau Schwelle (3×8 → 3×10 → 2×15 → 20-25 min am Stück) mit kurzen Intervallen alle 2-3 Wochen, spezifisch Wettkampftempo; Rad im Wechsel Sweet Spot, Schwelle, Over-Unders, VO2max, niedrige Kadenz; Schwimmen in einer von zwei Einheiten ein kurzer harter Teil (Lernende kurze schnelle 25er). Höchstens 2 harte Einheiten plus Spiel pro Woche; die Sportart mit dem größten Rückstand bekommt öfter Qualität. Eine Stufe höher nur, wenn die letzte laut Messdaten geklappt hat; zweimal nicht geschafft: eine Stufe zurück. Geplante Intervall-Werte zählen nie als geschafft: die nächste Stufe nur, wenn die eingetragenen oder gemessenen Intervalle passen (alle gemacht, keines abgebrochen, mehrheitlich im Zielbereich, Abfall unter 5 %, Erholung in den Pausen mindestens 12 Schläge), und auch dann höchstens eine Stufe weiter.
 
 - Warum: Ohne steigende Reize bleibt die Schwelle stehen; Abwechslung und Steigerung nach Nachweis verhindern Überforderung.
 - Quelle: Seiler, Coggan/Allen (Training and Racing with a Power Meter), Swim Smooth (CSS); Auftrag 19

@@ -15,6 +15,9 @@ import { reviewSoon } from '../review';
 import * as C from '../../../shared/core';
 import { strengthNumber } from '../../../shared/strength';
 import { editStrengthTemplate } from './strength';
+import { intervalsBlock, registerIntervalHost, registerPlannedLookup } from './intervalsui';
+import { checkField, crossCheck, applyDoubtFix } from '../../../shared/validate';
+import { actualMetrics } from '../../../shared/results';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
 /* Datensatz der Einheit (Zustand einer geplanten Einheit oder die Extra-Einheit selbst) */
@@ -77,7 +80,9 @@ export function fieldsBlock(tg: Target): string {
   return `<div class="card flat tight stack" data-fields="${tg.sport}">
     <div class="spread"><div class="lbl">${esc(t('fd.values'))} ${srcs.map(s => srcBadge(s)).join(' ')}</div>${hasOrig ? `<button class="link" data-act="fd-reset" ${attrs(tg)}>${esc(t('common.resetOriginal'))}</button>` : ''}</div>
     ${auto ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-auto>${auto}</div>` : ''}
+    ${doubtsHtml(tg, st)}
     <div class="fgrid">${main.map(f => oneField(tg, f, st)).join('')}</div>
+    ${intervalsBlock(tg, st, attrs(tg))}
     ${extra.length ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}
     <div class="fld wide"><span class="lab">${esc(t('fd.rpe'))}</span><div class="rpe-row" role="group" aria-label="${esc(t('fd.rpe'))}">${Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button class="chip ${String(st.rpe ?? '') === String(n) ? 'on' : ''}" aria-pressed="${String(st.rpe ?? '') === String(n)}" data-act="fd-rpe" data-v="${n}" ${attrs(tg)}>${n}</button>`).join('')}</div><div class="xs muted">${esc(t('fd.rpeHint'))}</div></div>
     <div class="fld wide"><span class="lab">${esc(t('fd.feel'))}</span><div class="chips" style="flex-wrap:wrap">${FEEL.map(([v, l]) => `<button class="chip ${String(st.feel ?? '') === v ? 'on' : ''}" aria-pressed="${String(st.feel ?? '') === v}" data-act="fd-feel" data-v="${v}" ${attrs(tg)}>${esc(l)}</button>`).join('')}</div></div>
@@ -87,6 +92,23 @@ export function fieldsBlock(tg: Target): string {
 }
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
+/* Auftrag 22: Rückfrage bei widersprüchlichen Werten (z. B. 200 km in 30 min, Puls über max. Puls) mit Vorschlag */
+function doubtsHtml(tg: Target, st: any): string {
+  const act = st && st.activityId ? (STATE.activities || {})[st.activityId] : null;
+  const list = crossCheck(tg.sport, actualMetrics(st || {}, act));
+  return list.length ? `<div class="banner" role="status" data-doubts>${list.map(d => `<div class="spread" style="gap:6px;flex-wrap:wrap"><span>${esc(d.text)}</span>${d.fix ? `<button class="btn ghost sm" data-act="fd-doubt" data-k="${esc(d.fix.key)}" data-v="${esc(d.fix.value)}" ${attrs(tg)}>${esc(d.fix.label)}</button>` : ''}</div>`).join('')}</div>` : '';
+}
+on('fd-doubt', el => {
+  const tg = tgOf(el); let st = rec(tg); if (!st) return;
+  const act = st.activityId ? (STATE.activities || {})[st.activityId] : null;
+  const before = actualMetrics(st, act); const after = applyDoubtFix(before, el.dataset.k!, el.dataset.v || '');
+  for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (!k.startsWith('_') && before[k] !== after[k]) st = setSessionMetricManual(st, k, after[k] ?? '');
+  put(tg, st); redraw(); rev(tg);
+});
+// Auftrag 22: Intervall-Liste nutzt denselben Datensatz, dieselbe Speicherung und dieselbe Neubewertung wie die übrigen Werte
+registerIntervalHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {},
+  thresholds: () => { const p = profile(); const th: any = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; } });
+registerPlannedLookup((id, date) => { const d = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((x: any) => x.date === date); return (d && d.sessions.find((x: any) => x.id === id)) || null; });
 /* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
 const rev = (tg: Target) => { if(customDraft(tg.id))return; const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
 // Beim Tippen sichern, ohne Formular/Fokus neu aufzubauen. Fachliche
@@ -95,6 +117,8 @@ onInput('fd', el => {
   const tg=tgOf(el), st=rec(tg); if(!st)return;
   let value:any=(el as HTMLInputElement).value.trim();
   if(el.dataset.pace || el.dataset.tf){const sec=readTime(el);if(sec!=null && isNaN(sec))return;value=sec?secToMmss(sec):'';}
+  // Auftrag 22: unvollständige oder unmögliche Werte beim Tippen nicht speichern (Prüfung mit Hinweis beim Verlassen des Felds)
+  const c=checkField(tg.sport,el.dataset.k!,value);if(!c.ok)return;
   put(tg,setSessionMetricManual(st,el.dataset.k!,value));saveSoon();
 });
 onInput('fd-top',(el,ev)=>CHANGE['fd-top'](el,ev));
@@ -112,6 +136,9 @@ onChange('fd', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const k = el.dataset.k!;
   let v: any = (el as HTMLInputElement).value.trim();
   if (el.dataset.pace || el.dataset.tf) { const s = readTime(el); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } v = s ? secToMmss(s) : ''; }
+  // Auftrag 22: Grenzen je Feld – unmögliche Werte freundlich ablehnen, der gespeicherte Wert bleibt
+  const chk = checkField(tg.sport, k, v);
+  if (!chk.ok) { toast(chk.msg!); refreshSheet(); return; }
   put(tg, setSessionMetricManual(st, k, v));
   saveSoon(); if (el.tagName === 'SELECT' || k === 'hr') refreshSheet(); nav.rerender();
   if (!customDraft(tg.id) && (k === 'hr' || k === 'pace' || /^test|^css|^crawl25|^breast200/.test(k)) && checkTestResult()) { saveState(); refreshSheet(); nav.rerender(); }

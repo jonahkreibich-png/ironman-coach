@@ -7,6 +7,7 @@
 import type { Activity, Source } from './analyze';
 import { splitsFromLaps } from '../fields';
 import { crawlOf } from '../results';
+import { cleanImported } from '../validate';
 
 export type MetricGroup = 'workouts' | 'sleep' | 'hrv' | 'restingHR' | 'temp' | 'spo2' | 'breath' | 'load' | 'weight';
 export const DEFAULT_PRIORITY: Record<MetricGroup, Source[]> = {
@@ -124,6 +125,10 @@ export function mergeActivities(a: Activity, b: Activity, settings: any): Activi
 
 /* Was eine Aufzeichnung in die Felder einer Einheit schreibt (gleiche Namen wie bisher in der App) */
 export function metricsFromActivity(a: Activity): Record<string, any> {
+  // Auftrag 22: Werte außerhalb sinnvoller Grenzen (Pulsgurt-Fehler, GPS-Sprung) nicht übernehmen
+  return cleanImported(a.sport, metricsFromActivity0(a)).metrics;
+}
+function metricsFromActivity0(a: Activity): Record<string, any> {
   const m: Record<string, any> = {};
   const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
   if (a.min != null) m.min = String(a.min);

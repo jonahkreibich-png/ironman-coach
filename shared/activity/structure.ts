@@ -96,7 +96,7 @@ export function lapKinds(laps: LapOut[], usePower = false): LapOut[] {
 /* ---------- Verlauf: Abschnitte aus Sekunden-Werten ---------- */
 interface Seg { hi: boolean; t0: number; t1: number; hr: number | null; grade: number | null; v: number; d0: number | null }
 const BIN = 5;
-export interface StreamResult { pattern: Pattern; intervals: IntervalOut | null }
+export interface StreamResult { pattern: Pattern; intervals: IntervalOut | null; /** Auftrag 22: harte und lockere Abschnitte (für die Intervall-Liste) */ segments?: (LapOut & { endHr?: number | null })[] }
 /* Signal: Watt (wenn vorhanden), sonst Tempo – bergauf/bergab ausgeglichen, wenn Höhe da ist (Hügel sollen nicht wie Tempowechsel aussehen) */
 export function streamStructure(recs: RawRecord[], sport: ActSport): StreamResult | null {
   if (!(sport === 'run' || sport === 'bike') || recs.length < 60) return null;
@@ -138,7 +138,8 @@ export function streamStructure(recs: RawRecord[], sport: ActSport): StreamResul
   const sm: (number | null)[] = raw.map((_, k) => { const w = raw.slice(Math.max(0, k - 3), k + 4).filter((x): x is number => x != null); return w.length ? avg(w) : null; });
   const ok = sm.map((v, k) => v != null && !stop(k));
   const vals = sm.filter((v, k) => ok[k]) as number[];
-  if (vals.length < 60) return null;
+  // Auftrag 22: ohne Tempo und Watt (z. B. Rolle ohne Wattmessung) bleibt nur der Puls
+  if (vals.length < 60) return !usePower && !hasAlt ? hrStructure(hrS, hrC, n, sm) : null;
   const g = twoMeans(vals);
   const contrast = g ? g.hi / g.lo - 1 : 0;
   const minC = usePower ? MIN_CONTRAST.power : MIN_CONTRAST.speed + 0.03;
@@ -173,6 +174,16 @@ export function streamStructure(recs: RawRecord[], sport: ActSport): StreamResul
   }
   const his = segs.filter(s => s.hi);
   const los = segs.filter(s => !s.hi);
+  // Auftrag 22: Abschnitte mit Strecke, Tempo/Watt, Puls (Ø, max., am Ende) aus den 5-s-Fächern
+  const segOut = (list: Seg[], inner: Seg[]) => list.map((s, i) => {
+    const k0 = Math.floor(s.t0 / BIN), k1 = Math.min(n - 1, Math.ceil(s.t1 / BIN) - 1);
+    let sp = 0, spN = 0, pw = 0, pwN = 0, mx = 0; const hrs: number[] = [];
+    for (let k = k0; k <= k1; k++) { if (spdC[k]) { sp += spd[k] / spdC[k]; spN++; } if (usePower && cnt[k]) { pw += sum[k] / cnt[k]; pwN++; } if (hrC[k]) { const h = hrS[k] / hrC[k]; hrs.push(h); mx = Math.max(mx, h); } }
+    const d = dist[k1] != null && dist[k0] != null ? dist[k1]! - dist[k0]! : null;
+    const kind: LapOut['kind'] = inner.includes(s) ? 'work' : i === 0 ? 'warmup' : i === list.length - 1 ? 'cooldown' : 'rest';
+    return { n: i + 1, sec: Math.round(s.t1 - s.t0), m: d != null && d > 0 ? Math.round(d) : null, avgHr: hrs.length ? Math.round(avg(hrs)) : null, maxHr: hrs.length ? Math.round(mx) : null,
+      speed: spN ? Math.round(sp / spN * 100) / 100 : null, power: pwN ? Math.round(pw / pwN) : null, kind, endHr: hrs.length ? Math.round(kind === 'work' ? hrs[hrs.length - 1] : Math.min(...hrs)) : null };
+  });
   const total = end || 1;
   const hiShare = his.reduce((a, s) => a + s.t1 - s.t0, 0) / total;
   const hrHi = avg(his.map(s => s.hr).filter((x): x is number => x != null)), hrLo = avg(los.map(s => s.hr).filter((x): x is number => x != null));
@@ -197,7 +208,7 @@ export function streamStructure(recs: RawRecord[], sport: ActSport): StreamResul
       recoveryHrDrop: drops.length ? Math.round(avg(drops)) : null,
       lapsHr: inner.map(s => (s.hr != null ? Math.round(s.hr) : null))
     };
-    return { pattern: { type, from: 'stream', reps: inner.length, workSec: work.map(Math.round) }, intervals };
+    return { pattern: { type, from: 'stream', reps: inner.length, workSec: work.map(Math.round) }, intervals, segments: segOut(segs, inner) };
   }
   // ohne Watt und Höhe: Hügel oder Tempowechsel zeigen sich oft nur im Puls (bergauf langsamer, aber Puls hoch)
   if (!usePower && !hasAlt) { const h = hrStructure(hrS, hrC, n, sm); if (h) return h; }
@@ -215,6 +226,15 @@ function hrStructure(hrS: number[], hrC: number[], n: number, sm: (number | null
   const segs: { hi: boolean; k0: number; k1: number }[] = []; let s0 = 0;
   for (let k = 1; k <= n; k++) if (k === n || lab[k] !== lab[s0]) { segs.push({ hi: lab[s0], k0: s0, k1: k - 1 }); s0 = k; }
   const his = segs.filter((x, i) => x.hi && i > 0 && (x.k1 - x.k0 + 1) * BIN >= 30 && (x.k1 - x.k0 + 1) * BIN <= 30 * 60);
+  // Auftrag 22: Abschnitte für die Intervall-Liste (Puls Ø, max., am Ende); Tempo nur, wenn gemessen
+  const segOut = () => segs.map((x, i) => {
+    const hs = hr.slice(x.k0, x.k1 + 1).filter((v): v is number => v != null);
+    const kind: LapOut['kind'] = his.includes(x) ? 'work' : i === 0 ? 'warmup' : i === segs.length - 1 ? 'cooldown' : 'rest';
+    return { n: i + 1, sec: (x.k1 - x.k0 + 1) * BIN, m: null, avgHr: hs.length ? Math.round(avg(hs)) : null, maxHr: hs.length ? Math.round(Math.max(...hs)) : null, speed: null, power: null, kind, endHr: hs.length ? Math.round(kind === 'work' ? hs[hs.length - 1] : Math.min(...hs)) : null };
+  });
+  // zwei lange harte Blöcke (z. B. 2×10 min auf der Rolle ohne Watt): nur als Abschnitte, nicht als erkanntes Intervalltraining –
+  // sie zählen nur, wenn der Plan Intervalle vorsieht (shared/intervals.ts)
+  if (his.length === 2 && his.every(x => (x.k1 - x.k0 + 1) * BIN >= 240) && segs[segs.length - 1] !== his[1]) return { pattern: { type: 'steady', from: 'stream' }, intervals: null, segments: segOut() };
   if (his.length < 3) return null;
   const work = his.map(x => (x.k1 - x.k0 + 1) * BIN);
   const sp = (x: { k0: number; k1: number }) => avg(sm.slice(x.k0, x.k1 + 1).filter((v): v is number => v != null));
@@ -222,6 +242,7 @@ function hrStructure(hrS: number[], hrC: number[], n: number, sm: (number | null
   const hrOf = (x: { k0: number; k1: number }) => avg(hr.slice(x.k0, x.k1 + 1).filter((v): v is number => v != null));
   const first = his[0], last = his[his.length - 1];
   return {
+    segments: segOut(),
     pattern: { type: slowUp ? 'hills' : cv(work) > 0.35 ? 'fartlek' : 'intervals', from: 'stream', reps: his.length, workSec: work },
     intervals: { count: his.length, workSec: work.reduce((a, x) => a + x, 0), avgHrWork: Math.round(avg(his.map(hrOf))), hrDriftPct: r1((hrOf(last) / hrOf(first) - 1) * 100), dropPct: null, recoveryHrDrop: null, lapsHr: his.map(x => Math.round(hrOf(x))) }
   };
@@ -289,4 +310,21 @@ export function statsOf(laps: LapOut[], usePower = false): IntervalOut | null {
     recoveryHrDrop: drops.length ? Math.round(avg(drops)) : null,
     lapsHr: work.map(l => l.avgHr)
   };
+}
+
+/* Auftrag 22: gespeicherte, verkleinerte Verläufe (streamsOf: t, hr, speed, alt, power) wieder als Messpunkte – für ältere
+   Aufzeichnungen, die vor der Abschnitts-Erkennung ausgewertet wurden. Strecke aus dem Tempo aufsummiert. */
+export function recordsFromStreams(st: { t: number[]; hr?: (number | null)[]; speed?: (number | null)[]; alt?: (number | null)[]; power?: (number | null)[] } | null | undefined): RawRecord[] {
+  if (!st || !Array.isArray(st.t)) return [];
+  const out: RawRecord[] = []; let dist = 0, anySpeed = false;
+  for (let i = 0; i < st.t.length; i++) {
+    const sp = st.speed ? st.speed[i] ?? null : null; const dt = i ? st.t[i] - st.t[i - 1] : 0;
+    if (sp != null) { dist += sp * dt; anySpeed = true; }
+    out.push({ t: st.t[i], hr: st.hr ? st.hr[i] ?? null : null, cad: null, power: st.power ? st.power[i] ?? null : null, dist: anySpeed ? Math.round(dist) : null, speed: sp, alt: st.alt ? st.alt[i] ?? null : null, temp: null, lat: null, lon: null });
+  }
+  return out;
+}
+export function segmentsFromStreams(st: any, sport: ActSport): LapOut[] | null {
+  const r = streamStructure(recordsFromStreams(st), sport);
+  return r && r.segments && r.segments.some(s => s.kind === 'work') ? r.segments : null;
 }

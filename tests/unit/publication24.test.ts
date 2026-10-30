@@ -13,11 +13,14 @@ function harness(fail?: string) {
   const verify = async (target: string) => { calls.push('verify:' + target); if ('verify:' + target === fail) throw Error('bad deployment'); };
   return { calls, go: () => publishRelease({ run: step, checkBackup: check, verify, now: new Date('2026-10-24T20:00:00Z') }) };
 }
+test('Rückweg-Zeitpunkt nicht lesbar: Release läuft weiter (Sicherung liegt vor)', async () => {
+  const h = harness('bookmark:production'); await h.go(); expect(h.calls).toContain('deploy:production');
+});
 test('publication checks both backups and test deployment before updating production', async () => {
   const h = harness(); await h.go();
-  expect(h.calls).toEqual(['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'deploy:production', 'verify:production']);
+  expect(h.calls).toEqual(['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'realdata:production', 'bookmark:production', 'deploy:production', 'verify:production']);
 });
-for (const fail of ['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production']) test('failure at ' + fail + ' prevents production deployment', async () => {
+for (const fail of ['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'realdata:production']) test('failure at ' + fail + ' prevents production deployment', async () => {
   const h = harness(fail); await expect(h.go()).rejects.toThrow(); expect(h.calls).not.toContain('deploy:production');
 });
 

@@ -124,7 +124,8 @@ describe('Bewertung: Art der Einheit kommt aus dem Plan', () => {
   test('geplante Intervalle, Runden von Hand: 5 von 5, Länge passt, Puls in den Belastungen', () => {
     const { ctx } = ctxWith(ivRun, simulate(ivParts, { laps: 'manual' }));
     const t = answer(ctx);
-    expect(t).toMatch(/5 von 5 Intervallen geschafft, je etwa 4 min wie geplant/); expect(t).toMatch(/In den Belastungen Puls Ø 1[67]\d \(Zone 4\)/);
+    // Auftrag 22: „Puls in den Belastungen“ steckt jetzt in der Intervall-Bewertung (Soll gegen Ist je Intervall, Puls im Ziel)
+    expect(t).toMatch(/5 von 5 Intervallen geschafft, je etwa 4 min wie geplant/); expect(t).toMatch(/In den Belastungen Puls Ø 1[67]\d \(Zone 4\)|Alle 5 Intervalle im Zielbereich/);
   });
   test('geplante Intervalle, nur automatische Runden: trotzdem erkannt (Verlauf)', () => {
     const { ctx } = ctxWith(ivRun, simulate(ivParts));

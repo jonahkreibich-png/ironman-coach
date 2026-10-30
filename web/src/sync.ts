@@ -1,3 +1,5 @@
+import { appTz } from '../../shared/tz';
+import { MERGE_KINDS } from '../../shared/merge3';
 import { storage as localStorage } from "./persistence";
 /* Sync mit dem eigenen Server (Cloudflare Worker).
    Datensatz-Ebene: jede Einheit, jeder Trend-Tag usw. hat einen eigenen updatedAt.
@@ -22,7 +24,10 @@ function readJson(k, fb) { try { return JSON.parse(localStorage.getItem(k) || 'n
 function writeJson(k, v) { return localStorage.setItem(k, JSON.stringify(v)); }
 let AUTH = readJson(AUTH_KEY, null);
 let identityReady = !!AUTH?.userId && AUTH.userId === readJson(STORAGE.owner, null);
-const META = Object.assign({ cursor: 0, hashes: {}, pending: {}, lastSyncAt: null, offset: 0, lastError: null }, readJson(META_KEY, {}));
+const META = Object.assign({ cursor: 0, hashes: {}, pending: {}, lastSyncAt: null, offset: 0, lastError: null, base: {} }, readJson(META_KEY, {}));
+if (!META.base) META.base = {};
+/* Auftrag 22: zuletzt mit dem Server abgeglichener Stand je Datensatz (für das feldweise Zusammenführen bei gleichzeitigen Änderungen) */
+const setBase = (k, kind, data, del) => { if (!MERGE_KINDS.has(kind)) return; if (del || data == null) delete META.base[k]; else META.base[k] = JSON.parse(JSON.stringify(data)); };
 function saveMeta() { if (!localStorage.changing) { META.localRevision = STATE._storageRevision || 0; writeJson(META_KEY, META); } }
 function now() { return Date.now() + (META.offset || 0); }
 let initialRemoteOnly = !!AUTH && !META.lastSyncAt && !hasLocalData();
@@ -62,9 +67,11 @@ function detect(ts?) {
   let n = 0;
   cur.forEach((r, k) => {
     const h = recHash(r);
-    if (META.hashes[k] === h) return;
+    if (META.hashes[k] === h) { if (MERGE_KINDS.has(r.kind) && !(k in META.base) && !META.pending[k] && r.data != null && META.lastSyncAt) setBase(k, r.kind, r.data, false); return; }
     const data = r.raw != null ? JSON.parse(r.raw) : r.data;
-    META.pending[k] = { kind: r.kind, key: r.key, data, updatedAt: Math.max(t, (META.pending[k]?.updatedAt || 0) + 1) };
+    const prev = META.pending[k];
+    const base = prev && 'base' in prev ? prev.base : MERGE_KINDS.has(r.kind) && k in META.base ? META.base[k] : undefined;
+    META.pending[k] = { kind: r.kind, key: r.key, data, updatedAt: Math.max(t, (prev?.updatedAt || 0) + 1), ...(base !== undefined ? { base } : {}) };
     META.hashes[k] = h; n++;
   });
   Object.keys(META.hashes).forEach(k => {
@@ -88,6 +95,7 @@ function applyRecord(rec) {
   const k = rec.kind + '|' + rec.key;
   const p = META.pending[k];
   if (p && p.updatedAt > rec.updatedAt) return false; // lokale Änderung ist neuer und wird noch hochgeladen
+  setBase(k, rec.kind, rec.data, rec.deleted);
   const d = rec.data, del = rec.deleted;
   const field = DICT_KINDS[rec.kind];
   if (field) { STATE[field] = STATE[field] || {}; if (del) delete STATE[field][rec.key]; else STATE[field][rec.key] = d; dictChanged = true; }
@@ -149,7 +157,7 @@ function applyRecord(rec) {
 async function api(method, path, body?, noAuth?) {
   const res = await fetch(API + path, {
     method, cache: 'no-store',
-    headers: Object.assign({ 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, 'X-App-Release': APP_RELEASE }, (!noAuth && AUTH) ? { Authorization: 'Bearer ' + AUTH.token } : {}),
+    headers: Object.assign({ 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, 'X-App-Release': APP_RELEASE, 'X-Time-Zone': appTz() }, (!noAuth && AUTH) ? { Authorization: 'Bearer ' + AUTH.token } : {}),
     body: body ? JSON.stringify(body) : undefined
   });
   let data = null; try { data = await res.json(); } catch (e) {}
@@ -161,7 +169,7 @@ async function api(method, path, body?, noAuth?) {
 /* Antwort als Strom lesen (Auftrag 12, KI-Coach): jede Zeile ist ein JSON-Objekt. Liefert das letzte Objekt („done“ oder „error“). */
 export async function apiStream(path: string, body: any, onLine: (o: any) => void): Promise<any> {
   if (!AUTH) throw Object.assign(new Error(t('sync.notConnected')), { status: 0 });
-  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, 'X-App-Release': APP_RELEASE, Authorization: 'Bearer ' + AUTH.token }, body: JSON.stringify(body) });
+  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'X-App-Version': APP_VERSION, 'X-App-Release': APP_RELEASE, 'X-Time-Zone': appTz(), Authorization: 'Bearer ' + AUTH.token }, body: JSON.stringify(body) });
   if (!res.ok || !res.body) { let d: any = null; try { d = await res.json(); } catch (e) {} throw Object.assign(new Error((d && d.error) || ('Fehler ' + res.status)), { status: res.status }); }
   const rd = res.body.getReader(); const dec = new TextDecoder(); let buf = ''; let last: any = null;
   for (;;) {
@@ -231,7 +239,7 @@ async function drainSync(): Promise<boolean> {
       if (typeof saveState === 'function') saveState(true);
       if (!await localStorage.settled()) throw new Error('Daten noch nicht lokal gespeichert. App offen lassen und Backup exportieren.');
       uncommittedHashes = null;
-      sent.forEach(c => { const k = c.kind + '|' + c.key; if (META.pending[k] && META.pending[k].updatedAt === c.updatedAt) delete META.pending[k]; });
+      sent.forEach(c => { const k = c.kind + '|' + c.key; if (META.pending[k] && META.pending[k].updatedAt === c.updatedAt) { delete META.pending[k]; if (!(res.records || []).some(r => r.kind === c.kind && r.key === c.key)) setBase(k, c.kind, c.data, c.deleted); } });
       if (typeof refreshStoredState === 'function') refreshStoredState();
       META.cursor = res.cursor;
       if (res.intervals) META.intervals = res.intervals;

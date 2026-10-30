@@ -5,6 +5,8 @@ import { decryptJson } from './http';
 import { type Env, berlinDate, addDaysStr, getRecord, getRecords, putRecords, getMeta, setMeta } from './store';
 import { fieldsFromIcu } from '../../shared/fields';
 import { pickMatch } from '../../shared/activity/merge';
+import { segmentsFromIcu, rowsFromSegments } from '../../shared/intervals';
+import { cleanImported } from '../../shared/validate';
 
 const SPORT_MAP = {
   run: ['Run', 'TrailRun', 'VirtualRun', 'Treadmill'],
@@ -121,7 +123,8 @@ export function activityMetrics(a, sport) {
     if (sport === 'bike') m.speed = r1(isNum(a.average_speed) && a.average_speed > 0 ? a.average_speed * 3.6 : (dist / 1000) / (min / 60));
   }
   // weitere Felder (Auftrag 7): max. Puls, Kadenz, Watt, Entkopplung, Effizienz, drinnen/draußen
-  return { ...fieldsFromIcu(a, sport), ...m };
+  // Auftrag 22: unmögliche Werte nicht übernehmen (gleiche Grenzen wie in der App)
+  return cleanImported(sport, { ...fieldsFromIcu(a, sport), ...m }).metrics;
 }
 function planSessionsByDate(plan) {
   const map: any = {};
@@ -161,6 +164,17 @@ export async function importIcuHistory(env: Env, uid: number, creds: Creds): Pro
   const r = await ingestHistory(env, uid, (acts || []).map(activityFromIcu).filter(Boolean));
   await setMeta(env, uid, 'icu_history', { at: Date.now(), ...r });
   return r;
+}
+
+/* Auftrag 22: Intervalle einer Aktivität (icu_intervals: Belastung/Erholung), als Intervall-Zeilen. Fehler stören den Abruf nicht. */
+export async function icuIntervalRows(env: Env, creds: Creds, id: string, sport: string): Promise<any[] | null> {
+  if (sport !== 'run' && sport !== 'bike' && sport !== 'swim') return null;
+  try {
+    const r = await icuGet(env, creds, `/api/v1/activity/${encodeURIComponent(id)}/intervals`);
+    const segs = segmentsFromIcu(Array.isArray(r) ? r : r && r.icu_intervals, sport);
+    const rows = segs.length ? rowsFromSegments(segs, sport) : [];
+    return rows.length ? rows : null;
+  } catch { return null; }
 }
 
 /* ---------- Hauptlauf ---------- */
@@ -216,6 +230,7 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
     // Auftrag 13: dieselbe Zuordnung wie bei Uhr/HealthFit (gleicher Tag und Sport, Uhrzeit und Dauer möglichst nah).
     // Eine Einheit, die schon mit einer Aufzeichnung verknüpft ist, nimmt nur dieselbe Einheit (Start ±30 min) auf – sonst Dubletten.
     const actRecs = await getRecords(env, uid, 'activity');
+    let ivBudget = 8; // Auftrag 22: höchstens 8 Intervall-Abrufe je Lauf (Abrufgrenzen schonen)
     const startOfLinked = (st: any) => { const ar = st && st.activityId ? actRecs[st.activityId] : null; return ar && isNum(ar.startMs) ? ar.startMs : null; };
     for (const a of sorted) {
       const id = String(a.id);
@@ -224,6 +239,7 @@ export async function runImport(env: Env, uid: number, opts?: any): Promise<any>
       if (!sport) { const t = String(a.type || 'ohne Sportart'); A.ignored[t] = (A.ignored[t] || 0) + 1; continue; }
       const date = a.start_date_local.slice(0, 10);
       const metrics = activityMetrics(a, sport);
+      if (ivBudget > 0 && (sport === 'run' || sport === 'bike' || sport === 'swim')) { ivBudget--; const rows = await icuIntervalRows(env, creds, id, sport); if (rows) metrics.intervals = rows; }
       const extra: any = { icuId: id };
       const startMs = Date.parse(a.start_date || '') || Date.parse(a.start_date_local + 'Z') || null;
       if (startMs) extra.icuStart = startMs;

@@ -8,8 +8,9 @@ import * as K from './keysessions';
 import { rulesOf, evaluate, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
 import { actualMetrics, effectiveActivity } from './results';
+import { evaluateIntervals } from './intervals';
 import { LIB } from './workoutlib';
-import { runQualitySpec, bikeQualitySpec } from './workoutbuild';
+import { runQualitySpec, bikeQualitySpec, runEasyForm, bikeEasyForm } from './workoutbuild';
 /* ---------- Datum ---------- */
 function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
@@ -503,9 +504,32 @@ function ladderIndex(title) {
 /* Bewertung der letzten Sweet-Spot-Einheit aus Messdaten (Runden der Uhr):
    alle Intervalle geschafft, Puls im Zielbereich, Puls- oder Tempoabfall erstes → letztes Intervall unter 5 %, Erholung in den Pausen.
    Ohne Rundendaten zählt die RPE, falls eingetragen, sonst bleibt die Stufe gleich. */
-function ladderVerdict(s, st, act, lthrBike): { result: 'up' | 'stay' | 'fail'; why: string } {
+function ladderVerdict(s, st, act, thrIn): { result: 'up' | 'stay' | 'fail'; why: string } {
+  // Auftrag 22: Schwelle passend zur Sportart (vorher galt der Rad-Schwellenpuls auch für Lauf-Stufen); Zahl = alter Aufruf mit Rad-Schwelle
+  const thr = typeof thrIn === 'number' ? { lthrBike: thrIn } : (thrIn || {});
+  const lthrBike = (s && s.sport === 'run' ? thr.lthrRun || LTHR_DEFAULT.run : thr.lthrBike || LTHR_DEFAULT.bike);
   const m = STEP_RE.exec((s && s.title) || '');
   const plannedReps = m ? +m[1] : null;
+  // Auftrag 22: Intervalle Soll gegen Ist (von Hand oder Uhr): nächste Stufe nur, wenn die Ist-Werte passen. Geplante Werte zählen nie.
+  const ie = s && s.spec ? evaluateIntervals(s, st, act, { lthrRun: thr.lthrRun, lthrBike: thr.lthrBike, ftp: thr.ftp, runThrSec: thr.thresholdPaceRunSec }, s.sport) : null;
+  if (ie && ie.planned && ie.source !== 'none' && ie.done + ie.extra > 0) {
+    const n = ie.planned, ok = ie.inTarget;
+    if (ie.done < n) return { result: 'fail', why: `nur ${ie.done} von ${n} Intervallen` };
+    if (ie.short) return { result: 'fail', why: `${ie.short} Intervall${ie.short > 1 ? 'e' : ''} abgebrochen oder deutlich kürzer` };
+    if (ie.fadePct != null && ie.fadePct >= 8) return { result: 'fail', why: `im letzten Intervall ${Math.round(ie.fadePct)} % schwächer als im ersten` };
+    if (ie.judged && ie.tooEasy > ie.judged / 2) return { result: 'stay', why: `${ie.tooEasy} von ${ie.judged} Intervallen unter dem Ziel` };
+    if (ie.judged && ie.tooHard > ie.judged / 2) return { result: 'stay', why: `${ie.tooHard} von ${ie.judged} Intervallen über dem Ziel (erst gleichmäßig im Ziel, dann weiter)` };
+    if (ie.fadePct != null && ie.fadePct >= 5) return { result: 'stay', why: `Abfall vom ersten zum letzten Intervall ${Math.round(ie.fadePct)} %` };
+    if (ie.work.hr && s.sport === 'bike' && ie.work.hr > 0.97 * lthrBike && !(ie.judged && ok === ie.judged)) return { result: 'stay', why: `Puls in den Intervallen ${ie.work.hr} über dem Zielbereich` };
+    if (ie.recovery != null && ie.recovery < 12) return { result: 'stay', why: `Puls fiel in den Pausen nur um ${ie.recovery} Schläge` };
+    if (!ie.judged) {
+      const rpe = toNum(st && st.rpe) ?? ie.work.rpe;
+      if (rpe == null) return { result: 'stay', why: `${ie.done} Intervalle, aber ohne Pace, Watt, Puls oder RPE – Stufe wiederholen` };
+      if (rpe >= 9) return { result: 'fail', why: `${ie.done} Intervalle, RPE ${rpe} (sehr hart)` };
+      if (rpe > 7) return { result: 'stay', why: `${ie.done} Intervalle, RPE ${rpe}` };
+    }
+    return { result: 'up', why: `${ie.done} von ${n} Intervallen${ie.judged ? `, ${ok} von ${ie.judged} im Ziel` : ''}${ie.fadePct != null ? `, Abfall ${Math.max(0, Math.round(ie.fadePct))} %` : ''}${ie.recovery != null ? ', Erholung ' + ie.recovery + ' Schläge' : ''}` };
+  }
   const iv = act && act.intervals;
   if (iv && iv.count >= 2) {
     const reps = iv.count;
@@ -526,6 +550,17 @@ function ladderVerdict(s, st, act, lthrBike): { result: 'up' | 'stay' | 'fail'; 
     return { result: 'stay', why: `keine Rundendaten, RPE ${rpe}` };
   }
   return { result: 'stay', why: 'keine Messdaten und keine RPE' };
+}
+/* Auftrag 22: erlaubte Stufe der nächsten Einheit einer Form aus der letzten (und vorletzten) Bewertung – eine Regel für Plan-Anpassung und Daten-Check */
+function libTarget(stage, result, prevResult) { return result === 'up' ? stage + 1 : result === 'fail' && prevResult === 'fail' ? Math.max(0, stage - 1) : stage; }
+/* Letzte Einheiten einer Form (28 Tage) und ihre Bewertung wie in der Wochenanpassung */
+function libStatus(state, weeks, date) {
+  const thr = { ...thrOf(state), lthrBike: (thrOf(state).lthrBike) || LTHR_DEFAULT.bike };
+  const libDone = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -28)).flatMap(d => d.sessions.filter(x => x && x.spec && x.spec.lib && LIB[x.spec.lib.key] && LIB[x.spec.lib.key].quality && ['run', 'bike'].includes(x.sport) && !x.cancelled).map(x => ({ s: x, st: (state.sessions || {})[x.id] || {}, date: d.date }))).sort((a, b) => a.date.localeCompare(b.date));
+  const verdictOf = (x) => x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], thr) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
+  const out = {};
+  for (const key of [...new Set(libDone.map(x => x.s.spec.lib.key))]) { const list = libDone.filter(x => x.s.spec.lib.key === key); const last = list[list.length - 1], prev = list[list.length - 2]; const v = verdictOf(last); if (!v) continue; const pv = prev ? verdictOf(prev) : null; out[key] = { stage: last.s.spec.lib.stage, target: libTarget(last.s.spec.lib.stage, v.result, pv && pv.result), why: v.why, date: last.date }; }
+  return out;
 }
 function isSweetSpot(s) { return !!s && s.sport === 'bike' && !s.pattern && !(s.spec && s.spec.lib) && !/^(Zone 2|Locker) statt/.test(s.title || '') && /sweet/i.test((s.title || '') + ' ' + (s.zone || '')); }
 const round5 = x => Math.max(5, Math.round(x / 5) * 5);
@@ -962,19 +997,6 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
 
   const nextSessions = planDays([next]).flatMap(d => d.sessions.map(s => Object.assign({}, s, { date: d.date })));
   const wRules = rulesOf(state.profile, parseFor(date));
-  if (pct !== 0) {
-    nextSessions.forEach(s => {
-      if (!['swim', 'bike', 'run'].includes(s.sport) || s.cancelled || isTestOrRace(s) || !s.plannedMinutes) return;
-      if (s.stage || s.race || s.fixed) return;
-      const f = 1 + pct / 100;
-      if (pct > 0 && !ruleOk(wRules, { ...s, plannedMinutes: round5(s.plannedMinutes * f) }, s.date, nextSessions.filter(x => x.date === s.date && x.id !== s.id && !x.cancelled))) return;
-      const rb = W.rebuildScaled(s, f);
-      push({ id: `${group}-vol-${s.id}`, type: 'modify', sessionId: s.id,
-        set: rb || { plannedMinutes: round5(s.plannedMinutes * f), plannedKm: s.plannedKm ? r1(s.plannedKm * f) : s.plannedKm == null ? null : s.plannedKm },
-        what: `${s.title}: ${s.plannedMinutes} → ${round5(s.plannedMinutes * f)} min`, reason: `Umfang ${pct > 0 ? '+' : ''}${pct} %` });
-    });
-  }
-
   // Intervall-Leiter Rad (Sweet Spot)
   const doneSS = planDays(weeks).filter(d => d.date <= date).flatMap(d => d.sessions.filter(s => isSweetSpot(s) && sessDone(state, s)).map(s => ({ s, st: state.sessions[s.id], date: d.date })))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -984,9 +1006,9 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     const cur = ladderIndex(last.s.title);
     if (cur >= 0) {
       const lthrBike = (thrOf(state).lthrBike) || LTHR_DEFAULT.bike;
-      const verdict = ladderVerdict(last.s, last.st, (state.activities || {})[last.st.activityId], lthrBike);
+      const verdict = ladderVerdict(last.s, last.st, (state.activities || {})[last.st.activityId], { ...thrOf(state), lthrBike });
       const prev = doneSS[doneSS.length - 2];
-      const prevVerdict = prev ? ladderVerdict(prev.s, prev.st, (state.activities || {})[prev.st.activityId], lthrBike) : null;
+      const prevVerdict = prev ? ladderVerdict(prev.s, prev.st, (state.activities || {})[prev.st.activityId], { ...thrOf(state), lthrBike }) : null;
       let target = cur;
       if (verdict.result === 'fail' && prevVerdict && prevVerdict.result === 'fail') { target = Math.max(0, cur - 1); ladderWhy = 'zweimal nicht geschafft: eine Stufe zurück (' + verdict.why + ')'; }
       else if (verdict.result === 'up') { target = Math.min(LADDER.length - 1, cur + 1); ladderWhy = target > cur ? 'letzte Einheit lief laut Messdaten gut (' + verdict.why + '): eine Stufe weiter' : 'höchste Stufe erreicht'; }
@@ -1012,19 +1034,42 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     const keys = [...new Set(libDone.map(x => x.s.spec.lib.key))];
     for (const key of keys) {
       const list = libDone.filter(x => x.s.spec.lib.key === key); const last = list[list.length - 1]; const prev = list[list.length - 2];
-      const verdictOf = (x) => x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], lthrBike) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
-      const v = verdictOf(last); if (!v || v.result === 'up') continue;
+      const verdictOf = (x) => x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], { ...thrOf(state), lthrBike }) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
+      const v = verdictOf(last); if (!v) continue;
       const pv = prev ? verdictOf(prev) : null;
-      const target = v.result === 'fail' && pv && pv.result === 'fail' ? Math.max(0, last.s.spec.lib.stage - 1) : last.s.spec.lib.stage;
-      const why = v.result === 'fail' && pv && pv.result === 'fail' ? `zweimal nicht geschafft (${v.why}): eine Stufe leichter` : `${v.why}: Stufe wiederholen`;
+      // Auftrag 22: auch nach einer guten Einheit höchstens eine Stufe weiter (nach einer Neuplanung lag die nächste Einheit sonst zwei Stufen höher)
+      const target = libTarget(last.s.spec.lib.stage, v.result, pv && pv.result);
+      const why = v.result === 'up' ? `${v.why}: eine Stufe weiter` : v.result === 'fail' && pv && pv.result === 'fail' ? `zweimal nicht geschafft (${v.why}): eine Stufe leichter` : `${v.why}: Stufe wiederholen`;
       nextSessions.filter(x => x.spec && x.spec.lib && x.spec.lib.key === key && x.spec.lib.stage > target && !x.cancelled && !x.locked).forEach(x => {
-        const sp = x.sport === 'run' ? runQualitySpec(key, target, x.spec.ctx, ({ 'Halbmarathon-Tempo': 'run_half', 'Marathon-Tempo': 'run_marathon', '10-km-Tempo': 'run_10k', '5-km-Tempo': 'run_5k' } as Record<string, string>)[x.spec.lib.label || ''] || null, {}) : bikeQualitySpec(key, target, x.spec.ctx, null, { total: x.plannedMinutes });
-        if (!sp) return; sp.why = x.spec.why; const b = W.build(sp); if (b.title === x.title) return;
+        // Auftrag 22: auch lockere Formen (z. B. Steigerungen) zurücksetzen können
+        const sp0 = x.sport === 'run' ? runQualitySpec(key, target, x.spec.ctx, ({ 'Halbmarathon-Tempo': 'run_half', 'Marathon-Tempo': 'run_marathon', '10-km-Tempo': 'run_10k', '5-km-Tempo': 'run_5k' } as Record<string, string>)[x.spec.lib.label || ''] || null, {}) : bikeQualitySpec(key, target, x.spec.ctx, null, { total: x.plannedMinutes });
+        const sp = sp0 || (x.sport === 'run' ? runEasyForm(key, target, x.spec.ctx, x.plannedMinutes || 40) : bikeEasyForm(key, target, x.spec.ctx, x.plannedMinutes || 60));
+        // Auftrag 22: gleicher Titel heißt nicht gleiche Stufe – entscheidend ist die Stufe im Bauplan
+        if (!sp) return; sp.why = x.spec.why; const b = W.build(sp); if (b.title === x.title && b.spec && b.spec.lib && b.spec.lib.stage === x.spec.lib.stage) return;
         push({ id: `${group}-lib-${x.id}`, type: 'modify', sessionId: x.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec },
           what: `${x.title} → ${b.title}`, reason: `${LIB[key].name}: ${why}` });
       });
     }
   }
+
+  // Auftrag 22: Umfang erst nach den Stufen-Änderungen und auf die schon geänderte Einheit (vorher überschrieb „Umfang ±x %“,
+  // aus der alten Fassung berechnet, die zurückgesetzte Stufe wieder)
+  const volStep = () => { if (pct !== 0) {
+    nextSessions.forEach(s0 => {
+      const s = Object.assign({}, s0, ...res.filter(a => a.sessionId === s0.id && a.type === 'modify').map(a => a.set || {}));
+      if (!['swim', 'bike', 'run'].includes(s.sport) || s.cancelled || isTestOrRace(s) || !s.plannedMinutes) return;
+      if (s.stage || s.race || s.fixed) return;
+      const f = 1 + pct / 100;
+      if (pct > 0 && !ruleOk(wRules, { ...s, plannedMinutes: round5(s.plannedMinutes * f) }, s.date, nextSessions.filter(x => x.date === s.date && x.id !== s.id && !x.cancelled))) return;
+      // Titel-Änderung ohne Bauplan (Sweet-Spot-Leiter alter Pläne) bleibt: dann nur die Minuten
+      const rb = res.some(a => a.sessionId === s0.id && a.type === 'modify' && a.set && !a.set.spec) ? null : W.rebuildScaled(s, f);
+      push({ id: `${group}-vol-${s.id}`, type: 'modify', sessionId: s.id,
+        set: rb || { plannedMinutes: round5(s.plannedMinutes * f), plannedKm: s.plannedKm ? r1(s.plannedKm * f) : s.plannedKm == null ? null : s.plannedKm },
+        what: `${s.title}: ${s.plannedMinutes} → ${round5(s.plannedMinutes * f)} min`, reason: `Umfang ${pct > 0 ? '+' : ''}${pct} %` });
+    });
+  } };
+
+  volStep();
 
   // Lernstufen (Kraul lernen, Lauf-Geh-Wechsel): eine Stufe weiter nur, wenn die letzte laut Daten geklappt hat (Auftrag 4 C1)
   const stageWhy: string[] = [];
@@ -1161,5 +1206,5 @@ export {
   addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
-  isLocked, stageVerdict, stageSession, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
+  isLocked, stageVerdict, stageSession, ladderVerdict as ladderVerdictOf, libStatus, canonicalActivityId, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

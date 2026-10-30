@@ -1,3 +1,4 @@
+import { localDate } from './tz';
 /* Berücksichtigungen (Auftrag 4 C3, ab Auftrag 5 über das Regel-Modell): freie Notizen wie „Knie zwickt“ oder
    „Schwimmbad nur samstags“ werden mit dem Regel-Parser (shared/ruleparse.ts) zu Regeln (shared/constraints.ts).
    Was der Parser nicht versteht, bleibt sichtbar als „noch nicht berücksichtigt“, statt ignoriert zu werden. */
@@ -7,7 +8,7 @@ import { effectsOf as effectsOfRules, describe, type Rule, type Effects } from '
 export type { Effects };
 export interface Consideration { text: string; cats: string[]; label: string; effect: string; understood: boolean; rules: Rule[] }
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => localDate();
 export function parseConsiderations(notes: string[], today = todayIso()): Consideration[] {
   const out: Consideration[] = [];
   for (const raw of notes || []) {

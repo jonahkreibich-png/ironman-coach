@@ -1,3 +1,4 @@
+import { localDate } from './tz';
 /* Ziel-Prognose (Auftrag 12): immer eine Prognose, als Bereich mit wahrscheinlichstem Wert, zweimal:
    „Wenn du heute starten würdest“ und „Erwartet am [Renntag]“ (persönlicher Fortschritt der letzten 8-12 Wochen und geplantes Training,
    vorsichtig abgeflacht). Ohne Test breiterer Bereich und Hinweis, welcher Test sie genauer macht.
@@ -215,7 +216,7 @@ export function prognosis(goal: Goal | null, est: Estimates, opts: ProgOpts = {}
   const prof: Partial<Profile> = opts.profile || {};
   const th: any = prof.thresholds || {};
   const estd: string[] = th.estimated || [];
-  const today = opts.today || new Date().toISOString().slice(0, 10);
+  const today = opts.today || localDate();
   const need = new Set(legs.map(l => l.sport));
   const sk: any = prof.skills || {};
   // Werte heute (fehlt etwas, Schätzung aus dem Profil oder vorsichtiger Standard)

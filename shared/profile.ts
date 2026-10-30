@@ -1,3 +1,4 @@
+import { localDate } from './tz';
 /* Profil des Nutzers statt fester Werte im Code. Wird als Datensatz (kind "profile", key "main") synchronisiert.
    Fehlt das Profil (alte Daten), wird es aus den bisherigen Einstellungen abgeleitet.
    Im Code stehen keine Werte einer bestimmten Person: fehlende Schwellen werden aus dem Profil geschätzt
@@ -310,7 +311,7 @@ export function mergeProfile(stored: any, fallback: Profile, today?: string): Pr
   p.rules = Array.isArray(stored.rules) ? stored.rules.filter((r: any) => r && r.kind) : [];
   p.routines = Array.isArray(stored.routines) ? stored.routines : [];
   p.sports = Array.isArray(stored.sports) && stored.sports.length ? stored.sports : fallback.sports;
-  return withEstimates(p, today || new Date().toISOString().slice(0, 10));
+  return withEstimates(p, today || localDate());
 }
 
 /* Aufbau-Rhythmus: eigener Wunsch (höchstens +10 % pro Woche, 2-4 Aufbauwochen), sonst nach Alter und Vorsicht */

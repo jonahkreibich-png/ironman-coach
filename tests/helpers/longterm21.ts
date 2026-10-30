@@ -19,6 +19,8 @@ import { prognosis } from '../../shared/prognosis';
 import { mainGoal } from '../../shared/goals';
 import { PERSONAS } from '../../fixtures/personas';
 import { manyUsers20 } from '../../fixtures/users20';
+import { plannedIntervals, evaluateIntervals, secToPace } from '../../shared/intervals';
+import { dataCheck } from '../../shared/datacheck';
 
 const copy = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 export const LT_START = '2026-11-02'; // Montag
@@ -32,7 +34,7 @@ export function ltUsers(): LtUser[] {
     const a = u.answers;
     if (a.sports.includes('swim') && i % 3 === 0) a.swimGear = ['board', 'buoy'];
     if (a.sports.includes('swim') && i % 3 === 1) a.swimGear = [];
-    return { id: u.id, label: u.label, answers: a, progress: i % 3 !== 2, watch: u.device ? u.device !== 'manual' : i % 2 === 0, weeks: 13 + (i * 5) % 14, ill: i % 3 === 0, vacation: i % 4 === 1 };
+    return { id: u.id, label: u.label, answers: a, progress: i % 3 !== 2, watch: u.device ? u.device !== 'manual' : i % 2 === 0, weeks: process.env.LT_LONG ? 52 : 13 + (i * 5) % 14, ill: i % 3 === 0, vacation: i % 4 === 1 };
   });
 }
 
@@ -112,7 +114,25 @@ export async function simulateLongterm21(u: LtUser, seed = 2101): Promise<LtResu
         if (crawlAbility > 0) { m.longestCrawl = String(crawlAbility); if ((profile.skills?.swimGear || []).includes('buoy')) m.longestPull = String(crawlAbility); }
         if (u.watch) m.hr = String(125 + Math.round(rnd() * 10));
       } else if (s.sport === 'strength') m.area = 'full';
-      state.sessions[s.id] = { completed: true, metrics: m, rpe: hard ? 7 : 4, feel: 2, ...(u.watch && k >= 28 ? { source: 'healthfit' } : {}) };
+      // Auftrag 22: Intervalle – ohne Uhr jede 2. Intervall-Einheit von Hand (manchmal eines abgebrochen oder eines mehr), mit Uhr wie von intervals.icu
+      const targets = ['run', 'bike', 'swim'].includes(s.sport) ? plannedIntervals(s, { lthrRun: th().lthrRun, lthrBike: th().lthrBike, runThrSec: th().thresholdPaceRunSec }) : [];
+      let ivSrc: string | null = null;
+      if (targets.length && (u.watch || rnd() < 0.5)) {
+        const n = targets.length + (rnd() < 0.1 ? 1 : 0) - (short && targets.length > 1 ? 1 : 0);
+        const rows: any[] = Array.from({ length: Math.max(1, n) }, (_, i) => { const t = targets[Math.min(i, targets.length - 1)]; const r: any = {};
+          if (t.sec) r.sec = Math.round(t.sec * (0.97 + rnd() * 0.06)); if (t.m) r.m = t.m;
+          if (s.sport === 'run' && t.pace) r.pace = secToPace(Math.round((t.pace[0] + t.pace[1]) / 2 / fit));
+          if (s.sport === 'swim' && t.pace100) r.pace100 = secToPace(Math.round((t.pace100[0] + t.pace100[1]) / 2));
+          if (u.watch && t.hr) r.hr = Math.round((t.hr[0] + (t.hr[1] || t.hr[0] + 8)) / 2) + i;
+          if (!u.watch) r.rpe = Math.min(10, t.rpe[0] + (i > 2 ? 1 : 0));
+          if (t.restSec && i < n - 1) { r.restSec = t.restSec; if (r.hr) r.restHr = r.hr - 25; }
+          return r; });
+        if (rnd() < 0.08 && rows.length > 1) { rows[rows.length - 1].aborted = true; if (rows[rows.length - 1].sec) rows[rows.length - 1].sec = Math.round(rows[rows.length - 1].sec / 2); count('Intervall abgebrochen'); }
+        m.intervals = rows; ivSrc = u.watch ? 'intervals' : 'manual'; count(u.watch ? 'Intervalle Uhr' : 'Intervalle von Hand');
+      }
+      state.sessions[s.id] = { completed: true, metrics: m, rpe: hard ? 7 : 4, feel: 2, ...(u.watch && k >= 28 ? { source: 'healthfit' } : {}), ...(ivSrc ? { metricsSrc: { intervals: ivSrc }, ...(ivSrc === 'manual' ? { metricsManual: { intervals: true } } : {}) } : {}) };
+      // Soll/Ist: eine Intervall-Einheit ohne eingetragene Intervalle zählt keine Intervalle als gemacht
+      if (targets.length) guard('Intervalle', () => { const e = evaluateIntervals(s, state.sessions[s.id], null, {}, s.sport); if (!e) fail('Intervalle', `${date} ${s.title}: keine Auswertung`); else if (!ivSrc && e.done > 0) fail('Soll als Ist gezählt', `${date} ${s.title}: ${e.done} Intervalle ohne Eintrag`); else if (ivSrc && e.done + e.extra === 0) fail('Intervalle verloren', `${date} ${s.title}`); });
       done.push(s.id); doneWeek += min; count(short ? 'kürzer' : 'genau');
     }
     // Extra-Einheit (etwa jede 3. Woche)
@@ -149,6 +169,8 @@ export async function simulateLongterm21(u: LtUser, seed = 2101): Promise<LtResu
 
     // ---------- Prüfungen nach jeder Woche ----------
     engine(date, { type: 'weekly' });
+    // Auftrag 22: täglicher Daten-Check findet in sauberen (simulierten) Daten nichts Falsches und stürzt nicht ab
+    guard('Daten-Check', () => { const dc = dataCheck({ state: { ...state, profile }, baseWeeks: plan.weeks, profile, goals, today: C.addDays(date, 1) }); /* wie der nächtliche Lauf am Montag nach der Sonntagsplanung */ for (const f of dc.findings.filter(f => f.group === 'values' || f.group === 'duplicates' || f.group === 'stage')) fail('Daten-Check: ' + f.group, `${date}: ${f.text}`); if (dc.findings.some(f => f.group === 'messages')) count('doppelte Meldung'); });
     const ext = guard('Verlängerung', () => extendPlan(plan, profile, goals, date)); if (ext) plan = ext;
     const eff = C.applyAdjustments(plan.weeks, state.adjustments);
     const upcoming = eff.filter((w: any) => w.endDate > date).slice(0, 2);

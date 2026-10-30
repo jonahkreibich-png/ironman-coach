@@ -55,14 +55,14 @@
 [data-design="glas"] .lbl { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); }
 [data-design="glas"] .hero-num, [data-design="glas"] .big, [data-design="glas"] .ring .rv b, [data-design="glas"] .tc-n, [data-design="glas"] .score .val, [data-design="glas"] .crit .v { font-family: var(--f-display); letter-spacing: -.02em; }
 [data-design="glas"] .ring { width: 104px; height: 104px; }
-[data-design="glas"] .ring .rv b { font-size: 34px; letter-spacing: -.04em; }
+[data-design="glas"] .ring .rv b { font-size: min(2rem, 68px); letter-spacing: -.04em; }
 /* Blatt (Einheit, Details): mattes Glas, Kopf in derselben Farbe */
 [data-design="glas"] .sheet { background: color-mix(in srgb, var(--bg) 95%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-radius: 30px 30px 0 0; }
 [data-design="glas"] .sheet-h { background: color-mix(in srgb, var(--bg) 95%, transparent); margin: 0 calc(-1 * var(--s4)); padding-left: var(--s4); padding-right: var(--s4); }
-[data-design="glas"] .score .val { font-size: 34px; }
+[data-design="glas"] .score .val { font-size: min(2rem, 68px); }
 /* Zahl und Veränderung: bei wenig Platz rutscht die Veränderung als Ganzes unter die Zahl */
 [data-design="glas"] .score .spread { flex-wrap: wrap; row-gap: 2px; }
-[data-design="glas"] .score .delta { font-size: 12px; white-space: nowrap; max-width: 100%; }
+[data-design="glas"] .score .delta { font-size: min(0.7059rem, 24px); white-space: nowrap; max-width: 100%; }
 [data-design="glas"] .score .lvl { -webkit-hyphens: manual; hyphens: manual; }
 [data-design="glas"] .sheet-h h2 { text-transform: none; letter-spacing: -.01em; font: 700 24px/1.15 var(--f-body); }
 [data-design="glas"] .status-word, [data-design="glas"] .day-h b, [data-design="glas"] .session-hero .t { text-transform: none; font-family: var(--f-body); letter-spacing: -.01em; }

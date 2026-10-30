@@ -17,6 +17,7 @@ import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
 import { de, mmss, dowName, joinDe } from './texts';
 import { patternOf, intervalsOf, type Pattern } from '../activity/structure';
+import { evaluateIntervals, plannedIntervals, evalToIntervalOut, type IvEval, type IvThresholds } from '../intervals';
 
 export interface ReviewOpt { label: string; say: string; go?: string }
 export interface Review { intent: 'review'; text: string; options: ReviewOpt[]; good: string[]; better: string[]; next: string[]; missing: string[]; items: number }
@@ -65,7 +66,7 @@ export function valsOf(d: Done): Vals {
     conflicts: actualMetrics(d.st, d.act)._issues || [],
     min: a.min ?? f.min, km: d.sport === 'swim' ? null : (a.km ?? f.km), meters: d.sport === 'swim' ? (a.km ? Math.round(a.km * 1000) : f.meters) : null,
     hr: a.avgHr ?? f.hr, pace: d.sport === 'run' ? (a.paceSecKm ?? f.paceSec) : null, speed: sp ? Math.round(sp * 10) / 10 : null, power: a.avgPower ?? f.power, cadence: a.avgCadence ?? f.cadence, dec: a.decouplingPct ?? f.decoupling,
-    splits: (a.splits && a.splits.length ? a.splits : f.splits) || [], hrZones: a.hrZones || null, intervals: d.act ? intervalsOf(a) : null, pattern: d.act ? patternOf(a) : null,
+    splits: (a.splits && a.splits.length ? a.splits : f.splits) || [], hrZones: a.hrZones || null, intervals: d.act ? intervalsOf(a) : (['run', 'bike', 'swim'].includes(d.sport) ? evalToIntervalOut(evaluateIntervals(d.planned || { sport: d.sport }, d.st, null, {}, d.sport)) : null), pattern: d.act ? patternOf(a) : null,
     spl: sw.strokesPerLength ?? f.spl, dps: sw.metersPerStroke ?? f.dps, longest: d.act ? crawlOf(a) : f.longestCrawl, pace100: sw.pace100 ?? f.pace100, crawlShare: f.crawlShare,
     rpe: f.rpe ?? num(a.rpe), feel: f.feel, deviation: f.deviation, notes: f.notes, technique: f.technique, tempC: a.tempC ?? null, ascent: a.ascentM ?? null,
     indoor: !!(a.indoor || f.indoor || /rolle|trainer|indoor|zwift/i.test(d.title)), bikeType: f.bikeType || a.bikeType || null, fromWatch: !!d.act && d.act.source !== 'manual'
@@ -168,22 +169,27 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   // Art der Einheit: Plan zuerst, die Messung bestätigt oder widerspricht (Auftrag 16)
   const sn = structureNote(d, v, s, hard);
   good.unshift(...sn.good); better.unshift(...sn.better); fatigue += sn.fatigue;
+  // Auftrag 22: Intervalle Soll gegen Ist zuerst (wichtigster Teil einer Intervall-Einheit)
+  const ivr = intervalReview(ctx, d); fatigue += ivr.fatigue;
+  const ivDone = !!(ivr.e && ivr.e.planned && ivr.e.done + ivr.e.extra > 0);
   // Wiederholungen und Intervall-Qualität
   const main = s && s.spec ? (s.spec.steps || []).find((x: any) => x.part === 'main' && (x.reps || 1) > 1) : null;
   const repsAll = s && s.spec ? (s.spec.steps || []).filter((x: any) => x.part === 'main').reduce((a: number, x: any) => a + (x.reps || 1), 0) : 0;
   // Schwimmen: alle Stücke des Hauptteils zählen (Technik, Kraul, Brust), die Uhr setzt pro Stück eine Runde
   if (d.sport === 'swim' && main && v.intervals && repsAll) {
     if (v.intervals.count >= repsAll * 0.8) good.push(`${v.intervals.count} Stücke mit Pause geschwommen (geplant ${repsAll}).`);
-  } else if (main && v.intervals && v.intervals.count <= main.reps * 1.5 && !sn.counted) {
+  } else if (main && v.intervals && v.intervals.count <= main.reps * 1.5 && !sn.counted && !ivDone) {
     if (v.intervals.count >= main.reps) good.push(`${v.intervals.count} von ${main.reps} Intervallen geschafft.`);
     else better.push(`${v.intervals.count} von ${main.reps} Intervallen. Lieber alle etwas ruhiger als die letzten auslassen.`);
   }
-  if (v.intervals && v.intervals.count >= 2 && d.sport !== 'swim' && (hard || !s)) {
+  if (v.intervals && v.intervals.count >= 2 && d.sport !== 'swim' && (hard || !s) && !ivDone) {
     const drift = Math.max(v.intervals.hrDriftPct || 0, v.intervals.dropPct || 0);
     if (drift < 5) good.push(`Intervalle sehr gleichmäßig (Abfall nur ${de(drift)} %).`);
     else if (drift > 8) better.push(`Das letzte Intervall war ${de(drift)} % schwächer als das erste: zu schnell angefangen. Die ersten zwei bewusst etwas ruhiger.`);
   }
-  if (main && !v.intervals && hard && !v.fromWatch) missing.push('Runden/Intervalle (kommen automatisch mit der Uhr)');
+  if (main && !v.intervals && hard && !v.fromWatch && !ivDone) missing.push('Intervalle (kommen automatisch mit der Uhr, sonst unter „Intervalle“ eintragen)');
+  good.unshift(...ivr.good); better.unshift(...ivr.better);
+  if (ivr.lead) good.splice(Math.min(1, good.length), 0, ivr.lead);
   // Entkopplung und Splits
   if (v.dec != null && (v.min || 0) >= 30) {
     if (v.dec <= 5) good.push(`Entkopplung ${de(v.dec)} %: der Puls blieb stabil, deine Grundlage trägt.`);
@@ -282,7 +288,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   // Müdigkeit und Gefühl zuerst (die Antwort zeigt nur die ersten zwei Punkte), Strecke und Dauer danach
   const pri = (t: string) => /müde gefühlt|Gefühl \d+\/10/.test(t) ? 2 : /^(Strecke|Nur \d+ von)/.test(t) ? -1 : 0;
   better.sort((a, b) => pri(b) - pri(a));
-  return { good, better, next: [], missing, head, fatigue };
+  return { good, better, next: ivr.next, missing, head, fatigue };
 }
 
 /* ---------- Plan gegen Messung (Auftrag 16) ----------
@@ -364,7 +370,7 @@ function fallback(sport: string, hard: boolean, indoor = false): string {
 export function reviewItem(ctx: EngineCtx, d: Done): Review {
   const r = reviewOne(ctx, d);
   const n = nextDays(ctx, d.date >= ctx.today ? ctx.today : d.date, r.fatigue, d.sport);
-  const text = compose(r.head, r.good, r.better, n.text, r.missing, fallback(d.sport, isHardDone(d, valsOf(d)), valsOf(d).indoor));
+  const text = compose(r.head, r.good, r.better, [...r.next, n.text].join(' '), r.missing, fallback(d.sport, isHardDone(d, valsOf(d)), valsOf(d).indoor));
   const opts: ReviewOpt[] = [...n.opts];
   if (r.missing.length) opts.unshift({ label: 'Werte eintragen', say: '', go: (d.custom ? 'plan' : 'session:' + d.key) });
   return { intent: 'review', text, options: opts, good: r.good, better: r.better, next: [n.text], missing: r.missing, items: 1 };
@@ -508,4 +514,73 @@ export function reviewChange(old: any, text: string, sig: string): 'same' | 'qui
   const first = (t: any) => String(t || '').split('\n')[0].trim();
   if (!old.inputSig) return (old.resultText ?? old.text) === text ? 'same' : first(old.resultText ?? old.text) === first(text) ? 'quiet' : 'corrected';
   return 'corrected';
+}
+
+/* ---------- Auftrag 22: Intervalle Soll gegen Ist ----------
+   Im Zielbereich? Gleichmäßig oder abfallend? Pulsanstieg über die Intervalle (Ermüdung), Erholung in den Pausen,
+   Vergleich mit derselben Einheit vor 2-4 Wochen. Daraus: nächste Stufe, wiederholen oder leichter, Zonen-Hinweis.
+   Nur Ist-Werte (von Hand oder Uhr) zählen; geplante Werte nie. */
+export const ivThr = (p: any): IvThresholds => { const th = (p && p.thresholds) || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p && (p.powerMeter || p.trainerType === 'smart') ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; };
+export function ivEvalOf(ctx: EngineCtx, d: Done): IvEval | null {
+  if (d.sport !== 'run' && d.sport !== 'bike' && d.sport !== 'swim') return null;
+  return evaluateIntervals(d.planned || { sport: d.sport }, d.st, d.act, ivThr(ctx.profile), d.sport);
+}
+const ivSig = (s: any) => { const t = plannedIntervals(s); return t.length ? `${s.sport}|${t.length}|${t.map(x => `${x.sec || x.m}:${x.zone}`).join(',')}` : ''; };
+const ivPerfTxt = (sport: string, e: IvEval) => sport === 'run' && e.work.paceSec ? { v: e.work.paceSec, txt: `${mmss(e.work.paceSec)}/km`, lowerBetter: true } : sport === 'bike' && e.work.power ? { v: e.work.power, txt: `${e.work.power} W`, lowerBetter: false } : sport === 'swim' && e.work.pace100 ? { v: e.work.pace100, txt: `${mmss(e.work.pace100)}/100 m`, lowerBetter: true } : null;
+/* Dieselbe Einheit (gleiche Intervalle) 12-35 Tage vorher, mit Ist-Werten */
+export function ivEarlier(ctx: EngineCtx, d: Done): { d: Done; e: IvEval } | null {
+  if (!d.planned) return null; const sig = ivSig(d.planned); if (!sig) return null;
+  const list = doneItems(ctx, C.addDays(d.date, -35), C.addDays(d.date, -12)).filter(x => x.key !== d.key && x.sport === d.sport && x.planned && ivSig(x.planned) === sig)
+    .map(x => ({ d: x, e: ivEvalOf(ctx, x) })).filter((x): x is { d: Done; e: IvEval } => !!x.e && x.e.done >= 1 && !!x.e.work.hr);
+  return list.length ? list[list.length - 1] : null;
+}
+export function intervalReview(ctx: EngineCtx, d: Done): { good: string[]; better: string[]; next: string[]; fatigue: number; e: IvEval | null; lead: string | null } {
+  const out = { good: [] as string[], better: [] as string[], next: [] as string[], fatigue: 0, e: null as IvEval | null, lead: null as string | null };
+  const e = ivEvalOf(ctx, d); out.e = e;
+  if (!e || !e.planned || e.done + e.extra < 1) return out;
+  const n = e.planned, sp = d.sport;
+  const quality = e.source === 'manual' ? ' (eingetragen)' : '';
+  // ein Satz für das Wichtigste: im Ziel, gleichmäßig, Erholung
+  const parts: string[] = [];
+  if (e.judged) {
+    const firstWhy = (v: string) => (e.lines.find(l => l.verdict === v) || { why: '' }).why;
+    if (e.inTarget === e.judged) parts.push(`${e.judged === 1 ? 'Intervall' : `alle ${e.judged} Intervalle`} im Zielbereich`);
+    else if (e.tooHard > e.judged / 2) { out.better.push(`${e.tooHard} von ${e.judged} Intervallen zu hart, z. B. ${firstWhy('hard')}. Im Ziel bringt es denselben Reiz bei weniger Müdigkeit.`); out.fatigue += 0.4; }
+    else if (e.tooEasy > e.judged / 2) out.better.push(`${e.tooEasy} von ${e.judged} Intervallen unter dem Ziel, z. B. ${firstWhy('easy')}.`);
+    else parts.push(`${e.inTarget} von ${e.judged} Intervallen im Zielbereich`);
+  }
+  if (e.done >= 2 && e.fadePct != null) {
+    if (e.fadePct > 5) { out.better.push(`Intervall ${e.done} war ${de(e.fadePct)} % schwächer als das erste: zu schnell angefangen. Die ersten bewusst etwas ruhiger.`); out.fatigue += 0.3; }
+    else if (e.hrRise != null && e.hrRise >= 8 && e.done >= 3) { out.better.push(`Leistung gleich, aber der Puls stieg von Intervall 1 bis ${e.done} um ${e.hrRise} Schläge: Ermüdung. Genug trinken und die Pausen ganz locker.`); out.fatigue += 0.3; }
+    else parts.push(`gleichmäßig (${e.fadePct <= 0 ? 'das letzte sogar etwas stärker' : `Abfall ${de(e.fadePct)} %`}${e.hrRise != null ? `, Puls ${e.hrRise >= 0 ? '+' : ''}${e.hrRise}` : ''})`);
+  }
+  if (e.recovery != null) {
+    if (e.recovery >= 25) parts.push(`gute Erholung in den Pausen (Puls −${e.recovery})`);
+    else if (e.recovery < 12) out.better.push(`In den Pausen fiel der Puls nur um ${e.recovery} Schläge. Pause ganz locker (gehen bzw. rollen); bleibt das so, waren die Intervalle zu hart.`);
+  }
+  if (parts.length) { const t = parts.join(', '); out.lead = t.charAt(0).toUpperCase() + t.slice(1) + quality + '.'; }
+  if (e.extra) out.good.push(`${e.extra} Intervall${e.extra > 1 ? 'e' : ''} mehr als geplant – zählt mit, die nächste Stufe richtet sich nach den geplanten.`);
+  if (e.short) out.better.push(`${e.short} Intervall${e.short > 1 ? 'e' : ''} abgebrochen oder deutlich kürzer. Lieber alle etwas ruhiger als das letzte abbrechen.`);
+  else if (e.done < n) out.better.push(`${e.done} von ${n} Intervallen gemacht${quality}.`);
+  // Vergleich mit derselben Einheit vor 2-4 Wochen
+  const prev = ivEarlier(ctx, d);
+  const a = ivPerfTxt(sp, e), b = prev ? ivPerfTxt(sp, prev.e) : null;
+  if (prev && a && b && e.work.hr && prev.e.work.hr) {
+    const dh = e.work.hr - prev.e.work.hr; const rel = (a.v - b.v) / b.v * (a.lowerBetter ? -1 : 1) * 100;
+    const label = d.planned.title || 'Einheit';
+    if (Math.abs(rel) <= 2 && dh <= -3) out.good.unshift(`${label} wie am ${fmtD(prev.d.date)}: ${sp === 'bike' ? 'gleiche Watt' : 'gleiches Tempo'} (${a.txt}) bei ${-dh} Schlägen weniger (${e.work.hr} statt ${prev.e.work.hr}). Das ist Fortschritt.`);
+    else if (rel >= 2 && dh <= 2) out.good.unshift(`${label} stärker als am ${fmtD(prev.d.date)}: ${a.txt} statt ${b.txt} bei ${dh <= 0 ? 'weniger' : 'fast gleichem'} Puls (${e.work.hr} statt ${prev.e.work.hr}).`);
+    else if (dh >= 5 && rel <= 1) { out.better.push(`Puls in den Intervallen ${dh} Schläge höher als am ${fmtD(prev.d.date)} bei ${rel < -2 ? 'weniger' : 'gleicher'} Leistung (${a.txt} statt ${b.txt}).`); out.fatigue += 0.4; }
+  }
+  // Folgen: nächste Stufe nur, wenn die Ist-Werte passen (dieselbe Regel wie die Plan-Anpassung)
+  const v = d.planned && (d.planned.spec?.lib || /sweet/i.test(d.planned.title || '')) ? C.ladderVerdictOf(d.planned, d.st, d.act, ctx.profile.thresholds || {}) : null;
+  if (v) {
+    if (v.result === 'up') out.next.push(`Nächstes Mal eine Stufe weiter (${v.why}).`);
+    else if (v.result === 'fail') out.next.push(`Nächstes Mal dieselbe Stufe, etwas ruhiger; klappt es zweimal nicht, wird sie leichter (${v.why}).`);
+    else out.next.push(`Nächstes Mal dieselbe Stufe wiederholen (${v.why}).`);
+  }
+  // Zonen-Hinweis: Tempo/Watt deutlich neben dem Ziel, der Puls passt aber
+  if (e.zoneFaster >= 2 && e.zoneFaster >= e.judged / 2) out.next.push(`Bei passendem Puls warst du in ${e.zoneFaster} Intervallen schneller als das Ziel: deine Zonen sind wahrscheinlich zu niedrig, ein Test bringt sie auf den neuen Stand.`);
+  else if (e.zoneSlower >= 2 && e.zoneSlower >= e.judged / 2) out.next.push(`Bei passendem Puls warst du in ${e.zoneSlower} Intervallen langsamer als das Ziel: entweder müde oder die Zonen sind zu hoch – ein Test zeigt es.`);
+  return out;
 }

@@ -1,3 +1,4 @@
+import { appTz } from '../../shared/tz';
 import { applyCustomPlanAdjustments } from '../../shared/custom-locations26';
 import { safeBackup } from './backup-validation';
 import { mergeStored } from './storage-merge';
@@ -102,6 +103,8 @@ export function hasLocalData(): boolean {
 
 /* STATE ist ein fester Behälter. replaceState tauscht den Inhalt aus, damit alle Module dieselbe Referenz behalten. */
 export const STATE: any = loadState();
+// Auftrag 22: Zeitzone des Geräts in den Einstellungen, damit der Server morgens zur richtigen Ortszeit plant (wird beim nächsten Speichern abgeglichen)
+try { const tz = appTz(); if (STATE.settings && STATE.settings.tz !== tz) STATE.settings.tz = tz; } catch (_) { /* egal */ }
 export function replaceState(next: any): void {
   if (next === STATE) return;
   Object.keys(STATE).forEach(k => { delete STATE[k]; });

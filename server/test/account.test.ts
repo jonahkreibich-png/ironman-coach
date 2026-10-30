@@ -74,3 +74,13 @@ test('E2: Der Betreiber sieht von anderen nur Name, Status, Version, Geräte und
   ]);
   for (const leak of ['"hrv"', 'restingHR', 'sleepHours', 'weightKg', '"rpe"', 'Knie']) expect(s).not.toContain(leak);
 });
+test('Auftrag 22: Konto löschen und neu anlegen – neues Konto startet leer, nichts Altes taucht wieder auf', async () => {
+  const { env, A, B } = await two();
+  expect((await call(env, 'DELETE', '/api/me', { confirm: 'LÖSCHEN' }, B.token)).status).toBe(200);
+  const inv = (await call(env, 'POST', '/api/admin/testusers', { note: 'Papa neu' }, A.token)).data;
+  const C = (await call(env, 'POST', '/api/setup', { name: 'iPhone Papa', invite: inv.code, userName: 'Papa' })).data;
+  expect(C.userId).not.toBe(B.userId);
+  const first = await call(env, 'POST', '/api/sync', { since: 0, changes: [] }, C.token);
+  expect(first.status).toBe(200);
+  expect(first.data.records.filter((r: any) => !r.deleted)).toEqual([]);
+});

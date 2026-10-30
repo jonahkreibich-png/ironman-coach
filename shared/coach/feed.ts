@@ -1,3 +1,4 @@
+import { localDate } from '../tz';
 /* Coach-Verlauf ordnen (Auftrag 5 D8): Briefings, Kommentare und Rückblicke verschwinden nach einigen Tagen (3/7/14, Standard 7)
    aus dem Chat ins Archiv. Erledigte Gespräche werden nach 3 Tagen zu einer Zeile zusammengeklappt („Mi: Lauf auf Samstag verschoben“).
    Sichtbar bleiben immer: offene Vorschläge und Rückfragen, ungelesene und angeheftete Nachrichten.
@@ -33,10 +34,10 @@ export function arrangeFeed(all: any[], now: number, seenAt: number, keepDays = 
   const feed: FeedItem[] = []; const archived: any[] = [];
   for (const g of groups) {
     const last = g[g.length - 1]; const age = now - last.at; const pinned = g.some(keep);
-    const date = new Date(last.at).toISOString().slice(0, 10);
+    const date = localDate(last.at);
     if (!pinned && age > keepDays * DAY) { archived.push(...g); continue; }
     if (g[0].from === 'user' && !pinned && age > 3 * DAY) { feed.push({ type: 'line', line: `${DOW[new Date(date + 'T12:00:00Z').getUTCDay()]}: ${summaryOf(g)}`, date, at: last.at, ids: g.map(m => m.id) }); continue; }
-    g.forEach(m => feed.push({ type: 'msg', msg: m, date: new Date(m.at).toISOString().slice(0, 10), at: m.at, ids: [m.id] }));
+    g.forEach(m => feed.push({ type: 'msg', msg: m, date: localDate(m.at), at: m.at, ids: [m.id] }));
   }
   return { feed, archived };
 }
@@ -57,7 +58,7 @@ export function occasionKey(m: any): string | null {
   if (!m || m.deleted || m.from === 'user' || m.chat || m.intent || m.kind === 'answer') return null;
   const text = norm(m.text);
   if (!text && !m.title) return null;
-  const day = m.date || (m.at ? new Date(m.at).toISOString().slice(0, 10) : '');
+  const day = m.date || (m.at ? localDate(m.at) : '');
   return [m.kind || '', norm(m.title).replace(/prue/g, 'prü'), text.replace(/prue/g, 'prü'), day].join('|');
 }
 const rank = (m: any) => (m.proposal && ['accepted', 'rejected'].includes(m.proposal.status) ? 0 : m.proposal && m.proposal.status === 'open' ? 1 : 2);

@@ -1,10 +1,10 @@
+import { localDate } from './tz';
 /* Eine aktuelle Ampel für Anzeige und Coach. Keine persistierten Ableitungen als Eingabe. */
 import * as C from './core';
 
 
-export function readinessDate(now = Date.now()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
-}
+/* Auftrag 22: „heute“ in der Zeitzone der App (Gerät bzw. Nutzer), nicht fest Europe/Berlin */
+export function readinessDate(now = Date.now()): string { return localDate(now); }
 export { readinessInputs, readinessSnapshot } from './core';
 /* Kein Score, keine Gründe und keine aus gesperrten Messwerten abgeleitete Farbe gehen ans Modell. */
 export function withheldReadiness(date: string): any {

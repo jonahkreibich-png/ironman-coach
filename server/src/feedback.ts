@@ -2,7 +2,7 @@
    einem Screenshot. Jede neue Meldung schickt sofort eine Mitteilung an alle Geräte des Betreibers. Der Betreiber hat einen
    Posteingang (neu / in Arbeit / erledigt) und kann antworten; die Antwort erscheint beim Nutzer als Coach-Nachricht.
    Gesundheits- oder Trainingsdaten gehen nur mit, wenn der Nutzer sie für diese Meldung bewusst freigibt (shared). */
-import { type Env, putRecords, getMeta, setMeta } from './store';
+import { type Env, putRecords, getMeta, setMeta, berlinDate } from './store';
 import type { Auth } from './auth';
 import { HttpError, readJson } from './http';
 import { deliver } from './notify';
@@ -103,7 +103,7 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
       await env.DB.prepare('UPDATE feedback SET reply = ?, reply_at = ?, reply_seen = 0 WHERE id = ?').bind(reply, now, id).run();
       // Antwort als Coach-Nachricht beim Nutzer (kommt über den normalen Abgleich) und als Mitteilung
       const uid = (row as any).user_id;
-      const msg = { id: `msg-fb-${id}-${now}`, at: now, date: new Date(now).toISOString().slice(0, 10), kind: 'answer', from: 'coach', title: 'Antwort auf deine Meldung', text: `Zu „${String((row as any).text).slice(0, 80)}“: ${reply}`, unread: true, pinned: true, feedbackId: id };
+      const msg = { id: `msg-fb-${id}-${now}`, at: now, date: berlinDate(now), kind: 'answer', from: 'coach', title: 'Antwort auf deine Meldung', text: `Zu „${String((row as any).text).slice(0, 80)}“: ${reply}`, unread: true, pinned: true, feedbackId: id };
       await putRecords(env, uid, [{ kind: 'coachMsg', key: msg.id, data: msg, updatedAt: now }]);
       try { await deliver(env, uid, { title: 'Antwort auf deine Meldung', body: reply.slice(0, 140), url: '/?go=coach', tag: 'fbr-' + id }); } catch (e) { /* egal */ }
     }
@@ -115,12 +115,14 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
     const since = Date.now() - 14 * 86400000;
     const acks: Record<string, number> = (await getMeta(env, a.uid, 'err_ack')) || {};
     const rows = await env.DB.prepare('SELECT e.user_id, u.name, e.msg, e.place, e.version, e.at FROM error_log e LEFT JOIN users u ON u.id = e.user_id WHERE e.at > ? ORDER BY e.id DESC LIMIT 5000').bind(since).all();
-    const groups: Record<string, any> = {}; const ops: Record<string, any> = {};
+    const groups: Record<string, any> = {}; const ops: Record<string, any> = {}; const dc: Record<string, any> = {};
     for (const r of (rows.results || []) as any[]) {
       const op = operatorHint(r.place, r.msg);
       const key = op ? op.key : errorKey(r.place, r.msg);
       if (acks[key] && r.at < acks[key]) continue; // gleiche Millisekunde: zählt als neu (sonst verschwindet ein sofort wiederkehrender Fehler)
-      const tgt = op ? ops : groups;
+      // Auftrag 22: Befunde des täglichen Daten-Checks getrennt (je Art und Text gruppiert)
+      const isDc = String(r.place || '').startsWith('datacheck:');
+      const tgt = op ? ops : isDc ? dc : groups;
       const g = tgt[key] = tgt[key] || (op ? { key, text: op.text, help: op.help, count: 0, lastAt: 0 } : { key, label: errorLabel(r.place), text: errorShort(r.msg), count: 0, lastAt: 0, users: [] as string[], versions: [] as string[] });
       g.count++; g.lastAt = Math.max(g.lastAt, r.at);
       // Auftrag 21: auch Server-Fehler ohne Nutzerbezug (Zeitpläne); bei vielen Betroffenen nur die Anzahl
@@ -128,7 +130,7 @@ export async function feedbackRoutes(req: Request, env: Env, p: string, a: Auth)
     }
     const byLast = (x: any, y: any) => y.lastAt - x.lastAt;
     const short = (g: any) => ({ ...g, userCount: g.users.length, users: g.users.length > 5 ? [...g.users.slice(0, 3), `+${g.users.length - 3} weitere`] : g.users });
-    return { groups: Object.values(groups).sort(byLast).map(short), operator: Object.values(ops).sort(byLast) };
+    return { groups: Object.values(groups).sort(byLast).map(short), operator: Object.values(ops).sort(byLast), datacheck: Object.values(dc).sort(byLast).map(short) };
   }
   if (p === '/api/admin/errors/ack' && M === 'POST') {
     const b = await readJson(req);

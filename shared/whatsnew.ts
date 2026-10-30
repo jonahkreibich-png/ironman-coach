@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.10.0', items: [
+    'Neu: Intervalle eintragen und auswerten. Unter den Werten jeder Intervall-Einheit steht die geplante Liste (z. B. 2×10 min Sweet Spot) mit Dauer, Puls, Pace oder Watt, Kadenz, RPE und Pause. Werte der Uhr (Runden, intervals.icu oder der Puls-Verlauf) stehen automatisch drin, von Hand Eingetragenes gilt. Kleine Balken zeigen je Intervall: im Ziel, zu hart oder zu locker.',
+    'Der Coach bewertet die Intervalle (gleichmäßig, Pulsanstieg, Erholung in den Pausen, Vergleich mit derselben Einheit vor 2-4 Wochen) und gibt die nächste Stufe nur frei, wenn die Ist-Werte passen. Unmögliche Werte (z. B. Puls 300 oder 200 km in 30 min) werden freundlich abgelehnt oder hinterfragt.',
+    'Mehr Sicherheit: Änderungen am iPhone und am PC an derselben Einheit gehen nicht mehr verloren, die App rechnet in deiner Zeitzone (auch auf Reisen), größere Schrift aus den iPhone-Einstellungen wirkt jetzt, und Farben haben mehr Kontrast.'
+  ] },
   { version: '3.9.0', items: [
     'Neu: „Jetzt abrufen“ bei jeder Verbindung und in jeder Einheit – mit klarer Rückmeldung, ob eine Aufzeichnung gefunden und eingetragen wurde. Frühere Workouts (bis 12 Monate) kommen einmalig dazu und machen die Scores genauer.',
     'Mehr Werte unter „Weitere Werte“ (z. B. Höhenmeter, Temperatur, Schuh, Normalized Power, Verpflegung, Puls und Brust-Tempo beim Schwimmen, Sprints). Scores zählen jetzt alle Einheiten des letzten Jahres, ältere mit weniger Gewicht; von Hand Eingetragenes zählt wie von der Uhr.',

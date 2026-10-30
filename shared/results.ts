@@ -1,4 +1,7 @@
 import {effectiveCustomBuckets} from './custom-state26';
+import { manualIntervals, rowsToLaps } from './intervals';
+import { statsOf } from './activity/structure';
+import { checkField } from './validate';
 /* Tatsächliche Ergebnisse, ohne Planwerte. Eine manuelle Korrektur (auch ein bewusst
    geleertes Feld) hat Vorrang. Keine Mutation der importierten Originalaufzeichnung. */
 export function resultNumber(v: any): number | null {
@@ -25,7 +28,8 @@ export function crawlOf(a: any): number | null {
 export function actualMetrics(st: any = {}, a: any = null): Record<string, any> {
   const sw = a?.swim || {};
   const m: Record<string, any> = a ? {
-    min: a.min, km: a.km, meters: a.km == null ? null : a.km * 1000,
+    // Auftrag 22: Distanz 0 von der Uhr heißt „nicht gemessen“ (ohne GPS), nicht 0 km
+    min: a.min, km: a.km > 0 ? a.km : null, meters: a.km > 0 ? a.km * 1000 : null,
     hr: a.avgHr, maxHr: a.maxHr, power: a.avgPower, maxPower: a.maxPower,
     cadence: a.avgCadence, maxCadence: a.maxCadence, pace: time(a.paceSecKm),
     speed: a.speedKmh, decoupling: a.decouplingPct, efficiency: a.efficiency,
@@ -34,8 +38,11 @@ export function actualMetrics(st: any = {}, a: any = null): Record<string, any> 
     area: a.strength?.area ?? a.area, exercises: a.strength?.exercises ?? a.exercises,
     ascent: a.ascentM, temp: a.tempC, np: a.np, paceBreast: time(sw.breastPace100), swolf: sw.swolf
   } : {};
+  const sport = (a && a.sport) || st?.sport;
   for (const [k, v] of Object.entries(st?.metrics || {})) {
     const src = st.metricsSrc?.[k];
+    // Auftrag 22: übernommene Werte außerhalb sinnvoller Grenzen (Uhr ohne GPS: 0 km, Pulsgurt-Fehler) zählen nicht; von Hand Eingetragenes bleibt
+    if (src && src !== 'manual' && !st.metricsManual?.[k] && sport && !checkField(sport, k, v).ok) continue;
     if (!a || !src || src === 'manual' || st.metricsManual?.[k] || (m[k] == null && k !== 'longestCrawl')) m[k] = v;
   }
   for (const k of Object.keys(st?.metricsManual || {})) if (st.metricsManual[k] && !Object.prototype.hasOwnProperty.call(st.metrics || {}, k)) m[k] = null;
@@ -101,6 +108,13 @@ export function effectiveActivity(a: any, st: any = {}): any {
     out.laps = []; out.intervals = null; out.pattern = null; out.splits = [];
     if (!st.metricsManual?.decoupling && st.metricsSrc?.decoupling !== 'manual') out.decouplingPct = null;
     if (!st.metricsManual?.efficiency && st.metricsSrc?.efficiency !== 'manual') out.efficiency = out.avgHr > 0 && out.speedKmh > 0 ? out.speedKmh / 3.6 * 60 / out.avgHr : null;
+  }
+  // Auftrag 22: von Hand eingetragene Intervalle gelten (Hand gewinnt) – als Runden für Scores, Trends und Bewertung
+  const man = ['run', 'bike', 'swim'].includes(a.sport) ? manualIntervals(st) : null;
+  if (man && man.length) {
+    out.laps = rowsToLaps(man, a.sport); out.segments = undefined;
+    out.intervals = statsOf(out.laps, a.sport === 'bike' && out.laps.some((l: any) => l.power));
+    out.pattern = man.length >= 2 ? { type: 'intervals', from: 'laps', reps: man.length } : out.pattern;
   }
   if (a.sport === 'strength') { const strength = actualStrength(st, a); out.area = strength.area; out.exercises = strength.exercises; out.strength = { ...(a.strength || {}), area: strength.area, exercises: strength.exercises }; }
   out.rpe = resultNumber(st.rpe) ?? a.rpe;

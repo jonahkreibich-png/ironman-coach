@@ -1,3 +1,4 @@
+import { localParts } from '../tz';
 /* Coach-Chat mit Zusammenhang (Auftrag 5 D): jede Nachricht bekommt eine Antwort, Rückfragen werden aufgelöst („ja“, „nein“,
    „Samstag“, „lieber Sonntag“, „mach das“), Planänderungen laufen über feste Aktionen (shared/coach/ops.ts) mit Vorschau,
    Bestätigen und Rückgängig, und nie gegen eine harte Regel der Person (shared/constraints.ts).
@@ -87,7 +88,7 @@ const label = (x: Sx) => `${x.s.title} (${fmtD(x.date)})`;
 function allowedDays(ctx: EngineCtx, x: Sx, rules: Rule[]): string[] {
   const w = weeksOf(ctx).find((ww: any) => ww.days.some((dd: any) => dd.date === x.date));
   // heute nur, solange der Tag noch nicht gelaufen ist (ab 18 Uhr in Berlin nicht mehr anbieten)
-  const late = ctx.now != null && parseInt(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Berlin' }).format(new Date(ctx.now)), 10) >= 18;
+  const late = ctx.now != null && localParts(ctx.now).hour >= 18;
   const days = (w ? w.days : []).map((dd: any) => dd.date).filter((dt: string) => (late ? dt > ctx.today : dt >= ctx.today) && dt !== x.date);
   return days.filter((dt: string) => { const l = live(dayOf(ctx, dt)); return !l.some((y: any) => y.sport === x.s.sport) && C.ruleOk(rules, x.s, dt, l) && (!isHard(x.s) || !l.some((y: any) => C.isHard(y))); })
     .sort((a: string, b: string) => live(dayOf(ctx, a)).length - live(dayOf(ctx, b)).length || a.localeCompare(b));

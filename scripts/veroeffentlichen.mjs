@@ -29,12 +29,25 @@ function execute(step) {
   if (step.kind === 'checks') {
     const npm = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
     if (!fs.existsSync(npm)) throw new Error('npm-cli.js wurde nicht gefunden. Node.js-Installation prüfen.');
-    runNode([npm, 'run', 'test:all'], ROOT, { VITE_APP_ENV: 'test' });
+    // Auftrag 22: vor großen Releases (STAMIO_LONG=1) die lange Langzeit-Simulation (52 Wochen) und 5.000 Zufallsfälle
+    runNode([npm, 'run', 'test:all'], ROOT, { VITE_APP_ENV: 'test', ...(process.env.STAMIO_LONG === '1' ? { LT_LONG: '1', FUZZ_N: '5000' } : {}) });
   } else if (step.kind === 'backup') {
     fs.mkdirSync(path.dirname(step.file), { recursive: true });
     const args = [path.join(ROOT, 'server', 'node_modules', 'wrangler', 'bin', 'wrangler.js'), 'd1', 'export', TARGETS[step.target].db, '--remote', '--output', step.file, '--skip-confirmation'];
     if (step.target === 'test') args.push('--env', 'test');
     runNode(args, path.join(ROOT, 'server'));
+  } else if (step.kind === 'realdata') {
+    // Auftrag 22: Umstellung und Laden aller Nutzer an einer Kopie der echten Daten (die Sicherung von eben)
+    runNode([path.join(ROOT, 'node_modules', 'vite-node', 'vite-node.mjs'), path.join(ROOT, 'scripts', 'release-check-cli.ts'), step.file]);
+  } else if (step.kind === 'bookmark') {
+    // Auftrag 22: Rückweg – Zeitpunkt der Datenbank vor dem Release (D1 Time Travel, kostenlos 7 Tage) festhalten
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'server', 'node_modules', 'wrangler', 'bin', 'wrangler.js'), 'd1', 'time-travel', 'info', TARGETS[step.target].db], { cwd: path.join(ROOT, 'server'), env: releaseEnvironment(), encoding: 'utf8' });
+    fs.writeFileSync(step.file, `Rückweg ${TARGETS[step.target].db}, Version ${VERSION}
+Zurück: wrangler d1 time-travel restore ${TARGETS[step.target].db} --bookmark=<bookmark unten>
+Code: wrangler rollback (Worker), Pages: vorherige Bereitstellung im Cloudflare-Dashboard
+
+${r.stdout || ''}${r.stderr || ''}`);
+    if (r.status !== 0) throw new Error('Rückweg-Zeitpunkt nicht lesbar (Sicherung liegt trotzdem in data-export).');
   } else if (step.kind === 'deploy') runNode([path.join(ROOT, 'scripts', 'deploy.mjs'), step.target]);
   else throw new Error('Unbekannter Veröffentlichungsschritt.');
 }
@@ -91,6 +104,10 @@ export async function publishRelease({ run = execute, checkBackup = verifyBackup
     await run({ kind: 'backup', target, file });
     const backup = await checkBackup(file);
     console.log('Sicherung geprüft: ' + file + ' (' + backup.bytes + ' Bytes)');
+    if (target === 'production') {
+      await run({ kind: 'realdata', target, file });
+      try { await run({ kind: 'bookmark', target, file: file.replace(/\.sql$/, '-rueckweg.txt') }); } catch (e) { console.log('Hinweis: ' + e.message); }
+    }
     await run({ kind: 'deploy', target });
     await verify(target);
   }

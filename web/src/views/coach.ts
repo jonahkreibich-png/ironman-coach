@@ -3,7 +3,7 @@
    (shared/coach/ops.ts) und Regeln wie überall. Alte Briefings und Kommentare wandern nach 3/7/14 Tagen in den Verlauf,
    erledigte Gespräche werden nach 3 Tagen zu einer Zeile. Mit aktivem KI-Coach antwortet der Server, die Oberfläche bleibt gleich. */
 import { STATE, saveState, UI, profile, saveProfile, rebuildPlanIndex } from '../store';
-import { esc, fmtDate, dowShort, todayStr, addDays } from '../util';
+import { esc, fmtDate, dowShort, todayStr, addDays, ymd } from '../util';
 import { t } from '../../../shared/i18n';
 import { D, invalidate } from '../data';
 import { on, onChange, ic, openSheet, refreshSheet, empty, pill } from '../kit';
@@ -23,7 +23,7 @@ import { analyze } from '../../../shared/coach/analysis';
 import { openSession } from './session';
 import { evidenceSignature } from '../../../shared/results';
 
-const time = (ms: number) => { const d = new Date(ms); return `${dowShort(d.toISOString().slice(0, 10))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const time = (ms: number) => { const d = new Date(ms); return `${dowShort(ymd(d))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 export const keepDays = () => [3, 7, 14].includes(+((STATE.settings || {}).coachKeepDays)) ? +STATE.settings.coachKeepDays : 7;
 const lastMsgId = () => { const l = Object.values(STATE.coachMsgs || {}).filter((m: any) => m && !m.deleted).sort((a: any, b: any) => a.at - b.at) as any[]; return l.length ? l[l.length - 1].id : null; };
 
@@ -270,7 +270,7 @@ function historySheet(): string {
   const list = searchMsgs(Object.values(STATE.coachMsgs || {}), Q).slice(0, 200);
   let lastDate = '';
   return `<div class="stack" data-history><input class="inp" id="hist-q" data-ch="hist-q" placeholder="${esc(t('chat.search'))}" value="${esc(Q)}" aria-label="${esc(t('chat.search'))}">
-    ${list.length ? list.map(m => { const dt = new Date(m.at).toISOString().slice(0, 10); const head = dt !== lastDate ? `<div class="lbl" style="margin-top:var(--s2)">${esc(dowShort(dt))} ${esc(fmtDate(dt))}</div>` : ''; lastDate = dt; return `${head}<div class="hist-item ${m.from === 'user' ? 'user' : ''}"><b>${esc(m.from === 'user' ? t('chat.you') : m.title || t('coach.title'))}</b> ${esc(m.text || '')}</div>`; }).join('') : empty(t('chat.historyEmpty'))}</div>`;
+    ${list.length ? list.map(m => { const dt = ymd(new Date(m.at)); const head = dt !== lastDate ? `<div class="lbl" style="margin-top:var(--s2)">${esc(dowShort(dt))} ${esc(fmtDate(dt))}</div>` : ''; lastDate = dt; return `${head}<div class="hist-item ${m.from === 'user' ? 'user' : ''}"><b>${esc(m.from === 'user' ? t('chat.you') : m.title || t('coach.title'))}</b> ${esc(m.text || '')}</div>`; }).join('') : empty(t('chat.historyEmpty'))}</div>`;
 }
 function openHistory() { openSheet(t('chat.history'), historySheet); }
 on('chat-history', () => { Q = ''; openHistory(); });
@@ -279,7 +279,7 @@ onChange('hist-q', el => { Q = (el as HTMLInputElement).value; refreshSheet(); }
 /* Langzeit-Notizen des Coachs: sichtbar und löschbar */
 function notesSheet(): string {
   const notes = Object.values(STATE.coachNotes || {}).filter((n: any) => n && !n.deleted) as any[];
-  return `<div class="stack"><div class="hint">${esc(t('coach.notesHint'))}</div>${notes.length ? `<div class="list">${notes.map(n => `<div class="li"><span class="grow">${esc(n.text)}<br><span class="s">${fmtDate(new Date(n.createdAt).toISOString().slice(0, 10))}</span></span><button class="btn danger sm" data-act="note-del" data-id="${esc(n.id)}">${esc(t('common.delete'))}</button></div>`).join('')}</div>` : empty(t('coach.noNotes'))}
+  return `<div class="stack"><div class="hint">${esc(t('coach.notesHint'))}</div>${notes.length ? `<div class="list">${notes.map(n => `<div class="li"><span class="grow">${esc(n.text)}<br><span class="s">${fmtDate(ymd(new Date(n.createdAt)))}</span></span><button class="btn danger sm" data-act="note-del" data-id="${esc(n.id)}">${esc(t('common.delete'))}</button></div>`).join('')}</div>` : empty(t('coach.noNotes'))}
     <div class="row"><input class="inp grow" id="note-new" placeholder="${esc(t('coach.notePh'))}"><button class="btn" data-act="note-add">${ic('plus')}</button></div></div>`;
 }
 on('notes-open', () => openSheet(t('coach.notes'), notesSheet));

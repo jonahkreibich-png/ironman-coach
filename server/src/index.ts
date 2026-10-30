@@ -11,6 +11,9 @@ import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, chec
 import { vapidPublicKey } from './webpush';
 import { logError, recentErrors, scrub } from './errlog';
 import { extraRoutes, publicRoutes, scheduledExtras, onRecordsChanged } from './extensions';
+import { runDataCheck } from './datacheck';
+import { withTz, userTz } from './tz';
+import { mergeVersions, MERGE_KINDS } from '../../shared/merge3';
 import { connectionsStatus, publicCatalog } from './connect';
 import { BRAND } from '../../shared/brand';
 import { feedbackRoutes } from './feedback';
@@ -24,6 +27,20 @@ const BACKUP_KEEP_DAYS = 30;
 function validChange(c: any): boolean {
   return c && KINDS.has(c.kind) && typeof c.key === 'string' && c.key.length > 0 && c.key.length <= 200 &&
     Number.isFinite(c.updatedAt) && c.updatedAt > 0 && (c.deleted ? true : c.data !== undefined);
+}
+/* Auftrag 22: Änderung mit Ausgangsstand (base) gegen den gespeicherten Stand zusammenführen. Gelöschtes bleibt gelöscht (neuere Löschung gewinnt wie bisher). */
+export async function mergeConcurrent(env: Env, uid: number, changes: any[]): Promise<number> {
+  const cand = changes.filter(c => c && !c.deleted && c.base !== undefined && MERGE_KINDS.has(c.kind));
+  let n = 0;
+  for (const c of cand) {
+    const row: any = await env.DB.prepare('SELECT data, updated_at, deleted FROM records WHERE user_id = ? AND kind = ? AND key = ?').bind(uid, c.kind, c.key).first();
+    if (row && !row.deleted && row.data != null) {
+      const r = mergeVersions(c.base, c.data, c.updatedAt, JSON.parse(String(row.data)), Number(row.updated_at) || 0);
+      c.data = r.data; c.updatedAt = r.updatedAt; if (r.merged) n++;
+    }
+  }
+  for (const c of changes) if (c && 'base' in c) delete c.base;
+  return n;
 }
 async function changesSince(env: Env, uid: number, since: number, limit: number) {
   const rows = await env.DB.prepare('SELECT kind, key, data, updated_at, deleted, rev FROM records WHERE user_id = ? AND rev > ? ORDER BY rev LIMIT ?')
@@ -75,8 +92,10 @@ export async function dailyBackup(env: Env, uid: number) {
   for (const r of (old.results || []) as any[]) if (new Date(r.day + 'T12:00:00Z').getUTCDay() !== 0) await env.DB.prepare('DELETE FROM backups WHERE user_id = ? AND day = ?').bind(uid, r.day).run();
   return { day, count: records.length };
 }
-async function nightly(env: Env) {
-  for (const uid of await activeUsers(env)) { try { await dailyBackup(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'backup', { uid }); } }
+export async function nightly(env: Env) {
+  for (const uid of await activeUsers(env)) await withTz(await userTz(env, uid), async () => { try { await dailyBackup(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'backup', { uid }); } });
+  // Auftrag 22: täglicher Daten-Check (nach der Sicherung, damit ein sicherer Fix immer eine Sicherung davor hat)
+  for (const uid of await activeUsers(env)) await withTz(await userTz(env, uid), async () => { try { await runDataCheck(env, uid); } catch (e) { await logError(env, 'server', (e as Error).message, 'datacheck', { uid }); } });
   await env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(Date.now()).run();
   await env.DB.prepare('DELETE FROM pair_attempts WHERE ts < ?').bind(Date.now() - 86400000).run();
   await env.DB.prepare('DELETE FROM push_log WHERE day < ?').bind(berlinDate(Date.now() - 14 * 86400000)).run();
@@ -155,6 +174,12 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
       const rows = await env.DB.prepare('SELECT u.id, u.name, u.role, u.features, u.created_at, u.test, (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id) AS devices, (SELECT MAX(last_seen) FROM devices d WHERE d.user_id = u.id) AS last_seen, (SELECT version FROM devices d WHERE d.user_id = u.id ORDER BY last_seen DESC LIMIT 1) AS version, (SELECT COUNT(*) FROM feedback f WHERE f.user_id = u.id) AS reports FROM users u ORDER BY u.id').all();
       return { users: (rows.results || []).map((r: any) => { const f = JSON.parse(r.features || '{}'); return { id: r.id, name: r.name, role: r.role, test: !!r.test, devices: r.devices, lastSeen: r.last_seen || null, version: r.version || null, reports: r.reports || 0, features: f, entitlements: entitlements(r.role, f), createdAt: r.created_at, self: r.id === uid }; }) };
     }
+    // Auftrag 22: Daten-Check sofort für alle Nutzer (sonst nachts); Ergebnis gruppiert, ohne Gesundheitswerte
+    if (p === '/api/admin/datacheck' && M === 'POST') {
+      const out: any[] = [];
+      for (const u of await activeUsers(env)) await withTz(await userTz(env, u), async () => { try { const r = await runDataCheck(env, u); out.push({ user: u, groups: r.groups || [], fixed: r.fixed || 0, segments: r.segments || 0, skippedWrite: !!r.skippedWrite }); } catch (e) { out.push({ user: u, error: String((e as Error).message).slice(0, 160) }); } });
+      return { users: out };
+    }
     // Test-Nutzer: Einladung erzeugen (der Tester richtet sich damit selbst ein)
     if (p === '/api/admin/testusers' && M === 'POST') return await createInvite(env, a, (await readJson(req)).note || 'Test-Nutzer', true);
     const um = /^\/api\/admin\/users\/(\d+)(?:\/(reset))?$/.exec(p);
@@ -198,6 +223,8 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
       for (const c of g.dropped) await touchRecord(env, uid, c.kind, c.key);
       changes.splice(0, changes.length, ...g.keep);
     }
+    // Auftrag 22: gleichzeitige Änderungen (iPhone und PC, offline, Import während der Eingabe) feldweise zusammenführen statt eine zu verwerfen
+    if (changes.length) await mergeConcurrent(env, uid, changes);
     if (changes.length) {
       await putRecords(env, uid, changes);
       // Neue Daten (Einheit, Nachtwerte, Notiz, Essen …) stoßen den Coach an, ohne die Antwort aufzuhalten
@@ -282,11 +309,12 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
 
 /* Alle 5 Minuten, für jeden Nutzer. Abruf und Anpassungen alle 30 Minuten zwischen 6 und 23 Uhr deutscher Zeit,
    Mitteilungen bei jedem Lauf. */
-export async function everyFive(env: Env, b?: any, onlyUsers?: number[]) {
-  b = b || berlinParts();
+export async function everyFive(env: Env, b0?: any, onlyUsers?: number[]) {
   const users = onlyUsers || await activeUsers(env);
   const out: any = {};
-  for (const uid of users) {
+  // Auftrag 22: je Nutzer in seiner Zeitzone (Morgen-Anpassung, Sonntagsplanung, Mitteilungen, „heute“)
+  for (const uid of users) await withTz(await userTz(env, uid), async () => {
+    const b = b0 || berlinParts();
     let L: any = null;
     // Auftrag 21: halbstündliche Arbeit je Nutzer auf die sechs 5-Minuten-Läufe verteilt (gleiche Häufigkeit, ein Sechstel der Last pro Lauf)
     const slot = Math.floor((b.minute % 30) / 5);
@@ -313,8 +341,8 @@ export async function everyFive(env: Env, b?: any, onlyUsers?: number[]) {
       }
     }
     try { out[uid] = await notifyTick(env, uid, { berlin: b, state: L }); } catch (e) { out[uid] = { error: (e as Error).message }; }
-  }
-  try { await scheduledExtras(env, b, users); } catch (e) { await logError(env, 'server', (e as Error).message, 'extras'); }
+  });
+  try { await scheduledExtras(env, b0 || berlinParts(), users); } catch (e) { await logError(env, 'server', (e as Error).message, 'extras'); }
   // Tests mit einem Nutzer erwarten das Ergebnis direkt
   return users.length === 1 ? out[users[0]] : out;
 }
@@ -325,7 +353,8 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     const url = new URL(req.url);
     try {
-      const out = await route(req, env, url, ctx);
+      // Auftrag 22: Zeitzone des Geräts (App schickt sie mit), sonst Europe/Berlin
+      const out = await withTz(req.headers.get('X-Time-Zone'), () => route(req, env, url, ctx));
       if (out instanceof Response) { cors && Object.entries(cors).forEach(([k, v]) => out.headers.set(k, v)); return out; }
       return json(out, 200, cors);
     } catch (e: any) {

@@ -10,7 +10,7 @@ describe('Auftrag 21: Langzeit-Simulation (36 erfundene Nutzer)', () => {
   test('mindestens 30 Nutzer, 3-6 Monate, gemischte Fälle', () => {
     expect(users.length).toBeGreaterThanOrEqual(30);
     expect(Math.min(...users.map(u => u.weeks))).toBeGreaterThanOrEqual(13);
-    expect(Math.max(...users.map(u => u.weeks))).toBeLessThanOrEqual(26);
+    expect(Math.max(...users.map(u => u.weeks))).toBeLessThanOrEqual(process.env.LT_LONG ? 52 : 26);
     expect(users.some(u => u.watch) && users.some(u => !u.watch)).toBe(true);
     expect(users.some(u => (u.answers.swimGear || []).length) && users.some(u => u.answers.sports.includes('swim') && !(u.answers.swimGear || []).length)).toBe(true);
   });

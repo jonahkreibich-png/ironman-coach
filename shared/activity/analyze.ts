@@ -2,11 +2,13 @@
    Schwimmbahnen mit Zügen. Ergebnis ist ein kompakter Datensatz (kind "activity"), die Rohverläufe werden verkleinert. */
 import type { RawActivity, ActSport } from './types';
 import { GENERIC_LTHR } from '../profile';
+import { appTz } from '../tz';
 import { isAutoLaps, lapKinds, streamStructure, paceTrend, statsOf, type Pattern } from './structure';
 
 export type Source = 'healthfit' | 'file' | 'shortcut' | 'intervals' | 'oura' | 'whoop' | 'polar' | 'withings' | 'fitbit' | 'suunto' | 'coros' | 'wahoo' | 'zepp' | 'healthkit' | 'manual';
 
-export interface LapOut { n: number; sec: number; m: number | null; avgHr: number | null; maxHr: number | null; speed: number | null; power: number | null; kind: 'work' | 'rest' | 'warmup' | 'cooldown' | 'steady' }
+export interface LapOut { n: number; sec: number; m: number | null; avgHr: number | null; maxHr: number | null; speed: number | null; power: number | null; kind: 'work' | 'rest' | 'warmup' | 'cooldown' | 'steady';
+  /** Auftrag 22: Puls am Ende der Runde (Erholung in Pausen), Kadenz, Züge pro Bahn (Schwimmen) */ endHr?: number | null; cad?: number | null; spl?: number | null }
 export interface IntervalOut {
   count: number; workSec: number; avgHrWork: number | null;
   /** Puls-Anstieg vom ersten zum letzten Intervall in % (bei gleicher Leistung = Ermüdung) */
@@ -51,6 +53,8 @@ export interface Activity {
   intervals: IntervalOut | null;
   /** Auftrag 16: Aufbau der Einheit (gleichmäßig, Intervalle, Fahrtspiel, Hügel, schneller werdend) */
   pattern?: Pattern | null;
+  /** Auftrag 22: harte und lockere Abschnitte aus dem Verlauf (wenn die Runden nichts sagen) */
+  segments?: LapOut[];
   swim: SwimOut | null;
   rpe?: number | null;
   /** Kadenz (Laufen: Schritte pro Minute, Rad: Umdrehungen), max. Leistung, Splits je km (Auftrag 7) */
@@ -74,7 +78,7 @@ const r1 = (x: number) => Math.round(x * 10) / 10;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 
-export function localDate(ms: number, tz = 'Europe/Berlin'): string {
+export function localDate(ms: number, tz = appTz()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
 }
 /* Stabile Kennung: gleicher Start und Sport ergibt dieselbe ID, so wird eine Datei nie doppelt angelegt */
@@ -134,6 +138,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   let intervals = intervalStats(laps, sport, usePower);
   // Auftrag 16: Aufbau erkennen. Automatische Runden (oder keine) sagen nichts über Intervalle, dann zählt der Verlauf.
   let pattern: Pattern | null = null;
+  let segments: LapOut[] | undefined;
   if (sport === 'run' || sport === 'bike') {
     const auto = isAutoLaps(raw.laps.filter(l => l.sec > 5).map(l => ({ sec: l.sec, m: l.dist, trigger: l.trigger })));
     const watch = laps.some(l => l.kind === 'rest' || l.kind === 'warmup' || l.kind === 'cooldown') && raw.laps.some(l => l.intensity && l.intensity !== 'active');
@@ -141,6 +146,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
     else if (laps.filter(l => l.kind === 'work').length === 1 && !auto) pattern = { type: 'tempo', from: watch ? 'watch' : 'laps', reps: 1, workSec: laps.filter(l => l.kind === 'work').map(l => Math.round(l.sec)), autoLaps: false };
     else {
       const st = streamStructure(recs, sport);
+      if (st && st.segments && st.segments.length) segments = st.segments;
       if (st && st.intervals) { intervals = st.intervals; pattern = { ...st.pattern, autoLaps: auto }; }
       else pattern = { type: 'steady', from: st ? 'stream' : laps.length >= 2 ? 'laps' : 'none', autoLaps: auto };
     }
@@ -149,7 +155,8 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   // Schwimmen
   const swim = sport === 'swim' ? swimStats(raw) : null;
 
-  const km = dist != null ? (sport === 'swim' ? r2(dist / 1000) : r2(dist / 1000)) : null;
+  // Auftrag 22: Distanz 0 (z. B. Teamsport ohne GPS) ist „nicht gemessen“
+  const km = dist != null && dist > 0 ? r2(dist / 1000) : null;
   // Kadenz: Laufuhren speichern Schritte eines Fußes, also doppelt
   const cads = recs.map(r => r.cad).filter((x): x is number => x != null && x > 0);
   const cadF = sport === 'run' && cads.length && avg(cads)! < 120 ? 2 : 1;
@@ -183,7 +190,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
     tempC: temps.length ? r1(avg(temps)!) : null,
     hrZones, decouplingPct, efficiency,
     avgCadence, maxCadence, maxPower, splits: splits.length ? splits : undefined,
-    laps, intervals, swim,
+    laps, intervals, swim, ...(segments ? { segments } : {}),
     pattern: withTrend(pattern, sport === 'run' ? paceTrend(splits) : null),
     hasStreams: recs.length > 0,
     createdAt: Date.now()
@@ -194,6 +201,22 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
    Sonst (Auftrag 16): nur bei deutlichem Wechsel schnell/langsam; automatische Runden der Uhr sind gleichmäßig. Schwimmen wie bisher. */
 export function classifyLaps(raw: RawActivity, usePower = false): LapOut[] {
   const L = raw.laps.filter(l => l.sec > 5);
+  return lapsBase(raw, L, usePower).map((o, i) => ({ ...o, ...lapExtra(raw, L[i]) }));
+}
+/* Auftrag 22: Puls am Ende der Runde, Ø-Kadenz und Züge pro Bahn aus Verlauf bzw. Bahnen (nur, was es gibt) */
+function lapExtra(raw: RawActivity, l: RawActivity['laps'][number] | undefined): Partial<LapOut> {
+  if (!l || !(l.start >= 0)) return {};
+  const t0 = l.start, t1 = l.start + (l.elapsed || l.sec);
+  const out: Partial<LapOut> = {};
+  const inLap = raw.records.filter(r => r.t >= t0 && r.t <= t1);
+  const endHr = [...inLap].reverse().find(r => r.hr != null && r.hr > 30 && r.t >= t1 - 15);
+  if (endHr) out.endHr = endHr.hr;
+  const cads = inLap.map(r => r.cad).filter((x): x is number => x != null && x > 0);
+  if (cads.length >= 5 && (raw.sport === 'run' || raw.sport === 'bike')) { const c = avg(cads)!; out.cad = Math.round(raw.sport === 'run' && c < 120 ? c * 2 : c); }
+  if (raw.sport === 'swim') { const ls = raw.lengths.filter(x => x.active && x.start >= t0 - 1 && x.start < t1 && x.strokes != null && x.strokes > 0); if (ls.length) out.spl = r1(avg(ls.map(x => x.strokes!))!); }
+  return out;
+}
+function lapsBase(raw: RawActivity, L: RawActivity['laps'], usePower: boolean): LapOut[] {
   if (L.length < 2) return L.map((l, i) => lapOut(l, i, 'steady'));
   const fromWatch = L.some(l => l.intensity && l.intensity !== 'active');
   if (fromWatch) {

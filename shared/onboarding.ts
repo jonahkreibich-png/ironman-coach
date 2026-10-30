@@ -173,6 +173,7 @@ export function goalTarget(g: any): number | null {
 }
 
 /* Antworten → Profil, Ziele, Plan */
+const validGoalDate = (d: any) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(Date.parse(d + 'T12:00:00Z')) && new Date(d + 'T12:00:00Z').toISOString().slice(0, 10) === d;
 export function profileFromAnswers(a: Answers, today: string, base?: Profile): { profile: Profile; goals: Goal[]; warnings: string[] } {
   const p: Profile = { ...defaultProfile(), ...(base || {}) };
   const warnings: string[] = [];
@@ -235,10 +236,12 @@ export function profileFromAnswers(a: Answers, today: string, base?: Profile): {
   p.planStyle = a.planStyle === 'strict' ? 'strict' : 'flexible';
   p.likesIntensity = a.likes === 'intensity' ? 'intensity' : a.likes === 'volume' ? 'volume' : 'balanced';
   p.answers = { ...a };
+  (Array.isArray(a.goals) ? a.goals : []).forEach((g: any) => { if (g && GOALS[g.type as GoalType] && g.date && !validGoalDate(g.date)) warnings.push('Das Zieldatum war ungültig und wurde nicht übernommen. Bitte das Datum neu wählen.'); });
   const goals: Goal[] = (Array.isArray(a.goals) ? a.goals : []).filter((g: any) => g && GOALS[g.type as GoalType]).map((g: any, i: number) => {
     const target = goalTarget(g) ?? (i === 0 && a.outcome === 'time' ? parseHm(a.targetTime) : null);
     return {
-      id: g.id || `goal-${i + 1}`, type: g.type, name: g.name || GOAL_NAMES[g.type as GoalType] || g.type, date: g.date || null, priority: g.priority || (i === 0 ? 'A' : 'B'),
+      // Auftrag 22 (Zufallstest): nur ein echtes Datum (JJJJ-MM-TT) und A/B/C; sonst stürzte der Plan-Generator ab
+      id: typeof g.id === 'string' && g.id ? g.id : `goal-${i + 1}`, type: g.type, name: typeof g.name === 'string' && g.name.trim() ? g.name.slice(0, 80) : GOAL_NAMES[g.type as GoalType] || g.type, date: validGoalDate(g.date) ? g.date : null, priority: ['A', 'B', 'C'].includes(g.priority) ? g.priority : (i === 0 ? 'A' : 'B'),
       outcome: target ? 'time' : (a.outcome || 'finish'), targetTimeSec: target, splits: g.timeMode === 'split' ? g.splits || null : null, why: a.why || undefined
     } as Goal;
   });
