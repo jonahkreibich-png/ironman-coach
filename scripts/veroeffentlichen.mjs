@@ -25,7 +25,7 @@ function runNode(args, cwd = ROOT, extra = {}) {
   const r = spawnSync(process.execPath, args, { cwd, env: { ...releaseEnvironment(), ...extra }, stdio: 'inherit' });
   if (r.error || r.status !== 0) throw new Error('Schritt fehlgeschlagen. Veröffentlichung angehalten.');
 }
-function execute(step) {
+export function execute(step) {
   if (step.kind === 'checks') {
     const npm = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
     if (!fs.existsSync(npm)) throw new Error('npm-cli.js wurde nicht gefunden. Node.js-Installation prüfen.');

@@ -1,9 +1,9 @@
 # Für Jonah
 
-**Nichts zu tun.** Version 3.9.0 veröffentliche ich selbst (erst Test-Umgebung, dann echte App, vorher Sicherungen).
+**Nichts zu tun.** Version 3.10.0 ist live (vorher in der Test-Umgebung mit deinen Daten geprüft, Sicherungen gemacht).
 
-Beim nächsten Öffnen: bei „Neue Version“ auf „Aktualisieren“ tippen. Danach verschwinden die 9 doppelten Schwimm-Hinweise von selbst.
+Beim nächsten Öffnen: bei „Neue Version“ auf „Aktualisieren“ tippen.
 
 Gut zu wissen:
-- Pull Buoy: deine 100 m vom 27.10. stehen als Bestwert. Schaffst du sie ein zweites Mal, zählen sie für die Stufe (wie beim Kraul).
-- „Jetzt abrufen“ findest du jetzt auch in jeder Einheit.
+- Intervalle: in jeder Intervall-Einheit unter den Werten. Mit Uhr steht alles schon drin, sonst „Intervalle eintragen“ antippen. Grau = geplant, zählt erst mit deinem Wert.
+- Größere Schrift aus den iPhone-Einstellungen (Anzeige & Helligkeit → Textgröße) wirkt jetzt auch in der App.

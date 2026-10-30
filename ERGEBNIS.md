@@ -1,3 +1,56 @@
+# Auftrag 22: Intervalle erfassen und auswerten, Fehler dauerhaft verhindern (30.10.)
+
+**Stand:** Fertig und live (Version 3.10.0): erst Test-Umgebung mit einer frischen Kopie deiner Daten, dann echte App (Sicherungen beider Umgebungen vorher geprüft, Rückweg-Zeitpunkt der Datenbank festgehalten). Du musst nichts tun – App öffnen und „Aktualisieren“ tippen.
+
+## 1. Intervalle (neu)
+- Unter den Werten jeder Intervall-Einheit (Laufen, Rad, Schwimmen, Koppel) steht der Bereich **„Intervalle“**: die geplante Liste mit den Soll-Werten grau im Feld (zählen nie als gemacht). Je Intervall Dauer bzw. Strecke, Ø/max. Puls, Pace/Watt/km/h bzw. Pace pro 100 m, Kadenz, Züge pro Bahn, RPE, Notiz; je Pause Dauer und Puls am Ende. Hinzufügen, löschen, verschieben, „wie vorheriges“, „abgebrochen“; Enter springt zum nächsten Feld.
+- **Automatisch:** Runden der Uhr (HealthFit/FIT), Abschnitte von intervals.icu, sonst harte Abschnitte aus dem Puls-/Tempo-/Watt-Verlauf. 1-km-Auto-Runden sind keine Intervalle. Hand gewinnt; „Uhrwerte verwenden“ holt sie zurück.
+- **Anzeige:** Ø der Intervalle (nur harte Teile), Ø der Pausen, Balken je Intervall: im Ziel / zu hart / zu locker / kürzer / nicht gemacht. Gesamtwerte der Einheit bleiben wie bisher.
+- **Coach:** im Ziel?, gleichmäßig oder abfallend, Pulsanstieg (Ermüdung), Erholung in den Pausen, Vergleich mit derselben Einheit vor 2-4 Wochen („gleiche Watt bei 5 Schlägen weniger“), dann: nächste Stufe / wiederholen / leichter, Zonen-Hinweis. Nächste Stufe nur mit passenden Ist-Werten. Scores zählen Intervalle mit Puls stark (Hand und Uhr nach Datenqualität).
+- **Deine Einheit 28.10. „Rad-Intervalle 2×10 min Sweet Spot (Rolle)“** (nur Puls, aus dem gespeicherten Verlauf erkannt): Intervall 1: 10:00 min, Ø 149, max. 157 · Pause 3:20, Puls fällt auf 128 (−29) · Intervall 2: 10:25 min, Ø 150, max. 158. Bewertung: beide im Zielbereich (Puls), gleichmäßig (Puls +1), gute Erholung. Die Abschnitte trägt der nächtliche Daten-Check für ältere Aufzeichnungen nach.
+
+## 2. Täglicher Daten-Check (alle Nutzer, nachts nach der Sicherung)
+Prüft Werte, doppelte Einheiten und Meldungen, Trainingsregeln, Stufen gegen Ist-Werte, verwaiste Anpassungen. Repariert nur eindeutig Doppeltes; Rest steht gruppiert im Posteingang (ohne Gesundheitswerte). Erster Lauf auf der Kopie von gestern:
+
+| Konto | Befund | Was passiert |
+|---|---|---|
+| du | 10 doppelte Coach-Meldungen | werden gelöscht |
+| du | Teamsport 19.10.: 0 km bei 60 min (Uhr ohne GPS) | Ursache behoben: 0 km = „nicht gemessen“, zählt nicht mehr |
+| du | 51 Anpassungen zu Einheiten, die es nach dem neuen Plan (27.10.) nicht mehr gibt | wirken nicht, nur gemeldet |
+| Konto 2 | alter Plan (18.10.): 5× Ruhetage, 6× Lauf-Qualität vor dem Ziel, 1× Kraft in der Wettkampfwoche | nur gemeldet; neu geplant: 0 Verstöße |
+| Konto 5 | alter Plan (17.10.): Kraft in der Wettkampfwoche | nur gemeldet; neu geplant: 0 Verstöße |
+
+## 3. Gefundene und behobene Fehler
+| Wo gefunden | Fehler | behoben |
+|---|---|---|
+| Zeit | Server rechnete für alle mit deutscher Zeit (Morgen-Anpassung, „heute“, Mitteilungen); Nutzer anderer Länder/auf Reisen falsch | Zeitzone je Nutzer vom Gerät ✓ |
+| Zeit | Meldungen und Coach-Verlauf nach Mitternacht mit Vortag (UTC-Datum), Wochentag im Chat-Verlauf bis 2 Uhr falsch | Ortsdatum ✓ |
+| Zeit | Zeitumstellung März/Oktober, So/Mo-Wechsel | geprüft, rechnete schon richtig; feste Tests ✓ |
+| Sync | iPhone offline + PC an derselben Einheit, oder Uhr-Import während der Eingabe: eine Änderung ging verloren | feldweise zusammenführen ✓ |
+| Zufallstests | Ziel mit kaputtem Datum ließ den Plan-Generator abstürzen | Datum geprüft ✓ |
+| Zufallstests | Jugendliche: Woche 6,1 h statt höchstens 6 h | Kürzung wiederholt und am Ende ✓ |
+| Zufallstests | Daten-Check stürzte bei beschädigten Einträgen ab | übersprungen und gemeldet ✓ |
+| Langzeit-Simulation | Stufe zurück wurde von „Umfang ±x %“ derselben Woche wieder überschrieben | Umfang wirkt auf die angepasste Einheit ✓ |
+| Langzeit-Simulation | nach Neuplanung zwei Stufen höher; lockere Formen (Steigerungen) ließen sich nicht zurücksetzen | höchstens eine Stufe weiter ✓ |
+| Langzeit-Simulation | Wettkampf zählte als „längster lockerer Lauf“ (Score +11) | ausgenommen ✓ |
+| Langzeit-Simulation | „2× Schwimmen“ kippte durch +2 min einer Stufen-Anpassung | 5 min Puffer ✓ |
+| Prüfung | Lauf-Stufen wurden am Rad-Schwellenpuls gemessen | richtige Schwelle ✓ |
+| Bedienbarkeit | iPhone-Einstellung „Größerer Text“ wirkte nicht (feste Pixel); Prognose ragte bei großer Schrift heraus | Schrift folgt dem iPhone (bis doppelt) ✓ |
+| Bedienbarkeit | 6 Farbpaare im hellen Modus unter dem Mindest-Kontrast (z. B. Hinweis-Pillen, weißer Text auf Orange) | etwas dunkler, alle ≥ 4,5:1 ✓ |
+
+Außerdem: Eingaben mit Grenzen (z. B. Puls 30-230, Komma oder Punkt) und Rückfrage („200 km in 30 min? Meintest du 20 km?“), gleiche Grenzen beim Import. Vor jedem Release: Kopie aller echten Daten umstellen und alle Nutzer laden lassen (gestern: alle 3 Konten fehlerfrei), Rückweg über Datenbank-Zeitpunkt + Sicherung.
+
+## Tests
+Typecheck ✓ · 2.555 Unit-/Server-Tests ✓ (neu u. a.: Intervalle aus FIT-Runden, ohne Runden, von Hand, abgebrochen, mehr als geplant, Schwimm-Sets, Koppel, Auto-Lap-Lauf; Zeitumstellung März/Oktober; iPhone+PC gleichzeitig, offline, Import während der Eingabe; Daten-Check; Release-Prüfung; Kontrast; 1.000 Zufallsfälle; Langzeit-Simulation 36 Nutzer mit Intervallen, 0 Befunde) · Build ✓ · 471 Browser-Tests in Chromium und WebKit ✓ (113 bewusst übersprungen wie bisher; neu: Intervall-Eingabe, große Schrift, VoiceOver-Namen, leerer Nutzer, 5 Grenzfälle). Mit allen echten Daten (Kopie von heute): Umstellung ohne Verlust (648 → 648), alle 3 Konten laden fehlerfrei. Echte App nach dem Deploy: keine Server-Fehler.
+
+## Offen
+- Alte Pläne von Konto 2 und 5 verletzen Regeln. Neu planen behebt es (geprüft); automatisch ändere ich fremde Pläne nicht.
+- Die 51 verwaisten Anpassungen bei dir bleiben stehen (wirken nicht).
+- Der Einrichtungscode für die Test-Umgebung in ZUGANG.local.md stimmt nicht mehr; deshalb habe ich die Test-Umgebung lesend über die Datenbank geprüft (keine Fehler). Den Daten-Check kannst du als Betreiber jederzeit selbst starten: Posteingang → „Daten-Check jetzt ausführen“ (sonst läuft er jede Nacht).
+- VoiceOver habe ich automatisch geprüft (jedes Bedienelement hat einen Namen), nicht mit einem echten iPhone.
+
+Frühere Aufträge:
+
 # Auftrag 21: mehr Werte, mehr Daten, Coach-Fehler, Jetzt abrufen, Langzeit-Simulation (28.10.)
 
 **Stand:** Fertig und live (Version 3.9.0): erst Test-Umgebung mit deinen Daten geprüft, dann echte App (Sicherung vorher in data-export, geprüft). Du musst nichts tun – App öffnen und „Aktualisieren“ tippen.
