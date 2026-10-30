@@ -7,7 +7,7 @@ import { todayStr } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
 import { mainGoal, type Goal } from '../../shared/goals';
 import { sportScores, formScore, legacyActivities, namedFromPlan, estimatesAt, rescoreNotes, SCORE_MODEL, type SportSport } from './data-types';
-import { prognosis, correctionFromGoals, type Prognosis, type PlanFacts } from '../../shared/prognosis';
+import { prognosis, correctionFromGoals, planFactsOf, goalPrognoses, lastMove, type Move, type Prognosis, type PlanFacts, type GoalProg } from '../../shared/prognosis';
 import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
 import type { Activity } from '../../shared/activity/analyze';
@@ -16,7 +16,9 @@ import { duplicateMsgIds, compactDecided } from '../../shared/coach/feed';
 export interface Derived {
   today: string; profile: Profile; goals: Goal[]; goal: Goal | null; minor: boolean; age: number | null;
   fallback: any; readiness: any; history: any[]; ill: any; ret: any;
-  activities: Activity[]; scores: any[]; form: any; prognosis: Prognosis | null; raceGoal: Goal | null; recentRace: Goal | null;
+  activities: Activity[]; scores: any[]; form: any; prognosis: Prognosis | null;
+  /** Auftrag 23: Prognose für jedes Ziel mit Datum oder Platzhalter-Termin, das nächste zuerst */
+  prognoses: GoalProg[]; raceGoal: Goal | null; recentRace: Goal | null;
   loadsBySport: Record<string, Record<string, number>>; engine: EngineCtx;
 }
 let cache: Derived | null = null;
@@ -31,6 +33,27 @@ export function prognosisFor(goal: Goal, date: string): Prognosis | null {
   } catch (e) { return null; }
 }
 export function invalidate() { cache = null; }
+/* Auftrag 23: Prognose für ein (auch gerade bearbeitetes) Ziel mit allen Daten – dieselbe Rechnung wie im Fortschritt */
+export function goalPrognosis(goal: Goal): Prognosis | null {
+  const d = D(); if (!lastInp || !goal.date || goal.type === 'fitness') return null;
+  try { const back = C.addDays(d.today, -70); return prognosis(goal, estimatesAt(lastInp, d.today), { profile: d.profile, today: d.today, history: [{ date: back, est: estimatesAt(lastInp, back) }], plan: planFacts(goal, d.today), correction: correctionFromGoals(d.goals) }); } catch (e) { return null; }
+}
+/* Auftrag 23: Was hat die Prognose eines Ziels zuletzt bewegt (Einheit, Test oder Wettkampf)? Erst beim Anzeigen gerechnet, je Datenstand gemerkt. */
+const moveCache = new Map<string, Move | null>();
+export function progMove(goal: Goal): Move | null {
+  const d = D(); if (!lastInp) return null;
+  const key = [goal.id, goal.date, d.today, d.activities.length, d.activities.length ? d.activities[d.activities.length - 1].date : '', JSON.stringify(goal.result || null), (d.goals || []).filter(g => g.result).length].join('|');
+  if (moveCache.has(key)) return moveCache.get(key)!;
+  let m: Move | null = null;
+  try {
+    const inp = lastInp; const gl = d.goals;
+    const dates = [...d.activities.map((a: any) => a.date), ...gl.filter(g => g.result && g.date).map(g => g.date!)].filter(x => x && x >= C.addDays(d.today, -90));
+    const ests = new Map<string, any>(); const estAt = (x: string) => { if (!ests.has(x)) ests.set(x, estimatesAt(inp, x)); return ests.get(x); };
+    m = lastMove(goal, estAt, dates, { profile: d.profile, today: d.today, plan: planFacts(goal, d.today), corrAt: x => correctionFromGoals(gl.filter(g => g.date && g.date <= x)) });
+  } catch (e) { m = null; }
+  if (moveCache.size > 30) moveCache.clear();
+  moveCache.set(key, m); return m;
+}
 export function D(): Derived { if (!cache || cache.today !== todayStr()) { cache = compute(); afterCompute(cache); } return cache; }
 
 /* Etappenziele merken und erreichte im Coach melden (Auftrag 12). Die neue Score-Skala erklärt „Neu in dieser Version“. */
@@ -67,21 +90,8 @@ function afterCompute(d: Derived) {
   } catch (e) { /* Anzeige geht vor */ }
 }
 /* Geplantes Training bis zum Rennen: längster Lauf, längste Fahrt, Koppeleinheiten (für die Prognose am Renntag) */
-function planFacts(goal: Goal | null, today: string): PlanFacts {
-  const out: PlanFacts = { longRunPlanned: null, longRidePlanned: null, bricksDone: 0, bricksPlanned: 0 };
-  const brick = (s: any) => /koppel|brick/i.test(s.title || '') || (s.spec && s.spec.kind === 'brick');
-  const end = goal && goal.date ? goal.date : today;
-  SESS.forEach((s: any) => {
-    if (s.cancelled || s.sport === 'rest') return;
-    const st = STATE.sessions[s.id] || {};
-    if (s.date < today) { if (st.completed && brick(s) && s.date >= C.addDays(today, -84)) out.bricksDone!++; return; }
-    if (s.date >= end) return;
-    if (brick(s)) out.bricksPlanned!++;
-    if (s.sport === 'run' && !C.isHard(s)) out.longRunPlanned = Math.max(out.longRunPlanned || 0, s.plannedMinutes || 0);
-    if (s.sport === 'bike' && !C.isHard(s)) out.longRidePlanned = Math.max(out.longRidePlanned || 0, s.plannedMinutes || 0);
-  });
-  Object.entries(effectiveCustomWorkouts() || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => { if (d >= C.addDays(today, -84) && d < today && /koppel|brick/i.test(w.title || '')) out.bricksDone!++; }));
-  return out;
+export function planFacts(goal: Goal | null, today: string): PlanFacts {
+  return planFactsOf(SESS, (s: any) => !!(STATE.sessions[s.id] || {}).completed, effectiveCustomWorkouts() || {}, goal, today, C.isTestOrRace);
 }
 
 function compute(): Derived {
@@ -105,14 +115,18 @@ function compute(): Derived {
   const scores = sportScores(inp, scoreSports.length ? scoreSports : ['run']);
   const form = formScore(inp);
   let prog: Prognosis | null = null;
+  let progs: GoalProg[] = [];
   try {
     const back = C.addDays(today, -70);
-    prog = goal ? prognosis(goal, estimatesAt(inp, today), { profile: prof, today, history: [{ date: back, est: estimatesAt(inp, back) }], plan: planFacts(goal, today), correction: correctionFromGoals(gl) }) : null;
+    const est = estimatesAt(inp, today), history = [{ date: back, est: estimatesAt(inp, back) }], correction = correctionFromGoals(gl);
+    progs = goalPrognoses(gl, PLAN.meta || {}, today, est, { profile: prof, history, correction, planFor: g => planFacts(g, today) });
+    const own = goal && progs.find(x => x.goal.id === goal.id);
+    prog = own ? own.p : goal ? prognosis(goal, est, { profile: prof, today, history, plan: planFacts(goal, today), correction }) : null;
   } catch (e) { prog = null; }
   const state = { ...STATE, profile: prof, settings: { ...STATE.settings, readiness: fallback } };
   return {
     today, profile: prof, goals: gl, goal, minor: isMinor(prof, today), age: ageOf(prof, today), fallback, readiness, history, ill, ret,
-    activities: acts, scores, form, prognosis: prog, raceGoal: raceModeGoal(gl, today), recentRace: recentRace(gl, today), loadsBySport,
+    activities: acts, scores, form, prognosis: prog, prognoses: progs, raceGoal: raceModeGoal(gl, today), recentRace: recentRace(gl, today), loadsBySport,
     engine: { readinessSnapshot: readiness, today, now: Date.now(), state, baseWeeks: BASE_WEEKS, planMeta: PLAN.meta || {}, profile: prof, goals: gl }
   };
 }

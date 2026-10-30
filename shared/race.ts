@@ -71,6 +71,31 @@ export function pacingPlan(goal: Goal, prog: Prognosis | null, thr: { lthrRun: n
   return out;
 }
 
+/* Auftrag 23: Pacing für die Wunschzeit. Jede Disziplin bekommt das Tempo, das die Wunschzeit braucht (Puls/Watt/Pace wie im normalen
+   Pacing). Liegt das über der erwarteten Leistung am Renntag, steht eine Warnung dabei – mit dem Tempo, das realistisch ist. */
+export function wishPacing(goal: Goal, prog: Prognosis | null, rows: { sport: string; need: number; pred: number }[], thr: { lthrRun: number; lthrBike: number; ftp?: number | null }): { segments: PaceSegment[]; warnings: string[] } {
+  if (!prog || !prog.total) return { segments: [], warnings: [] };
+  const parts = (prog.race ? prog.race.parts : prog.parts) || [];
+  const bike0 = prog.race && prog.race.bike ? prog.race.bike : prog.bike;
+  const f = (sport?: string) => { const r = rows.find(x => x.sport === sport); return r && r.need > 0 ? r.need / r.pred : 1; };
+  const wishProg: Prognosis = { ...prog, parts: parts.map(x => ({ ...x, best: x.best * f(x.sport) })), race: null,
+    bike: bike0 ? { ...bike0, watts: bike0.watts ? Math.round(bike0.watts * Math.pow(1 / f('bike'), 2.5)) : null, kmh: Math.round(bike0.kmh / f('bike') * 10) / 10 } : null };
+  const warnings: string[] = [];
+  const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+  const legs = legsOf(goal);
+  const km = (s: string) => legs.filter(l => l.sport === s).reduce((a, l) => a + l.km, 0);
+  for (const r of rows) {
+    if (!(r.need > 0) || r.need >= r.pred * 0.985) continue;
+    if (r.sport === 'run' && km('run')) warnings.push(`Laufen: ${mmss(r.need / km('run'))}/km liegt über deiner erwarteten Leistung (${mmss(r.pred / km('run'))}/km). Wer so losläuft, bricht meist ein. Starte im realistischen Tempo und leg ab der Hälfte zu, wenn es geht.`);
+    if (r.sport === 'swim' && km('swim')) warnings.push(`Schwimmen: ${mmss(r.need / (km('swim') * 10))}/100 m liegt über deiner erwarteten Leistung (${mmss(r.pred / (km('swim') * 10))}/100 m). Zu schnell anschwimmen kostet auf dem Rad und beim Laufen mehr, als es bringt.`);
+    if (r.sport === 'bike') {
+      const w = wishProg.bike && wishProg.bike.watts; const ftp = thr.ftp || (bike0 && bike0.watts && bike0.intensity ? bike0.watts / bike0.intensity : null);
+      warnings.push(`Rad: ${w ? `${w} W` : `Ø ${String(wishProg.bike ? wishProg.bike.kmh : '').replace('.', ',')} km/h`} liegt über deiner erwarteten Leistung (${bike0 && bike0.watts ? `${bike0.watts} W` : `Ø ${String(bike0 ? bike0.kmh : '').replace('.', ',')} km/h`})${w && ftp ? `, das wären ${Math.round(w / ftp * 100)} % deiner FTP` : ''}. Zu hart gefahren fehlt die Kraft beim Laufen.`);
+    }
+  }
+  return { segments: pacingPlan(goal, wishProg, thr), warnings };
+}
+
 export function packingList(goal: Goal): { group: string; items: string[] }[] {
   const legs = new Set(legsOf(goal).map(l => l.sport));
   const tri = GOALS[goal.type].group === 'tri';

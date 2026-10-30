@@ -14,11 +14,24 @@ import type { Estimates } from './scores';
 import type { Profile } from './profile';
 import { vdot, timeForVdot, riegel, vdotFromThreshold } from './vdot';
 import { GRAVEL_F } from './bikespeed';
+import { wkgFromKmh } from './sports';
 
 export { vdot, timeForVdot, riegel };
 
 export interface Prediction { label: string; sport?: 'swim' | 'bike' | 'run' | 'trans'; low: number; high: number; best: number; note?: string }
-export interface RaceDay { date: string; total: Prediction; parts: Prediction[] }
+export interface RaceDay {
+  date: string; total: Prediction; parts: Prediction[];
+  /** Auftrag 23: Abstand in Wochen, kurz (bis 4 Monate) / mittel (bis 1 Jahr) / lang, Sicherheit am Renntag, gerundeter Bereich für weite Ziele */
+  weeks?: number; horizon?: 'kurz' | 'mittel' | 'lang'; confidence?: 'niedrig' | 'mittel' | 'hoch'; approx?: string | null;
+  /** erwartete Entwicklung je Sportart bis zum Rennen */
+  growth?: Growth[];
+  /** Laufziele: andere Distanzen am Renntag */
+  runDistances?: Prediction[];
+  /** fürs Pacing am Renntag */
+  bike?: Prognosis['bike'];
+  /** Annahmen nur für den Renntag (z. B. Kraul gelernt) */
+  notes?: string[];
+}
 export interface Prognosis {
   ok: boolean;
   /** Tests, die die Prognose genauer machen */
@@ -113,7 +126,9 @@ function bikeIntensity(type: GoalType, raceMin: number, longestMin: number | nul
 function runExponent(km: number, longestMin: number | null, dec: number | null): number {
   const need = km >= 40 ? 150 : km >= 20 ? 100 : km >= 10 ? 70 : 45;
   const r = longestMin ? longestMin / need : 0.3;
-  let k = 1.06 + 0.09 * clamp((1 - r) / 0.7, 0, 1);
+  // Auftrag 23: Marathon und länger mindestens 1,07 (Hobbyläufer verlieren auf den letzten 10 km mehr als auf kürzeren Strecken)
+  const b = km >= 40 ? 1.07 : 1.06;
+  let k = b + (1.15 - b) * clamp((1 - r) / 0.7, 0, 1);
   if (dec != null && dec > 5) k += Math.min(0.02, (dec - 5) * 0.004);
   return Math.round(k * 1000) / 1000;
 }
@@ -180,7 +195,8 @@ function model(goal: Goal, sd: Side, prof: Partial<Profile>, spreads: Record<str
       if (offBike) {
         const base = ({ tri_supersprint: 0.03, tri_sprint: 0.04, tri_olympic: 0.06, tri_middle: 0.09, tri_long: 0.13, duathlon: 0.05 } as any)[type] ?? 0.05;
         const typical = ({ tri_supersprint: 0.92, tri_sprint: 0.9, tri_olympic: 0.85, tri_middle: 0.77, tri_long: 0.7, duathlon: 0.87 } as any)[type] ?? 0.85;
-        const brickF = 1 - 0.35 * Math.min(1, sd.bricks / 8);
+        // Koppeltraining verkleinert den Abschlag um bis zu ein Viertel (Auftrag 23: vorher ein Drittel, Ironman-Marathon war zu schnell)
+        const brickF = 1 - 0.25 * Math.min(1, sd.bricks / 8);
         const pen = base * ((ifac || typical) / typical) * brickF;
         rt *= 1 + pen;
         note = `Abschlag nach dem Rad ${de(pen * 100, 0)}\u00a0%`;
@@ -202,6 +218,79 @@ function model(goal: Goal, sd: Side, prof: Partial<Profile>, spreads: Record<str
   return { parts, total: { label: goal.name, best: sum('best'), low: sum('low'), high: sum('high') }, bike: bikeOut, assumptions, runK, ifac, swimMix };
 }
 
+/* ---------- Entwicklung bis zum Wettkampf (Auftrag 23) ----------
+   Vorher: Trend der letzten 10 Wochen, nach 16 Wochen abgeflacht, danach +2-4 % pro Jahr. Für Ziele in 2-3 Jahren war das viel zu wenig
+   (Ironman 2029 bei Jonah: Schwimmen 2:41 → 2:21/100 m in 3 Jahren, obwohl er gerade Kraulen lernt).
+   Jetzt: jede Sportart nähert sich einer persönlichen Leistungsgrenze, die vom geplanten Umfang in dieser Sportart, Alter und Geschlecht
+   abhängt. Pro Jahr wird ein fester Anteil des Abstands geschlossen (Laufen 25 %, Rad 28 %, Schwimmen 40 % wegen der Technik);
+   Jugendliche schneller, Ältere langsamer. Wer weit weg ist (Einsteiger), macht große Sprünge; wer nah dran ist, kleine.
+   „Wenn du den Plan durchziehst“: Pausen, Krankheit und Verletzungen stecken im breiteren Bereich (nach oben mehr als nach unten). */
+export type DevSport = 'run' | 'bike' | 'swim';
+export interface DevCtx { age: number | null; sex: 'f' | 'm' | 'd' | null | undefined; weeklyHours: number; shares: Record<DevSport, number> }
+export interface Growth { sport: DevSport; level: 'Einsteiger' | 'Fortgeschritten' | 'Erfahren'; gain: number; from: number; to: number; ceiling: number; years: number }
+const CLOSE_PER_YEAR: Record<DevSport, number> = { run: 0.25, bike: 0.28, swim: 0.4 };
+/* Alter: Jugendliche entwickeln sich schneller, ab 30 langsamer (Faktor auf den Anteil, der pro Jahr geschlossen wird) */
+export function ageFactor(age: number | null): number {
+  if (age == null) return 1;
+  return age < 20 ? 1.25 : age < 30 ? 1 : age < 40 ? 0.9 : age < 50 ? 0.75 : age < 60 ? 0.6 : 0.45;
+}
+/* Leistungsgrenze in der Einheit der Sportart: Laufen Schwellen-Tempo (m/s), Rad W/kg, Schwimmen Tempo (m/s an der CSS). Mit Umfang je Sportart (h/Woche). */
+export function ceilingOf(sport: DevSport, ctx: DevCtx): number {
+  const hs = Math.max(0, ctx.weeklyHours * (ctx.shares[sport] || 0));
+  const u = (a: number, b: number) => clamp((hs - a) / (b - a), 0, 1);
+  let c = sport === 'run' ? 3.51 + (4.1 - 3.51) * u(1, 7)       // 4:45/km … 4:04/km
+    : sport === 'bike' ? 2.6 + (4.0 - 2.6) * u(1.5, 8)            // W/kg
+      : 100 / (125 - 30 * u(0.5, 4));                                // 2:05 … 1:35/100 m
+  if (ctx.sex === 'f') c *= sport === 'run' ? 0.9 : sport === 'bike' ? 0.87 : 0.95;
+  if (ctx.age != null && ctx.age > 35) c /= 1 + 0.007 * (ctx.age - 35);
+  if (ctx.age != null && ctx.age < 16) c *= 0.92 + 0.02 * Math.max(0, ctx.age - 12);
+  return c;
+}
+/* Erwartete Verbesserung (Anteil, 0,1 = 10 % schneller bzw. stärker) nach `years` Jahren bei aktuellem Wert `cur` */
+export function growthOf(sport: DevSport, cur: number, ctx: DevCtx, years: number): Growth {
+  const C = ceilingOf(sport, ctx);
+  const f = clamp(CLOSE_PER_YEAR[sport] * ageFactor(ctx.age), 0.05, 0.6);
+  const gap = (C - cur) / C;
+  const level: Growth['level'] = gap > 0.2 ? 'Einsteiger' : gap > 0.07 ? 'Fortgeschritten' : 'Erfahren';
+  let to: number;
+  if (cur < C * 0.98) to = C - (C - cur) * Math.pow(1 - f, years);
+  else {
+    // an oder über der eigenen Grenze: Jugendliche legen noch etwas zu, ab 45 geht es leicht zurück
+    const a = ctx.age ?? 30;
+    const rate = a < 20 ? 0.015 : a < 35 ? 0.006 : a < 45 ? 0 : -0.006;
+    to = cur * (1 + rate * years);
+  }
+  return { sport, level, gain: to / cur - 1, from: cur, to, ceiling: C, years };
+}
+/* Anteile der Sportarten am Umfang (für die Grenze je Sportart) */
+export function sportShares(sports: string[]): Record<DevSport, number> {
+  const has = (s: DevSport) => sports.includes(s);
+  const n = (['swim', 'bike', 'run'] as DevSport[]).filter(has);
+  if (n.length <= 1) return { run: has('run') || !n.length ? 1 : 0, bike: has('bike') ? 1 : 0, swim: has('swim') ? 1 : 0 };
+  const w: Record<DevSport, number> = { swim: has('swim') ? 0.2 : 0, bike: has('bike') ? 0.45 : 0, run: has('run') ? 0.35 : 0 };
+  const s = w.swim + w.bike + w.run;
+  return { swim: w.swim / s, bike: w.bike / s, run: w.run / s };
+}
+/* Unsicherheit nach Abstand: wächst mit der Wurzel der Zeit und mit der Größe des erwarteten Sprungs */
+/* Unabhängige Quellen addieren sich quadratisch: Datenlage heute, Zeit bis zum Rennen und wie stark man auf Training anspricht
+   (±30 % des erwarteten Sprungs). Ergibt bei 3 Jahren etwa ±8-10 % auf die Gesamtzeit. */
+export function horizonSpread(base: number, weeks: number, gain: number): number {
+  const t = 0.015 * Math.sqrt(Math.max(0, weeks) / 13), r = 0.3 * Math.max(0, gain);
+  return Math.sqrt(base * base + t * t + r * r);
+}
+export function horizonOf(weeks: number): 'kurz' | 'mittel' | 'lang' { return weeks <= 16 ? 'kurz' : weeks <= 52 ? 'mittel' : 'lang'; }
+/* Gerundeter Bereich für weite Ziele: über 4 h auf halbe Stunden, über 1,5 h auf 5 min, sonst auf Minuten */
+export function approxRange(low: number, high: number): string {
+  const step = high > 4 * 3600 ? 1800 : high > 5400 ? 300 : 60;
+  const lo = Math.round(low / step) * step, hi = Math.max(lo + step, Math.round(high / step) * step);
+  const f = (s: number) => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? (m ? `${h}:${String(m).padStart(2, '0')}` : String(h)) : String(m); };
+  return high > 3600 ? `${f(lo)}–${f(hi)} h` : `${f(lo)}–${f(hi)} min`;
+}
+
+function runPred(d: { l: string; m: number }, thr: number, longRun: number | null, dec: number | null, sp: number, corr: ProgOpts['correction']): Prediction {
+  const t = runTimeSec(d.m / 1000, thr, longRun, dec).sec * ((corr && corr.run) || 1);
+  return { label: d.l, sport: 'run', best: t, low: t * (1 - sp * 0.8), high: t * (1 + sp * 1.2) };
+}
 function trendRate(now: number | null, then: number | null, weeks: number, lowerBetter = false): number | null {
   if (!now || !then || weeks < 4) return null;
   const r = lowerBetter ? then / now - 1 : now / then - 1;
@@ -258,28 +347,59 @@ export function prognosis(goal: Goal | null, est: Estimates, opts: ProgOpts = {}
 
   const nowM = model(g, sideNow, prof, spreads, opts.correction);
 
-  // Erwartet am Renntag: Fortschritt der letzten 8-12 Wochen, sonst vorsichtiger Standard; abgeflacht (τ = 16 Wochen)
+  // Erwartet am Renntag (Auftrag 23): Entwicklungsmodell je Sportart (Abstand zur eigenen Grenze, Alter, Umfang), in den ersten Monaten
+  // zur Hälfte mit dem eigenen Trend der letzten 10 Wochen gemischt (der Anteil des Trends nimmt mit dem Abstand ab).
   let race: RaceDay | null = null;
   const W = g.date ? Math.max(0, daysBetween(today, g.date) / 7) : 0;
   if (g.date && W >= 1) {
     const h = (opts.history || []).filter(x => x.est).sort((a, b) => a.date.localeCompare(b.date))[0];
     const wk = h ? daysBetween(h.date, today) / 7 : 0;
-    const years = prof.experienceYears ?? null;
-    const def0 = years != null && years < 2 ? 0.004 : 0.002;
-    const yearly = years != null && years < 2 ? 0.04 : 0.02;
-    const proj = (rate: number | null, cap: number) => { const r = Math.max(rate ?? def0, def0 * 0.5); const tau = 16; return clamp(r * tau * (1 - Math.exp(-W / tau)) + Math.max(0, W - 26) / 52 * yearly, 0, cap); };
+    const yrs = W / 52.18;
+    const age = prof.birthYear ? (Date.parse(today + 'T12:00:00Z') - Date.parse(prof.birthYear + '-07-01T12:00:00Z')) / (365.25 * 86400000) + yrs / 2 : null;
+    const dctx: DevCtx = { age, sex: prof.sex, weeklyHours: prof.weeklyHours || 6, shares: sportShares(((prof.sports as string[]) || []).length ? prof.sports as string[] : [...need]) };
+    const weight = prof.weightKg || 72;
+    const wkgNow = sideNow.ftp ? sideNow.ftp / weight : wkgFromKmh(sideNow.bikeKmh);
+    // Wer noch nicht krault, lernt es mit dem Plan (Schwimm-Stufen): bei mindestens 6 Monaten bis zum Rennen gilt Kraul ab etwa einem halben
+    // Jahr, zuerst etwa im Brust-Tempo; danach entwickelt es sich wie bei Einsteigern. Vorher blieb es bis zum Rennen bei Brust.
+    const learn = !canCrawl && need.has('swim') && W >= 26 && sk.swimCrawl !== 'never';
+    const cssBase = sideNow.css || (learn ? breast + 5 : null);
+    const grow: Partial<Record<DevSport, Growth>> = {
+      run: growthOf('run', sideNow.thrSpeed, dctx, yrs),
+      bike: growthOf('bike', wkgNow, dctx, yrs),
+      ...(cssBase ? { swim: growthOf('swim', 100 / cssBase, dctx, learn ? Math.max(0, yrs - 0.5) : yrs) } : {})
+    };
+    const proj = (rate: number | null, model: number, cap: number) => {
+      if (rate == null) return clamp(model, -0.05, cap);
+      const tau = 16; const trend = Math.max(rate, 0) * tau * (1 - Math.exp(-W / tau));
+      const w = 0.5 * Math.exp(-W / 20);
+      return clamp(w * trend + (1 - w) * model, 0, cap);
+    };
     const rRun = h ? trendRate(est.runThrSpeed, h.est.runThrSpeed, wk) : null;
     const rBike = h ? trendRate(est.ftp || est.bikeThrKmh, h.est.ftp || h.est.bikeThrKmh, wk) : null;
     const rSwim = h ? trendRate(est.swimCss, h.est.swimCss, wk, true) : null;
-    const iRun = proj(rRun, 0.15), iBike = proj(rBike, 0.18), iSwim = proj(rSwim, canCrawl && (sideNow.contM || 0) < 400 ? 0.25 : 0.15);
-    const longRun = Math.max(sideNow.longRun || 0, plan.longRunPlanned || 0) || null;
-    const longRide = Math.max(sideNow.longRide || 0, plan.longRidePlanned || 0) || null;
+    const iRun = proj(rRun, grow.run!.gain, 0.45), iBike = proj(rBike, grow.bike!.gain, 0.6), iSwim = proj(rSwim, grow.swim ? grow.swim.gain : 0, 0.8);
+    const runKm = legs.filter(l => l.sport === 'run').reduce((a, l) => Math.max(a, l.km), 0);
+    const bikeKm0 = legs.filter(l => l.sport === 'bike').reduce((a, l) => a + l.km, 0);
+    // Plan durchziehen: lange Einheiten wachsen Schritt für Schritt auf das, was die Distanz braucht (voll erst nach der idealen
+    // Vorbereitungszeit), mindestens bis zum geplanten; Koppeleinheiten etwa jede 3. Woche
+    const ramp = clamp(W / GOALS[type].prepWeeks[1], 0, 1);
+    const grown = (cur: number | null, need: number) => (cur || 0) + Math.max(0, need - (cur || 0)) * ramp;
+    const needRun = runKm >= 40 ? 150 : runKm >= 20 ? 100 : runKm >= 10 ? 70 : 45;
+    const longRun = Math.max(sideNow.longRun || 0, plan.longRunPlanned || 0, runKm ? grown(sideNow.longRun, needRun) : 0) || null;
+    const bikeMinRace = bikeKm0 ? bikeKm0 / (sideNow.bikeKmh * 0.9) * 60 : 0;
+    const longRide = Math.max(sideNow.longRide || 0, plan.longRidePlanned || 0, bikeKm0 ? grown(sideNow.longRide, Math.min(330, bikeMinRace * 0.8)) : 0) || null;
     const raceM = legs.filter(l => l.sport === 'swim').reduce((a, l) => a + l.km * 1000, 0);
-    const contRace = canCrawl ? Math.min(Math.max(raceM, 25), (sideNow.contM || 25) * Math.pow(2, W / 8)) : 0;
-    const sideRace: Side = { ...sideNow, thrSpeed: sideNow.thrSpeed * (1 + iRun), ftp: sideNow.ftp ? sideNow.ftp * (1 + iBike) : null, bikeKmh: sideNow.bikeKmh * Math.cbrt(1 + iBike), css: sideNow.css ? sideNow.css / (1 + iSwim) : null, contM: contRace, longRun, longRide, bricks: (plan.bricksDone || 0) + (plan.bricksPlanned || 0) };
-    const wider: Record<string, number> = {}; Object.entries(spreads).forEach(([k, v]) => { wider[k] = v + Math.min(0.08, 0.003 * W); });
+    const contRace = canCrawl ? Math.min(Math.max(raceM, 25), (sideNow.contM || 25) * Math.pow(2, W / 8)) : learn ? Math.min(Math.max(raceM, 25), 25 * Math.pow(2, (W - 26) / 8)) : 0;
+    const bricks = Math.max((plan.bricksDone || 0) + (plan.bricksPlanned || 0), GOALS[type].group === 'tri' ? Math.min(8, Math.floor(Math.min(W, GOALS[type].prepWeeks[1]) / 3)) : 0);
+    const sideRace: Side = { ...sideNow, thrSpeed: sideNow.thrSpeed * (1 + iRun), ftp: sideNow.ftp ? sideNow.ftp * (1 + iBike) : null, bikeKmh: sideNow.bikeKmh * Math.cbrt(1 + iBike), css: cssBase ? cssBase / (1 + iSwim) : null, canCrawl: canCrawl || learn, contM: contRace, longRun, longRide, bricks };
+    const gainOf: Record<string, number> = { run: iRun, bike: Math.cbrt(1 + iBike) - 1, swim: iSwim };
+    const wider: Record<string, number> = {}; Object.entries(spreads).forEach(([k, v]) => { wider[k] = horizonSpread(v, W, gainOf[k] || 0); });
     const rm = model(g, sideRace, prof, wider, opts.correction);
-    race = { date: g.date, total: rm.total, parts: rm.parts };
+    const horizon = horizonOf(W);
+    const growth = (Object.values(grow) as Growth[]).filter(x => need.has(x.sport)).map(x => ({ ...x, gain: x.sport === 'run' ? iRun : x.sport === 'bike' ? iBike : iSwim }));
+    const rconf: Prognosis['confidence'] = horizon === 'lang' ? 'niedrig' : horizon === 'mittel' && confidence === 'hoch' ? 'mittel' : confidence;
+    race = { date: g.date, total: rm.total, parts: rm.parts, bike: rm.bike, notes: learn ? ['Schwimmen: Kraulen lernst du mit dem Plan (Schwimm-Stufen). Gerechnet ab etwa einem halben Jahr, zuerst etwa im Brust-Tempo, danach wie bei Einsteigern.'] : [], weeks: Math.round(W), horizon, confidence: rconf, approx: horizon === 'lang' ? approxRange(rm.total.low, rm.total.high) : null, growth,
+      runDistances: need.has('run') && GOALS[type].group === 'run' ? RUN_DIST.map(d => runPred(d, sideRace.thrSpeed, sideRace.longRun, sideNow.runDec, wider.run || 0.06, opts.correction)) : undefined };
   }
 
   // Was bringt am meisten? Jede Stellschraube einzeln verbessern und die Ersparnis vergleichen
@@ -308,7 +428,7 @@ export function prognosis(goal: Goal | null, est: Estimates, opts: ProgOpts = {}
   const improve = best && best.s > 20 ? `Am meisten bringt dir ${best.what}: etwa ${best.s >= 90 ? Math.round(best.s / 60) + ' min' : Math.round(best.s) + ' s'} schneller.` : '';
 
   // Laufziele: andere Distanzen mit demselben Ausdauer-Modell
-  const runDistances = RUN_DIST.map(d => { const r = runTimeSec(d.m / 1000, thrSpeed, sideNow.longRun, sideNow.runDec); const t = r.sec * ((opts.correction && opts.correction.run) || 1); const sp = spreads.run || 0.06; return { label: d.l, sport: 'run' as const, best: t, low: t * (1 - sp * 0.8), high: t * (1 + sp * 1.2) }; });
+  const runDistances = RUN_DIST.map(d => runPred(d, thrSpeed, sideNow.longRun, sideNow.runDec, spreads.run || 0.06, opts.correction));
   if (W > 0 && g.date) reasons.push(`Wettkampf in ${Math.round(W)} Wochen: bis dahin kann sich viel ändern`);
   return { ok: true, missing: [...new Set(missing)], confidence, confReasons: reasons, total: nowM.total, parts: nowM.parts, race, runDistances: need.has('run') ? runDistances : undefined, improve, assumptions: nowM.assumptions, bike: nowM.bike };
 }
@@ -340,4 +460,80 @@ export function correctionFromGoals(goals: Goal[]): Partial<Record<'swim' | 'bik
     c = updateCorrection(c, pr, actual);
   }
   return Object.keys(c).length ? c : null;
+}
+
+/* ---------- Auftrag 23: Prognose für jedes Ziel ---------- */
+/* Geplantes Training bis zum Rennen (vorher nur in der App): längster Lauf und längste Fahrt, Koppeleinheiten erledigt (letzte 12 Wochen)
+   und geplant. sessions: Einheiten des Plans mit Datum; done: erledigt?; extra: eigene Einheiten je Tag; skip: Tests und Wettkämpfe.
+   Auftrag 23: vorher zählten nur „nicht harte“ Einheiten – „hart“ schließt in core.ts aber jeden langen Lauf ein (isKey = Intervalle oder lang),
+   so wurde genau der lange Lauf übersehen (Jonah: 105 min am 28.2. → gerechnet mit 50 min). */
+export function planFactsOf(sessions: any[], done: (s: any) => boolean, extra: Record<string, any[]>, goal: Goal | null, today: string, skip: (s: any) => boolean): PlanFacts {
+  const out: PlanFacts = { longRunPlanned: null, longRidePlanned: null, bricksDone: 0, bricksPlanned: 0 };
+  const brick = (s: any) => /koppel|brick/i.test(s.title || '') || (s.spec && s.spec.kind === 'brick');
+  const end = goal && goal.date ? goal.date : today;
+  const from = addDaysP(today, -84);
+  for (const s of sessions || []) {
+    if (!s || s.cancelled || s.sport === 'rest' || s.race) continue;
+    if (s.date < today) { if (s.date >= from && brick(s) && done(s)) out.bricksDone!++; continue; }
+    if (s.date >= end) continue;
+    if (brick(s)) out.bricksPlanned!++;
+    if (skip(s)) continue;
+    if (s.sport === 'run') out.longRunPlanned = Math.max(out.longRunPlanned || 0, s.plannedMinutes || 0);
+    if (s.sport === 'bike' && !s.indoor) out.longRidePlanned = Math.max(out.longRidePlanned || 0, s.plannedMinutes || 0);
+  }
+  Object.entries(extra || {}).forEach(([d, l]) => (l || []).forEach((w: any) => { if (d >= from && d < today && w && /koppel|brick/i.test(w.title || '')) out.bricksDone!++; }));
+  return out;
+}
+function addDaysP(s: string, n: number): string { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
+export interface GoalProg { goal: Goal; placeholder: boolean; p: Prognosis }
+/* Alle künftigen Ziele mit Datum oder Platzhalter-Termin (aus dem Plan), nach Datum, das nächste zuerst. Fitness-Ziele haben keine Zeit. */
+export function goalsWithDates(goals: Goal[], planMeta: any, today: string): { goal: Goal; placeholder: boolean }[] {
+  const ph: { id: string; date: string }[] = (planMeta && planMeta.placeholders) || [];
+  return (goals || []).filter(g => g && g.type !== 'fitness' && !g.result && legsOf(g).length).map(g => {
+    if (g.date) return { goal: g, placeholder: false };
+    const p = ph.find(x => x && x.id === g.id);
+    const date = p ? p.date : planMeta && planMeta.goalId === g.id && planMeta.eventDate ? planMeta.eventDate : null;
+    return date ? { goal: { ...g, date }, placeholder: true } : null;
+  }).filter((x): x is { goal: Goal; placeholder: boolean } => !!x && x.goal.date! >= today)
+    .sort((a, b) => a.goal.date!.localeCompare(b.goal.date!) || (a.goal.priority || 'C').localeCompare(b.goal.priority || 'C'));
+}
+export function goalPrognoses(goals: Goal[], planMeta: any, today: string, est: Estimates, opts: Omit<ProgOpts, 'plan' | 'today'> & { planFor?: (g: Goal) => PlanFacts }): GoalProg[] {
+  return goalsWithDates(goals, planMeta, today).map(x => {
+    try { return { ...x, p: prognosis(x.goal, est, { ...opts, today, plan: opts.planFor ? opts.planFor(x.goal) : null }) }; } catch (e) { return null; }
+  }).filter((x): x is GoalProg => !!x && x.p.ok);
+}
+
+/* Was hat die Prognose zuletzt bewegt? Für jeden Tag mit neuen Daten (Einheit, Test, Wettkampf), vom neuesten rückwärts: Prognose mit
+   den Werten bis zum Vortag gegen die mit den Werten bis zu diesem Tag (gleicher Abstand zum Rennen). Der erste Tag, der sie um mehr als
+   0,2 % verschiebt, ist „zuletzt aktualisiert“. */
+export interface Move { date: string; delta: number; why: string[] }
+const paceTxt = (ms: number | null | undefined) => ms ? mmss(1000 / ms) + '/km' : '–';
+export function moveReasons(a: Estimates, b: Estimates, ca?: ProgOpts['correction'], cb?: ProgOpts['correction']): string[] {
+  const out: string[] = [];
+  const rel = (x: number | null | undefined, y: number | null | undefined) => x && y ? Math.abs(y / x - 1) : x || y ? 1 : 0;
+  if (rel(a.runThrSpeed, b.runThrSpeed) > 0.003) out.push(`Lauf-Schwelle ${paceTxt(a.runThrSpeed)} → ${paceTxt(b.runThrSpeed)}`);
+  if ((b.runLongMin || 0) !== (a.runLongMin || 0)) out.push(`längster Lauf ${a.runLongMin || 0} → ${b.runLongMin || 0} min`);
+  if (b.ftp && rel(a.ftp, b.ftp) > 0.005) out.push(`FTP ${Math.round(a.ftp || 0)} → ${Math.round(b.ftp)} W`);
+  else if (rel(a.bikeThrKmh, b.bikeThrKmh) > 0.003) out.push(`Rad-Schwelle ${de(a.bikeThrKmh || 0)} → ${de(b.bikeThrKmh || 0)} km/h`);
+  if ((b.bikeLongMin || 0) !== (a.bikeLongMin || 0)) out.push(`längste Fahrt ${a.bikeLongMin || 0} → ${b.bikeLongMin || 0} min`);
+  if (rel(a.swimCss, b.swimCss) > 0.003) out.push(`Schwimm-Tempo (CSS) ${a.swimCss ? mmss(a.swimCss) : '–'} → ${b.swimCss ? mmss(b.swimCss) : '–'}/100 m`);
+  if ((b.swimContM || 0) !== (a.swimContM || 0)) out.push(`Kraul am Stück ${a.swimContM || 0} → ${b.swimContM || 0} m`);
+  if (JSON.stringify(ca || null) !== JSON.stringify(cb || null)) out.push('Wettkampf-Ergebnis eingetragen (persönlicher Korrekturfaktor)');
+  if ((b.runDec ?? null) !== (a.runDec ?? null) && !out.length) out.push('Ausdauer beim Laufen (Puls-Drift)');
+  return out;
+}
+export function lastMove(goal: Goal, estAt: (d: string) => Estimates, dates: string[], opts: Omit<ProgOpts, 'history'> & { corrAt?: (d: string) => ProgOpts['correction'] }): Move | null {
+  const today = opts.today || localDate();
+  const prev = (d: string) => addDaysP(d, -1);
+  const total = (e: Estimates, c: ProgOpts['correction']) => { const p = prognosis(goal, e, { ...opts, correction: c }); return p.race ? p.race.total.best : p.total ? p.total.best : 0; };
+  const list = [...new Set(dates)].filter(d => d && d <= today).sort().reverse().slice(0, 10);
+  for (const d of list) {
+    const ea = estAt(prev(d)), eb = estAt(d);
+    const ca = opts.corrAt ? opts.corrAt(prev(d)) : opts.correction, cb = opts.corrAt ? opts.corrAt(d) : opts.correction;
+    const ta = total(ea, ca), tb = total(eb, cb);
+    if (!ta || !tb || Math.abs(tb / ta - 1) < 0.002) continue;
+    return { date: d, delta: tb - ta, why: moveReasons(ea, eb, ca, cb) };
+  }
+  return null;
 }

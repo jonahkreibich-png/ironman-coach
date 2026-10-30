@@ -39,6 +39,7 @@ import './views/planedit';
 import { checkForUpdate, startPwa } from './pwa';
 import { initErrorLog } from './errlog';
 import { nav } from './nav';
+import { initTabLens } from './tablens';
 import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
@@ -146,6 +147,7 @@ function render() {
   const trail: string[] = UI.trail || []; if (trail[trail.length - 1] !== here && here !== 'feedback') { UI.trail = [...trail, here].slice(-6); saveUi(); }
   if (HAS_PLAN && UI.tab === 'plan' && !UI.sub) centerWeekBar();
   renderTop(); renderTabs(); updateBadge();
+  if (HAS_PLAN) initTabLens();
 }
 function go(target: string, scroll?: string | null) {
   const [a, b] = target.split(':');

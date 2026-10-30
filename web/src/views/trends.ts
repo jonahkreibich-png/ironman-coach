@@ -4,7 +4,7 @@ import { storage as localStorage } from "../persistence";
 import { STATE, PLAN, BASE_WEEKS } from '../store';
 import { esc, fmtDate } from '../util';
 import { D } from '../data';
-import { on, sec, sparkline, openSheet } from '../kit';
+import { on, sparkline, openSheet, fold } from '../kit';
 import { lineChart } from '../charts';
 import { trendCards, GROUPS, type Period, type TrendCard, type TrendGroup } from '../../../shared/trends';
 import { t } from '../../../shared/i18n';
@@ -39,7 +39,10 @@ export function renderTrends(): string {
     return `<div class="tgroup" data-tgroup="${g}"><div class="lbl">${esc(t('trend.g.' + g))}</div><div class="tlist">${[...open, ...locked].map(card).join('')}</div></div>`;
   }).join('');
   const filters = `<div class="chips trend-groups" role="group" aria-label="Trendgruppe">${(['all', ...GROUPS] as const).map(g => `<button class="chip ${GROUP === g ? 'on' : ''}" aria-pressed="${GROUP === g}" data-act="trend-group" data-group="${g}">${g === 'all' ? 'Alle' : esc(t('trend.g.' + g))}</button>`).join('')}</div>`;
-  return sec(t('trend.title'), `<div class="stack">${seg}${filters}${groups}</div>`, esc(t('trend.aside')));
+  // Auftrag 23: einklappbar; eingeklappt: Anzahl und der erste Hinweis
+  const open = CARDS.filter(c => !c.locked); const warn = open.find(c => c.tone === 'warn') || open[0];
+  const sum = open.length ? t('trend.sum', { n: open.length }) + (warn ? ` · ${warn.title}${warn.value ? ': ' + warn.value + (warn.unit ? ' ' + warn.unit : '') : ''}` : '') : t('trend.sumNone');
+  return fold('trends', t('trend.title'), sum, `<div class="stack">${seg}${filters}${groups}</div>`, { aside: esc(t('trend.aside')) });
 }
 
 const FMT: Record<string, (v: number) => string> = {

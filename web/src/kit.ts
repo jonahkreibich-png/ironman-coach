@@ -4,6 +4,7 @@ import { esc, $ } from './util';
 import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
 import { t } from '../../shared/i18n';
 import { SOURCE_LABEL } from '../../shared/activity/merge';
+import { storage } from './persistence';
 
 /* ---------- Aktionen ---------- */
 export type ActFn = (el: HTMLElement, ev: Event) => void | Promise<void>;
@@ -58,6 +59,27 @@ export function sparkline(vals: (number | null)[], color = 'var(--accent)'): str
 export function bar(pct: number, color = 'var(--accent)'): string { return `<div class="bar" style="--c:${color}"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(1)}%"></i></div>`; }
 export function pill(text: string, kind = ''): string { return `<span class="pill ${kind}">${esc(text)}</span>`; }
 export function empty(text: string): string { return `<div class="empty">${esc(text)}</div>`; }
+/* Auftrag 23: einklappbarer Bereich, Zustand je Gerät gemerkt. Eingeklappt zeigt die Kopfzeile das Wichtigste (sum).
+   kind 'sec': Abschnitt mit Überschrift; 'card': Karte innerhalb eines Abschnitts (z. B. eine Prognose je Ziel). */
+const FOLD_KEY = 'fold:';
+export function foldOpen(id: string, def = true): boolean {
+  try { const v = storage.getItem(FOLD_KEY + id); return v === '1' ? true : v === '0' ? false : def; } catch (e) { return def; }
+}
+export function fold(id: string, title: string, sum: string, body: string, o: { kind?: 'sec' | 'card'; aside?: string; def?: boolean; sub?: string; badge?: string } = {}): string {
+  const open = foldOpen(id, o.def ?? true);
+  if ((o.kind || 'sec') === 'card') return `<details class="fold fold-card card" data-fold="${esc(id)}" ${open ? 'open' : ''}><summary class="fold-h"><span class="fold-t"><b>${esc(title)}</b>${o.badge ? ` <span class="pill">${esc(o.badge)}</span>` : ''}${o.sub ? `<br><span class="xs muted">${esc(o.sub)}</span>` : ''}</span><span class="fold-sum num" data-fold-sum>${esc(sum)}</span><span class="chev" aria-hidden="true">${ic('down')}</span></summary><div class="fold-body">${body}</div></details>`;
+  return `<section class="sec"><details class="fold fold-sec" data-fold="${esc(id)}" ${open ? 'open' : ''}><summary class="sec-h fold-h"><h2>${esc(title)}</h2><span class="fold-sum" data-fold-sum>${esc(sum)}</span>${o.aside ? `<span class="aside fold-aside">${o.aside}</span>` : ''}<span class="chev" aria-hidden="true">${ic('down')}</span></summary><div class="fold-body">${body}</div></details></section>`;
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', ev => {
+  // sofort beim Antippen merken (das toggle-Ereignis kommt erst danach; wer gleich neu lädt oder die App schließt, verlöre es sonst)
+  const sm = ev.target && (ev.target as HTMLElement).closest ? (ev.target as HTMLElement).closest('summary') : null;
+  const det = sm && sm.parentElement && sm.parentElement.matches('details[data-fold]') ? sm.parentElement as HTMLDetailsElement : null;
+  if (det && !ev.defaultPrevented) { try { storage.setItem(FOLD_KEY + det.dataset.fold, det.open ? '0' : '1'); } catch (e) { /* privat */ } }
+}, true);
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('toggle', ev => {
+  const el = ev.target as HTMLElement;
+  if (el && el.matches && el.matches('details[data-fold]')) { try { storage.setItem(FOLD_KEY + el.dataset.fold, (el as HTMLDetailsElement).open ? '1' : '0'); } catch (e) { /* privat */ } }
+}, true);
 export function more(summary: string, body: string, open = false): string {
   return `<details class="more" ${open ? 'open' : ''}><summary>${esc(summary)}<span class="chev">${ic('down')}</span></summary><div class="body">${body}</div></details>`;
 }

@@ -648,3 +648,56 @@ fieldset.custom-entry { border: 0; margin: 0; padding: 0; min-width: 0; }
 /* Auftrag 21: Vorschlag mit Was/von/nach */
 .prop-list { margin: 6px 0 0; padding-left: 18px; font-size: min(0.7647rem, 26px); }
 .prop-list li { margin: 2px 0; }
+
+/* Auftrag 23: einklappbare Bereiche im Fortschritt (Zustand je Gerät gemerkt) */
+details.fold > summary { list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.fold-h { display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.fold-sec > .fold-h { margin-bottom: 0; }
+.fold-sec[open] > .fold-h { margin-bottom: var(--s2); }
+.fold-h h2 { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.fold-sum { flex: 1 1 0; min-width: 0; font-size: var(--t-xs); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+details.fold[open] > summary .fold-sum { visibility: hidden; }
+details.fold-card[open] > summary .fold-sum { visibility: visible; color: var(--ink-2); }
+.fold-aside { display: none; }
+details.fold[open] > summary .fold-aside { display: inline; white-space: nowrap; }
+details.fold > summary .chev svg { transition: transform .2s; }
+details.fold[open] > summary .chev svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { details.fold > summary .chev svg { transition: none; } }
+.fold-card { padding-top: var(--s2); padding-bottom: var(--s2); }
+.fold-card > .fold-h .fold-t { flex: 0 1 auto; min-width: 0; }
+.fold-card > .fold-body { margin-top: var(--s3); }
+.fold-card .fold-sum { font-size: var(--t-sm); font-weight: 700; color: var(--ink); }
+[data-wish] .li.lever { background: var(--accent-soft); border-radius: 10px; }
+[data-wish] .lever-t { color: var(--accent); }
+
+/* Auftrag 23: Glas-Linse in der Tab-Leiste (Drücken und Halten oder Wischen). Nur transform/opacity werden animiert. */
+.tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tabbar-in#tabs { touch-action: none; }
+.tab-lens { position: fixed; left: 0; top: 0; z-index: 31; pointer-events: none; border-radius: 999px; overflow: hidden; opacity: 0; transform-origin: 50% 50%; will-change: transform, opacity; transition: opacity .18s ease-out;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 82%, #fff 18%), color-mix(in srgb, var(--surface) 94%, transparent));
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.95), inset 0 -2px 3px rgba(0,0,0,.05), inset 0 0 0 .5px rgba(255,255,255,.7), 0 8px 24px rgba(0,0,0,.16), 0 1px 3px rgba(0,0,0,.12);
+  }
+.tab-lens.on { opacity: 1; }
+.tab-lens::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.55), transparent 55%), radial-gradient(90% 60% at 50% 115%, rgba(255,255,255,.25), transparent 60%); }
+.tab-lens-in { position: absolute; left: 0; top: 0; margin: 0 !important; max-width: none !important; pointer-events: none; transform-origin: 0 0; }
+/* Kopie in der Linse: eigene Klassen (ltab), gleiche Form wie .tab */
+.tab-lens-in .ltab { height: var(--nav-h); border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink-2); font-size: min(0.6765rem, 23px); font-weight: 600; min-width: 0; padding: 0 1px; }
+.tab-lens-in .ltab svg { width: 24px; height: 24px; }
+.tab-lens-in .ltab span { max-width: 100%; white-space: nowrap; font-size: min(11.5px, 3.3vw); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; }
+.tab-lens-in .ltab.peek { color: var(--accent); }
+.tab-lens-in .ltab .dot { display: none; }
+[data-design="glas"] .tab-lens-in .ltab { height: calc(var(--nav-h) - 12px); }
+[data-design="glas"] .tab-lens-in .ltab svg { width: 26px; height: 26px; }
+.tabbar.lens-on .tab.peek { color: var(--accent); }
+:root[data-theme="dark"] .tab-lens { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 78%, #fff 10%), color-mix(in srgb, var(--surface) 92%, transparent)); box-shadow: inset 0 1px 1px rgba(255,255,255,.28), inset 0 0 0 .5px rgba(255,255,255,.18), 0 8px 24px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .tab-lens::after { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.16), transparent 55%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tab-lens { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 78%, #fff 10%), color-mix(in srgb, var(--surface) 92%, transparent)); box-shadow: inset 0 1px 1px rgba(255,255,255,.28), inset 0 0 0 .5px rgba(255,255,255,.18), 0 8px 24px rgba(0,0,0,.5); }
+  :root:not([data-theme="light"]) .tab-lens::after { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.16), transparent 55%); }
+}
+@media (prefers-reduced-motion: reduce) { .tab-lens { transition: none; } }
+.prog2 .big.approx { font-size: clamp(1.25rem, 6vw, 1.6rem); white-space: nowrap; }
+.tab-lens:not(.on) { visibility: hidden; transition: opacity .18s ease-out, visibility 0s linear .18s; }
+@media (prefers-reduced-motion: reduce) { .tab-lens:not(.on) { transition: none; } }

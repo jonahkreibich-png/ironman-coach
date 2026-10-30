@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.11.0', items: [
+    'Fortschritt: eine eigene Prognose für jedes Ziel (das nächste zuerst, Platzhalter-Termine gekennzeichnet), heute und am Wettkampftag, mit „Zuletzt aktualisiert“ und „Warum?“. Ziele in über einem Jahr zeigen einen ehrlichen Bereich (z. B. „ca. 11–13 h, wenn du den Plan durchziehst“); Einsteiger, Schwimm-Technik und Jugendliche entwickeln sich in der Rechnung jetzt realistisch schneller.',
+    'Wunschzeit: je Disziplin, was nötig wäre und was die Prognose sagt, ob sie realistisch, ambitioniert oder sehr unwahrscheinlich ist, der größte Hebel und Pacing passend zur Wunschzeit. Der Plan ändert sich dadurch nicht – nur wenn du „Plan auf Wunschzeit ausrichten“ (mit Vorschau) bestätigst.',
+    'Alle Bereiche im Fortschritt lassen sich einklappen (die App merkt es sich). Tab-Leiste: gedrückt halten oder über die Leiste wischen zeigt eine Glas-Linse, die dem Finger folgt; loslassen öffnet den Tab.'
+  ] },
   { version: '3.10.0', items: [
     'Neu: Intervalle eintragen und auswerten. Unter den Werten jeder Intervall-Einheit steht die geplante Liste (z. B. 2×10 min Sweet Spot) mit Dauer, Puls, Pace oder Watt, Kadenz, RPE und Pause. Werte der Uhr (Runden, intervals.icu oder der Puls-Verlauf) stehen automatisch drin, von Hand Eingetragenes gilt. Kleine Balken zeigen je Intervall: im Ziel, zu hart oder zu locker.',
     'Der Coach bewertet die Intervalle (gleichmäßig, Pulsanstieg, Erholung in den Pausen, Vergleich mit derselben Einheit vor 2-4 Wochen) und gibt die nächste Stufe nur frei, wenn die Ist-Werte passen. Unmögliche Werte (z. B. Puls 300 oder 200 km in 30 min) werden freundlich abgelehnt oder hinterfragt.',

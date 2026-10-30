@@ -149,7 +149,8 @@ export function weekShare(goals: Goal[], weekStart: string, sports: SportKey[]):
 /* Auftrag 19: Reihenfolge der Sportarten nach Rückstand zum Ziel (Schwelle heute gegen das, was das Ziel braucht); Kraul-Lernende haben im
    Schwimmen den größten Rückstand */
 export function deficitOrder(p: Profile, g: Goal, swimLearning: boolean, only?: string[]): string[] {
-  const R = requirementFor(g, p); const th = p.thresholds || ({} as any);
+  // Auftrag 23: die Wunschzeit verschiebt die Schwerpunkte nur, wenn der Plan ausdrücklich darauf ausgerichtet wurde (alignWish)
+  const R = requirementFor(g.alignWish ? g : { ...g, targetTimeSec: null, splits: null }, p); const th = p.thresholds || ({} as any);
   const d: Record<string, number> = { run: 0, bike: 0, swim: 0 };
   if (R.runThresholdSecKm && th.thresholdPaceRunSec > 0) d.run = th.thresholdPaceRunSec / R.runThresholdSecKm - 1;
   if (R.bikeThresholdKmh && th.thresholdSpeedBikeKmh > 0) d.bike = R.bikeThresholdKmh / th.thresholdSpeedBikeKmh - 1;
@@ -243,20 +244,19 @@ function bikeChoice(p: Profile, hard: boolean, month: number, eff: Effects): { i
   return { indoor: false, name: (hard ? outHard || out : out) ? BIKE_LABEL[(hard ? outHard || out : out)!] : null };
 }
 
-/* Wettkampf-Einheit: Dauer aus Wunschzeit oder typischer Dauer */
+/* Wettkampf-Einheit: typische Dauer (Auftrag 23: nicht mehr aus der Wunschzeit, sonst änderte sie Belastung und Plan) */
 function raceSession(g: Goal): any {
   const def = GOALS[g.type];
-  const min = g.targetTimeSec ? Math.round(g.targetTimeSec / 60) : Math.round((def.hours[0] + def.hours[1]) / 2 * 60);
+  const min = Math.round((def.hours[0] + def.hours[1]) / 2 * 60);
   const sport: SportKey = def.group === 'tri' ? (g.type === 'aquathlon' || g.type === 'duathlon' ? 'run' : 'bike') : (legsOf(g)[0] || { sport: 'run' }).sport;
   const prio = g.priority === 'A' ? 'Hauptziel' : g.priority === 'B' ? 'wichtiges Rennen' : 'Trainingswettkampf';
-  const lines = [`Wettkampf (${prio})${g.targetTimeSec ? `, Wunschzeit ${hm(g.targetTimeSec)}` : ''}.`,
+  const lines = [`Wettkampf (${prio}).`,
     g.priority === 'C' ? 'Als Training laufen lassen: zügig, aber nicht ganz am Limit. Kein Tapering davor.' : 'Ruhig starten, das erste Drittel bewusst etwas langsamer als geplant, dann steigern.',
     'Nur gewohntes Essen und Trinken, nichts Neues am Wettkampftag.'];
   if ((g as any).placeholder) lines.push('Termin ist ein Platzhalter: Trag das echte Datum beim Ziel ein, dann plant die App neu.');
   return { sport, title: g.name + ((g as any).placeholder ? ' (Platzhalter)' : ''), plannedMinutes: min, description: lines.join('\n'), race: true, goalId: g.id, goalType: g.type, priority: g.priority, hard: true, ...((g as any).placeholder ? { placeholder: true } : {}),
     spec: { sport, kind: 'race', title: g.name, ctx: {}, steps: [{ part: 'main', min, note: lines.join(' ') }], noDistance: true } };
 }
-const hm = (s: number) => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? `${h}:${String(m).padStart(2, '0')} h` : `${m} min`; };
 
 interface Cand { s: any; long?: boolean; hard?: boolean; strength?: boolean; fixed?: boolean; pairDay?: string; prio: number; /** bleibt aus dem alten Plan (vergangen oder erledigt) */ frozen?: boolean; /** lockere Variante, falls die harte Einheit keinen Platz findet */ easy?: W.Spec;
   /** nur an diesen Wochentagen (Kraft nach Körperbereich) */ onDays?: number[]; test?: boolean; /** morgens vor der Schule oder nachmittags */ slot?: 'am' | 'pm' }

@@ -1,5 +1,6 @@
 /* Schnellfragen: die Engine beantwortet sie aus den Daten, ganz ohne KI. */
 import * as C from '../core';
+import { wishCheck } from '../goalcheck';
 import type { EngineCtx } from './engine';
 import { readinessFacts, readinessOf } from './engine';
 import { joinDe, de, dowName, mmss } from './texts';
@@ -74,8 +75,11 @@ export function answerQuick(ctx: EngineCtx, id: QuickId, extra?: { scores?: any[
     const p = extra && extra.prognosis;
     if (p && p.ok && p.total) {
       const fmt = (s: number) => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}:${String(m).padStart(2, '0')} h` : `${m} min`; };
-      lines.push(`Prognose aus deinen Daten: ${fmt(p.total.low)} bis ${fmt(p.total.high)} (Vertrauen ${p.confidence}).`);
-      if (g.targetTimeSec) lines.push(g.targetTimeSec >= p.total.low ? 'Deine Zielzeit ist realistisch.' : `Für deine Zielzeit (${fmt(g.targetTimeSec)}) fehlt noch etwas. ${p.improve || ''}`);
+      // Auftrag 23: am Wettkampftag (nicht „wenn du heute starten würdest“), Wunschzeit mit derselben Einordnung wie im Fortschritt
+      const r = p.race ? p.race.total : p.total;
+      lines.push(p.race && p.race.approx ? `Prognose für den Wettkampftag: ca. ${p.race.approx}, wenn du den Plan durchziehst (grob, das ist noch weit weg).` : `Prognose ${p.race ? 'für den Wettkampftag' : 'aus deinen Daten'}: ${fmt(r.low)} bis ${fmt(r.high)} (Vertrauen ${p.race && p.race.confidence ? p.race.confidence : p.confidence}).`);
+      const wc = wishCheck(g, p);
+      if (wc) lines.push(wc.text + (wc.leverText ? ' ' + wc.leverText : '') + (wc.verdict !== 'realistisch' && p.improve ? ' ' + p.improve : ''));
       else if (p.improve) lines.push(p.improve);
     } else if (p && p.missing) lines.push(`Für eine Prognose fehlt noch: ${joinDe(p.missing)}.`);
     const def = GOALS[g.type];

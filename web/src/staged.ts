@@ -13,7 +13,7 @@ import { replanFuture, previewReplan } from './replan';
 import { rulesOf, cellOf, describe, GRID_SPORTS, GRID_DAYS } from '../../shared/constraints';
 import { parseFor } from '../../shared/ruleparse';
 import type { Profile } from '../../shared/profile';
-import type { Goal } from '../../shared/goals';
+import { goalsChangePlan, type Goal } from '../../shared/goals';
 
 /* Felder, die den Plan bestimmen. Alles andere (Name, Gewicht, Sprache …) wird weiter sofort gespeichert. */
 export const PLAN_FIELDS = ['rules', 'notes', 'skills', 'bikes', 'freq', 'sports', 'dayLoad', 'teamSport', 'weeklyHoursSet', 'weeklyHours', 'maxDayHours', 'experienceYears', 'planStyle', 'likesIntensity', 'injuries', 'medicalCaution', 'teamSportName', 'powerMeter', 'trainerType'] as const;
@@ -40,6 +40,12 @@ export function stage(screen: string, fn: (p: Profile, goals: Record<string, Goa
   delete LAST[screen];
   if (!changes().length) DR = null;
   invalidate(); nav.rerender();
+}
+/* Auftrag 23: Ändert der Entwurf den Plan? Nur Wunschzeit, Strecke oder „Warum“ geändert → nein, dann nur speichern. */
+function draftChangesPlan(d: Draft): boolean {
+  const base: any = profile();
+  if (PLAN_FIELDS.some(k => !same(base[k], (d.profile as any)[k]))) return true;
+  return goalsChangePlan(STATE.goals || {}, d.goals || {});
 }
 export function discard(): void { DR = null; AFTER = null; invalidate(); }
 
@@ -97,8 +103,10 @@ export function stageBarHtml(screen: string): string {
 function previewSheet(): string {
   if (!DR) return '';
   const list = changes();
-  const pv = HAS_PLAN ? previewReplan(DR.profile, Object.values(DR.goals || {}).filter(Boolean) as Goal[]) : null;
-  const plan = !pv ? `<div class="hint">${esc(t('stage.noPlan'))}</div>`
+  const replan = draftChangesPlan(DR);
+  const pv = HAS_PLAN && replan ? previewReplan(DR.profile, Object.values(DR.goals || {}).filter(Boolean) as Goal[]) : null;
+  const plan = HAS_PLAN && !replan ? `<div class="hint" data-stage-preview data-plan-same>${esc(t('stage.planSame'))}</div>`
+    : !pv ? `<div class="hint">${esc(t('stage.noPlan'))}</div>`
     : !pv.ok ? `<div class="hint">${esc(pv.msg)}</div>`
     : pv.changes.length ? `<div class="stack" data-stage-preview>${[['stage.thisWeekH', pv.thisWeek], ['stage.nextWeekH', pv.nextWeek]].filter(([, l]) => l.length).map(([h, l]) => `<div class="small muted">${esc(t(h as string))}</div><div class="list">${(l as string[]).slice(0, 6).map(c => `<div class="li"><span class="t">${esc(c)}</span></div>`).join('')}${l.length > 6 ? `<div class="li"><span class="muted">${esc(t('stage.more', { n: l.length - 6 }))}</span></div>` : ''}</div>`).join('')}</div><div class="hint">${esc(t('stage.laterToo'))}</div>`
     : `<div class="hint" data-stage-preview>${esc(t('stage.noChangeSoon'))}</div>`;
@@ -113,14 +121,15 @@ on('stage-discard', () => { const next = AFTER; discard(); closeSheet(); if (nex
 on('stage-confirm', () => {
   if (!DR) { closeSheet(); return; }
   const list = changes(); const d = DR; const next = AFTER;
+  const draftChangesPlanSaved = draftChangesPlan(d);
   // nur die Plan-Felder übernehmen; was zwischendurch sofort gespeichert wurde (Name, Gewicht …), bleibt
   const p: any = profile();
   for (const k of PLAN_FIELDS) p[k] = clone((d.profile as any)[k]);
   saveProfile(p);
   STATE.goals = clone(d.goals); saveState();
   DR = null; AFTER = null;
-  let msg = t('common.saved');
-  if (HAS_PLAN) {
+  let msg = HAS_PLAN && !draftChangesPlanSaved ? t('stage.planSame') : t('common.saved');
+  if (HAS_PLAN && draftChangesPlanSaved) {
     const r = replanFuture(t('stage.reason'), t('cons.why', { list: list.slice(0, 6).join(', ') + (list.length > 6 ? ' …' : '') }));
     msg = r.ok ? t('cons.replanned') + (r.changed && r.changed.length ? ' ' + t('cons.thisWeek', { list: r.changed.join('; ') }) : '') : r.msg;
   }

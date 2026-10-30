@@ -28,7 +28,9 @@ export function renderWettkampf(): string {
 function before(g: Goal): string {
   const d = D(); const n = daysUntil(d.today, g.date!);
   const b = briefing(g, d.today);
-  const prog = d.prognosis && d.goal && d.goal.id === g.id ? d.prognosis : null;
+  // Auftrag 23: die Prognose dieses Ziels (vorher nur, wenn es das Hauptziel war; ein B-Rennen in 10 Tagen hatte sonst keine)
+  const own = (d.prognoses || []).find(x => x.goal.id === g.id);
+  const prog = own ? own.p : d.prognosis && d.goal && d.goal.id === g.id ? d.prognosis : null;
   const thr = d.profile.thresholds;
   const pace = pacingPlan(g, prog, { lthrRun: thr.lthrRun, lthrBike: thr.lthrBike, ftp: thr.ftp });
   const fuel = raceFuel(g, prog, d.profile.weightKg || 65, d.minor);

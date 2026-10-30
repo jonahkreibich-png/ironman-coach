@@ -632,7 +632,8 @@ function goalFrom(ctx: EngineCtx, raw: string, toks: string[]): Reply | null {
     const sec = timeIn(low)!;
     const g = (type ? (ctx.goals || []).find(x => x.type === type && !x.result) : null) || mainGoal(ctx.goals, ctx.today);
     if (!g) return { intent: 'goal', text: 'Du hast noch kein Ziel. Für welchen Wettkampf ist die Wunschzeit?', go: 'profil' } as any;
-    return propose('goal-time', `Wunschzeit für ${g.name} auf ${hms(sec)} setzen?`, [{ op: 'goal', goal: { ...g, targetTimeSec: sec, outcome: 'time' } as Goal }, { op: 'replan', reason: 'Wunschzeit geändert' }]);
+    // Auftrag 23: die Wunschzeit ändert den Plan nicht (Ausrichten nur per Knopf im Fortschritt, mit Vorschau)
+    return propose('goal-time', `Wunschzeit für ${g.name} auf ${hms(sec)} setzen? Der Plan bleibt gleich; im Fortschritt siehst du, wie realistisch sie ist und was am meisten bringt.`, [{ op: 'goal', goal: { ...g, targetTimeSec: sec, outcome: 'time' } as Goal }]);
   }
   if (!wantGoal || !type) return wantGoal && /\bziel\b/.test(j) ? { intent: 'goal', text: 'Welches Ziel? Zum Beispiel „Ich will im April einen Halbmarathon laufen“.', options: [{ label: 'Halbmarathon', say: 'Ich will einen Halbmarathon laufen' }, { label: '10 km', say: 'Ich will 10 km laufen' }, { label: 'Triathlon', say: 'Ich will einen Sprint-Triathlon machen' }] } : null;
   const date = dateIn(j, ctx.today);

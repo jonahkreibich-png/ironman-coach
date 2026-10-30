@@ -46,6 +46,8 @@ export interface Goal {
   /** gewünschtes Ergebnis */
   outcome?: 'finish' | 'time' | 'place';
   targetTimeSec?: number | null;
+  /** Auftrag 23: Plan auf die Wunschzeit ausgerichtet (nur nach Vorschau und Bestätigen): Schwerpunkte nach dem Rückstand zur Wunschzeit */
+  alignWish?: boolean;
   /** Triathlon: Wunschzeit je Disziplin (Sekunden) statt gesamt */
   splits?: Partial<Record<'swim' | 'bike' | 'run', number>> | null;
   /** eigene Strecken (z. B. Rad-Event mit 150 km) */
@@ -78,4 +80,24 @@ export function goalFromPlanMeta(meta: any): Goal | null {
   const t: GoalType = /mittel|70\.3|half/i.test(ev) ? 'tri_middle' : /olymp/i.test(ev) ? 'tri_olympic' : /sprint/i.test(ev) ? 'tri_sprint'
     : /marathon/i.test(ev) && /halb/i.test(ev) ? 'run_half' : /marathon/i.test(ev) ? 'run_marathon' : /tri|lang|140|226|full/i.test(ev) ? 'tri_long' : 'fitness';
   return { id: 'goal-main', type: t, name: ev || 'Hauptziel', date: meta.eventDate, priority: 'A', outcome: 'finish' };
+}
+
+/* Auftrag 23: Felder eines Ziels, die den Plan nicht ändern. Die Wunschzeit (gesamt oder je Disziplin) zeigt nur, wie realistisch sie
+   ist; den Plan richtet erst „Plan auf Wunschzeit ausrichten“ aus (alignWish). Strecke und „Warum“ wirken nur auf Prognose und Coach. */
+export const PLAN_NEUTRAL_GOAL_KEYS = ['targetTimeSec', 'splits', 'outcome', 'why', 'course', 'createdAt'] as const;
+export function planRelevantGoal(g: Goal | null | undefined): any {
+  if (!g) return null;
+  const o: any = { ...g };
+  for (const k of PLAN_NEUTRAL_GOAL_KEYS) delete o[k];
+  // ausgerichtet: dann zählt die Wunschzeit doch (Schwerpunkte nach Rückstand zur Wunschzeit)
+  if (g.alignWish) { o.targetTimeSec = g.targetTimeSec ?? null; o.splits = g.splits ?? null; }
+  return o;
+}
+/* Ändert sich der Plan durch diese Ziel-Änderungen? (nur Wunschzeit o. Ä. geändert → nein) */
+export function goalsChangePlan(before: Record<string, Goal> | Goal[], after: Record<string, Goal> | Goal[]): boolean {
+  const map = (x: any) => { const m: Record<string, any> = {}; (Array.isArray(x) ? x : Object.values(x || {})).forEach((g: any) => { if (g && g.id) m[g.id] = planRelevantGoal(g); }); return m; };
+  const a = map(before), b = map(after);
+  const ids = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const id of ids) if (JSON.stringify(a[id] ?? null) !== JSON.stringify(b[id] ?? null)) return true;
+  return false;
 }
