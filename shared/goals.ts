@@ -62,6 +62,18 @@ export interface Goal {
 
 export function legsOf(g: Goal): Leg[] { return g.legs && g.legs.length ? g.legs : (GOALS[g.type] || GOALS.fitness).legs; }
 export function goalSports(g: Goal): SportKey[] { return [...new Set(legsOf(g).map(l => l.sport))]; }
+/* Auftrag 24: Sportarten, die ein Ziel braucht, der Nutzer aber nicht gewählt hat. Ohne gewählte Sportarten (alte Profile): keine Aussage.
+   Für solche Ziele gibt es keine Prognose, nur einen Hinweis (die Plan-Erstellung plant sie ohnehin nicht ein). */
+export function missingSports(g: Goal | null | undefined, sports: readonly string[] | null | undefined): SportKey[] {
+  if (!g || !sports || !sports.length) return [];
+  return goalSports(g).filter(s => !sports.includes(s));
+}
+const SPORT_NAME: Record<string, string> = { swim: 'Schwimmen', bike: 'Radfahren', run: 'Laufen' };
+export function mismatchText(missing: readonly string[]): string {
+  const names = missing.map(s => SPORT_NAME[s] || s);
+  const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' und ' + names[names.length - 1] : names[0];
+  return `Dein Ziel enthält ${list}, das trainierst du bisher nicht – Ziel ändern oder ${list} hinzufügen?`;
+}
 
 /* Hauptziel: das nächste A-Ziel in der Zukunft, sonst das nächste Ziel überhaupt */
 export function mainGoal(goals: Goal[], today: string): Goal | null {

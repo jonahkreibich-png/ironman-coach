@@ -87,6 +87,8 @@ test.describe('Grundfunktionen', () => {
 
   test('Schnellfrage beantwortet der kostenlose Coach', async ({ page }) => {
     await tab(page, 'coach').click();
+    // Auftrag 24: der Tab wird erst nach dem Start der Linsen-Animation aufgebaut (zwei Frames), also auf den Coach warten
+    await expect(page.locator('[data-view="coach"]')).toBeVisible();
     // Auftrag 20: Hinweise des Coaches (z. B. „Score neu berechnet“) können schon da sein: Frage und Antwort kommen dazu
     const before = await page.locator('.msg').count();
     await page.locator('[data-act="chat-say"]').first().click();

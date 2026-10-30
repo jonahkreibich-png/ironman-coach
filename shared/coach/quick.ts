@@ -4,7 +4,7 @@ import { wishCheck } from '../goalcheck';
 import type { EngineCtx } from './engine';
 import { readinessFacts, readinessOf } from './engine';
 import { joinDe, de, dowName, mmss } from './texts';
-import { mainGoal, GOALS } from '../goals';
+import { mainGoal, GOALS, mismatchText } from '../goals';
 import { sleepNeed } from '../profile';
 
 export const QUICK = [
@@ -81,7 +81,8 @@ export function answerQuick(ctx: EngineCtx, id: QuickId, extra?: { scores?: any[
       const wc = wishCheck(g, p);
       if (wc) lines.push(wc.text + (wc.leverText ? ' ' + wc.leverText : '') + (wc.verdict !== 'realistisch' && p.improve ? ' ' + p.improve : ''));
       else if (p.improve) lines.push(p.improve);
-    } else if (p && p.missing) lines.push(`Für eine Prognose fehlt noch: ${joinDe(p.missing)}.`);
+    } else if (p && p.mismatch && p.mismatch.length) lines.push(mismatchText(p.mismatch));
+    else if (p && p.missing && p.missing.length) lines.push(`Für eine Prognose fehlt noch: ${joinDe(p.missing)}.`);
     const def = GOALS[g.type];
     if (days != null && days < def.prepWeeks[0] * 7) lines.push('Bis zum Ziel ist es knapp. Wir konzentrieren uns aufs gesunde Ankommen.');
     void mmss;

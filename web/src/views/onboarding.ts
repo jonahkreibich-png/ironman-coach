@@ -166,7 +166,7 @@ function bestsQ(q: Question, a: Answers): string {
 function goalsQ(q: Question, a: Answers): string {
   const list: any[] = Array.isArray(a.goals) ? a.goals : [];
   const age = parseNum(a.birthYear) ? +todayStr().slice(0, 4) - +a.birthYear : null;
-  const prof = profileFromAnswers(a, todayStr()).profile;
+  const prof = obProfile(a);
   return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${esc(q.label)}${star(q)}</span>${list.map((g, i) => {
     const al = goalAllowed(g.type, age);
     const tri = GOALS[g.type as GoalType] && GOALS[g.type as GoalType].group === 'tri' && g.type !== 'duathlon' && g.type !== 'aquathlon';
@@ -260,10 +260,13 @@ on('ob-goal-mode', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) 
 onChange('ob-goal', el => { const a = A(); const g = (a.goals || [])[+el.dataset.i!]; if (!g) return; g[el.dataset.k!] = (el as HTMLInputElement).value; redraw(); });
 onChange('ob-goal-time', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } g.targetTime = sec; saveState(); refreshRealism(+el.dataset.i!); });
 onChange('ob-goal-split', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } g.splits = { ...(g.splits || {}), [el.dataset.s!]: sec }; saveState(); refreshRealism(+el.dataset.i!); });
+/* Auftrag 24: Ziele kommen im Fragebogen vor den Sportarten. Solange keine gewählt sind, keine Prüfung „Ziel passt zu den Sportarten“
+   (sonst fehlte die Einordnung, weil der Entwurf nur den Standard „Laufen“ kennt). */
+function obProfile(a: any) { const p = profileFromAnswers(a, todayStr()).profile; return Array.isArray(a.sports) && a.sports.length ? p : { ...p, sports: [] as any }; }
 /* Nur den Realismus-Hinweis neu schreiben, damit der Fokus im Zeitfeld bleibt */
 function refreshRealism(i: number) {
   const a = A(); const g = (a.goals || [])[i]; const box = document.querySelector(`[data-realism="${i}"]`) as HTMLElement | null; if (!g || !g.date) return;
-  const r = realism({ ...g, targetTimeSec: goalTarget(g) }, profileFromAnswers(a, todayStr()).profile, todayStr());
+  const r = realism({ ...g, targetTimeSec: goalTarget(g) }, obProfile(a), todayStr());
   if (box && r) { box.textContent = r.text; box.className = `banner ${r.ok === false ? 'warn' : 'info'}`; }
 }
 on('ob-apply', el => {

@@ -6,7 +6,7 @@ import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr } from '../util'
 import { t, hhmm } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, openSheet, closeSheet, refreshSheet, field, select, toggle, armed, more, sportLabel, timeField, readTime } from '../kit';
 import { realism } from '../../../shared/goalcheck';
-import { GOALS, mainGoal, type Goal, type GoalType , legsOf } from '../../../shared/goals';
+import { GOALS, mainGoal, missingSports, mismatchText, type Goal, type GoalType , legsOf } from '../../../shared/goals';
 import { ageOf, isMinor, type Profile, type SportKey } from '../../../shared/profile';
 import { goalAllowed } from '../../../shared/rules';
 import { daysUntil } from '../../../shared/race';
@@ -20,6 +20,12 @@ const SCREEN = 'profil';
 const SPORT_KEYS: SportKey[] = ['swim', 'bike', 'run', 'strength', 'football'];
 export const goalLabel = (type: string) => t('goal.' + type);
 
+/* Auftrag 24: Ziel braucht eine Sportart, die nicht gewählt ist: kurzer Hinweis direkt am Ziel, mit „Ziel ändern“ und „… hinzufügen“ */
+function mismatchHint(g: Goal, sports: readonly string[], today: string): string {
+  if (g.result || (g.date && g.date < today) || g.type === 'fitness') return '';
+  const miss = missingSports(g, sports); if (!miss.length) return '';
+  return `<div class="banner info small" data-goal-mismatch="${esc(g.id)}">${esc(mismatchText(miss))}<div class="row" style="margin-top:6px;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-act="goal-open" data-id="${esc(g.id)}">${esc(t('prof.changeGoal'))}</button>${miss.map(s => `<button class="btn ghost sm" data-act="pf-sport" data-s="${s}">${esc(t('prof.addSport', { s: sportLabel(s) }))}</button>`).join('')}</div></div>`;
+}
 export function renderProfil(): string {
   const p = profile(), dp = draftProfile(SCREEN), today = todayStr();
   const gl = draftGoals(SCREEN).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
@@ -28,7 +34,7 @@ export function renderProfil(): string {
   let h = last ? `<div class="banner good" data-replanned style="margin-bottom:var(--s3)">${esc(last)}</div>` : '';
   h += sec(t('prof.goals'), `<div class="list">${gl.map(g => `<button class="li" data-act="goal-open" data-id="${esc(g.id)}"><span class="ic" style="--c:var(--accent)">${ic(g.result ? 'trophy' : 'target')}</span>
       <span class="grow"><span class="t">${esc(g.name)}</span> ${pill(g.priority, g.priority === 'A' ? 'accent' : '')}${main && main.id === g.id ? ' ' + pill(t('prof.main'), 'good') : ''}<br>
-      <span class="s">${esc(goalLabel(g.type))}${g.date ? ' · ' + fmtDate(g.date) + (g.date >= today ? ' · ' + t('prof.inDays', { n: daysUntil(today, g.date) }) : '') : ''}${g.result && g.result.timeSec ? ' · ' + hhmm(g.result.timeSec) : ''}</span></span><span class="chev">${ic('right')}</span></button>`).join('') || `<div class="li"><span class="muted">${esc(t('prof.noGoals'))}</span></div>`}</div>
+      <span class="s">${esc(goalLabel(g.type))}${g.date ? ' · ' + fmtDate(g.date) + (g.date >= today ? ' · ' + t('prof.inDays', { n: daysUntil(today, g.date) }) : '') : ''}${g.result && g.result.timeSec ? ' · ' + hhmm(g.result.timeSec) : ''}</span></span><span class="chev">${ic('right')}</span></button>${mismatchHint(g, dp.sports, today)}`).join('') || `<div class="li"><span class="muted">${esc(t('prof.noGoals'))}</span></div>`}</div>
     <button class="btn ghost block" data-act="goal-new" style="margin-top:var(--s2)">${ic('plus')} ${esc(t('prof.addGoal'))}</button>`, t('prof.goalsAside'));
   h += sec(t('prof.person'), `<div class="card"><div class="fgrid">
     ${field('pf-name', t('prof.name'), p.name, { data: 'data-ch="pf" data-k="name"' })}

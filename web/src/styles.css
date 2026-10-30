@@ -672,16 +672,22 @@ details.fold[open] > summary .chev svg { transform: rotate(180deg); }
 [data-wish] .li.lever { background: var(--accent-soft); border-radius: 10px; }
 [data-wish] .lever-t { color: var(--accent); }
 
-/* Auftrag 23: Glas-Linse in der Tab-Leiste (Drücken und Halten oder Wischen). Nur transform/opacity werden animiert. */
+/* Auftrag 23/24: EINE Glas-Linse in der Tab-Leiste. In Ruhe markiert sie den aktiven Tab, beim Drücken/Ziehen ist sie die vergrößerte Linse.
+   Animiert werden nur transform (per Skript, Feder) und opacity (Glanz und Schatten beim Drücken). */
 .tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .tabbar-in#tabs { touch-action: none; }
-.tab-lens { position: fixed; left: 0; top: 0; z-index: 31; pointer-events: none; border-radius: 999px; overflow: hidden; opacity: 0; transform-origin: 50% 50%; will-change: transform, opacity; transition: opacity .18s ease-out;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 82%, #fff 18%), color-mix(in srgb, var(--surface) 94%, transparent));
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.95), inset 0 -2px 3px rgba(0,0,0,.05), inset 0 0 0 .5px rgba(255,255,255,.7), 0 8px 24px rgba(0,0,0,.16), 0 1px 3px rgba(0,0,0,.12);
-  }
+.tab-lens { position: fixed; left: 0; top: auto; bottom: 0; z-index: 31; pointer-events: none; opacity: 0; transform-origin: 50% 50%; will-change: transform; }
 .tab-lens.on { opacity: 1; }
-.tab-lens::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.55), transparent 55%), radial-gradient(90% 60% at 50% 115%, rgba(255,255,255,.25), transparent 60%); }
-.tab-lens-in { position: absolute; left: 0; top: 0; margin: 0 !important; max-width: none !important; pointer-events: none; transform-origin: 0 0; }
+body.no-plan .tab-lens { display: none; }
+.tab-lens-clip { position: absolute; inset: 0; border-radius: 999px; overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 22%, #fff 78%), color-mix(in srgb, var(--bg) 55%, #fff 45%));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(0,0,0,.04), inset 0 0 0 .5px rgba(255,255,255,.7), 0 4px 14px color-mix(in srgb, var(--accent) 20%, transparent); }
+/* beim Drücken: kräftiger Schatten und Glanz (nur die Deckkraft wechselt) */
+.tab-lens-shadow { position: absolute; inset: 0; border-radius: 999px; box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.12); opacity: .001; transition: opacity .2s ease-out; }
+.tab-lens-shine { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .001; transition: opacity .2s ease-out;
+  background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.6), transparent 55%), radial-gradient(90% 60% at 50% 115%, rgba(255,255,255,.3), transparent 60%); }
+.tab-lens.pressed .tab-lens-shadow, .tab-lens.pressed .tab-lens-shine { opacity: 1; }
+.tab-lens-in { position: absolute; left: 0; top: 0; margin: 0 !important; max-width: none !important; pointer-events: none; transform-origin: 0 0; will-change: transform; }
 /* Kopie in der Linse: eigene Klassen (ltab), gleiche Form wie .tab */
 .tab-lens-in .ltab { height: var(--nav-h); border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink-2); font-size: min(0.6765rem, 23px); font-weight: 600; min-width: 0; padding: 0 1px; }
 .tab-lens-in .ltab svg { width: 24px; height: 24px; }
@@ -691,13 +697,13 @@ details.fold[open] > summary .chev svg { transform: rotate(180deg); }
 [data-design="glas"] .tab-lens-in .ltab { height: calc(var(--nav-h) - 12px); }
 [data-design="glas"] .tab-lens-in .ltab svg { width: 26px; height: 26px; }
 .tabbar.lens-on .tab.peek { color: var(--accent); }
-:root[data-theme="dark"] .tab-lens { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 78%, #fff 10%), color-mix(in srgb, var(--surface) 92%, transparent)); box-shadow: inset 0 1px 1px rgba(255,255,255,.28), inset 0 0 0 .5px rgba(255,255,255,.18), 0 8px 24px rgba(0,0,0,.5); }
-:root[data-theme="dark"] .tab-lens::after { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.16), transparent 55%); }
+:root[data-theme="dark"] .tab-lens-clip { background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #fff 16%), color-mix(in srgb, var(--bg) 92%, #fff 8%)); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 .5px rgba(255,255,255,.14), 0 4px 14px rgba(0,0,0,.4); }
+:root[data-theme="dark"] .tab-lens-shine { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.18), transparent 55%); }
+:root[data-theme="dark"] .tab-lens-shadow { box-shadow: 0 10px 28px rgba(0,0,0,.5); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .tab-lens { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 78%, #fff 10%), color-mix(in srgb, var(--surface) 92%, transparent)); box-shadow: inset 0 1px 1px rgba(255,255,255,.28), inset 0 0 0 .5px rgba(255,255,255,.18), 0 8px 24px rgba(0,0,0,.5); }
-  :root:not([data-theme="light"]) .tab-lens::after { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.16), transparent 55%); }
+  :root:not([data-theme="light"]) .tab-lens-clip { background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #fff 16%), color-mix(in srgb, var(--bg) 92%, #fff 8%)); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 .5px rgba(255,255,255,.14), 0 4px 14px rgba(0,0,0,.4); }
+  :root:not([data-theme="light"]) .tab-lens-shine { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.18), transparent 55%); }
+  :root:not([data-theme="light"]) .tab-lens-shadow { box-shadow: 0 10px 28px rgba(0,0,0,.5); }
 }
-@media (prefers-reduced-motion: reduce) { .tab-lens { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tab-lens-shadow, .tab-lens-shine { transition: none; } }
 .prog2 .big.approx { font-size: clamp(1.25rem, 6vw, 1.6rem); white-space: nowrap; }
-.tab-lens:not(.on) { visibility: hidden; transition: opacity .18s ease-out, visibility 0s linear .18s; }
-@media (prefers-reduced-motion: reduce) { .tab-lens:not(.on) { transition: none; } }

@@ -10,7 +10,7 @@ import { SPORT_COLOR, sportIcon } from '../icons';
 import { fmtDuration, type Prognosis, type Prediction, type Growth } from '../../../shared/prognosis';
 import { pacingPlan, wishPacing } from '../../../shared/race';
 import { wishCheck, hm } from '../../../shared/goalcheck';
-import { GOALS, type Goal } from '../../../shared/goals';
+import { GOALS, mismatchText, type Goal } from '../../../shared/goals';
 import { nav } from '../nav';
 import { toast } from '../toast';
 import { renderTrends } from './trends';
@@ -31,6 +31,9 @@ export function renderFortschritt(): string {
   h += renderTrends();
   // Auftrag 23: Prognose für jedes Ziel mit Datum (auch Platzhalter), das nächste zuerst; jede einzeln einklappbar
   const list = d.prognoses || [];
+  // Auftrag 24: Ziel passt nicht zu den gewählten Sportarten: keine Prognose, ein kurzer Hinweis mit Weg ins Profil
+  const mis = (d.mismatches || []).map(x => `<div class="banner info small" data-goal-mismatch="${esc(x.goal.id)}"><b>${esc(x.goal.name)}:</b> ${esc(mismatchText(x.missing))} <button class="btn ghost sm" data-act="go-sub" data-sub="profil">${esc(t('prog.toProfile'))}</button></div>`).join('');
+  if (mis) h += mis;
   if (list.length) h += fold('prognoses', t('prog.prognoses'), list.map(x => `${x.goal.name}: ${shortRange(x.p)}`).join(' · '),
     `<div class="stack" data-prognoses>${list.map(x => fold('prog-' + x.goal.id, x.goal.name, shortRange(x.p), progCard(x.goal, x.p, false, x.placeholder), { kind: 'card', sub: goalSub(x.goal, x.placeholder), badge: x.placeholder ? t('prog.placeholder') : '' })).join('')}</div>`);
   else if (d.goal && d.prognosis) h += fold('prognoses', t('prog.prognosis'), `${d.goal.name}: ${shortRange(d.prognosis)}`, progCard(d.goal, d.prognosis, false, false));
@@ -72,8 +75,12 @@ function growthLine(gr: Growth, d: ReturnType<typeof D>): string {
   const pace = (ms: number) => { const s = Math.round(1000 / ms); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/km`; };
   const p100 = (ms: number) => { const s = Math.round(100 / ms); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/100 m`; };
   const to = gr.from * (1 + gr.gain);
-  const v = gr.sport === 'run' ? `${pace(gr.from)} → ${pace(to)}` : gr.sport === 'swim' ? `${p100(gr.from)} → ${p100(to)}` : `${num(gr.from, 1)} → ${num(to, 1)} W/kg`;
-  return t('prog.growthLine', { s: sportLabel(gr.sport), lvl: gr.level, v, g: pct(gr.gain) });
+  const v = gr.sport === 'run' ? `${pace(gr.from)} → ${pace(to)}` : gr.sport === 'swim' ? `${p100(gr.from)} → ${p100(to)}${gr.breast ? ' ' + t('prog.breast') : ''}` : (() => { const k = num(gr.from, 1) === num(to, 1) ? 2 : 1; return `${num(gr.from, k)} → ${num(to, k)} W/kg`; })();
+  // Auftrag 24: woraus die Hochrechnung stammt
+  const basis = gr.basis === 'pause' ? t('prog.basisPause', { w: Math.max(1, Math.round(gr.pauseWeeks || 0)) })
+    : gr.basis === 'trend' ? t('prog.basisTrend', { w: gr.trendWeeks ?? '', p: Math.round((gr.trendShare || 0) * 100) })
+      : gr.trendWeeks ? t('prog.basisTypicalSome', { w: gr.trendWeeks }) : t('prog.basisTypical');
+  return t('prog.growthLine', { s: sportLabel(gr.sport), lvl: gr.level, v, g: pct(gr.gain) }) + ' – ' + basis;
 }
 function moveLine(goal: Goal): string {
   const m = progMove(goal);

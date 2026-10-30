@@ -14,7 +14,7 @@ import { withTz, userTz } from '../server/src/tz';
 import { runEngine } from '../shared/coach/engine';
 import { doneItems, reviewItem } from '../shared/coach/review';
 import { sportScores, legacyActivities, namedFromPlan, estimatesAt } from '../shared/scores';
-import { goalPrognoses, planFactsOf, correctionFromGoals, fmtDuration } from '../shared/prognosis';
+import { goalPrognoses, planFactsOf, correctionFromGoals, fmtDuration, trendHistory } from '../shared/prognosis';
 import { evaluateIntervals } from '../shared/intervals';
 import { dataCheck } from '../shared/datacheck';
 import { mainGoal } from '../shared/goals';
@@ -62,7 +62,7 @@ export async function releaseDataCheck(src: string, today = localDate()): Promis
         const acts = [...namedFromPlan(L.state, L.baseWeeks, C.recordedActivities(L.state)), ...legacyActivities(L.state, L.baseWeeks, L.profile)] as any[];
         const inp: any = { today, activities: acts, trend: L.state.trend, illness: L.state.illnessPeriods, profile: L.profile, goal: mainGoal(L.goals, today) };
         const sessions = C.planDays(C.applyAdjustments(L.baseWeeks, L.state.adjustments || {})).flatMap((d: any) => (d.sessions || []).map((x: any) => ({ ...x, date: d.date })));
-        const list = goalPrognoses(L.goals, L.planMeta, today, estimatesAt(inp, today), { profile: L.profile, history: [{ date: C.addDays(today, -70), est: estimatesAt(inp, C.addDays(today, -70)) }], correction: correctionFromGoals(L.goals), planFor: g => planFactsOf(sessions, (x: any) => !!((L.state.sessions || {})[x.id] || {}).completed, L.state.customWorkouts || {}, g, today, C.isTestOrRace) });
+        const list = goalPrognoses(L.goals, L.planMeta, today, estimatesAt(inp, today), { profile: L.profile, history: trendHistory(x => estimatesAt(inp, x), today), ill: (C.illnessAt(L.state.illnessPeriods, today) || {}).start || null, correction: correctionFromGoals(L.goals), planFor: g => planFactsOf(sessions, (x: any) => !!((L.state.sessions || {})[x.id] || {}).completed, L.state.customWorkouts || {}, g, today, C.isTestOrRace) });
         for (const x of list) { const r = x.p.race ? x.p.race.total : x.p.total!; if (!Number.isFinite(r.best) || r.best <= 0 || r.low > r.best || r.high < r.best) throw new Error(`${x.goal.name}: ungültig`); }
         stats.prognoses = list.map(x => `${x.goal.name} ${x.p.race && x.p.race.approx ? 'ca. ' + x.p.race.approx : fmtDuration((x.p.race ? x.p.race.total : x.p.total!).best)}${x.placeholder ? ' (Platzhalter)' : ''}`).join(', ');
       });

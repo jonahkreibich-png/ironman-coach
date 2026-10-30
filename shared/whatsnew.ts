@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.12.0', items: [
+    'Tab-Leiste wie in iOS 26: eine einzige Glas-Linse, die mit Feder gleitet, sich beim schnellen Ziehen dehnt und weich am nächsten Tab einrastet. Antippen gleitet ebenso, ohne Ruckeln beim Wechsel.',
+    'Prognose: „Erwartet am Wettkampftag“ rechnet jetzt immer mit deiner Entwicklung bis dahin – ohne viele eigene Daten mit typischen Fortschritten (nach Niveau, Alter, Sportart, Umfang), mit mehr Daten zählt dein eigener Trend mehr. „Warum?“ sagt, woraus die Hochrechnung stammt.',
+    'Prognosen nur für deine Sportarten: Passt ein Ziel nicht dazu (z. B. Triathlon ohne Laufen), steht beim Ziel ein kurzer Hinweis statt einer Prognose.'
+  ] },
   { version: '3.11.0', items: [
     'Fortschritt: eine eigene Prognose für jedes Ziel (das nächste zuerst, Platzhalter-Termine gekennzeichnet), heute und am Wettkampftag, mit „Zuletzt aktualisiert“ und „Warum?“. Ziele in über einem Jahr zeigen einen ehrlichen Bereich (z. B. „ca. 11–13 h, wenn du den Plan durchziehst“); Einsteiger, Schwimm-Technik und Jugendliche entwickeln sich in der Rechnung jetzt realistisch schneller.',
     'Wunschzeit: je Disziplin, was nötig wäre und was die Prognose sagt, ob sie realistisch, ambitioniert oder sehr unwahrscheinlich ist, der größte Hebel und Pacing passend zur Wunschzeit. Der Plan ändert sich dadurch nicht – nur wenn du „Plan auf Wunschzeit ausrichten“ (mit Vorschau) bestätigst.',

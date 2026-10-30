@@ -5,9 +5,9 @@ import { readinessInputs, readinessSnapshot } from '../../shared/readiness';
 import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon } from './store';
 import { todayStr } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
-import { mainGoal, type Goal } from '../../shared/goals';
+import { mainGoal, goalSports, type Goal } from '../../shared/goals';
 import { sportScores, formScore, legacyActivities, namedFromPlan, estimatesAt, rescoreNotes, SCORE_MODEL, type SportSport } from './data-types';
-import { prognosis, correctionFromGoals, planFactsOf, goalPrognoses, lastMove, type Move, type Prognosis, type PlanFacts, type GoalProg } from '../../shared/prognosis';
+import { prognosis, correctionFromGoals, planFactsOf, goalPrognoses, goalMismatches, lastMove, trendHistory, type Move, type Prognosis, type PlanFacts, type GoalProg } from '../../shared/prognosis';
 import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
 import type { Activity } from '../../shared/activity/analyze';
@@ -19,6 +19,8 @@ export interface Derived {
   activities: Activity[]; scores: any[]; form: any; prognosis: Prognosis | null;
   /** Auftrag 23: Prognose für jedes Ziel mit Datum oder Platzhalter-Termin, das nächste zuerst */
   prognoses: GoalProg[]; raceGoal: Goal | null; recentRace: Goal | null;
+  /** Auftrag 24: Ziele, die nicht zu den gewählten Sportarten passen (Hinweis statt Prognose) */
+  mismatches: { goal: Goal; missing: string[] }[];
   loadsBySport: Record<string, Record<string, number>>; engine: EngineCtx;
 }
 let cache: Derived | null = null;
@@ -28,15 +30,14 @@ export function prognosisFor(goal: Goal, date: string): Prognosis | null {
   D(); if (!lastInp) return null;
   try {
     const inp = { ...lastInp, goal, today: date };
-    const back = C.addDays(date, -70);
-    return prognosis(goal, estimatesAt(inp, date), { profile: lastInp.profile, today: date, history: [{ date: back, est: estimatesAt(inp, back) }], plan: planFacts(goal, date), correction: correctionFromGoals(goals().filter(g => g.id !== goal.id && (!g.date || g.date < date))) });
+    return prognosis(goal, estimatesAt(inp, date), { profile: lastInp.profile, today: date, history: trendHistory(x => estimatesAt(inp, x), date), plan: planFacts(goal, date), correction: correctionFromGoals(goals().filter(g => g.id !== goal.id && (!g.date || g.date < date))) });
   } catch (e) { return null; }
 }
 export function invalidate() { cache = null; }
 /* Auftrag 23: Prognose für ein (auch gerade bearbeitetes) Ziel mit allen Daten – dieselbe Rechnung wie im Fortschritt */
 export function goalPrognosis(goal: Goal): Prognosis | null {
   const d = D(); if (!lastInp || !goal.date || goal.type === 'fitness') return null;
-  try { const back = C.addDays(d.today, -70); return prognosis(goal, estimatesAt(lastInp, d.today), { profile: d.profile, today: d.today, history: [{ date: back, est: estimatesAt(lastInp, back) }], plan: planFacts(goal, d.today), correction: correctionFromGoals(d.goals) }); } catch (e) { return null; }
+  try { return prognosis(goal, estimatesAt(lastInp, d.today), { profile: d.profile, today: d.today, ill: d.ill ? d.ill.start : null, history: trendHistory(x => estimatesAt(lastInp, x), d.today), plan: planFacts(goal, d.today), correction: correctionFromGoals(d.goals) }); } catch (e) { return null; }
 }
 /* Auftrag 23: Was hat die Prognose eines Ziels zuletzt bewegt (Einheit, Test oder Wettkampf)? Erst beim Anzeigen gerechnet, je Datenstand gemerkt. */
 const moveCache = new Map<string, Move | null>();
@@ -110,23 +111,25 @@ function compute(): Derived {
   C.dailyLoadEntries({ ...STATE, profile: prof }, PLAN.weeks).forEach(e => { const m = (loadsBySport[e.sport] = loadsBySport[e.sport] || {}); m[e.date] = (m[e.date] || 0) + e.load; });
   const cal = PLAN.meta && PLAN.meta.scoreCalibration;
   const inp = { today, activities: acts, trend: STATE.trend, illness: STATE.illnessPeriods, profile: prof, goal, calibration: cal || null, manualAdjust: STATE.scoreAdjust, loadsBySport, settings: STATE.settings, stages: (STATE.settings || {}).stageGoals || null };
-  const scoreSports = (['swim', 'bike', 'run', 'strength'] as SportSport[]).filter(s => prof.sports.includes(s as any) || (goal && JSON.stringify(goal).includes(s)));
+  // Auftrag 24: nur gewählte Sportarten (vorher kamen die Sportarten des Ziels dazu, auch wenn man sie nicht trainiert); ohne Wahl die des Ziels
+  const chosenScore = (['swim', 'bike', 'run', 'strength'] as SportSport[]).filter(s => (prof.sports || []).includes(s as any));
+  const scoreSports = chosenScore.length ? chosenScore : (['swim', 'bike', 'run'] as SportSport[]).filter(s => goal && goalSports(goal).includes(s as any));
   lastInp = inp;
   const scores = sportScores(inp, scoreSports.length ? scoreSports : ['run']);
   const form = formScore(inp);
   let prog: Prognosis | null = null;
   let progs: GoalProg[] = [];
   try {
-    const back = C.addDays(today, -70);
-    const est = estimatesAt(inp, today), history = [{ date: back, est: estimatesAt(inp, back) }], correction = correctionFromGoals(gl);
-    progs = goalPrognoses(gl, PLAN.meta || {}, today, est, { profile: prof, history, correction, planFor: g => planFacts(g, today) });
+    // Auftrag 24: Trend aus mehreren Ständen (12, 8, 5 Wochen zurück), nur wo es damals eigene Daten gab; krank = Pause läuft
+    const est = estimatesAt(inp, today), history = trendHistory(x => estimatesAt(inp, x), today), correction = correctionFromGoals(gl);
+    progs = goalPrognoses(gl, PLAN.meta || {}, today, est, { profile: prof, history, correction, ill: ill ? ill.start : null, planFor: g => planFacts(g, today) });
     const own = goal && progs.find(x => x.goal.id === goal.id);
-    prog = own ? own.p : goal ? prognosis(goal, est, { profile: prof, today, history, plan: planFacts(goal, today), correction }) : null;
+    prog = own ? own.p : goal ? prognosis(goal, est, { profile: prof, today, history, plan: planFacts(goal, today), correction, ill: ill ? ill.start : null }) : null;
   } catch (e) { prog = null; }
   const state = { ...STATE, profile: prof, settings: { ...STATE.settings, readiness: fallback } };
   return {
     today, profile: prof, goals: gl, goal, minor: isMinor(prof, today), age: ageOf(prof, today), fallback, readiness, history, ill, ret,
-    activities: acts, scores, form, prognosis: prog, prognoses: progs, raceGoal: raceModeGoal(gl, today), recentRace: recentRace(gl, today), loadsBySport,
+    activities: acts, scores, form, prognosis: prog, prognoses: progs, mismatches: goalMismatches(gl, PLAN.meta || {}, today, prof.sports), raceGoal: raceModeGoal(gl, today), recentRace: recentRace(gl, today), loadsBySport,
     engine: { readinessSnapshot: readiness, today, now: Date.now(), state, baseWeeks: BASE_WEEKS, planMeta: PLAN.meta || {}, profile: prof, goals: gl }
   };
 }
