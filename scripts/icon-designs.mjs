@@ -122,3 +122,41 @@ export const WAVE_VARIANTS = [
   { id: 'w1b', num: '1b', name: 'Welle → Weg, Sonnenaufgang', idea: 'Verlauf von Tiefblau/Petrol (Wasser) nach Orange (Ziel, Sonnenaufgang).', svg: (mode = 'light', key = 'b') => waveRoad(PALETTES['1b'][mode], key) },
   { id: 'w1c', num: '1c', name: 'Welle → Weg, Petrol + Orange', idea: 'Petrol als Grundfarbe, die Sonne als oranger Akzent.', svg: (mode = 'light', key = 'c') => waveRoad(PALETTES['1c'][mode], key) }
 ];
+
+/* Auftrag 25, Runde 3: zurück zum grafischen Zeichen von Variante 1, keine Landschaft. Eine einzige dicke weiße Linie:
+   zwei weiche Wellen (Wasser), die ohne Knick in einen Bogen nach oben übergehen; am Ende ein oranger Punkt (Ziel).
+   Runde Enden, 10,5 von 100 dick (bei 20 px noch gut 2 px). Dunkel: dunkles Petrol statt fast Schwarz. */
+function linePath({ x0 = 9, y0 = 62, half = 15, amp = 16, dip = 0.7, c2 = [66, 30], end = [76, 29] } = {}) {
+  let d = `M${x0} ${y0} q${half / 2} ${-amp} ${half} 0 t${half} 0 t${half} 0`;
+  const jx = x0 + 3 * half, jy = y0;
+  // Fortsetzung genau in Richtung des letzten Abstiegs: glatter Übergang von der Welle in den Bogen
+  const c1 = [jx + (half / 2) * dip, jy + amp * dip];
+  return d + ` C ${c1[0].toFixed(2)} ${c1[1].toFixed(2)}, ${c2[0]} ${c2[1]}, ${end[0]} ${end[1]}`;
+}
+const LINE = linePath();
+const LINE_BG = {
+  petrol: { light: ['#1a9aa3', '#0d6f7b', '#08505c'], dark: ['#17606b', '#0d4049', '#072a31'] },
+  blue: { light: ['#2a7cf6', '#0a52c4', '#06409c'], dark: ['#17606b', '#0d4049', '#072a31'] }
+};
+function lineIcon(bgKey, mode, key, lineGrad) {
+  const c = LINE_BG[bgKey][mode];
+  const id = s => s + key;
+  const stroke = lineGrad ? `url(#${id('l')})` : '#ffffff';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="${id('g')}" x1="0.1" y1="0" x2="0.5" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="0.55" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient>
+    <radialGradient id="${id('h')}" cx="0.3" cy="0.05" r="0.75"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${id('d')}" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#ffc08a"/><stop offset="1" stop-color="#ff7a35"/></radialGradient>
+    ${lineGrad ? `<linearGradient id="${id('l')}" gradientUnits="userSpaceOnUse" x1="10" y1="62" x2="76" y2="30"><stop offset="0" stop-color="#9fdcff"/><stop offset="0.5" stop-color="#c9ecff"/><stop offset="0.8" stop-color="#ffffff"/></linearGradient>` : ''}
+    <filter id="${id('f')}" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="1.4" stdDeviation="1.4" flood-color="#00141a" flood-opacity=".3"/></filter>
+  </defs>
+  <rect width="100" height="100" fill="url(#${id('g')})"/><rect width="100" height="100" fill="url(#${id('h')})"/>
+  <g filter="url(#${id('f')})"><path d="${LINE}" fill="none" stroke="${stroke}" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="81.5" cy="27.5" r="8.8" fill="url(#${id('d')})"/></g></svg>`;
+}
+export const LINE_VARIANTS = [
+  { id: 'w1', num: '1', name: 'Zum Vergleich: ursprüngliche Variante 1', idea: 'So sah Variante 1 in der ersten Runde aus.', svg: (mode = 'light', key = 'o') => VARIANTS[0].svg(mode, key) },
+  { id: 'l2a', num: '2a', name: 'Welle → Bogen, Petrol', idea: 'Hintergrund Petrol, Verlauf von hell nach dunkel; weiße Linie, oranger Punkt.', svg: (mode = 'light', key = 'a') => lineIcon('petrol', mode, key, false) },
+  { id: 'l2b', num: '2b', name: 'Welle → Bogen, Blau', idea: 'Hintergrund Blau wie bisher; weiße Linie, oranger Punkt.', svg: (mode = 'light', key = 'b') => lineIcon('blue', mode, key, false) },
+  { id: 'l2c', num: '2c', name: 'Welle → Bogen, Petrol mit Linienverlauf', idea: 'Hintergrund Petrol; die Linie geht von Hellblau (Welle) in Weiß (Bogen) über.', svg: (mode = 'light', key = 'c') => lineIcon('petrol', mode, key, true) }
+];
