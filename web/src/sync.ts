@@ -457,7 +457,9 @@ export async function pushStatus() { try { return await api('GET', '/api/push/st
 export async function enablePush(prefs?: any) {
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') throw new Error(t('push.denied'));
-  const reg = await navigator.serviceWorker.ready;
+  // Auftrag 25: ohne Service Worker nicht ewig warten (der war bis 3.13.0 defekt), sondern klar sagen, was zu tun ist
+  const reg = await Promise.race([navigator.serviceWorker.ready, new Promise<null>(r => setTimeout(() => r(null), 10000))]);
+  if (!reg) throw new Error(t('push.noWorker'));
   const { key } = await api('GET', '/api/push/key', null, true);
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });

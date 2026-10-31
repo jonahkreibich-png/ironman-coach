@@ -637,5 +637,6 @@ export const de: Record<string, string> = {
   'prof.photoFail': 'Das Bild konnte nicht gelesen werden.',
   'prof.photoHint': 'Nur für dich sichtbar, klein gespeichert.',
   'set.shoeHint': 'Freiwillig: Die App zählt die Kilometer deiner Laufschuhe und sagt Bescheid, wenn ein neues Paar fällig wird.',
-  'set.cycleHint': 'Freiwillig: Mit eingetragenem Zyklus gibt der Coach sanfte Hinweise, der Plan bleibt gleich.'
+  'set.cycleHint': 'Freiwillig: Mit eingetragenem Zyklus gibt der Coach sanfte Hinweise, der Plan bleibt gleich.',
+  'push.noWorker': 'Mitteilungen sind noch nicht bereit. Schließ die App einmal ganz und öffne sie wieder vom Home-Bildschirm.'
 };

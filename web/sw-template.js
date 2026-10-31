@@ -3,6 +3,10 @@ const VERSION = '__VERSION__';
 const PREFIX = '__CACHE_PREFIX__';
 const CACHE = PREFIX + VERSION;
 const ASSETS = __ASSETS__;
+
+/* Auftrag 25: Diese Zeile fehlte seit dem Umbau (11.10.) – die Datei war ungültig, der Service Worker startete nie
+   (keine Mitteilungen, kein Offline-Start). tests/unit/sw.test.ts und tests/e2e/auftrag25-sw.spec.ts prüfen das jetzt. */
+self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE).then(cache => Promise.all(
       ASSETS.map(url => fetch(new Request(url, { cache: 'reload' })).then(res => {
@@ -53,11 +57,13 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // Server-Anfragen und Rückkehr von Diensten (OAuth) nie aus dem Speicher: immer frisch vom Server
+  if (url.pathname.includes('/api/')) return;
 
   // Seitenaufrufe: immer die gespeicherte App-Seite, damit sie offline sofort startet
   if (req.mode === 'navigate') {
     event.respondWith(
-      caches.open(CACHE).then(cache => cache.match('./index.html').then(hit => hit || fetch(req)))
+      caches.open(CACHE).then(cache => cache.match('./index.html').then(hit => hit || cache.match('./')).then(hit => hit || fetch(req)))
         .catch(() => fetch(req))
     );
     return;

@@ -1,10 +1,8 @@
 # Für Jonah
 
-**Eine Sache: Icon wählen.** Öffne `icon-varianten.html` (im Projektordner, am besten auf dem iPhone) und schreib mir die Nummer 1–4. Dann baue ich es überall ein.
-
-Sonst nichts zu tun. Version 3.13.0 ist live (vorher in der Test-Umgebung geprüft, Sicherungen gemacht). Beim nächsten Öffnen auf „Aktualisieren“ tippen.
+1. **Icon wählen:** https://claude.ai/artifact/AbEz9tVJufVYtKhXbwdnPt öffnen und mir die Nummer 1–4 schreiben.
+2. **Mitteilungen einschalten** (nach dem Update auf 3.13.1): App vom Home-Bildschirm öffnen, ganz schließen (nach oben wischen) und noch einmal öffnen. Unten unter Mehr → Über muss „Version 3.13.1“ stehen. Dann Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“ und beim iPhone-Fenster „Erlauben“. Mit „Test senden“ prüfen.
 
 Gut zu wissen:
-- **Mehr** ist neu sortiert wie die iPhone-Einstellungen, mit Suche oben. Krankheitsphasen findest du jetzt unter Berücksichtigungen, Räder und Laufschuhe unter Ausrüstung, Zonen unter „Zonen und Tests“.
-- Unter **Profil und Ziele** kannst du ein Bild wählen; unter **Konto** freiwillig deine E-Mail eintragen.
-- Der **KI-Coach** antwortet mit viel weniger Daten pro Frage (schneller, genauer) und ändert nur das, was du nennst.
+- **Mehr** ist sortiert wie die iPhone-Einstellungen, mit Suche oben. Verbindungen stehen unter Einstellungen, Krankheitsphasen unter Berücksichtigungen, Räder und Laufschuhe unter Ausrüstung.
+- Der Plan-Generator ist weg; den Plan erstellt der Fragebogen.

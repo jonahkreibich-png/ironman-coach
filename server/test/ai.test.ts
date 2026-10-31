@@ -74,7 +74,7 @@ describe('Zugang', () => {
   test('Betreiber hat immer alles, eingeladene Nutzer nur mit Freischaltung', async () => {
     mock([text('Antwort für B')]);
     const { env, T } = await user();
-    expect((await call(env, 'GET', '/api/me', null, T)).data.entitlements).toEqual({ ai: true, foodPhoto: true, generator: true });
+    expect((await call(env, 'GET', '/api/me', null, T)).data.entitlements).toEqual({ ai: true, foodPhoto: true });
     const inv = (await call(env, 'POST', '/api/invites', { note: 'Tester' }, T)).data;
     const B = (await call(env, 'POST', '/api/setup', { name: 'Pixel', invite: inv.code, userName: 'Bea' })).data;
     await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'settings', key: 'main', data: { settings: { ai: { enabled: true, consentAt: 1 } } }, updatedAt: 1 }] }, B.token);
@@ -83,7 +83,7 @@ describe('Zugang', () => {
     expect((await call(env, 'POST', `/api/admin/users/${B.userId}/features`, { features: { ai: true } }, B.token)).status).toBe(403);
     expect((await call(env, 'POST', `/api/admin/users/${B.userId}/features`, { features: { ai: true, foo: true } }, T)).data.features).toEqual({ ai: true });
     const users = (await call(env, 'GET', '/api/admin/users', null, T)).data.users;
-    expect(users.find((u: any) => u.id === B.userId).entitlements).toEqual({ ai: true, foodPhoto: false, generator: false });
+    expect(users.find((u: any) => u.id === B.userId).entitlements).toEqual({ ai: true, foodPhoto: false });
     const r2 = await chat(env, B.token, 'Hallo');
     expect(r2.status).toBe(200); expect(requests).toHaveLength(1);
   });

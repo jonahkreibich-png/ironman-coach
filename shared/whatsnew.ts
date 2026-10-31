@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.13.1', items: [
+    'Mitteilungen gehen jetzt: Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“ (auf dem iPhone in der App vom Home-Bildschirm). Ein Fehler hatte das bisher verhindert.',
+    'Die App startet jetzt auch ohne Internet vom Home-Bildschirm und zeigt „Neue Version“, wenn es ein Update gibt.',
+    'Verbindungen stehen jetzt unter Einstellungen. Der alte Plan-Generator ist weg: Den Plan erstellt der Fragebogen, Änderungen am Profil planen automatisch neu.'
+  ] },
   { version: '3.13.0', items: [
     'Mehr ist neu sortiert wie die iPhone-Einstellungen: Suche oben, deine Profilkarte mit Bild, dann Konto, Training, Verbindungen, Einstellungen, Daten und Datenschutz, Hilfe und Über. Nichts ist weggefallen, nur besser einsortiert. Zurück-Wischen bringt dich zur Liste.',
     'Der KI-Coach bekommt nur noch die Daten, die zur Frage passen: schnellere und genauere Antworten. Er beachtet eine eingetragene Krankheit, ändert nur das Training und den Tag, die du nennst, und schreibt nichts als erledigt, was erst ein Vorschlag ist.',

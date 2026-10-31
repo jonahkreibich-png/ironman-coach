@@ -32,5 +32,5 @@ export const APP_ENV: 'test' | 'dev' | 'production' = ((import.meta.env.VITE_APP
   || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(host) ? 'dev' : /-test\.|^test\./.test(host) ? 'test' : 'production');
 export const FEATURES = {
   /* Plan-Generator: nur in der Testumgebung sichtbar */
-  generator: APP_ENV !== 'production'
+  // Auftrag 25: Plan-Generator entfernt (Fragebogen und automatische Neuplanung erzeugen den Plan)
 };

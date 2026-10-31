@@ -1,9 +1,15 @@
 # Auftrag 25: Icon-Varianten, Mehr-Tab neu, Coach-KI gezielter, Gesamttest (31.10.)
 
+## Nachtrag 3.13.1
+- **Mitteilungen gingen nie:** Der Service Worker (Hintergrund-Teil der App) war seit dem Umbau am 11.10. kaputt, eine Zeile fehlte. In der echten App gab es deshalb keine einzige Mitteilungs-Anmeldung, dazu keinen Offline-Start und keinen Update-Hinweis. Repariert, Server-Antworten werden dabei nie zwischengespeichert. Neue feste Tests prüfen den Service Worker (auch in WebKit/Safari).
+- **Verbindungen** stehen jetzt in der Gruppe Einstellungen.
+- **Plan-Generator entfernt:** altes Test-Werkzeug, nur du sahst es. Den Plan erstellt der Fragebogen, Profiländerungen planen automatisch neu (gleiche Plan-Logik).
+- **Icon-Varianten** als Link: https://claude.ai/artifact/AbEz9tVJufVYtKhXbwdnPt
+
 **Stand:** Punkte 2–4 fertig und live als Version 3.13.0: erst Test-Umgebung (mit echten KI-Fragen geprüft), dann echte App. Vorher beide gesichert; alle 3 Konten laden an einer Kopie der echten Daten fehlerfrei. **Icon: Du wählst** – die 4 Varianten liegen in `icon-varianten.html`. Nach deiner Wahl baue ich das Icon überall ein (Manifest, Icons, Startbilder).
 
 ## 1. Icon (wartet auf deine Wahl)
-`icon-varianten.html` im Projektordner öffnen (am besten auf dem iPhone). Je Variante: Homescreen in echter Größe (hell und dunkel), kleine Größen bis 16 px, Startbild.
+Link: https://claude.ai/artifact/AbEz9tVJufVYtKhXbwdnPt (am besten auf dem iPhone). Je Variante: Homescreen in echter Größe (hell und dunkel), kleine Größen bis 16 px, Startbild.
 1. **Welle → Straße** – Schwimmwellen werden zur ansteigenden Straße, am Ende das Ziel
 2. **Puls-Bogen** – Herzschlag geht in einen Bogen nach oben über
 3. **Tempo-Form** – drei schräge Balken in Schwimm-, Rad- und Lauffarbe

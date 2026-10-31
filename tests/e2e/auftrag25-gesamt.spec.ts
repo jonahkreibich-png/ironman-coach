@@ -213,8 +213,9 @@ test('Plan-Generator und Lexikon: Seiten öffnen ohne Fehler', async ({ page }) 
   await seed(page);
   await open(page, '/?go=lexikon');
   await expect(page.locator('.view[data-view="lexikon"]')).toContainText(/Zone/);
+  // Plan-Generator entfernt: alter Link führt zur Liste
   await open(page, '/?go=generator');
-  await expect(page.locator('#app')).not.toBeEmpty();
+  await expect(page.locator('#mehr-q')).toBeVisible();
   expect(errs).toEqual([]);
 });
 

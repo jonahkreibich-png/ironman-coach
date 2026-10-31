@@ -511,3 +511,13 @@ Nach Regel 8 selbst entschieden. Jede Zeile: was, warum, wie rückgängig.
 | 408 | docs/FUNKTIONEN.md: jede Funktion mit Ort und Test; tests/e2e/auftrag25-gesamt.spec.ts schließt die Lücken (Fragebogen bis Plan, Heute, Einheit, Extra, Plan, Coach, Fortschritt, Essen, Werte/Wettkampf, Verbindungen, Fehler melden, Export/Löschen, Mitteilungen, Offline, Generator/Lexikon, Zurück-Wischen, Homescreen-Modus, Safe Area, Tastatur). | Auftrag 25 Punkt 4; vorhandene Tests weiterverwendet statt doppelt. | docs/FUNKTIONEN.md |
 | 409 | Antworten des Modellvergleichs und Datenbank-Arbeitskopien nur lokal in data-export/ bzw. scratch/ (nicht im Git); im Repo nur die 60 Fragen. | Die Antworten enthalten echte Trainings- und Gesundheitsdaten. | scripts/ki-vergleich25.ts |
 | 410 | Release 3.13.0 mit scripts/veroeffentlichen.mjs (alle Tests, Sicherungen beider Umgebungen, Echtdaten-Prüfung aller Konten, Test, dann echte App); vorher Test-Umgebung einzeln mit echten KI-Fragen geprüft. | CLAUDE.md: erst Test, dann echte App mit Sicherung. | – |
+
+## Auftrag 25, Nachtrag (3.13.1)
+
+| Nr. | Was | Warum | Wo |
+|---|---|---|---|
+| 411 | Service Worker repariert: In der Vorlage fehlte seit dem Umbau (11.10.) die Zeile `self.addEventListener('install', …`; sw.js war ungültig und startete nie. Dazu: /api/ (Server-Antworten, OAuth-Rückkehr) nie aus dem Speicher; Offline-Start findet die App-Seite auch unter „./“. | Jonah konnte Mitteilungen nicht einschalten: in der echten App gab es keine einzige Anmeldung. Ohne Service Worker auch kein Offline-Start und kein Update-Hinweis. Ohne /api-Ausnahme hätte der reparierte Worker alte Server-Daten geliefert. | web/sw-template.js, tests/unit/sw.test.ts, tests/e2e/auftrag25-sw.spec.ts |
+| 412 | Mitteilungen einschalten wartet höchstens 10 s auf den Service Worker und sagt dann, was zu tun ist. | Vorher hing der Knopf für immer. | web/src/sync.ts enablePush |
+| 413 | Verbindungen als erste Zeile in der Gruppe „Einstellungen“. | Jonahs Wunsch. | web/src/views/mehr.ts |
+| 414 | Plan-Generator entfernt (Ansicht, Menüzeile, Freischaltung). Alte Links führen zur Liste. | Altes Test-Werkzeug, in der echten App nur für den Betreiber sichtbar; Fragebogen und automatische Neuplanung erzeugen den Plan mit derselben Logik (shared/plangen.ts bleibt). | web/src/views/generator.ts (gelöscht), main.ts, features.ts |
+| 415 | Icon-Varianten als private Seite auf claude.ai statt als lokale Datei. | Jonah konnte die Datei auf dem iPhone nicht öffnen. | icon-varianten.html |

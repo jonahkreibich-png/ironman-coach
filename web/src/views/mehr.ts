@@ -5,10 +5,10 @@ import { t } from '../../../shared/i18n';
 import { ic, pill, onInput } from '../kit';
 import { D } from '../data';
 import { profile } from '../store';
-import { isSyncOn, statusText, entitled, me, isAdmin } from '../sync';
+import { isSyncOn, statusText, me, isAdmin } from '../sync';
 import { reauthHints } from './verbindungen';
 import { backupDue } from './daten';
-import { FEATURES, APP, APP_RELEASE } from '../config';
+import { APP, APP_RELEASE } from '../config';
 import { daysUntil } from '../../../shared/race';
 import { notifySummary, themeLabel } from './einstellungen';
 
@@ -31,8 +31,7 @@ export function mehrGroups(): Group[] {
     { sub: 'zonen', icon: 'pulse', color: 'var(--bad)', title: t('sub.zonen'), sub2: t('mehr.zonen'), keys: 'puls schwellenpuls pace tempo ftp watt css maxpuls zonen ampel ruhepuls hrv score test' },
     { sub: 'ausruestung', icon: 'tool', color: 'var(--bike)', title: t('sub.ausruestung'), sub2: t('mehr.ausruestung'), keys: 'rad räder fahrrad rolle smart trainer wattmesser pull buoy kickbrett flossen paddles schnorchel laufschuhe schuhe' },
     { sub: 'vorlagen', icon: 'edit', color: 'var(--strength)', title: t('sub.vorlagen'), sub2: t('mehr.vorlagen'), keys: 'vorlage vorlagen kraft übungen einheiten' },
-    { sub: 'onboarding', icon: 'doc', color: 'var(--strength)', title: t('sub.onboarding'), sub2: t('mehr.onboarding'), keys: 'fragebogen neu plan erstellen' },
-    ...((FEATURES.generator || entitled('generator')) ? [{ sub: 'generator', icon: 'wand', color: 'var(--bike)', title: t('sub.generator'), sub2: t('mehr.generator'), keys: 'generator' }] : [])
+    { sub: 'onboarding', icon: 'doc', color: 'var(--strength)', title: t('sub.onboarding'), sub2: t('mehr.onboarding'), keys: 'fragebogen neu plan erstellen' }
   ];
   const daily: Row[] = [
     ...(race ? [{ sub: 'wettkampf', icon: 'flag', color: 'var(--accent)', title: t('sub.wettkampf'), sub2: race.date && race.date >= d.today ? t('race.inDays', { name: race.name, n: daysUntil(d.today, race.date) }) : t('race.enterResult', { name: race.name }), keys: 'rennwoche pacing verpflegung ergebnis' }] : []),
@@ -44,8 +43,8 @@ export function mehrGroups(): Group[] {
     { title: t('mehr.g.account'), rows: [{ sub: 'konto', icon: 'user', color: 'var(--accent)', title: t('sub.konto'), sub2: isSyncOn() ? statusText() : t('mehr.kontoNone'), keys: 'konto anmelden anmeldung abmelden e-mail email geräte gerät koppeln sync wiederherstellung code' }] },
     { title: t('mehr.g.training'), rows: training },
     { title: t('mehr.g.daily'), rows: daily },
-    { title: t('mehr.g.connections'), rows: [{ sub: 'verbindungen', icon: 'link', color: 'var(--run)', title: t('sub.verbindungen'), sub2: t('mehr.verbindungen'), badge: reauth ? pill(t('conn.reauth'), 'warn') : '', keys: 'uhr ring garmin oura intervals healthfit apple health strava dropbox import datei' }] },
     { title: t('mehr.g.settings'), rows: [
+      { sub: 'verbindungen', icon: 'link', color: 'var(--run)', title: t('sub.verbindungen'), sub2: t('mehr.verbindungen'), badge: reauth ? pill(t('conn.reauth'), 'warn') : '', keys: 'uhr ring garmin oura intervals healthfit apple health strava dropbox import datei verbindungen' },
       { sub: 'mitteilungen', icon: 'bell', color: 'var(--bad)', title: t('sub.mitteilungen'), sub2: notifySummary(), keys: 'mitteilungen push benachrichtigung erinnerung ruhezeit' },
       { sub: 'darstellung', icon: 'palette', color: 'var(--info)', title: t('sub.darstellung'), value: esc(themeLabel()), keys: 'hell dunkel farbschema design heute ansicht' },
       { sub: 'coachset', icon: 'chat', color: 'var(--accent)', title: t('sub.coachset'), sub2: t('mehr.coachset'), keys: 'ki coach chat nachrichten tagesrückblick einwilligung' },

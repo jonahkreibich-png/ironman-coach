@@ -19,7 +19,7 @@ test.describe('Grundfunktionen', () => {
         await expect(tab(page, id)).toHaveAttribute('aria-current', 'page');
         await expect(page.locator(`.view[data-view="${id}"]`)).not.toBeEmpty();
       }
-      for (const sub of ['werte', 'essen', 'profil', 'verbindungen', 'konto', 'zonen', 'ausruestung', 'mitteilungen', 'darstellung', 'coachset', 'einheiten', 'sprache', 'daten', 'ueber', 'onboarding', 'generator']) {
+      for (const sub of ['werte', 'essen', 'profil', 'verbindungen', 'konto', 'zonen', 'ausruestung', 'mitteilungen', 'darstellung', 'coachset', 'einheiten', 'sprache', 'daten', 'ueber', 'onboarding']) {
         await tab(page, 'mehr').click();
         await page.locator(`[data-act="go-sub"][data-sub="${sub}"]`).first().click();
         await expect(page.locator(`.view[data-view="${sub}"]`)).not.toBeEmpty();

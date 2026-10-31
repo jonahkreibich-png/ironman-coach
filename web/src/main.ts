@@ -26,7 +26,6 @@ import { renderProfil } from './views/profil';
 import { renderVerbindungen, handleOAuthReturn, loadConnections } from './views/verbindungen';
 import { applyTheme, renderZonen, renderMitteilungen, renderDarstellung, renderCoachSet, renderEinheiten, renderSprache } from './views/einstellungen';
 import { renderDaten, resetDatenCache, renderKonto, renderUeber, renderBetreiber } from './views/daten';
-import { renderGenerator } from './views/generator';
 import { renderWettkampf } from './views/wettkampf';
 import { renderBeruecksichtigungen, renderAusruestung } from './views/beruecksichtigungen';
 import { focusFeedback } from './views/feedback';
@@ -45,7 +44,6 @@ import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
 import { isSyncOn, loadAiState, loadMe, entitled, onSynced } from './sync';
 import { checkSwimSkill } from './testupdate';
-export const canGenerate = () => FEATURES.generator || entitled('generator');
 
 initErrorLog();
 const storageBanner = document.createElement('div');
@@ -95,12 +93,12 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
 const SUBS: Record<string, () => string> = {
   lexikon: renderLexikon, strength: renderStrength, vorlagen: renderTrainingTemplates, werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen,
   daten: renderDaten, konto: renderKonto, ueber: renderUeber, betreiber: renderBetreiber, zonen: renderZonen, ausruestung: renderAusruestung,
-  mitteilungen: renderMitteilungen, darstellung: renderDarstellung, coachset: renderCoachSet, einheiten: renderEinheiten, sprache: renderSprache, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback, generator: () => canGenerate() ? renderGenerator() : renderMehr()
+  mitteilungen: renderMitteilungen, darstellung: renderDarstellung, coachset: renderCoachSet, einheiten: renderEinheiten, sprache: renderSprache, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
 const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'konto', 'ueber', 'verbindungen', 'feedback', 'lexikon']);
 /* Auftrag 25: alte Namen (Links aus Mitteilungen, gespeicherter Zustand) führen auf die neue Seite; „einstellungen“ ist jetzt die Gruppe im Mehr-Tab */
-const SUB_ALIAS: Record<string, string | null> = { einstellungen: null, settings: null, notify: 'mitteilungen', ki: 'coachset' };
+const SUB_ALIAS: Record<string, string | null> = { einstellungen: null, settings: null, generator: null, notify: 'mitteilungen', ki: 'coachset' };
 
 /* Alter UI-Zustand: view = heute|plan|werte|fortschritt|essen */
 if (!UI.tab) {

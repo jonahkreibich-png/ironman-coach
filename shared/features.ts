@@ -1,6 +1,6 @@
 /* Freischaltungen pro Nutzer. Der Betreiber (Admin) hat immer alles.
    Andere Nutzer bekommen Funktionen einzeln (heute vom Admin für Tester, später z. B. per Kauf im Store). */
-export const FEATURE_KEYS = ['ai', 'foodPhoto', 'generator'] as const;
+export const FEATURE_KEYS = ['ai', 'foodPhoto'] as const;
 export type FeatureKey = typeof FEATURE_KEYS[number];
 export type Entitlements = Record<FeatureKey, boolean>;
 
