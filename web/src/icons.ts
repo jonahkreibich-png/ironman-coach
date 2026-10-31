@@ -37,6 +37,15 @@ const UI: Record<string, string> = {
   doc: '<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6"/>', bug: '<rect x="7" y="8" width="10" height="11" rx="5"/><path d="M12 8V5M9 5l1.5 2M15 5l-1.5 2M3 13h4M17 13h4M4 18l3-2M20 18l-3-2"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14.6-4.5M4 13a8 8 0 0 0 14.6 4.5"/><path d="M5 3v4h4M19 21v-4h-4"/>', up: '<path d="M6 14l6-6 6 6"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5h4"/>',
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>', lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>', target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  // Auftrag 25: Mehr-Tab (Suche, Sprache, Einheiten, Darstellung, Datenschutz, Ausrüstung, Betreiber, Hilfe)
+  search: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z"/>',
+  ruler: '<path d="M3.5 15.5l12-12 5 5-12 12z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/>',
+  palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.5-1.8-.3-1.1.3-2.2 1.5-2.2h2a3.5 3.5 0 0 0 3.5-3.5c0-5.3-3.8-9.5-8.5-9.5z"/><circle cx="8" cy="11" r="1.2"/><circle cx="11" cy="7.5" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/>',
+  shield: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M9 12l2 2 4-4"/>',
+  tool: '<path d="M14.5 4.5a4 4 0 0 0-5 5L4 15v5h5l5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-3-1-1-3z"/>',
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.8-2.5 2-2.5 4M12 16.8v.2"/>',
+  book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
   // Auftrag 21: Schwimm-Hilfsmittel
   board: '<path d="M7 3.5h10a2 2 0 0 1 2 2V17a6.5 6.5 0 0 1-14 0V5.5a2 2 0 0 1 2-2z"/><path d="M9.5 7h5"/>', buoy: '<path d="M8 4h8a3 3 0 0 1 0 6h-1v4h1a3 3 0 0 1 0 6H8a3 3 0 0 1 0-6h1v-4H8a3 3 0 0 1 0-6z"/>',
   fins: '<path d="M9 3h6l3 14-3 4H9l-3-4z"/><path d="M12 7v10"/>', paddles: '<rect x="6" y="3" width="12" height="18" rx="4"/><path d="M10 8h4M10 12h4"/>', snorkel: '<path d="M15 3v12a5 5 0 0 1-10 0"/><path d="M13 3h4"/>'

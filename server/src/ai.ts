@@ -42,7 +42,9 @@ export function aiSafeCtx(ctx: EngineCtx): EngineCtx {
   const coachMsgs = Object.fromEntries(Object.entries(ctx.state.coachMsgs || {}).filter(([, m]: any) => !m?.aiExcluded && !(withheld && m?.from !== 'user')));
   const adjustments = withoutAdjustmentReasons(ctx.state.adjustments || {});
   const baseWeeks = ctx.baseWeeks, planMeta = ctx.planMeta;
-  return { ...ctx, baseWeeks, planMeta, readinessWithheld: withheld, readinessSnapshot: snapshot, state: { ...ctx.state, trend, activities: acts, coachMsgs, adjustments, coachNotes: withheld ? {} : ctx.state.coachNotes } };
+  // Auftrag 25: Profilbild und E-Mail gehen nie an eine KI
+  const { photo: _photo, email: _email, ...profile } = (ctx.profile || {}) as any;
+  return { ...ctx, profile, baseWeeks, planMeta, readinessWithheld: withheld, readinessSnapshot: snapshot, state: { ...ctx.state, trend, activities: acts, coachMsgs, adjustments, coachNotes: withheld ? {} : ctx.state.coachNotes } };
 }
 
 /* Gespräche und Wochenplanung: Sonnet 5.5 (halb so teuer wie Opus 5.5, reicht fürs Coaching); günstiges Modell für Routine (Briefings, Kommentare, Essensfotos) */

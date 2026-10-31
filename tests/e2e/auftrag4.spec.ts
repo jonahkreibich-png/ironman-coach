@@ -92,7 +92,7 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
 
 test('A7: Pace in Min und Sek getrennt eintragen (Zahlentastatur), geschätzte Werte sind markiert', async ({ page }) => {
   await seed(page);
-  await open(page, '/?go=einstellungen');
+  await open(page, '/?go=zonen');
   const m = page.locator('#z-tp-m');
   await expect(m).toHaveAttribute('inputmode', 'numeric');
   await expect(page.locator('#z-tp-s')).toHaveAttribute('inputmode', 'numeric');
@@ -182,7 +182,7 @@ test.describe('mit Server', () => {
     const inv = await (await request.post('/api/admin/testusers', { headers: { Authorization: 'Bearer ' + admin.token }, data: { note: 'Test: Papa' } })).json();
     // Gerät mit Daten einer anderen Person (nie verbunden)
     await seed(page);
-    await open(page, '/?go=daten');
+    await open(page, '/?go=konto');
     await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einladung' }).click();
     await expect(page.locator('#keep-inv')).not.toBeChecked();
     await page.fill('#inv-code', inv.code); await page.fill('#inv-name', 'Papa');
@@ -208,7 +208,7 @@ test.describe('mit Server', () => {
     expect(fb.feedback[0].screen).toContain('start');
     // Abmelden: Gerät frei für die nächste Person
     await page.locator('[data-act="back"]').click().catch(() => {});
-    await open(page, '/?go=daten');
+    await open(page, '/?go=konto');
     const out = page.locator('[data-act="sign-out"]'); await out.click(); await out.click();
     await page.waitForLoadState('load');
     await expect.poll(() => page.evaluate(() => localStorage.getItem('ec_sync_auth'))).toBeNull();
@@ -221,7 +221,7 @@ test.describe('mit Server', () => {
   test('A2/A3: „Verbinden“ im Fragebogen öffnet den Anbieter und kehrt mit allen Antworten an dieselbe Stelle zurück', async ({ page, request }) => {
     await request.post('/__reset');
     await seed(page, { noPlan: true });
-    await open(page, '/?go=daten');
+    await open(page, '/?go=konto');
     await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einrichtungscode' }).click();
     await page.locator('[data-act="sync-setup"]').click();
     await expect(page.locator('[data-sync-status]').first()).toBeVisible();
@@ -255,7 +255,7 @@ void TODAY;
 
 test('A1: alte, auf dem Gerät gespeicherte Standardwerte einer anderen Person werden durch eigene Schätzungen ersetzt', async ({ page }) => {
   await seed(page, { extra: d => { d.settings = { ...d.settings, lthrRun: 170, lthrBike: 165, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28, readiness: { rhrMax: 65, hrvMin: 35, tempMax: 0.5 } }; d.profile = { birthYear: 1976, sports: ['bike', 'run'], thresholds: { lthrRun: 170, lthrBike: 162, thresholdPaceRunSec: 339, thresholdSpeedBikeKmh: 28 } }; } });
-  await open(page, '/?go=einstellungen');
+  await open(page, '/?go=zonen');
   await expect(page.locator('[data-estimated]')).toBeVisible();
   const th = (await stored(page)).profile.thresholds;
   expect(th.lthrRun).not.toBe(170); expect(th.thresholdPaceRunSec).not.toBe(339); expect(th.thresholdSpeedBikeKmh).not.toBe(28);

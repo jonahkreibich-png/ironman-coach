@@ -1,17 +1,17 @@
 import { storage as localStorage } from '../persistence';
-/* Daten und Geräte: Sync mit dem eigenen Server, Geräte koppeln, Server-Sicherungen, Datei-Backup,
+/* Konto, Daten und Datenschutz, Über, Betreiber (früher „Daten und Geräte“): Sync mit dem eigenen Server, Geräte koppeln, Server-Sicherungen, Datei-Backup,
    Einladungen (nur Admin), Fehlerprotokoll und App-Info. */
 import { STATE, HAS_PLAN, hasLocalData } from '../store';
 import { esc, fmtDate, dowShort, ymd, daysBetween, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, armed, more, empty } from '../kit';
 import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify, deleteAccount, setupSignup } from '../sync';
-import { profile } from '../store';
+import { profile, saveProfile } from '../store';
 import { recoveryBanner } from './intro';
 import { backupText, parseBackupText, isBackup, isPlan, applyBackup, markBackedUp, shareBackupFile } from '../backup';
 import { readErrors } from '../errlog';
 import { checkForUpdate } from '../pwa';
-import { APP, APP_VERSION } from '../config';
+import { APP, APP_VERSION, APP_RELEASE } from '../config';
 import { isIOS, isStandalone } from './einstellungen';
 import { invalidate } from '../data';
 import { FEATURE_KEYS } from '../../../shared/features';
@@ -60,30 +60,60 @@ export function connectPanel(): string {
   </div>`;
 }
 
-export function renderDaten(): string {
-  let h = '';
+/* Auftrag 25: früher eine lange Seite „Daten und Geräte“, jetzt vier Unterseiten im Mehr-Tab:
+   Konto (E-Mail, Anmeldung, Geräte, Wiederherstellung, Abmelden), Daten und Datenschutz (Backup, Export, Konto löschen),
+   Über (App, Version, Fehlerprotokoll) und Betreiber (nur Admin: Einladungen, Nutzer, KI-Verbrauch, Serverfehler). */
+export function renderKonto(): string {
+  let h = sec(t('acc.email'), emailCard());
   // Auftrag 15: ein Konto ohne Einladung, mit einem Tipp; Codes (Kopplung, Einladung, Wiederherstellung, Einrichtung) darunter
   if (!isSyncOn()) h += sec(t('data.sync'), `<div class="card stack"><div class="hint">${esc(t('data.syncIntro'))}</div><div class="hint">${esc(t('data.signupHint'))}</div><button class="btn block" data-act="acc-signup">${esc(t('data.signup'))}</button>${more(t('data.haveCode'), connectPanel())}</div>`);
   else {
     if (DEVICES == null) loadLists();
     const S = syncInfo();
+    h = recoveryBanner() + h;
     h += sec(t('data.sync'), `<div class="card stack"><div class="spread">${syncStatusBadge()}<button class="btn ghost sm" data-act="sync-now">${ic('sync')} ${esc(t('data.syncNow'))}</button></div>
-      ${S.lastError && S.status !== 'ok' ? `<div class="hint">${esc(S.lastError)}</div>` : ''}
-      <div class="lbl">${esc(t('data.devices'))}</div>
+      ${S.lastError && S.status !== 'ok' ? `<div class="hint">${esc(S.lastError)}</div>` : ''}</div>`);
+    h += sec(t('data.devices'), `<div class="card stack">
       ${DEVICES == null ? `<div class="hint">${esc(t('common.loading'))}</div>` : `<div class="list">${DEVICES.map(d => `<div class="li" data-dev="${esc(d.id)}"><span class="ic">${ic('phone')}</span><span class="grow"><span class="t">${esc(d.name)}${d.self ? ' ' + pill(t('data.thisDevice')) : ''}</span><br><span class="s">${esc(t('data.lastSeen', { ago: d.lastSeen ? ago(d.lastSeen) : '–' }))}</span></span>${d.self ? '' : `<button class="btn danger sm" data-act="dev-del">${esc(t('common.remove'))}</button>`}</div>`).join('')}</div>`}
       ${PAIR && PAIR.expiresAt > Date.now() ? `<div class="pair-code num">${esc(PAIR.code)}</div><div class="hint">${esc(t('data.pairShow', { time: time(PAIR.expiresAt) }))}</div>` : `<button class="btn ghost" data-act="pair-create">${ic('plus')} ${esc(t('data.addDevice'))}</button>`}
       <button class="link" data-act="sync-off">${esc(t('data.syncOff'))}</button></div>`);
-    h = recoveryBanner() + h;
     h += sec(t('data.recovery'), `<div class="card stack"><div class="hint">${esc(t('data.recoveryHint'))}</div>${NEW_RC ? `<div class="pair-code num" data-new-rc>${esc(NEW_RC)}</div><div class="hint">${esc(t('intro.rcHint'))}</div>` : ''}<button class="btn ghost" data-act="rc-new">${esc(t('data.recoveryNew'))}</button></div>`);
-    if (ME && ME.role === 'admin') h += sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside')) + sec(t('data.wai'), waiCard(), t('data.usersAside'));
   }
-  h += sec(t('data.backup'), backupCard(), STATE.lastBackupAt ? t('data.lastBackup', { d: fmtDate(STATE.lastBackupAt.slice(0, 10)) }) : '');
   if (isSyncOn() || hasLocalData()) h += sec(t('data.signOut'), `<div class="card stack"><div class="hint">${esc(t(isSyncOn() ? 'data.signOutHint' : 'data.wipeHint'))}</div><button class="btn danger" data-act="sign-out">${esc(t(isSyncOn() ? 'data.signOutBtn' : 'data.wipeBtn'))}</button></div>`);
+  return h;
+}
+/* E-Mail (freiwillig): steht im Profil, wird mit dem Konto gesichert und nur für Rückfragen zu deinen Meldungen genutzt; die App verschickt nichts */
+function emailCard(): string {
+  const v = String((profile() as any).email || '');
+  return `<div class="card stack"><div class="fld"><label for="acc-email">${esc(t('acc.emailLabel'))}</label><input class="inp" id="acc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" data-ch="acc-email" value="${esc(v)}" placeholder="name@beispiel.de"></div><div class="hint">${esc(t('acc.emailHint'))}</div></div>`;
+}
+export const validEmail = (s: string) => s === '' || (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s) && s.length <= 120);
+onChange('acc-email', el => {
+  const v = (el as HTMLInputElement).value.trim();
+  if (!validEmail(v)) { toast(t('acc.emailInvalid')); return; }
+  const p: any = { ...profile() }; if (v) p.email = v; else delete p.email;
+  saveProfile(p); toast(v ? t('common.saved') : t('acc.emailRemoved'));
+});
+
+export function renderDaten(): string {
+  if (isSyncOn() && DEVICES == null) loadLists();
+  let h = sec(t('data.backup'), backupCard(), STATE.lastBackupAt ? t('data.lastBackup', { d: fmtDate(STATE.lastBackupAt.slice(0, 10)) }) : '');
   if (isSyncOn()) h += sec(t('data.account'), `<div class="card stack"><div class="hint">${esc(t('data.exportHint'))}</div><button class="btn ghost" data-act="acc-export">${esc(t('data.export'))}</button>
     ${ME && ME.role === 'admin' ? '' : `<div class="lbl" style="margin-top:var(--s3)">${esc(t('data.deleteTitle'))}</div><div class="hint">${esc(t('data.deleteHint'))}</div><div class="fld"><label for="acc-confirm">${esc(t('data.deleteType'))}</label><input class="inp" id="acc-confirm" autocomplete="off" autocapitalize="characters"></div><button class="btn danger" data-act="acc-delete">${esc(t('data.deleteBtn'))}</button>`}</div>`);
-  h += sec(t('data.errors'), errorsCard());
-  h += sec(t('data.app'), appCard(), t('data.version', { v: APP_VERSION }));
+  else h += sec(t('data.account'), `<div class="card stack"><div class="hint">${esc(t('data.localOnly'))}</div>${hasLocalData() ? `<button class="btn ghost" data-act="go-sub" data-sub="konto">${esc(t('data.toAccount'))}</button>` : ''}</div>`);
+  h += sec(t('data.privacy'), `<div class="card"><div class="hint">${esc(t('data.privacyHint'))}</div></div>`);
   return h;
+}
+export function renderUeber(): string {
+  return sec(t('data.app'), appCard(), t('data.version', { v: APP_RELEASE + ' (' + APP_VERSION + ')' })) + sec(t('data.errors'), errorsCard());
+}
+export function renderBetreiber(): string {
+  if (!isSyncOn()) return `<div class="card"><div class="hint">${esc(t('data.operatorOnly'))}</div></div>`;
+  if (DEVICES == null) loadLists();
+  if (!ME) return `<div class="card">${empty(t('common.loading'))}</div>`;
+  if (ME.role !== 'admin') return `<div class="card"><div class="hint">${esc(t('data.operatorOnly'))}</div></div>`;
+  return sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside')) + sec(t('data.wai'), waiCard(), t('data.usersAside'))
+    + sec(t('data.serverErrors'), `<div class="card stack"><button class="btn ghost sm" data-act="err-server">${esc(t('data.errorsServer'))}</button>${SERVER_ERR ? `<div class="list">${SERVER_ERR.slice(0, 15).map(e => `<div class="li"><span class="grow"><span class="t small">${esc(e.msg || e.message || '')}</span><br><span class="s">${esc(new Date(e.at || e.ts || 0).toLocaleString('de-DE'))} · ${esc(e.source || '')} ${esc(e.place || '')}</span></span></div>`).join('') || empty(t('data.noErrors'))}</div>` : ''}</div>`);
 }
 
 on('acc-signup', el => busy(el, async () => { await setupSignup(String((profile() as any).name || '')); resetDatenCache(); nav.rerender(); toast(t('data.signupDone')); }));
@@ -151,8 +181,7 @@ export function backupDue(): boolean {
 function errorsCard(): string {
   const local = readErrors().slice(-8).reverse();
   return `<div class="card stack"><div class="hint">${esc(t('data.errorsHint'))}</div>
-    ${local.length ? `<div class="list">${local.map(e => `<div class="li"><span class="grow"><span class="t small">${esc(e.msg)}</span><br><span class="s">${esc(new Date(e.at).toLocaleString('de-DE'))} · ${esc(e.where)} · ${esc(e.version)}</span></span></div>`).join('')}</div>` : empty(t('data.noErrors'))}
-    ${isSyncOn() && ME && ME.role === 'admin' ? `<button class="btn ghost sm" data-act="err-server">${esc(t('data.errorsServer'))}</button>${SERVER_ERR ? `<div class="list">${SERVER_ERR.slice(0, 15).map(e => `<div class="li"><span class="grow"><span class="t small">${esc(e.msg || e.message || '')}</span><br><span class="s">${esc(new Date(e.at || e.ts || 0).toLocaleString('de-DE'))} · ${esc(e.source || '')} ${esc(e.place || '')}</span></span></div>`).join('') || empty(t('data.noErrors'))}</div>` : ''}` : ''}</div>`;
+    ${local.length ? `<div class="list">${local.map(e => `<div class="li"><span class="grow"><span class="t small">${esc(e.msg)}</span><br><span class="s">${esc(new Date(e.at).toLocaleString('de-DE'))} · ${esc(e.where)} · ${esc(e.version)}</span></span></div>`).join('')}</div>` : empty(t('data.noErrors'))}</div>`;
 }
 
 const DOTS = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="vertical-align:-3px" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';

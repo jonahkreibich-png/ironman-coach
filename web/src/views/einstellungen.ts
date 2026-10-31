@@ -17,6 +17,9 @@ import { nav } from '../nav';
 import { toast } from '../toast';
 import { keepDays } from './coach';
 import { reviewMode } from '../review';
+import { DAYS } from '../store';
+import { effStatus } from '../domain';
+import { isTestS } from '../../../shared/trainingrules';
 
 const NOTIFY_DEFAULTS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
@@ -41,19 +44,46 @@ export function applyTheme(v: string) {
   try { localStorage.setItem(STORAGE.theme, v); } catch (e) {}
 }
 
-export function renderEinstellungen(): string {
-  let h = sec(t('set.look'), `<div class="card stack"><div class="seg" role="group" aria-label="${esc(t('set.theme'))}">${[['', t('set.system')], ['light', t('set.light')], ['dark', t('set.dark')]].map(([v, l]) => `<button class="${theme() === v ? 'on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${theme() === v}">${esc(l)}</button>`).join('')}</div>
+/* Auftrag 25: Die frühere Seite „Einstellungen“ ist auf eigene Unterseiten im Mehr-Tab verteilt (nichts entfernt):
+   Zonen und Tests, Mitteilungen, Darstellung, Coach und KI, Einheiten, Sprache. Krankheitsphasen und Zyklus stehen unter
+   Berücksichtigungen, die Laufschuhe unter Ausrüstung. */
+export const themeLabel = () => theme() === 'light' ? t('set.light') : theme() === 'dark' ? t('set.dark') : t('set.system');
+export function notifySummary(): string {
+  if (!isSyncOn()) return t('mehr.notifyNoAccount');
+  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+  if (perm === 'denied') return t('mehr.notifyBlocked');
+  return PUSH && PUSH.thisDevice && perm === 'granted' ? t('mehr.notifyOn') : t('mehr.notifyOff');
+}
+export function renderDarstellung(): string {
+  return sec(t('set.look'), `<div class="card stack"><div class="seg" role="group" aria-label="${esc(t('set.theme'))}">${[['', t('set.system')], ['light', t('set.light')], ['dark', t('set.dark')]].map(([v, l]) => `<button class="${theme() === v ? 'on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${theme() === v}">${esc(l)}</button>`).join('')}</div>
     <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`);
-  h += sec(t('set.zones'), zonesCard(), t('set.zonesAside'));
-  h += sec(t('set.notify'), notifyCard());
-  h += sec(t('set.chat'), `<div class="card stack"><span class="lab">${esc(t('set.chatKeep'))}</span><div class="seg" role="group" aria-label="${esc(t('set.chatKeep'))}">${[3, 7, 14].map(n => `<button class="${keepDays() === n ? 'on' : ''}" aria-pressed="${keepDays() === n}" data-act="set-chat-keep" data-v="${n}">${esc(t('set.chatDays', { n }))}</button>`).join('')}</div><div class="hint">${esc(t('set.chatKeepHint'))}</div>
+}
+export function renderZonen(): string {
+  return sec(t('set.zones'), zonesCard(), t('set.zonesAside')) + sec(t('set.tests'), testsCard()) + sec(t('set.ready'), readyCard(), t('set.readyAside')) + sec(t('set.score'), scoreCard(), t('set.scoreAside'));
+}
+export function renderMitteilungen(): string { return sec(t('set.notify'), notifyCard()); }
+export function renderCoachSet(): string {
+  return sec(t('set.ai'), aiCard()) + sec(t('set.chat'), `<div class="card stack"><span class="lab">${esc(t('set.chatKeep'))}</span><div class="seg" role="group" aria-label="${esc(t('set.chatKeep'))}">${[3, 7, 14].map(n => `<button class="${keepDays() === n ? 'on' : ''}" aria-pressed="${keepDays() === n}" data-act="set-chat-keep" data-v="${n}">${esc(t('set.chatDays', { n }))}</button>`).join('')}</div><div class="hint">${esc(t('set.chatKeepHint'))}</div>
     <span class="lab">${esc(t('set.review'))}</span><div class="seg" role="group" aria-label="${esc(t('set.review'))}" data-review-mode>${[['full', t('set.reviewFull')], ['short', t('set.reviewShort')], ['off', t('set.reviewOff')]].map(([v, l]) => `<button class="${reviewMode() === v ? 'on' : ''}" aria-pressed="${reviewMode() === v}" data-act="set-review" data-v="${v}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t('set.reviewHint'))}</div></div>`);
-  h += sec(t('set.ai'), aiCard());
-  h += sec(t('set.illness'), illnessCard());
-  h += sec(t('set.ready'), readyCard(), t('set.readyAside'));
-  h += sec(t('set.care'), careCard());
-  h += sec(t('set.score'), scoreCard(), t('set.scoreAside'));
-  return h;
+}
+/* Einheiten und Sprache: früher im Profil, jetzt je eine Auswahl-Liste */
+function choiceList(k: 'units' | 'lang', label: string, opts: string[][]): string {
+  const cur = (profile() as any)[k];
+  return `<div class="list" role="radiogroup" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button class="li" role="radio" aria-checked="${cur === v}" data-act="set-pf" data-k="${k}" data-v="${v}"><span class="grow"><span class="t">${esc(l)}</span></span>${cur === v ? `<span class="v" style="color:var(--accent)">${ic('check')}</span>` : ''}</button>`).join('')}</div>`;
+}
+export function renderEinheiten(): string { return sec(t('prof.units'), choiceList('units', t('prof.units'), [['metric', t('prof.metric')], ['imperial', t('prof.imperial')]])); }
+export function renderSprache(): string { return sec(t('prof.language'), choiceList('lang', t('prof.language'), [['de', 'Deutsch'], ['en', 'English (beta)']])); }
+on('set-pf', el => { const k = el.dataset.k!, v = el.dataset.v!; if (k !== 'units' && k !== 'lang') return; saveProfile({ ...profile(), [k]: v } as any); invalidate(); nav.rerender(); toast(t('common.saved')); });
+
+/* Auftrag 25: Tests aus dem Plan (nächste und erledigte), Antippen öffnet die Einheit */
+function testsCard(): string {
+  const today = todayStr();
+  const all = DAYS.flatMap((d: any) => (d.sessions || []).filter((s: any) => isTestS(s) && !s.cancelled).map((s: any) => ({ ...s, date: d.date })));
+  const next = all.filter((s: any) => s.date >= today && effStatus(s) !== 'done').slice(0, 3);
+  const done = all.filter((s: any) => effStatus(s) === 'done').slice(-3).reverse();
+  const row = (s: any, label: string) => `<button class="li" data-act="sess-open" data-sid="${esc(s.id)}"><span class="ic" style="--c:var(--${esc(s.sport)})">${ic(s.sport)}</span><span class="grow"><span class="t">${esc(s.title)}</span><br><span class="s">${esc(label)} · ${esc(fmtDate(s.date))}</span></span><span class="chev">${ic('right')}</span></button>`;
+  const rows = [...next.map((s: any) => row(s, t('set.testNext'))), ...done.map((s: any) => row(s, t('set.testDone')))].join('');
+  return `<div class="stack" data-tests>${rows ? `<div class="list">${rows}</div>` : `<div class="card"><div class="hint">${esc(t('set.testsNone'))}</div></div>`}<div class="hint">${esc(t('set.testsHint'))}</div></div>`;
 }
 
 /* ---------- Zonen ---------- */
@@ -194,7 +224,7 @@ onChange('ai-on', el => { STATE.settings.ai = { ...(STATE.settings.ai || {}), en
 onChange('ai-set', el => { STATE.settings.ai = { ...(STATE.settings.ai || {}), [el.dataset.k!]: +(el as HTMLSelectElement).value }; saveState(); setTimeout(() => loadAiState().then(() => nav.rerender()), 1800); toast(t('common.saved')); });
 
 /* ---------- Krankheitsphasen ---------- */
-function illnessCard(): string {
+export function illnessCard(): string {
   const list = [...(STATE.illnessPeriods || [])].sort((a: any, b: any) => String(b.start).localeCompare(String(a.start)));
   return `<div class="card stack"><div class="hint">${esc(t('set.illnessHint'))}</div>
     ${list.map((p: any) => `<div class="fgrid" data-ill="${esc(p.id)}" style="padding-top:10px;border-top:1px solid var(--line)">
@@ -217,15 +247,18 @@ onChange('ill-f', el => {
   saveState(); invalidate(); nav.rerender();
 });
 
-/* ---------- Auftrag 18: freiwillig – Laufschuhe und Zyklus ---------- */
-function careCard(): string {
-  const sh = STATE.settings.shoe || {}; const cy = STATE.settings.cycle || {};
-  return `<div class="card stack" data-care><div class="hint">${esc(t('set.careHint'))}</div>
+/* ---------- Auftrag 18: freiwillig – Laufschuhe (Auftrag 25: unter Ausrüstung) und Zyklus (unter Berücksichtigungen) ---------- */
+export function shoeCard(): string {
+  const sh = STATE.settings.shoe || {};
+  return `<div class="card stack" data-care><div class="hint">${esc(t('set.shoeHint'))}</div>
     <span class="lab">${esc(t('set.shoe'))}</span><div class="fgrid">
       <div class="fld"><label for="shoe-name">${esc(t('set.shoeName'))}</label><input id="shoe-name" class="inp" data-ch="care" data-g="shoe" data-k="name" value="${esc(sh.name || '')}"></div>
       <div class="fld"><label for="shoe-since">${esc(t('set.shoeSince'))}</label><input id="shoe-since" class="inp" type="date" data-ch="care" data-g="shoe" data-k="since" value="${esc(sh.since || '')}"></div>
-      <div class="fld"><label for="shoe-km0">${esc(t('set.shoeKm0'))}</label><input id="shoe-km0" class="inp" inputmode="numeric" data-ch="care" data-g="shoe" data-k="km0" value="${sh.km0 ?? ''}"></div></div>
-    <label class="row"><input type="checkbox" data-ch="care" data-g="cycle" data-k="on" ${cy.on ? 'checked' : ''}> ${esc(t('set.cycleOn'))}</label>
+      <div class="fld"><label for="shoe-km0">${esc(t('set.shoeKm0'))}</label><input id="shoe-km0" class="inp" inputmode="numeric" data-ch="care" data-g="shoe" data-k="km0" value="${sh.km0 ?? ''}"></div></div></div>`;
+}
+export function cycleCard(): string {
+  const cy = STATE.settings.cycle || {};
+  return `<div class="card stack" data-cycle><div class="hint">${esc(t('set.cycleHint'))}</div><label class="row"><input type="checkbox" data-ch="care" data-g="cycle" data-k="on" ${cy.on ? 'checked' : ''}> ${esc(t('set.cycleOn'))}</label>
     ${cy.on ? `<div class="fgrid"><div class="fld"><label for="cy-start">${esc(t('set.cycleStart'))}</label><input id="cy-start" class="inp" type="date" data-ch="care" data-g="cycle" data-k="start" value="${esc(cy.start || '')}"></div>
       <div class="fld"><label for="cy-len">${esc(t('set.cycleLen'))}</label><input id="cy-len" class="inp" inputmode="numeric" data-ch="care" data-g="cycle" data-k="length" value="${cy.length ?? 28}"></div></div>` : ''}</div>`;
 }

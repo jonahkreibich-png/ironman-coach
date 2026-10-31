@@ -1,5 +1,5 @@
 /* Berücksichtigungen (Auftrag 4 C3, Auftrag 5 A2/A3): Wochenraster (welche Sportart an welchem Tag), Sätze in eigenen Worten mit
-   „So habe ich es verstanden“, Können (Kraul, Laufen am Stück, längste Radfahrt) und Räder.
+   „So habe ich es verstanden“, Können (Kraul, Laufen am Stück, längste Radfahrt), Krankheitsphasen und Zyklus. Räder, Hilfsmittel und Schuhe: Ausrüstung.
    Alles landet im Regel-Modell (shared/constraints.ts). Änderungen werden erst vorgemerkt (Auftrag 6): „X Änderungen übernehmen“
    zeigt, was sich im Plan ändert, dann werden die kommenden Wochen neu geplant und die laufende Woche an die Regeln angepasst. */
 import { profile, saveProfile, HAS_PLAN } from '../store';
@@ -16,6 +16,7 @@ import { gridHtml, listHtml, addHtml, registerTarget, weekHtml } from './rules';
 import { weekSummary } from '../../../shared/weekgrid';
 import { dayCap } from '../../../shared/plangen';
 import { todayStr } from '../util';
+import { illnessCard, cycleCard, shoeCard } from './einstellungen';
 
 const SCREEN = 'beruecksichtigungen';
 const MONTH_OPTS = (): [string, string][] => Array.from({ length: 12 }, (_, i) => [String(i + 1), t('month.' + (i + 1))]);
@@ -50,12 +51,28 @@ export function renderBeruecksichtigungen(): string {
     ${p.sports.includes('run') ? field('cs-run', t('cons.runMin'), sk.runContinuousMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="runContinuousMin" data-num="1"' }) : ''}
     ${p.sports.includes('bike') ? field('cs-bike', t('cons.bikeMin'), sk.bikeLongestMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="bikeLongestMin" data-num="1"' }) : ''}</div>
     ${p.sports.includes('swim') ? `<div class="fgrid">${select('cs-pool', t('cons.pool'), String(sk.poolM || ''), [['', '–'], ['25', '25 m'], ['50', '50 m'], ['both', t('cons.poolBoth')]], 'data-ch="cs" data-k="poolM"')}</div>${toggle('cs-ow', t('cons.openWater'), !!sk.openWater, 'data-ch="cs" data-k="openWater" data-bool="1"')}${sk.openWater ? `<div class="fgrid">${select('cs-owf', t('cons.owFrom'), String(sk.openWaterFrom || 6), MONTH_OPTS(), 'data-ch="cs" data-k="openWaterFrom" data-num="1"')}${select('cs-owt', t('cons.owTo'), String(sk.openWaterTo || 9), MONTH_OPTS(), 'data-ch="cs" data-k="openWaterTo" data-num="1"')}</div>` : ''}` : ''}
-    ${p.sports.includes('swim') ? `<div class="lbl">${esc(t('cons.swimGear'))}</div><div class="chips" style="flex-wrap:wrap" data-swimgear>${SWIM_GEAR_OPTIONS.map(([k, l]) => `<button class="chip ${((sk.swimGear || []) as string[]).includes(k) ? 'on' : ''}" aria-pressed="${((sk.swimGear || []) as string[]).includes(k)}" data-act="cs-gear" data-v="${k}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t(sk.swimGear == null ? 'cons.swimGearNone' : 'cons.swimGearHint'))}</div>` : ''}
     ${p.sports.includes('swim') && sk.swimCrawl !== 'yes' ? toggle('cs-breast', t('cons.breast'), !!sk.swimBreast, 'data-ch="cs" data-k="swimBreast" data-bool="1"') : ''}
-    ${p.sports.includes('bike') ? `<div class="lbl">${esc(t('cons.bikes'))}</div><div class="chips" style="flex-wrap:wrap">${BIKE_OPTIONS.map(([k, l]) => `<button class="chip ${(p.bikes || []).includes(k) ? 'on' : ''}" aria-pressed="${(p.bikes || []).includes(k)}" data-act="cs-bike" data-v="${k}">${esc(l)}</button>`).join('')}</div>${toggle('cs-pm', t('cons.powerMeter'), !!p.powerMeter, 'data-ch="cs-pm"')}${(p.bikes || []).some(b => b === 'trainer' || b === 'spin') ? `<div>${select('cs-tt', t('cons.trainer'), p.trainerType || '', [['', '–'], ['smart', t('cons.trainerSmart')], ['basic', t('cons.trainerBasic')]], 'data-ch="cs-tt"')}</div><div class="hint">${esc(t('cons.trainerHint'))}</div>` : ''}` : ''}
     ${p.sports.includes('run') || p.sports.includes('bike') ? `<div class="lbl">${esc(t('cons.terrain'))}</div><div class="chips" style="flex-wrap:wrap" data-terrain>${[['hills', t('cons.terrainHills')], ['track', t('cons.terrainTrack')]].map(([k, l]) => { const on0 = !!(p.terrain && (p.terrain as any)[k]); return `<button class="chip ${on0 ? 'on' : ''}" aria-pressed="${on0}" data-act="cs-terrain" data-v="${k}">${esc(l)}</button>`; }).join('')}</div><div class="hint">${esc(t('cons.terrainHint'))}</div>` : ''}</div>`);
   if (!LAST && HAS_PLAN) h += `<div class="hint">${esc(t('cons.replanHint'))}</div>`;
+  h += sec(t('set.illness'), illnessCard());
+  if (p.sex !== 'm') h += sec(t('set.cycle'), cycleCard());
   return h + stageBarHtml(SCREEN);
+}
+
+/* Auftrag 25: Ausrüstung als eigene Seite (Räder, Wattmesser, Rolle, Schwimm-Hilfsmittel, Laufschuhe). Änderungen an Rad und Hilfsmitteln
+   bestimmen den Plan und werden wie bisher erst vorgemerkt; die Laufschuhe gelten sofort. */
+const GEAR = 'ausruestung';
+export function renderAusruestung(): string {
+  const p = draftProfile(GEAR); const sk = p.skills || {};
+  const LAST = lastApplied(GEAR);
+  let h = LAST ? `<div class="banner good" data-replanned style="margin-bottom:var(--s3)">${esc(LAST)}</div>` : '';
+  const bike = p.sports.includes('bike') ? `<div class="card stack" data-gear-bike><div class="lbl">${esc(t('cons.bikes'))}</div><div class="chips" style="flex-wrap:wrap">${BIKE_OPTIONS.map(([k, l]) => `<button class="chip ${(p.bikes || []).includes(k) ? 'on' : ''}" aria-pressed="${(p.bikes || []).includes(k)}" data-act="cs-bike" data-v="${k}">${esc(l)}</button>`).join('')}</div>${toggle('cs-pm', t('cons.powerMeter'), !!p.powerMeter, 'data-ch="cs-pm"')}${(p.bikes || []).some(b => b === 'trainer' || b === 'spin') ? `<div>${select('cs-tt', t('cons.trainer'), p.trainerType || '', [['', '–'], ['smart', t('cons.trainerSmart')], ['basic', t('cons.trainerBasic')]], 'data-ch="cs-tt"')}</div><div class="hint">${esc(t('cons.trainerHint'))}</div>` : ''}</div>` : '';
+  const swim = p.sports.includes('swim') ? `<div class="card stack" data-gear-swim><div class="lbl">${esc(t('cons.swimGear'))}</div><div class="chips" style="flex-wrap:wrap" data-swimgear>${SWIM_GEAR_OPTIONS.map(([k, l]) => `<button class="chip ${((sk.swimGear || []) as string[]).includes(k) ? 'on' : ''}" aria-pressed="${((sk.swimGear || []) as string[]).includes(k)}" data-act="cs-gear" data-v="${k}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t(sk.swimGear == null ? 'cons.swimGearNone' : 'cons.swimGearHint'))}</div></div>` : '';
+  if (bike) h += sec(t('gear.bike'), bike);
+  if (swim) h += sec(t('gear.swim'), swim);
+  if (p.sports.includes('run')) h += sec(t('gear.run'), shoeCard());
+  if (!bike && !swim && !p.sports.includes('run')) h += `<div class="card"><div class="hint">${esc(t('gear.none'))}</div></div>`;
+  return h + stageBarHtml(GEAR);
 }
 onChange('cs', el => {
   const k = el.dataset.k!; const inp = el as HTMLInputElement;
@@ -65,11 +82,11 @@ onChange('cs', el => {
   if (k === 'openWater' && v) { stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), openWater: true, openWaterFrom: (p.skills || {}).openWaterFrom || 6, openWaterTo: (p.skills || {}).openWaterTo || 9 }; }); return; }
   stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), [k]: v || (v === 0 ? 0 : null) }; });
 });
-on('cs-gear', el => { const v = el.dataset.v!; stage(SCREEN, (p: any) => { const cur: string[] = (p.skills || {}).swimGear || []; p.skills = { ...(p.skills || {}), swimGear: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] }; }); });
+on('cs-gear', el => { const v = el.dataset.v!; stage(GEAR, (p: any) => { const cur: string[] = (p.skills || {}).swimGear || []; p.skills = { ...(p.skills || {}), swimGear: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] }; }); });
 on('cs-terrain', el => { const v = el.dataset.v as 'hills' | 'track'; stage(SCREEN, (p: any) => { const cur = { ...(p.terrain || {}) }; cur[v] = !cur[v]; p.terrain = cur; }); });
-onChange('cs-pm', el => { const v = (el as HTMLInputElement).checked; stage(SCREEN, p => { p.powerMeter = v; }); });
-onChange('cs-tt', el => { const v = (el as HTMLSelectElement).value; stage(SCREEN, p => { p.trainerType = v === 'smart' || v === 'basic' ? v : null; }); });
-on('cs-bike', el => { const v = el.dataset.v!; stage(SCREEN, p => { p.bikes = (p.bikes || []).includes(v) ? p.bikes.filter(x => x !== v) : [...(p.bikes || []), v]; }); });
+onChange('cs-pm', el => { const v = (el as HTMLInputElement).checked; stage(GEAR, p => { p.powerMeter = v; }); });
+onChange('cs-tt', el => { const v = (el as HTMLSelectElement).value; stage(GEAR, p => { p.trainerType = v === 'smart' || v === 'basic' ? v : null; }); });
+on('cs-bike', el => { const v = el.dataset.v!; stage(GEAR, p => { p.bikes = (p.bikes || []).includes(v) ? p.bikes.filter(x => x !== v) : [...(p.bikes || []), v]; }); });
 
 /* Teamsport mit derselben Logik wie im Fragebogen (Auftrag 11): erst „Gibt es Spiele?“, nur dann Spieltage und Dauer */
 const DOWS = [1, 2, 3, 4, 5, 6, 0];

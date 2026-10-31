@@ -9,7 +9,7 @@ import * as C from '../../shared/core';
 const ALL = manyUsers19();
 const USERS = ALL.filter((u, i) => i >= 52 || i % 4 === 0);
 const TECH = /\bServer\b|\bAPI\b|Secret|TOKEN_KEY|_CLIENT_|APP_SECRET|Betreiber|wrangler|FUER-JONAH|Sync einrichten|Einrichtungscode/;
-const SCREENS = ['heute', 'plan', 'coach', 'fortschritt', 'mehr', 'profil', 'werte', 'verbindungen', 'daten', 'einstellungen', 'beruecksichtigungen'];
+const SCREENS = ['heute', 'plan', 'coach', 'fortschritt', 'mehr', 'profil', 'werte', 'verbindungen', 'konto', 'daten', 'zonen', 'ausruestung', 'coachset', 'mitteilungen', 'beruecksichtigungen'];
 const SPORT_TITLE: Record<string, RegExp> = { run: /Lauf|Fahrtspiel|Hügelsprints/, bike: /Ausfahrt|Rad |Rolle|Sweet Spot|Over-Unders/, swim: /Schwimm|Kraul|Freiwasser/ };
 
 async function problems(page: Page): Promise<string[]> {

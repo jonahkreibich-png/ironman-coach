@@ -110,6 +110,9 @@ export const BIKE_TYPES = ['road', 'gravel', 'mtb', 'tt', 'trekking', 'ebike', '
 
 export interface Profile {
   name: string;
+  /** Auftrag 25: Profilbild (kleines JPEG als data-URL) und freiwillige E-Mail; gehen nie an eine KI (server/src/ai.ts aiSafeCtx) */
+  photo?: string;
+  email?: string;
   birthYear: number | null;
   sex?: 'f' | 'm' | 'd' | null;
   heightCm: number | null;

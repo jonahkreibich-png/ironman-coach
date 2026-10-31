@@ -148,7 +148,7 @@ export function renderCoach(): string {
   h += `<div class="composer"><textarea id="coach-in" rows="1" placeholder="${esc(t('coach.ask'))}" aria-label="${esc(t('coach.ask'))}"></textarea><button class="btn" data-act="coach-send" aria-label="${esc(t('coach.send'))}">${ic('right')}</button></div>`;
   if (ai.tier === 'claude') h += `<div class="xs muted" style="text-align:center;margin-top:6px">${esc(t('coach.aiCost', { used: ai.monthUsd.toFixed(2), budget: ai.budgetUsd.toFixed(2) }))}</div>`;
   else if (ai.tier === 'free' && ai.free) h += `<div class="xs muted" style="text-align:center;margin-top:6px" data-free-count>${esc(t('coach.freeAiToday', { n: ai.free.todayQuestions || 0, max: ai.free.maxPerDay || 30 }))}</div>`;
-  else h += `<div class="hint" style="text-align:center;margin-top:var(--s2)"><button class="link" data-act="go-sub" data-sub="einstellungen">${esc(t('coach.aiSettings'))}</button></div>`;
+  else h += `<div class="hint" style="text-align:center;margin-top:var(--s2)"><button class="link" data-act="go-sub" data-sub="coachset">${esc(t('coach.aiSettings'))}</button></div>`;
   return h;
 }
 export function scrollCoachBottom() { const f = document.querySelector('.feed'); if (f) window.scrollTo(0, document.body.scrollHeight); }

@@ -274,7 +274,7 @@ export function runTestUpdate(state: any, weeks: any[], profile: any, today: str
         const parts = [`Schwellenpuls ${th.lthrRun || '–'} → ${hr}`, pace ? `Schwellen-Pace ${th.thresholdPaceRunSec ? mmss(th.thresholdPaceRunSec) : '–'} → ${mmss(pace)}/km` : '', aet ? `aerobe Schwelle ${th.aetHr[0]}-${th.aetHr[1]} → ${aet[0]}-${aet[1]}` : ''].filter(Boolean);
         return { sport: 'run', sessionId: s.id, date: d.date, lthrRun: hr, thresholdPaceRunSec: pace, aetHr: aet, title: 'Zonen aktualisiert',
           thresholds: { lthrRun: hr, ...(pace ? { thresholdPaceRunSec: pace } : {}), ...(aet ? { aetHr: aet } : {}) }, settings: { lthrRun: hr, ...(pace ? { thresholdPaceRunSec: pace } : {}) },
-          text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit. Ändern kannst du die Werte unter Mehr → Einstellungen.` };
+          text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit. Ändern kannst du die Werte unter Mehr → Zonen und Tests.` };
       }
       if (s.sport === 'bike') {
         let hr: number | null = null, watt: number | null = null, kmh: number | null = null;

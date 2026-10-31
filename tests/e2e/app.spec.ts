@@ -19,7 +19,7 @@ test.describe('Grundfunktionen', () => {
         await expect(tab(page, id)).toHaveAttribute('aria-current', 'page');
         await expect(page.locator(`.view[data-view="${id}"]`)).not.toBeEmpty();
       }
-      for (const sub of ['werte', 'essen', 'profil', 'verbindungen', 'einstellungen', 'daten', 'onboarding', 'generator']) {
+      for (const sub of ['werte', 'essen', 'profil', 'verbindungen', 'konto', 'zonen', 'ausruestung', 'mitteilungen', 'darstellung', 'coachset', 'einheiten', 'sprache', 'daten', 'ueber', 'onboarding', 'generator']) {
         await tab(page, 'mehr').click();
         await page.locator(`[data-act="go-sub"][data-sub="${sub}"]`).first().click();
         await expect(page.locator(`.view[data-view="${sub}"]`)).not.toBeEmpty();
@@ -97,7 +97,7 @@ test.describe('Grundfunktionen', () => {
 
   test('Darstellung: dunkel und Heute-Variante B', async ({ page }) => {
     await tab(page, 'mehr').click();
-    await page.locator('[data-sub="einstellungen"]').click();
+    await page.locator('[data-sub="darstellung"]').click();
     await page.locator('[data-act="set-theme"][data-v="dark"]').click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.locator('[data-act="set-variant"][data-v="feed"]').click();
@@ -108,7 +108,7 @@ test.describe('Grundfunktionen', () => {
 
   test('Ziel anlegen und Score-Erklärung öffnen', async ({ page }) => {
     await tab(page, 'mehr').click();
-    await page.locator('[data-sub="profil"]').click();
+    await page.locator('.mrow[data-sub="profil"]').click();
     await page.locator('[data-act="goal-new"]').click();
     await page.selectOption('#g-type', 'run_10k');
     await page.fill('#g-date', '2027-04-18'); await page.locator('#g-date').blur();
@@ -128,7 +128,7 @@ test.describe('Grundfunktionen', () => {
 test('Sync einrichten, Verbindungen und Kurzbefehl-Schlüssel', async ({ page, request }) => {
   await request.post('/__reset');
   await seed(page);
-  await open(page, '/?go=daten');
+  await open(page, '/?go=konto');
   await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einrichtungscode' }).click();
   await page.locator('[data-act="sync-setup"]').click();
   await expect(page.locator('[data-sync-status]').first()).toContainText('Abgeglichen');

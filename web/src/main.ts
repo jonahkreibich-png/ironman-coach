@@ -16,7 +16,7 @@ import { renderHeute } from './views/heute';
 import { renderPlan, scrollToPlanDay, centerWeekBar } from './views/plan';
 import { renderCoach, scrollCoachBottom } from './views/coach';
 import { renderFortschritt } from './views/fortschritt';
-import { renderMehr } from './views/mehr';
+import { renderMehr, resetMehrSearch } from './views/mehr';
 import { renderLexikon, setLexiconQuery } from './views/lexikon';
 import { renderWerte, openCheckin } from './views/werte';
 import { renderStrength } from './views/strength';
@@ -24,11 +24,11 @@ import {renderTrainingTemplates,openTemplatePicker,openSessionPrescriptionEditor
 import { renderEssen } from './views/essen';
 import { renderProfil } from './views/profil';
 import { renderVerbindungen, handleOAuthReturn, loadConnections } from './views/verbindungen';
-import { renderEinstellungen, applyTheme } from './views/einstellungen';
-import { renderDaten, resetDatenCache } from './views/daten';
+import { applyTheme, renderZonen, renderMitteilungen, renderDarstellung, renderCoachSet, renderEinheiten, renderSprache } from './views/einstellungen';
+import { renderDaten, resetDatenCache, renderKonto, renderUeber, renderBetreiber } from './views/daten';
 import { renderGenerator } from './views/generator';
 import { renderWettkampf } from './views/wettkampf';
-import { renderBeruecksichtigungen } from './views/beruecksichtigungen';
+import { renderBeruecksichtigungen, renderAusruestung } from './views/beruecksichtigungen';
 import { focusFeedback } from './views/feedback';
 import { takeInviteFromUrl, pendingInvite, inviteHtml, introStep, introHtml, maybeWhatsNew } from './views/intro';
 import { renderFeedback } from './views/feedback';
@@ -93,11 +93,14 @@ const TABS: { id: Tab; icon: string; render: () => string }[] = [
   { id: 'mehr', icon: 'grid', render: renderMehr }
 ];
 const SUBS: Record<string, () => string> = {
-  lexikon: renderLexikon, strength: renderStrength, vorlagen: renderTrainingTemplates, werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen, einstellungen: renderEinstellungen,
-  daten: renderDaten, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback, generator: () => canGenerate() ? renderGenerator() : renderMehr()
+  lexikon: renderLexikon, strength: renderStrength, vorlagen: renderTrainingTemplates, werte: renderWerte, essen: renderEssen, profil: renderProfil, verbindungen: renderVerbindungen,
+  daten: renderDaten, konto: renderKonto, ueber: renderUeber, betreiber: renderBetreiber, zonen: renderZonen, ausruestung: renderAusruestung,
+  mitteilungen: renderMitteilungen, darstellung: renderDarstellung, coachset: renderCoachSet, einheiten: renderEinheiten, sprache: renderSprache, wettkampf: renderWettkampf, onboarding: renderOnboarding, beruecksichtigungen: renderBeruecksichtigungen, feedback: renderFeedback, generator: () => canGenerate() ? renderGenerator() : renderMehr()
 };
 /* Unterseiten, die auch ohne Plan erreichbar sind (Start, Verbinden) */
-const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'verbindungen', 'feedback', 'lexikon']);
+const NO_PLAN_SUBS = new Set(['onboarding', 'daten', 'konto', 'ueber', 'verbindungen', 'feedback', 'lexikon']);
+/* Auftrag 25: alte Namen (Links aus Mitteilungen, gespeicherter Zustand) führen auf die neue Seite; „einstellungen“ ist jetzt die Gruppe im Mehr-Tab */
+const SUB_ALIAS: Record<string, string | null> = { einstellungen: null, settings: null, notify: 'mitteilungen', ki: 'coachset' };
 
 /* Alter UI-Zustand: view = heute|plan|werte|fortschritt|essen */
 if (!UI.tab) {
@@ -105,6 +108,7 @@ if (!UI.tab) {
   if (v === 'werte' || v === 'essen') { UI.tab = 'mehr'; UI.sub = v; } else UI.tab = TABS.some(x => x.id === v) ? v : 'heute';
 }
 if (!TABS.some(x => x.id === UI.tab)) UI.tab = 'heute';
+if (UI.sub && UI.sub in SUB_ALIAS) UI.sub = SUB_ALIAS[UI.sub];
 if (UI.sub && !SUBS[UI.sub]) UI.sub = null;
 
 const byId = (id: string) => document.getElementById(id)!;
@@ -118,7 +122,7 @@ function coachUnread(): number {
 
 function renderTop() {
   const sub = UI.tab === 'mehr' || !HAS_PLAN ? UI.sub : null;
-  const title = sub === 'vorlagen' ? 'Trainingsvorlagen' : sub ? t('sub.' + sub) : HAS_PLAN ? t('tab.' + UI.tab) : APP.name;
+  const title = sub === 'vorlagen' ? 'Trainingsvorlagen' : sub ? t('sub.' + sub, { app: APP.name }) : HAS_PLAN ? t('tab.' + UI.tab) : APP.name;
   byId('top').innerHTML = sub
     ? `<button class="icon-btn" data-act="back" aria-label="${esc(t('common.back'))}">${ic('back')}</button><h1 class="top-title">${esc(title)}</h1><span style="width:40px"></span>`
     : `<h1 class="top-title"><span class="mark" aria-hidden="true">${esc(APP.mark)}</span>${esc(title)}</h1>${HAS_PLAN && UI.tab === 'heute' ? `<button class="icon-btn" data-act="checkin-open" aria-label="${esc(t('heute.enterValues'))}">${ic('heart')}</button>` : '<span style="width:40px"></span>'}`;
@@ -150,12 +154,14 @@ function render() {
   if (HAS_PLAN) initTabLens();
 }
 function go(target: string, scroll?: string | null) {
-  const [a, b] = target.split(':');
+  let [a, b] = target.split(':');
+  if (a in SUB_ALIAS && !b) { const to = SUB_ALIAS[a]; if (to) a = to; else { a = 'mehr'; } }
   // offene, nicht übernommene Änderungen (Auftrag 6): vor dem Verlassen nachfragen
   if (guardLeave(SUBS[a] && !b ? a : b && SUBS[b] ? b : a, () => go(target, scroll))) return;
   if (SUBS[a] && !b) { UI.tab = 'mehr'; UI.sub = a; }
   else { UI.tab = (TABS.some(x => x.id === a) ? a : 'heute') as Tab; UI.sub = b && SUBS[b] ? b : null; }
-  if (UI.sub === 'daten') resetDatenCache();
+  if (UI.sub === 'daten' || UI.sub === 'konto' || UI.sub === 'betreiber') resetDatenCache();
+  if (UI.tab === 'mehr' && !UI.sub) resetMehrSearch();
   saveUi(); render();
   if (scroll) { const el = document.getElementById(scroll); if (el) { el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); return; } }
   if (UI.tab === 'plan' && !UI.sub && UI.planDate) { scrollToPlanDay(); return; }
@@ -246,7 +252,7 @@ render();
 openFromUrl(location.href);
 startPwa();
 setTimeout(maybeWhatsNew, 400);
-if (isSyncOn()) { loadMe().then(() => { if (UI.tab === 'mehr') rerender(); }); loadAiState().then(() => { if (UI.tab === 'coach' || UI.sub === 'einstellungen') rerender(); }); loadConnections(); }
+if (isSyncOn()) { loadMe().then(() => { if (UI.tab === 'mehr') rerender(); }); loadAiState().then(() => { if (UI.tab === 'coach' || UI.sub === 'coachset') rerender(); }); loadConnections(); }
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); rerender(); } });
 void checkForUpdate;

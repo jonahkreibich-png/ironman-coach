@@ -56,7 +56,7 @@ test('hell und dunkel: Chat, Scores und Prognose ragen nicht heraus', async ({ p
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await seed(page);
   for (const theme of ['light', 'dark']) {
-    await open(page, '/?go=einstellungen');
+    await open(page, '/?go=darstellung');
     await page.locator(`[data-act="set-theme"][data-v="${theme}"]`).click();
     await open(page, '/?go=coach');
     await send(page, 'Wie war meine Woche?');
@@ -97,7 +97,7 @@ test('Prognose: heute und am Renntag, je Disziplin, Pacing-Plan', async ({ page 
 
 test('Einstellungen: Rad-Zonen auch in km/h mit Hinweis auf Wind und Steigung', async ({ page }) => {
   await seed(page);
-  await open(page, '/?go=einstellungen');
+  await open(page, '/?go=zonen');
   await expect(page.locator('[data-speed-zones]')).toBeVisible();
   await expect(page.locator('.tbl', { hasText: 'km/h' }).first()).toBeVisible();
   await expect(page.getByText('flache Strecken ohne Wind').first()).toBeVisible();

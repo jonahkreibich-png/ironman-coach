@@ -47,7 +47,7 @@ test.describe('Kostenlose KI im Coach', () => {
     await expect(page.locator('.feed .msg.coach').last()).not.toHaveClass(/typing/, { timeout: 10000 });
     await expect(page.locator('[data-by-ai]')).toHaveCount(0);
     expect(await page.evaluate(() => !!localStorage.getItem('ec_sync_auth'))).toBe(false);
-    await page.goto('/?go=einstellungen');
+    await page.goto('/?go=coachset');
     await expect(page.locator('[data-act="free-open"]')).toBeVisible();
   });
 
@@ -90,14 +90,14 @@ test.describe('Kostenlose KI im Coach', () => {
     await expect(page.locator('[data-by-ai]')).toHaveCount(0);
   });
 
-  test('Betreiber sieht den Verbrauch unter Daten und Geräte', async ({ page, request }) => {
+  test('Betreiber sieht den Verbrauch unter Betreiber', async ({ page, request }) => {
     await request.post('/__reset');
     const admin = await (await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } })).json();
     await request.post('/__fake-ai', { data: { on: true } });
     await seed(page);
     await page.goto('/?go=coach');
     await page.evaluate(a => { localStorage.setItem('ec_sync_auth', JSON.stringify({ token: a.token, deviceId: a.deviceId, connectedAt: Date.now() })); localStorage.setItem('ec_owner', '1'); }, admin);
-    await page.goto('/?go=daten');
+    await page.goto('/?go=betreiber');
     await expect(page.locator('[data-wai]')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-wai]')).toContainText('10000');
   });

@@ -113,16 +113,18 @@ test.describe('Verbindungen für jeden Nutzer', () => {
     await expect(page.locator('[data-act="conn-open"][data-id="oura"]')).toBeVisible();
     expect(await page.locator('#app').innerText()).not.toMatch(TECH);
     expect(await page.locator('#app').innerText()).not.toMatch(/Server-Schlüssel/);
-    // Daten und Geräte: Konto statt Server
-    await page.goto('/?go=daten');
+    // Konto und Daten: Konto statt Server
+    for (const sub of ['konto', 'daten']) {
+    await page.goto('/?go=' + sub);
     expect(await page.locator('#app').innerText()).not.toMatch(/Server|Secret|TOKEN/);
+    }
   });
-  test('ohne Konto: „Konto anlegen“ unter Daten und Geräte, ohne Einladung', async ({ page, request }) => {
+  test('ohne Konto: „Konto anlegen“ unter Konto, ohne Einladung', async ({ page, request }) => {
     await request.post('/__reset');
     await request.post('/api/setup', { data: { name: 'iPhone Betreiber' } });
     const { seed } = await import('./helpers');
     await seed(page);
-    await page.goto('/?go=daten');
+    await page.goto('/?go=konto');
     expect(await page.locator('#app').innerText()).not.toMatch(/Server|Secret|TOKEN|Betreiber/);
     await page.locator('[data-act="acc-signup"]').click();
     await expect(page.locator('[data-sync-status]').first()).toBeVisible();

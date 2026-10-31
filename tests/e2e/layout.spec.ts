@@ -125,7 +125,7 @@ async function overflow(page: Page): Promise<string[]> {
     return [...new Set(out)].slice(0, 15);
   });
 }
-const SCREENS = (state: State) => state === 'leer' ? ['/', '/?go=onboarding', '/?go=daten', '/?go=verbindungen', '/?go=feedback', '/?invite=ABCDEFGH', '#intro'] : [...TABS.map(x => '/?go=' + x), ...SUBS.map(x => '/?go=' + x)];
+const SCREENS = (state: State) => state === 'leer' ? ['/', '/?go=onboarding', '/?go=konto', '/?go=daten', '/?go=ueber', '/?go=verbindungen', '/?go=feedback', '/?invite=ABCDEFGH', '#intro'] : [...TABS.map(x => '/?go=' + x), ...SUBS.map(x => '/?go=' + x)];
 
 for (const [wname, w] of WIDTHS) {
   for (const dark of [false, true]) {

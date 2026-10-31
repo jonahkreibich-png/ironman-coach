@@ -1,4 +1,5 @@
-/* Profil und Ziele: persönliche Angaben statt fester Werte im Code, mehrere Ziele mit Priorität, Sprache und Einheiten.
+/* Profil und Ziele: persönliche Angaben (mit Bild, Auftrag 25) statt fester Werte im Code, mehrere Ziele mit Priorität.
+   Sprache und Einheiten stehen seit Auftrag 25 unter Mehr → Einstellungen.
    Was den Plan bestimmt (Ziele, Sportarten, Stunden, Stil …), wird erst vorgemerkt und mit Vorschau übernommen (Auftrag 6, web/src/staged.ts).
    Persönliche Angaben (Name, Gewicht, Sprache …) werden sofort gespeichert. */
 import { STATE, saveState, profile, goals, saveProfile } from '../store';
@@ -13,6 +14,7 @@ import { daysUntil } from '../../../shared/race';
 import { invalidate, goalPrognosis } from '../data';
 import { nav } from '../nav';
 import { toast } from '../toast';
+import { avatarHtml } from './mehr';
 import { stage, draftProfile, draftGoals, draftGoal, stageBarHtml, lastApplied, PLAN_FIELDS } from '../staged';
 
 const SCREEN = 'profil';
@@ -36,7 +38,7 @@ export function renderProfil(): string {
       <span class="grow"><span class="t">${esc(g.name)}</span> ${pill(g.priority, g.priority === 'A' ? 'accent' : '')}${main && main.id === g.id ? ' ' + pill(t('prof.main'), 'good') : ''}<br>
       <span class="s">${esc(goalLabel(g.type))}${g.date ? ' · ' + fmtDate(g.date) + (g.date >= today ? ' · ' + t('prof.inDays', { n: daysUntil(today, g.date) }) : '') : ''}${g.result && g.result.timeSec ? ' · ' + hhmm(g.result.timeSec) : ''}</span></span><span class="chev">${ic('right')}</span></button>${mismatchHint(g, dp.sports, today)}`).join('') || `<div class="li"><span class="muted">${esc(t('prof.noGoals'))}</span></div>`}</div>
     <button class="btn ghost block" data-act="goal-new" style="margin-top:var(--s2)">${ic('plus')} ${esc(t('prof.addGoal'))}</button>`, t('prof.goalsAside'));
-  h += sec(t('prof.person'), `<div class="card"><div class="fgrid">
+  h += sec(t('prof.person'), `<div class="card"><div class="row" data-photo style="gap:var(--s3);margin-bottom:var(--s3);align-items:center">${avatarHtml(64)}<div class="stack" style="gap:4px"><div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn ghost sm" for="pf-photo">${esc(t((p as any).photo ? 'prof.photoChange' : 'prof.photoPick'))}</label><input type="file" id="pf-photo" data-ch="pf-photo" accept="image/*" hidden>${(p as any).photo ? `<button class="btn ghost sm" data-act="pf-photo-del">${esc(t('prof.photoRemove'))}</button>` : ''}</div><span class="xs muted">${esc(t('prof.photoHint'))}</span></div></div><div class="fgrid">
     ${field('pf-name', t('prof.name'), p.name, { data: 'data-ch="pf" data-k="name"' })}
     ${field('pf-birth', t('prof.birthYear'), p.birthYear ?? '', { inputmode: 'numeric', data: 'data-ch="pf" data-k="birthYear" data-num="1"' })}
     ${select('pf-sex', t('prof.sex'), p.sex || '', [['', t('prof.sexNone')], ['f', t('prof.sexF')], ['m', t('prof.sexM')], ['d', t('prof.sexD')]], 'data-ch="pf" data-k="sex"')}
@@ -53,8 +55,7 @@ export function renderProfil(): string {
     <div class="fld wide"><label for="pf-inj">${esc(t('prof.injuries'))}</label><input class="inp" id="pf-inj" data-ch="pf" data-k="injuries" value="${esc(dp.injuries)}" placeholder="${esc(t('prof.injuriesPh'))}"></div>
     ${toggle('pf-med', t('prof.medical'), dp.medicalCaution, 'data-ch="pf" data-k="medicalCaution" data-bool="1"')}
     <div class="hint">${esc(t('stage.profHint'))}</div>${toggle('pf-veg', t('prof.vegetarian'), !!p.vegetarian, 'data-ch="pf" data-k="vegetarian" data-bool="1"')}
-    <div class="hint">${esc(t('prof.thresholdsHint'))}</div><button class="btn ghost sm" data-act="go-sub" data-sub="einstellungen">${esc(t('prof.toZones'))}</button></div>`);
-  h += sec(t('prof.lang'), `<div class="card"><div class="fgrid">${select('pf-lang', t('prof.language'), p.lang, [['de', 'Deutsch'], ['en', 'English (beta)']], 'data-ch="pf" data-k="lang"')}${select('pf-units', t('prof.units'), p.units, [['metric', t('prof.metric')], ['imperial', t('prof.imperial')]], 'data-ch="pf" data-k="units"')}</div></div>`);
+    <div class="hint">${esc(t('prof.thresholdsHint'))}</div><button class="btn ghost sm" data-act="go-sub" data-sub="zonen">${esc(t('prof.toZones'))}</button></div>`);
   h += `<button class="btn ghost block" data-act="go-sub" data-sub="onboarding" style="margin-top:var(--s3)">${ic('wand')} ${esc(t('prof.redoOnboarding'))}</button>`;
   return h + stageBarHtml(SCREEN);
 }
@@ -144,3 +145,23 @@ on('goal-del', el => {
 });
 void more; void paceToSec; void secToPace;
 export type { Profile };
+
+/* Auftrag 25: Profilbild. Auf 192 × 192 px zugeschnitten und als JPEG im Profil gespeichert (etwa 10 KB, wird mit dem Konto gesichert). */
+export async function photoDataUrl(file: Blob, size = 192): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.decoding = 'async';
+    await new Promise<void>((ok, bad) => { img.onload = () => ok(); img.onerror = () => bad(new Error('img')); img.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight); if (!side) throw new Error('img');
+    const c = document.createElement('canvas'); c.width = size; c.height = size;
+    const g = c.getContext('2d'); if (!g) throw new Error('canvas');
+    g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+    return c.toDataURL('image/jpeg', 0.82);
+  } finally { URL.revokeObjectURL(url); }
+}
+onChange('pf-photo', async el => {
+  const f = (el as HTMLInputElement).files && (el as HTMLInputElement).files![0]; if (!f) return;
+  try { const data = await photoDataUrl(f); if (data.length > 60000) throw new Error('size'); saveProfile({ ...profile(), photo: data } as any); nav.rerender(); toast(t('prof.photoSaved')); }
+  catch (e) { toast(t('prof.photoFail')); }
+});
+on('pf-photo-del', () => { const p: any = { ...profile() }; delete p.photo; saveProfile(p); nav.rerender(); toast(t('common.saved')); });

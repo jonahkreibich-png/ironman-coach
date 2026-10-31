@@ -707,3 +707,17 @@ body.no-plan .tab-lens { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .tab-lens-shadow, .tab-lens-shine { transition: none; } }
 .prog2 .big.approx { font-size: clamp(1.25rem, 6vw, 1.6rem); white-space: nowrap; }
+
+/* Auftrag 25: Mehr-Tab wie die iOS-Einstellungen: Suche, Profilkarte, gruppierte Listen */
+.mehr-search { position: relative; margin: 0 0 var(--s3); }
+.mehr-search .ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-3); display: grid; pointer-events: none; }
+.mehr-search .ic svg { width: 18px; height: 18px; }
+.mehr-search .inp { padding-left: 38px; border-radius: 12px; }
+.profile-card { display: block; width: 100%; padding: 0; text-align: left; color: inherit; font: inherit; margin-bottom: var(--s4); cursor: pointer; }
+.profile-card .li { min-height: 76px; }
+.avatar { border-radius: 50%; object-fit: cover; flex-shrink: 0; display: inline-grid; place-items: center; }
+.avatar.ph { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent)); color: var(--accent-ink); font-weight: 700; letter-spacing: .02em; }
+.avatar.ph svg { width: 55%; height: 55%; }
+.mgroup { margin-bottom: var(--s4); }
+.mgroup .li .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[hidden] { display: none !important; }

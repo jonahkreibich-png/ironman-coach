@@ -49,6 +49,7 @@ describe('Texte (i18n)', () => {
       ...['work', 'rest', 'warmup', 'cooldown', 'steady'].map(k => 'lap.' + k),
       ...['heute', 'plan', 'coach', 'fortschritt', 'mehr'].map(k => 'tab.' + k),
       ...['werte', 'essen', 'profil', 'verbindungen', 'einstellungen', 'daten', 'wettkampf', 'onboarding', 'generator'].flatMap(k => ['sub.' + k, 'mehr.' + k]),
+      ...['konto', 'zonen', 'ausruestung', 'mitteilungen', 'darstellung', 'coachset', 'einheiten', 'sprache', 'ueber', 'betreiber', 'vorlagen'].map(k => 'sub.' + k), // Auftrag 25
       ...['dropbox', 'oura', 'whoop', 'polar', 'withings', 'fitbit', 'intervals', 'shortcut', 'suunto', 'coros', 'wahoo', 'garmin', 'trainingpeaks'].map(k => 'conn.desc.' + k),
       ...['workouts', 'sleep', 'hrv', 'restingHR', 'temp', 'spo2', 'breath', 'load', 'weight'].map(k => 'group.' + k),
       ...['ready', 'easy', 'rest', 'novalues', 'sick', 'return'].map(k => 'heute.st.' + k), ...[0, 1, 2, 3].map(i => 'return.s' + i),

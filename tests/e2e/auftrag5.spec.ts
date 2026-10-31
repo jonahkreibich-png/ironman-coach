@@ -87,7 +87,7 @@ test.describe('B: Meldungen mit Server', () => {
     await expect(page.locator('[data-feedback-queued]')).toContainText('Ausgang');
     // jetzt mit Einladung einrichten (Daten auf dem Gerät gehören nicht zum Konto)
     await page.locator('[data-act="back"]').click().catch(() => {});
-    await open(page, '/?go=daten');
+    await open(page, '/?go=konto');
     await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einladung' }).click();
     await page.fill('#inv-code', inv.code); await page.fill('#inv-name', 'Papa');
     await page.locator('[data-act="sync-invite"]').click();
@@ -206,7 +206,7 @@ test.describe('E: bereit für Tester', () => {
     await request.post('/api/sync', { headers: { Authorization: 'Bearer ' + auth.token }, data: { since: 0, changes: [{ kind: 'profile', key: 'main', data: { name: 'Papa', notes: ['dienstags gar nichts'] }, updatedAt: Date.now() }] } });
     // Safari-Daten gelöscht / neues Handy
     await page.evaluate(() => localStorage.clear());
-    await page.goto('/?go=daten');
+    await page.goto('/?go=konto');
     await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Wiederherstellungscode' }).click();
     await page.fill('#rc-code', rc);
     await page.locator('[data-act="rc-recover"]').click();

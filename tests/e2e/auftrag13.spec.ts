@@ -11,7 +11,7 @@ test.describe('mit Server', () => {
   test('Dropbox im Fehlerzustand: „Fehler“ statt „nicht verbunden“, Grund, Hilfe, letzte Datei, Jetzt abrufen', async ({ page, request }) => {
     await request.post('/__reset');
     await seed(page);
-    await open(page, '/?go=daten');
+    await open(page, '/?go=konto');
     await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Einrichtungscode' }).click();
     await page.locator('[data-act="sync-setup"]').click();
     await expect(page.locator('[data-sync-status]').first()).toBeVisible();

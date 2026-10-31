@@ -158,7 +158,7 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
       const rf = refreshFuture(L.plan.weeks || [], L.profile, day, L.state);
       if (rf.changed) { L.plan = { ...L.plan, weeks: rf.weeks }; L.baseWeeks = rf.weeks; changes.push({ kind: 'plan', key: 'main', data: L.plan, updatedAt: t + 6 }); }
       changes.push({ kind: 'coachMsg', key: 'msg-trend-' + day, data: { id: 'msg-trend-' + day, at: t, date: day, kind: 'info', from: 'coach', title: 'Zonen aus deinen Uhrdaten aktualisiert', important: true,
-        text: tr.text + (rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '') + ' Ändern kannst du die Werte unter Mehr → Einstellungen.' }, updatedAt: t + 2 });
+        text: tr.text + (rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '') + ' Ändern kannst du die Werte unter Mehr → Zonen und Tests.' }, updatedAt: t + 2 });
     }
   }
   // Schwimmen: neue Bestwerte → Können eintragen und alle kommenden Schwimmeinheiten neu stufen
