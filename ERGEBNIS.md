@@ -1,6 +1,6 @@
 # Auftrag 25: Icon-Varianten, Mehr-Tab neu, Coach-KI gezielter, Gesamttest (31.10.)
 
-**Stand:** Punkte 2–4 fertig und live als Version 3.13.0 (STAND_RELEASE). **Icon: Du wählst** – die 4 Varianten liegen in `icon-varianten.html`. Nach deiner Wahl baue ich das Icon überall ein (Manifest, Icons, Startbilder).
+**Stand:** Punkte 2–4 fertig und live als Version 3.13.0: erst Test-Umgebung (mit echten KI-Fragen geprüft), dann echte App. Vorher beide gesichert; alle 3 Konten laden an einer Kopie der echten Daten fehlerfrei. **Icon: Du wählst** – die 4 Varianten liegen in `icon-varianten.html`. Nach deiner Wahl baue ich das Icon überall ein (Manifest, Icons, Startbilder).
 
 ## 1. Icon (wartet auf deine Wahl)
 `icon-varianten.html` im Projektordner öffnen (am besten auf dem iPhone). Je Variante: Homescreen in echter Größe (hell und dunkel), kleine Größen bis 16 px, Startbild.
@@ -60,7 +60,7 @@ Fragen: `docs/ki-vergleich-25/fragen.json`. Alle Antworten je Modell liegen nur 
 ## 4. Gesamttest
 `docs/FUNKTIONEN.md`: alle Funktionen und Bildschirme mit Ort und Test.
 
-STAND_TESTS
+**Tests:** Unit 2.640 bestanden; E2E (Chromium + WebKit) 403 bestanden, 141 nach Korrektur der zwei Funde (Wort „Server“ im neuen Datenschutz-Text, alte Erwartung „Gute Besserung“) ebenfalls. Neu: 15 Gesamt-Abläufe, 5 Mehr-Tab-Tests, 4 Große-Schrift-Durchläufe, 16 Coach-Unit-Tests. In der Test-Umgebung (stamio-test) zusätzlich geprüft: Laden, Mehr, Zurück-Wischen, 3 echte KI-Fragen.
 
 | Funktion | getestet (wie) | Fehler | behoben |
 |---|---|---|---|
