@@ -19,7 +19,7 @@ test('sw.js ist gültiges JavaScript und hat alle Ereignisse', () => {
 });
 test('Server-Anfragen und OAuth-Rückkehr gehen nie über den Speicher, App-Seiten schon', () => {
   const h = load();
-  const ask = (url: string, mode = 'cors') => { let used = false; h.fetch({ request: { method: 'GET', url, mode }, respondWith: () => { used = true; } }); return used; };
+  const ask = (url: string, mode = 'cors') => { let used = false; h.fetch({ request: { method: 'GET', url, mode }, respondWith: (p: any) => { used = true; Promise.resolve(p).catch(() => {}); } }); return used; };
   expect(ask('https://app.example/api/me')).toBe(false);
   expect(ask('https://app.example/api/connect/oura/callback?code=1', 'navigate')).toBe(false);
   expect(ask('https://app.example/assets/index.js')).toBe(true);
