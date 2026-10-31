@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.13.0', items: [
+    'Mehr ist neu sortiert wie die iPhone-Einstellungen: Suche oben, deine Profilkarte mit Bild, dann Konto, Training, Verbindungen, Einstellungen, Daten und Datenschutz, Hilfe und Über. Nichts ist weggefallen, nur besser einsortiert. Zurück-Wischen bringt dich zur Liste.',
+    'Der KI-Coach bekommt nur noch die Daten, die zur Frage passen: schnellere und genauere Antworten. Er beachtet eine eingetragene Krankheit, ändert nur das Training und den Tag, die du nennst, und schreibt nichts als erledigt, was erst ein Vorschlag ist.',
+    'Der Regel-Coach versteht Daten wie „auf den 3.11“ und „den Lauftest“ und schreibt ohne doppelte Punkte und Floskeln.'
+  ] },
   { version: '3.12.0', items: [
     'Tab-Leiste wie in iOS 26: eine einzige Glas-Linse, die mit Feder gleitet, sich beim schnellen Ziehen dehnt und weich am nächsten Tab einrastet. Antippen gleitet ebenso, ohne Ruckeln beim Wechsel.',
     'Prognose: „Erwartet am Wettkampftag“ rechnet jetzt immer mit deiner Entwicklung bis dahin – ohne viele eigene Daten mit typischen Fortschritten (nach Niveau, Alter, Sportart, Umfang), mit mehr Daten zählt dein eigener Trend mehr. „Warum?“ sagt, woraus die Hochrechnung stammt.',

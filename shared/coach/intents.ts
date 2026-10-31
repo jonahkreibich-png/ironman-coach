@@ -21,7 +21,7 @@ type Extra = { scores?: any[]; prognosis?: any };
 
 /* ---------- Text normalisieren und unscharf vergleichen ---------- */
 export function norm(s: string): string {
-  return String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(s || '').toLowerCase().replace(/\b(am|den|auf|zum|bis|vom|ab|nach)\s+(\d{1,2})\.(\d{1,2})\.?(?![\d.,])/g, (_m, p, dd, mm) => +dd >= 1 && +dd <= 31 && +mm >= 1 && +mm <= 12 ? `${p} d${+dd}m${+mm}` : _m).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 function lev(a: string, b: string): number {
   if (a === b) return 0; if (Math.abs(a.length - b.length) > 2) return 3;
@@ -50,6 +50,7 @@ function has(toks: string[], words: string[]): boolean {
 const DAYS: [string[], number][] = [[['montag', 'mo'], 1], [['dienstag', 'di'], 2], [['mittwoch', 'mi'], 3], [['donnerstag', 'do'], 4], [['freitag', 'fr'], 5], [['samstag', 'sa', 'sonnabend'], 6], [['sonntag', 'so'], 0]];
 function dayIn(toks: string[], today: string): string | null {
   if (toks.includes('heute')) return today;
+  for (const t of toks) { const m = /^d(\d{1,2})m(\d{1,2})$/.exec(t); if (m) { const y = +today.slice(0, 4); let x = `${y}-${String(+m[2]).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`; if (x < C.addDays(today, -60)) x = `${y + 1}${x.slice(4)}`; return x; } }
   if (toks.includes('morgen') && !toks.includes('guten')) return C.addDays(today, 1);
   if (toks.includes('uebermorgen')) return C.addDays(today, 2);
   for (const [w, d] of DAYS) if (toks.some(t => w.includes(t) && (t.length > 2 || w[1] === t) || w.some(x => x.length > 3 && wordHit(t, x)))) {
@@ -107,7 +108,7 @@ export const INTENTS: Intent[] = [
     answer: ctx => C.illnessAt(ctx.state.illnessPeriods, ctx.today) ? { intent: 'healthy', text: 'Schön! Soll ich die Krankheitsphase mit gestern beenden? Dann beginnt heute der Wiedereinstieg: die ersten Tage nur locker.', actions: [{ label: 'Ja, Krankheit beenden', kind: 'illness-end' }] } : 'Super, dann läuft der Plan normal weiter.' },
   { id: 'sick', when: t => has(t, ['krank', 'erkaeltet', 'erkaeltung', 'fieber', 'grippe', 'halsschmerzen', 'schnupfen', 'husten', 'corona', 'covid', 'infekt']) && !has(t, ['nicht mehr', 'wieder gesund']),
     answer: ctx => C.illnessAt(ctx.state.illnessPeriods, ctx.today) ? { intent: 'sick', text: 'Du bist schon als krank eingetragen. Schlafen, trinken, genug essen. Melde dich, wenn du 24 Stunden ohne Symptome bist, dann starten wir in Stufen.' }
-      : { intent: 'sick', text: 'Gute Besserung! Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Bei Fieber gilt: kein Training.', actions: [{ label: 'Ja, Krankheit eintragen', kind: 'illness-start' }, { label: 'Nein, nur leicht angeschlagen', kind: 'say', payload: 'Ich bin müde' }] } },
+      : { intent: 'sick', text: 'Das tut mir leid. Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Bei Fieber gilt: kein Training.', actions: [{ label: 'Ja, Krankheit eintragen', kind: 'illness-start' }, { label: 'Nein, nur leicht angeschlagen', kind: 'say', payload: 'Ich bin müde' }] } },
   { id: 'pain', when: t => !!bodyIn(t) && has(t, ['schmerz', 'schmerzen', 'weh', 'zwickt', 'zieht', 'tut', 'verletzt', 'probleme', 'beschwerden', 'entzuendet']) || has(t, ['schmerzen', 'schmerz']) && !has(t, ['hals']),
     answer: (ctx, t) => { const b = bodyIn(t) || 'Schmerzen'; const note = `${b}: Beschwerden seit ${ctx.today.split('-').reverse().join('.')}`;
       const known = parseConsiderations([note])[0];

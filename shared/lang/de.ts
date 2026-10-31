@@ -622,7 +622,7 @@ export const de: Record<string, string> = {
   'data.localOnly': 'Ohne Konto liegen deine Daten nur auf diesem Gerät. Sichere sie oben als Datei oder leg ein Konto an.',
   'data.toAccount': 'Zum Konto',
   'data.privacy': 'Datenschutz',
-  'data.privacyHint': 'Deine Trainings- und Gesundheitsdaten gehören dir. Sie liegen auf diesem Gerät und, mit Konto, verschlüsselt übertragen auf dem Server der App. Werte vom Ring (Oura) gehen nie an eine KI. Du kannst alles als Datei mitnehmen und dein Konto jederzeit löschen.',
+  'data.privacyHint': 'Deine Trainings- und Gesundheitsdaten gehören dir. Sie liegen auf diesem Gerät und, mit Konto, verschlüsselt übertragen gesichert in deinem Konto. Werte vom Ring (Oura) gehen nie an eine KI. Du kannst alles als Datei mitnehmen und dein Konto jederzeit löschen.',
   'data.operatorOnly': 'Nur für den Betreiber der App.',
   'data.serverErrors': 'Serverfehler',
   'gear.bike': 'Rad',

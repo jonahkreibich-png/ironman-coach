@@ -10,7 +10,7 @@ import { HttpError } from './http';
 import { aiSafeCtx, type ChatResult, type ChatStream } from './ai';
 import { runTool, type ToolChange , mergeSwapProposals } from '../../shared/coach/tools';
 import { checkMessage } from '../../shared/coach/safety';
-import { coachSkill, compactContext, openAiTools, inventedNumbers, cleanAnswer, autoTool, isChangeRequest, claimsChange, leaksInternals } from '../../shared/coach/freeai';
+import { focusedPrompt, changeHasTarget, limitToMentioned, inventedNumbers, cleanAnswer, autoTool, isChangeRequest, claimsChange, leaksInternals } from '../../shared/coach/freeai';
 import { hasSource } from '../../shared/activity/merge';
 import type { EngineCtx, CoachMsg } from '../../shared/coach/engine';
 import { isMinor } from '../../shared/profile';
@@ -98,8 +98,16 @@ export async function readStream(body: ReadableStream | any, onText: (t: string)
 /* Verlauf: nur das Gespräch von heute (höchstens 4 Nachrichten), sonst verwechseln kleine Modelle alte Antworten mit heute */
 function history(msgs: CoachMsg[], today: string): any[] {
   return msgs.filter(m => m && m.text && m.date === today && (m.kind === 'user' || m.kind === 'answer')).sort((a, b) => a.at - b.at).slice(-4)
-    .map(m => ({ role: m.from === 'user' ? 'user' : 'assistant', content: String(m.text).slice(0, 600) }));
+    .map(m => ({ role: m.from === 'user' ? 'user' : 'assistant', content: String(m.text).slice(0, 300) }));
 }
+/* Auftrag 25: Hat die KI bei einem Änderungswunsch nur nachgefragt („Auf welchen Tag?“), ist die nächste Nachricht die Antwort darauf */
+export function pendingChange(msgs: CoachMsg[], today: string): boolean {
+  const h = msgs.filter(m => m && m.text && m.date === today && (m.kind === 'user' || m.kind === 'answer')).sort((a, b) => a.at - b.at);
+  const a = h[h.length - 1], u = h[h.length - 2];
+  return !!(a && u && a.from !== 'user' && u.from === 'user' && /\?\s*$/.test(String(a.text)) && isChangeRequest(String(u.text)));
+}
+/* Grund im Vorschlag nur, wenn der Athlet selbst einen genannt hat (sonst schrieb die KI Sätze wie „Du möchtest den Schwimmtraining verschieben.“) */
+export const GIVES_REASON = /\b(weil|da ich|wegen|keine zeit|krank|muede|müde|schmerz\w*|termin|arbeit|schule|urlaub|regen|wetter|geburtstag|reise|besuch)\b/i;
 
 export class FallbackError extends HttpError { constructor(public why: string) { super(503, 'Die KI ist gerade nicht verfügbar. Der Regel-Coach antwortet.'); } }
 
@@ -117,39 +125,41 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   if (hard) { out.messages.push({ id: `msg-safe-${now}`, at: now + 1, date: ctx.today, kind: 'warning', from: 'coach', text: hard.text, important: hard.flag === 'emergency' }); out.blocked = hard.flag; return out; }
   const st = await freeStatus(env, uid, ctx.state.settings, !!o.parentNeeded);
   if (!st.active) throw new FallbackError(st.reason || 'inactive');
-  const system = coachSkill(ctx, BRAND.name) + '\n\nDATEN DES ATHLETEN (Stand heute):\n' + compactContext(ctx);
-  const messages: any[] = [{ role: 'system', content: system }, ...history(Object.values(ctx.state.coachMsgs || {}) as CoachMsg[], ctx.today), { role: 'user', content: noThink(model, userMsg.text) }];
-  const sources: string[] = [system, userMsg.text, ...messages.map(m => String(m.content || ''))];
-  const tools = openAiTools();
+  const msgs = Object.values(ctx.state.coachMsgs || {}) as CoachMsg[];
+  const followUp = pendingChange(msgs, ctx.today);
+  const reasonGiven = GIVES_REASON.test(userMsg.text);
   const props: CoachMsg[] = [];
-  const propose = (r: any) => { if (r && r.proposal) props.push({ id: `msg-prop-${now}-${props.length}`, at: Date.now(), date: ctx.today, kind: 'proposal', from: 'ai', title: r.proposal.title, text: r.proposal.text, proposal: { changes: r.proposal.changes, status: 'open' } }); };
-  // erkannte Frage: Werkzeug schon vorher ausführen (Ergebnis der Regel-Engine), die KI formuliert nur
-  const pre = autoTool(ctx, userMsg.text);
-  if (pre) {
-    const r = runTool(ctx, pre.name, pre.input, { proposeOnly: true });
-    const id = 'pre' + String(now).slice(-6);
-    messages.push({ role: 'assistant', content: '', tool_calls: [{ id, type: 'function', function: { name: pre.name, arguments: JSON.stringify(pre.input) } }] });
-    messages.push({ role: 'tool', tool_call_id: id, name: pre.name, content: String(r.result).slice(0, 6000) });
-    sources.push(r.result); out.tools.push(pre.name + '*'); propose(r);
-  }
+  const propose = (r: any) => { if (r && r.proposal) props.push({ id: `msg-prop-${now}-${props.length}`, at: Date.now(), date: ctx.today, kind: 'proposal', from: 'ai', title: r.proposal.title, text: reasonGiven ? r.proposal.text : '', proposal: { changes: r.proposal.changes, status: 'open' } }); };
+  // erkannte Frage: Werkzeug schon vorher ausführen (Ergebnis der Regel-Engine), die KI formuliert nur – ohne eigene Runde, direkt im Text
+  const pre = followUp ? null : autoTool(ctx, userMsg.text);
+  const pr = pre ? runTool(ctx, pre.name, pre.input, { proposeOnly: true }) : null;
+  // Auftrag 25: gezielter Kontext (nur passende Daten, Regeln und Werkzeuge)
+  const fp = focusedPrompt(ctx, followUp ? 'verschieben: ' + userMsg.text : userMsg.text, BRAND.name, pre);
+  const system = fp.system + (pr ? '\n\nAUSWERTUNG DER APP ZU DIESER FRAGE:\n' + String(pr.result).slice(0, 3500) : '');
+  const messages: any[] = [{ role: 'system', content: system }, ...history(msgs, ctx.today), { role: 'user', content: noThink(model, userMsg.text) }];
+  const sources: string[] = [system, userMsg.text, ...messages.map(m => String(m.content || ''))];
+  const tools = fp.tools;
+  out.topic = fp.topic;
+  if (pre && pr) { out.tools.push(pre.name + '*'); propose(pr); }
   let final = '', tin = 0, tout = 0, calls = 0;
   // Änderungswunsch: es muss ein Werkzeug aufgerufen werden (sonst behaupten kleine Modelle nur, etwas geändert zu haben)
-  const change = !pre && isChangeRequest(userMsg.text);
+  const change = !pre && (followUp || isChangeRequest(userMsg.text));
   let nudged = false, toolCalled = !!pre;
   // Modelltext wird erst nach der abschließenden Faktenprüfung ausgegeben.
   try {
-    for (let round = 0; round < 4; round++) {
+    const rounds = tools.length ? fp.maxRounds : 1;
+    for (let round = 0; round < rounds; round++) {
       if (live && round > 0) live.reset();
-      const last = round === 3;
-      const quiet = change && !props.length && round === 0;
-      const body = await env.AI.run(model, { messages, ...(last ? {} : { tools, ...(quiet ? { tool_choice: 'required' } : {}) }), max_tokens: 700, temperature: 0.3, stream: true, ...modelExtras(model) });
+      const last = round === rounds - 1;
+      const force = change && round === 0 && !props.length && changeHasTarget(userMsg.text);
+      const body = await env.AI.run(model, { messages, ...(last || !tools.length ? {} : { tools, ...(force ? { tool_choice: 'required' } : {}) }), max_tokens: 500, temperature: 0.3, stream: true, ...modelExtras(model) });
       const turn = await readStream(body, () => {});
       if (env.WAI_DEBUG) console.log('TURN', round, JSON.stringify({ c: turn.content.slice(0, 300), t: turn.toolCalls, u: turn.usage && turn.usage.neurons }));
       calls++; out.rounds = round + 1;
       if (turn.usage) { out.neurons += Number(turn.usage.neurons || 0); tin += turn.usage.prompt_tokens || 0; tout += turn.usage.completion_tokens || 0; }
       if (!turn.toolCalls.length) {
         // Änderungswunsch ohne Werkzeug: einmal ausdrücklich nachfordern
-        if (change && !toolCalled && !nudged && !last) {
+        if (change && !toolCalled && !nudged && !last && !/\?\s*$/.test(cleanAnswer(turn.content))) {
           nudged = true;
           messages.push({ role: 'assistant', content: turn.content || '' }, { role: 'user', content: 'Ändere nichts mit Worten. Rufe jetzt genau das passende Werkzeug auf (add_rule, move_session, modify_session oder cancel_session; die IDs stehen in den Daten). Antworte erst nach dem Ergebnis.' });
           continue;
@@ -174,11 +184,17 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
     await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, errors: 1, fallbacks: 1 });
     throw new FallbackError('error: ' + String((e as Error).message || e).slice(0, 120));
   }
-  if (change && !toolCalled) {
+  // Rückfrage („Auf welchen Tag?“) ist erlaubt; sonst muss eine Änderung über ein Werkzeug laufen
+  const asksBack = /\?\s*$/.test(cleanAnswer(final)) && !claimsChange(cleanAnswer(final));
+  if (change && !toolCalled && !asksBack) {
     await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 });
     throw new FallbackError('change without tool');
   }
+  // Auftrag 25: nur Vorschläge für den genannten Tag, keine doppelten
+  if (props.length) { const kept = limitToMentioned(ctx, userMsg.text, props); if (!kept.length) { await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 }); throw new FallbackError('proposal for other day'); } props.splice(0, props.length, ...kept); }
   final = fixCoachText(cleanAnswer(final), ctx);
+  // Auftrag 25: Mit Vorschlag ist noch nichts geändert: Sätze wie „Ich habe den Lauf gekürzt.“ fallen weg, „Ich habe dir einen Vorschlag gemacht …“ bleibt
+  if (props.length) { const kept = final.split(/(?<=[.!?])\s+/).filter(x => /vorschlag/i.test(x) || !claimsChange(x)); if (kept.length) final = kept.join(' '); }
   const bad = inventedNumbers(final, sources);
   const claimed = claimsChange(final) && !props.length;
   // Auftrag 17: behauptete Leistungen (z. B. „100 m geschafft“) müssen in den echten Daten stehen, sonst antwortet der Regel-Coach

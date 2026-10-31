@@ -86,7 +86,7 @@ export function renderPlan(): string {
   // Auftrag 19, Punkt 3 (Jonahs Wahl: C): Balken je Tag oben, darunter jeder Tag als Zeile, heute aufgeklappt
   h += weekMix(w, today);
   h += `<button class="btn ghost block" data-act="custom-add" data-date="${UI.planDate && w.days.some((d: any) => d.date === UI.planDate) ? UI.planDate : (w.days.some((d: any) => d.date === today) ? today : w.startDate)}" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('plan.addExtra'))}</button>`;
-  h += `<section class="sec" data-plan-adjustments><button class="btn ghost block spread" data-act="plan-adjustments" aria-expanded="${!!UI.planAdjustmentsOpen}" aria-controls="plan-adjustments-body">${esc(t("plan.adjustments"))}<span class="xs muted">${esc(t("plan.last30"))} ${ic("down")}</span></button><div id="plan-adjustments-body" ${UI.planAdjustmentsOpen ? "" : "hidden"}>${adjustmentsList()}</div></section>`;
+  h += `<section class="sec" data-plan-adjustments><button class="btn ghost block spread" data-act="plan-adjustments" aria-expanded="${!!UI.planAdjustmentsOpen}" aria-controls="plan-adjustments-body" style="flex-wrap:wrap;row-gap:2px"><span>${esc(t("plan.adjustments"))}</span><span class="xs muted">${esc(t("plan.last30"))} ${ic("down")}</span></button><div id="plan-adjustments-body" ${UI.planAdjustmentsOpen ? "" : "hidden"}>${adjustmentsList()}</div></section>`;
   return '<div class="plan-c" data-plan-design="C">' + h + '</div>';
 }
 /* ---------- Auftrag 19, Punkt 3: Woche als Balken und aufklappbare Tage ---------- */

@@ -162,6 +162,7 @@ function go(target: string, scroll?: string | null) {
   else { UI.tab = (TABS.some(x => x.id === a) ? a : 'heute') as Tab; UI.sub = b && SUBS[b] ? b : null; }
   if (UI.sub === 'daten' || UI.sub === 'konto' || UI.sub === 'betreiber') resetDatenCache();
   if (UI.tab === 'mehr' && !UI.sub) resetMehrSearch();
+  if (UI.sub) pushSub(); else leaveSubHistory();
   saveUi(); render();
   if (scroll) { const el = document.getElementById(scroll); if (el) { el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); return; } }
   if (UI.tab === 'plan' && !UI.sub && UI.planDate) { scrollToPlanDay(); return; }
@@ -169,13 +170,27 @@ function go(target: string, scroll?: string | null) {
   window.scrollTo(0, 0);
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+/* Auftrag 25: Zurück-Wischen (iPhone, App auf dem Homescreen) und Browser-Zurück. Eine Unterseite legt einen Verlaufseintrag an;
+   Zurück schließt zuerst ein offenes Blatt, sonst geht es zur Liste „Mehr“. Höchstens ein Eintrag (2 Ebenen). */
+let subPushed = false, skipPop = false;
+function pushSub() { if (subPushed) return; try { history.pushState({ stamio: 'sub' }, ''); subPushed = true; } catch (e) { /* ohne Verlauf */ } }
+window.addEventListener('popstate', () => {
+  if (skipPop) { skipPop = false; return; }
+  if (!subPushed) return;
+  subPushed = false;
+  if (sheetOpen()) { closeSheet(); if (UI.sub) pushSub(); return; }
+  if (!UI.sub) return;
+  if (guardLeave('mehr', () => { UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); })) { pushSub(); return; }
+  UI.sub = null; saveUi(); render(); window.scrollTo(0, 0);
+});
+function leaveSubHistory() { if (subPushed) { subPushed = false; skipPop = true; try { history.back(); } catch (e) { skipPop = false; } } }
 nav.render = render; nav.rerender = rerender; nav.go = go;
 
 /* ---------- Aktionen ---------- */
 on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!; if (tab === UI.tab && !UI.sub) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } if (tab === 'plan') UI.planDate = null; go(tab); });
 on('lex', el => { if (sheetOpen()) closeSheet(); setLexiconQuery(el.dataset.q || ''); go('lexikon'); });
 on('go-sub', el => { if (sheetOpen()) closeSheet(); go(el.dataset.sub!); });
-on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
+on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; leaveSubHistory(); UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
 on('ill-start', () => { STATE.illnessPeriods.push({ id: 'ill-' + Date.now(), start: todayStr(), end: null, note: '' }); saveState(); rerender(); toast(t('ill.started')); });
 on('ill-end', () => {
   const ill = D().ill; if (!ill) return; const t0 = todayStr();
@@ -249,6 +264,7 @@ try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } 
 { let ran = false; const check = () => { if (ran) return; ran = true; try { if (HAS_PLAN && planRulesOnStart()) rerender(); } catch (e) { /* nie den Start verhindern */ } };
   if (isSyncOn()) onSynced(check); else check(); }
 render();
+if (UI.sub) pushSub();
 openFromUrl(location.href);
 startPwa();
 setTimeout(maybeWhatsNew, 400);

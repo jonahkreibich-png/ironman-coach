@@ -74,7 +74,7 @@ ${VARIANTS.map((v, i) => `<section id="${v.id}"><h2><b>${i + 1}</b>${v.name}</h2
   <h3>Kleine Größen</h3>${sizes(v)}
   <h3>Homescreen</h3><div class="row">${phone(v, 'light')}${phone(v, 'dark')}</div>
   <h3>Startbild beim Öffnen (verkleinert)</h3><div class="splashes">${splash(v, 'light')}${splash(v, 'dark')}</div></section>`).join('')}
-<p class="note">Hinweis: Auf dem iPhone-Homescreen zeigt eine Web-App immer ein Icon (das helle). Die dunkle Fassung wird für das Startbild im dunklen Modus und überall in der App genutzt, wo das Icon auf dunklem Grund steht. Nachbar-Apps sind neutrale Platzhalter.</p>
+<p class="note">Hinweis: Auf dem iPhone-Homescreen zeigt eine Web-App immer ein Icon (das helle). Die dunkle Fassung nutze ich für das Startbild im dunklen Modus. Nachbar-Apps sind neutrale Platzhalter.</p>
 </body></html>`;
 fs.writeFileSync('icon-varianten.html', html);
 console.log('icon-varianten.html geschrieben');

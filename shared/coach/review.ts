@@ -450,6 +450,7 @@ export function isReviewQuestion(raw: string): boolean {
   if (/\b(was steht|was soll|was mache|was muss|wann|warum|wieso|plan fuer|morgen|naechste|naechsten|kommende)\b/.test(j) && !/\b(wie war|vergleich|gestern|letzte woche)\b/.test(j)) return false;
   if (/\b(krank|schmerz|verschieb|streich|tausch|keine zeit|urlaub)\b/.test(j)) return false;
   if (/\bvergleich\b.*\b(woche|vorwoche|letzte)\b|\b(woche|vorwoche)\b.*\bvergleich/.test(j)) return true;
+  if (/\bgenug (gemacht|trainiert)\b/.test(j)) return true;
   return ASK.test(j) && WHAT.test(j);
 }
 const SPORT_RE: [RegExp, string][] = [[/\b(lauf|laufen|gelaufen|joggen|jogging|run|laeufe|tempolauf|longrun)\b/, 'run'], [/\b(rad|radfahrt|radtour|ausfahrt|fahrt|gefahren|rolle|bike|radeln|radl|geradelt|velo|radfahren|fahrrad)\b/, 'bike'], [/\b(schwimm\w*|geschwommen|kraul|becken)\b/, 'swim'], [/\b(kraft|gym|krafttraining)\b/, 'strength']];

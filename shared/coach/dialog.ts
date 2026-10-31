@@ -70,16 +70,17 @@ function daysOf(ctx: EngineCtx, toks: string[]): { from: string | null; to: stri
   return { from, to, any: found.map(f => f.d) };
 }
 function pickSessions(ctx: EngineCtx, toks: string[], date: string | null, d?: DialogState): Sx[] {
-  const sport = sportIn(toks); const long = has(toks, ['lang', 'langen', 'langer', 'lange']); const hard = has(toks, ['intervall', 'intervalle', 'harte', 'hart', 'tempo', 'schwelle']);
+  const sport = sportIn(toks); const test = toks.some(t => /test$|^test|check$/.test(t)); const long = has(toks, ['lang', 'langen', 'langer', 'lange']); const hard = has(toks, ['intervall', 'intervalle', 'harte', 'hart', 'tempo', 'schwelle']);
   const pron = has(toks, ['ihn', 'sie', 'es', 'den', 'die', 'das']) && !sport && !date;
   let list = upcoming(ctx, 8);
   if (pron && d && d.focus) { const f = list.find(x => x.s.id === d.focus!.sid); if (f) return [f]; }
   if (date) list = list.filter(x => x.date === date);
   if (sport) list = list.filter(x => x.s.sport === sport);
+  if (test) list = list.filter(x => /test|check/i.test(x.s.title || ''));
   if (long) list = list.filter(x => isLong(x.s));
   if (hard) list = list.filter(x => isHard(x.s));
-  if (!date && !sport && !long && !hard) list = list.filter(x => x.date === ctx.today).length ? list.filter(x => x.date === ctx.today) : list.slice(0, 1);
-  else if (!date) list = list.slice(0, sport || long || hard ? 1 : 3);
+  if (!date && !sport && !long && !hard && !test) list = list.filter(x => x.date === ctx.today).length ? list.filter(x => x.date === ctx.today) : list.slice(0, 1);
+  else if (!date) list = list.slice(0, sport || long || hard || test ? 1 : 3);
   return list;
 }
 const label = (x: Sx) => `${x.s.title} (${fmtD(x.date)})`;
@@ -283,8 +284,8 @@ function resolve(ctx: EngineCtx, d: DialogState, p: Pending, toks: string[], raw
   if (p.kind === 'move-day') {
     const x = p.data.x as Sx;
     if (day) return moveTo(ctx, d, x, day, true);
-    if (has(toks, ['streich', 'streichen', 'ausfallen', 'weglassen', 'absagen'])) return apply('cancel', [cancelOp(ctx, [x])], `Erledigt: ${x.s.title} (${fmtD(x.date)}) entfällt.`);
-    if (isNo(toks)) return { intent: 'cancelled', text: `Okay, ${x.s.title} bleibt am ${fmtD(x.date)}.`, pending: null };
+    if (has(toks, ['streich', 'streichen', 'ausfallen', 'weglassen', 'absagen'])) return apply('cancel', [cancelOp(ctx, [x])], `Erledigt: „${x.s.title}“ am ${fmtD(x.date)} entfällt.`);
+    if (isNo(toks)) return { intent: 'cancelled', text: `Okay, „${x.s.title}“ bleibt am ${fmtD(x.date)}`, pending: null };
     return null;
   }
   if (p.kind === 'which') {
@@ -384,10 +385,10 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
     }
     if (mild) {
       const e = easyToday(ctx);
-      return { intent: 'unwell', text: `Gute Besserung! Wenn du dich nur etwas schlapp fühlst, reicht heute locker oder Pause. Bist du richtig krank (Fieber, Halsweh, Gliederschmerzen), trage ich eine Krankheitsphase ein.`, pending: { kind: 'confirm', at: Date.now(), ops: e.length ? [{ op: 'adjust', adj: e }] : [], data: { done: 'heute nur locker' } },
+      return { intent: 'unwell', text: `Das tut mir leid. Wenn du dich nur etwas schlapp fühlst, reicht heute locker oder Pause. Bist du richtig krank (Fieber, Halsweh, Gliederschmerzen), trage ich eine Krankheitsphase ein.`, pending: { kind: 'confirm', at: Date.now(), ops: e.length ? [{ op: 'adjust', adj: e }] : [], data: { done: 'heute nur locker' } },
         options: [...(e.length ? [{ label: 'Heute nur locker', say: 'ja' }] : []), { label: 'Ich bin richtig krank', say: 'Ich bin krank' }, { label: 'Heute ganz frei', say: 'heute frei' }] };
     }
-    return propose('sick', 'Gute Besserung! Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Hals-Regel: Bei Fieber, Husten oder Gliederschmerzen kein Training; nur Schnupfen ohne Fieber erlaubt höchstens locker und kurz.', [{ op: 'illness-start', date: ctx.today }], [{ label: 'Ja, Krankheit eintragen', say: 'ja' }, { label: 'Nur heute locker', say: 'heute nur locker' }, { label: 'Nein', say: 'nein' }]);
+    return propose('sick', 'Das tut mir leid. Soll ich ab heute eine Krankheitsphase eintragen? Dann pausiert der Plan, und danach steigen wir in Stufen wieder ein. Hals-Regel: Bei Fieber, Husten oder Gliederschmerzen kein Training; nur Schnupfen ohne Fieber erlaubt höchstens locker und kurz.', [{ op: 'illness-start', date: ctx.today }], [{ label: 'Ja, Krankheit eintragen', say: 'ja' }, { label: 'Nur heute locker', say: 'heute nur locker' }, { label: 'Nein', say: 'nein' }]);
   }
   // Während einer Krankheitsphase: Fragen nach Training beantwortet der Coach zur Krankheit, statt den Plan zu ändern
   if (illNow && /^(kann|darf|soll|koennte|duerfte|sollte) ich\b|\b(wieder|schon) (trainieren|laufen|schwimmen|radfahren|rad fahren|fahren|sport)\b/.test(j) && !verbOf(toks.filter(x => x !== 'locker' && x !== 'lockerer'))) {
@@ -508,9 +509,9 @@ function dayOptions(ctx: EngineCtx, x: Sx): Opt[] {
 function askDay(ctx: EngineCtx, d: DialogState, x: Sx): Reply {
   const opts = dayOptions(ctx, x);
   d.focus = { sid: x.s.id, date: x.date };
-  if (opts.length === 1) return { intent: 'move', text: `Für ${x.s.title} finde ich diese Woche keinen anderen erlaubten Tag. Soll ich die Einheit streichen?`, pending: { kind: 'move-day', at: Date.now(), data: { x } }, options: [{ label: 'Ja, streichen', say: 'streichen' }, { label: 'Nein', say: 'nein' }] };
+  if (opts.length === 1) return { intent: 'move', text: `Für „${x.s.title}“ finde ich diese Woche keinen anderen Tag, der zu deinen Regeln passt. Soll ich die Einheit streichen?`, pending: { kind: 'move-day', at: Date.now(), data: { x } }, options: [{ label: 'Ja, streichen', say: 'streichen' }, { label: 'Nein', say: 'nein' }] };
   const names = opts.slice(0, -1).map(o => o.label);
-  return { intent: 'move', text: `Soll ich ${x.s.title} (${fmtD(x.date)}) auf ${names.length > 1 ? names.slice(0, -1).join(', ') + ' oder ' + names[names.length - 1] : names[0]} legen?`, pending: { kind: 'move-day', at: Date.now(), data: { x } }, options: opts };
+  return { intent: 'move', text: `Soll ich „${x.s.title}“ vom ${fmtD(x.date)} auf ${names.length > 1 ? names.slice(0, -1).join(', ') + ' oder ' + names[names.length - 1] : names[0]} legen?`, pending: { kind: 'move-day', at: Date.now(), data: { x } }, options: opts };
 }
 /* Verschieben auf einen Tag: nie gegen eine harte Regel; bei schon gewähltem Tag direkt ausführen (die Frage war die Vorschau) */
 function moveTo(ctx: EngineCtx, d: DialogState, x: Sx, to: string, chosen: boolean): Reply {
@@ -530,7 +531,7 @@ function moveTo(ctx: EngineCtx, d: DialogState, x: Sx, to: string, chosen: boole
   const hardNear = C.isHard(x.s) && [C.addDays(to, -1), to, C.addDays(to, 1)].some(dd => live(dayOf(ctx, dd)).some((y: any) => y.id !== x.s.id && C.isHard(y)));
   const op = moveOp(ctx, x, to);
   d.focus = { sid: x.s.id, date: to };
-  if (chosen && !hardNear) return apply('move', [op], `Erledigt: ${x.s.title} liegt jetzt am ${fmtD(to).replace(/\.$/, '')}.`);
+  if (chosen && !hardNear) return apply('move', [op], `Erledigt: „${x.s.title}“ liegt jetzt am ${fmtD(to)}`);
   return withMove(propose('move', `${x.s.title} von ${fmtD(x.date)} auf ${fmtD(to)} verschieben?${hardNear ? ' Achtung: dann liegen zwei harte Einheiten direkt nebeneinander.' : ''}`, [op], [{ label: 'Ja, verschieben', say: 'ja' }, { label: 'Anderer Tag', say: 'anderer Tag' }, { label: 'Nein', say: 'nein' }]), x);
 }
 function swapOps(ctx: EngineCtx, a: Sx[], b: Sx[]): Op {
@@ -659,7 +660,7 @@ export function clarify(ctx: EngineCtx, toks: string[], pre: string): Reply {
   const list = toks.length ? pickSessions(ctx, toks, ds.from, {}) : [];
   if ((ds.from || sport) && list.length) {
     const x = list[0];
-    return { intent: 'clarify', text: `${pre ? pre + ' ' : ''}Was soll ich mit ${x.s.title} (${fmtD(x.date)}) machen?`, pending: { kind: 'what', at: Date.now(), data: { list: [x] } },
+    return { intent: 'clarify', text: `${pre ? pre + ' ' : ''}Am ${fmtD(x.date)} steht „${x.s.title}“. Was soll damit passieren?`, pending: { kind: 'what', at: Date.now(), data: { list: [x] } },
       options: [{ label: 'Verschieben', say: 'verschieben' }, { label: 'Kürzer', say: 'kürzer' }, { label: 'Lockerer', say: 'lockerer' }, { label: 'Streichen', say: 'streichen' }] };
   }
   if (ds.from) return { intent: 'clarify', text: `${pre ? pre + ' ' : ''}Was ist am ${fmtD(ds.from)}? Hast du da keine Zeit, oder geht es um etwas anderes?`, options: [{ label: 'Keine Zeit an dem Tag', say: `Am ${DOWL[dowOf(ds.from)]} habe ich keine Zeit` }, { label: 'Was steht da an?', say: `Was steht am ${DOWL[dowOf(ds.from)]} an?` }] };

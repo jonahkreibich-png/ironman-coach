@@ -54,11 +54,11 @@ export function renderEssen(): string {
   const tg = targetsFor(date); const e = (STATE.nutrition || {})[date] || {};
   const minor = D().minor;
   let h = `<div class="spread" style="margin-bottom:var(--s3)"><input class="inp" type="date" value="${date}" data-ch="food-date" style="max-width:180px">${select('food-type', '', tg.overridden ? tg.type : 'auto', [['auto', t('food.auto', { t: t('food.type.' + tg.typeAuto) })], ...dayTypesFor({ team: hasTeam(), races: D().goals.some(g => !!g.date) }).map(k => [k, t('food.type.' + k)] as [string, string])], 'data-ch="food-type"').replace('<label for="food-type"></label>', '')}</div>
-  <div class="card"><div class="lbl">${esc(t('food.target'))}</div><div class="big">${tg.kcal[0]}-${tg.kcal[1]} kcal</div>
+  <div class="card"><div class="lbl">${esc(t('food.target'))}</div><div class="big" data-range>${tg.kcal[0]}–${tg.kcal[1]}<wbr> kcal</div>
     <div class="hint num">${esc(t('food.macros', { c: `${tg.carbs[0]}-${tg.carbs[1]}`, p: `${tg.protein[0]}-${tg.protein[1]}`, f: `${tg.fat[0]}-${tg.fat[1]}` }))}</div>
     ${nbar(t('food.kcal'), e.kcal ?? null, tg.kcal[0], tg.kcal[1], '')}${nbar(t('food.carbs'), e.carbs ?? null, tg.carbs[0], tg.carbs[1], ' g')}${nbar(t('food.protein'), e.protein ?? null, tg.protein[0], tg.protein[1], ' g')}
     <div class="hint">${esc(t('food.note.' + tg.type))}</div>
-    <div class="row"><button class="btn grow" data-act="food-photo">${ic('camera')} ${esc(t('food.photo'))}</button><button class="btn ghost" data-act="food-edit">${ic('edit')} ${esc(t('food.enter'))}</button></div></div>`;
+    <div class="row wrap"><button class="btn grow" data-act="food-photo" style="flex:1 1 auto">${ic('camera')} ${esc(t('food.photo'))}</button><button class="btn ghost" data-act="food-edit">${ic('edit')} ${esc(t('food.enter'))}</button></div></div>`;
   // Hinweis bei zu wenig Essen
   const days = [] as { kcal: number | null; low: number }[];
   for (let i = 6; i >= 1; i--) { const d = addDays(date, -i); const ee = (STATE.nutrition || {})[d]; days.push({ kcal: ee && ee.kcal != null ? ee.kcal : null, low: targetsFor(d).kcal[0] }); }

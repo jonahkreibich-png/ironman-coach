@@ -165,13 +165,16 @@ describe('Streaming, Werkzeuge, Wächter', () => {
     const shown = s.lines.filter(l => l.t === 'delta').map(l => l.text).join('');
     expect(shown).toBe('Schlaf ist die beste Erholung.'); expect(s.last.messages.find((m: any) => m.kind === 'answer').text).toBe('Schlaf ist die beste Erholung.');
   });
-  test('„Wie war mein Training?“: Bewertung der Regel-Engine kommt vorher als Werkzeug-Ergebnis zur KI', async () => {
+  test('„Wie war mein Training?“: Bewertung der Regel-Engine kommt vorher in den Text, ein einziger Aufruf ohne Werkzeuge (Auftrag 25)', async () => {
     const ai = fakeAI([{ text: 'Ich finde keine erledigte Einheit, hak sie im Plan ab.' }]);
     const { env, T } = await user({ ai });
     await chat(env, T, 'wie war mein training heute');
-    const msgs = ai.calls[0].input.messages;
-    expect(msgs.some((m: any) => m.role === 'assistant' && m.tool_calls && m.tool_calls[0].function.name === 'review_training')).toBe(true);
-    expect(msgs.some((m: any) => m.role === 'tool' && /Keine erledigte Einheit/.test(m.content))).toBe(true);
+    expect(ai.calls).toHaveLength(1);
+    expect(ai.calls[0].input.tools).toBeUndefined();
+    const sys = ai.calls[0].input.messages[0].content;
+    expect(sys).toMatch(/AUSWERTUNG DER APP ZU DIESER FRAGE:[\s\S]*Keine erledigte Einheit/);
+    expect(sys).toContain('LETZTE 7 TAGE');
+    expect(sys).not.toContain('NÄCHSTE TAGE:');
   });
   test('Planänderung: Werkzeug → nur Vorschlag, nichts sofort geändert; Bestätigen wendet an', async () => {
     const id = (add(today, 1) > add(mon, 6) ? 'w2' : 'w1') + '-' + ['so', 'mo', 'di', 'mi', 'do', 'fr', 'sa'][dow(add(today, 1))];
@@ -193,6 +196,7 @@ describe('Streaming, Werkzeuge, Wächter', () => {
     const { env, T } = await user({ ai });
     const r = await chat(env, T, 'ab jetzt mittwochs kein rad mehr');
     expect(r.status).toBe(503); expect(ai.calls).toHaveLength(2);
+    expect(ai.calls[0].input.tools.map((t: any) => t.function.name)).toEqual(['get_data', 'move_session', 'modify_session', 'cancel_session', 'add_rule']);
     expect(ai.calls[0].input.tool_choice).toBe('required');
     expect(ai.calls[1].input.messages[ai.calls[1].input.messages.length - 1].content).toMatch(/Rufe jetzt genau das passende Werkzeug auf/);
   });
@@ -226,13 +230,21 @@ describe('Datenschutz und Betreiber', () => {
     expect(sent).not.toMatch(/\b123\b/); expect(sent).not.toMatch(/Ruhepuls 37|\b37 \//);
     expect(sent).toMatch(/Werte von Oura gibt die App nicht an die KI weiter/);
   });
-  test('ohne Oura: Ampel-Zeile in der Zusammenfassung, Profil, Phase, heute und letzte 7 Tage', async () => {
-    const ai = fakeAI([{ text: 'Gut.' }]);
+  test('gezielter Kontext (Auftrag 25): je Frage nur die passenden Abschnitte, Grundregeln immer', async () => {
+    const ai = fakeAI([{ text: 'Gut.' }, { text: 'Gut.' }, { text: 'Gut.' }]);
     const { env, T } = await user({ ai });
     await chat(env, T, 'Hallo');
-    const sys = ai.calls[0].input.messages[0].content;
-    for (const k of ['PROFIL:', 'ZIEL:', 'PHASE:', 'HEUTE:', 'NÄCHSTE TAGE:', 'LETZTE 7 TAGE:', 'AMPEL HEUTE:']) expect(sys).toContain(k);
-    expect(sys).toMatch(/Erfinde nichts/); expect(sys).toMatch(/„Das weiß ich nicht“/); expect(sys).toMatch(/Keine medizinischen Diagnosen/);
+    let sys = ai.calls[0].input.messages[0].content;
+    for (const k of ['PROFIL:', 'ZIEL:', 'HEUTE (']) expect(sys).toContain(k);
+    expect(sys).not.toContain('LETZTE 7 TAGE'); expect(sys).not.toContain('Trainingsregeln der App (gelten für jeden Plan');
+    expect(sys).toMatch(/erfinde keine Zahlen/); expect(sys).toMatch(/Keine Diagnosen/);
+    expect(ai.calls[0].input.tools).toBeUndefined();
+    await chat(env, T, 'Bin ich gerade müde, wie ist meine Form?');
+    sys = ai.calls[1].input.messages[0].content;
+    expect(sys).toContain('AMPEL HEUTE:');
+    await chat(env, T, 'Was steht diese Woche noch in meinem Plan?');
+    sys = ai.calls[2].input.messages[0].content;
+    for (const k of ['PHASE:', 'NÄCHSTE TAGE:', 'LETZTE 7 TAGE:']) expect(sys).toContain(k);
   });
   test('Verbrauch: Betreiber sieht heute je Person und Tage; normale Nutzer nicht', async () => {
     const ai = fakeAI([{ text: 'Gut.', neurons: 28 }]);
@@ -268,4 +280,16 @@ test('kostenlose KI: roter Modelltext wird erst nach Prüfung als echte gelbe Ap
   const deltas = r.lines.filter(l => l.t === 'delta').map(l => l.text).join('');
   expect(deltas).not.toContain('rot'); expect(deltas).toContain('Gelb');
   expect(JSON.stringify(ai.calls[0].input.messages)).not.toContain('Gelb');
+});
+
+describe('Auftrag 25: Vorschlag statt behaupteter Änderung', () => {
+  test('„Ich habe den Lauf gekürzt.“ fällt weg, wenn es nur ein Vorschlag ist', async () => {
+    const id = (add(today, 1) > add(mon, 6) ? 'w2' : 'w1') + '-' + ['so', 'mo', 'di', 'mi', 'do', 'fr', 'sa'][dow(add(today, 1))];
+    const ai = fakeAI([{ tools: [{ name: 'cancel_session', args: { session_id: id } }] }, { text: 'Ich habe die Einheit gestrichen. Ich habe dir einen Vorschlag gemacht, du kannst ihn unten bestätigen.' }]);
+    const { env, T } = await user({ ai });
+    const r = await chat(env, T, 'streich morgen das training');
+    if (id.endsWith('-mo') || r.status !== 200) return; // Montag: Ruhetag
+    const ans = r.data.messages.find((m: any) => m.kind === 'answer');
+    expect(ans.text).toBe('Ich habe dir einen Vorschlag gemacht, du kannst ihn unten bestätigen.');
+  });
 });

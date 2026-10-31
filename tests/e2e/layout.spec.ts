@@ -224,3 +224,24 @@ for (const [wname, w] of WIDTHS) {
     });
   }
 }
+
+/* Auftrag 25: große Schrift (iPhone „Größerer Text“, etwa 23 pt statt 17 pt) auf allen Bildschirmen, hell und dunkel, 390 und 320 px */
+for (const [wname, w] of [['390', 390], ['320', 320]] as [string, number][]) {
+  for (const dark of [false, true]) {
+    test(`große Schrift, ${wname} px, ${dark ? 'dunkel' : 'hell'}: nichts ragt heraus`, async ({ page }) => {
+      test.setTimeout(150000);
+      await page.setViewportSize({ width: w, height: 760 });
+      await prepare(page, 'normal', dark);
+      await page.addInitScript(() => { const set = () => { document.documentElement.style.fontSize = '23px'; }; if (document.documentElement) set(); document.addEventListener('DOMContentLoaded', set); });
+      const problems: string[] = [];
+      for (const url of SCREENS('normal')) {
+        await page.goto(url);
+        await expect(page.locator('#app')).not.toBeEmpty();
+        await page.waitForTimeout(60);
+        expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe('23px');
+        (await overflow(page)).forEach(p => problems.push(`${url}: ${p}`));
+      }
+      expect(problems).toEqual([]);
+    });
+  }
+}

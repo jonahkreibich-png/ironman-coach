@@ -163,10 +163,10 @@ test.describe('D: Coach-Chat', () => {
     await seed(page);
     await open(page, '/?go=coach');
     await page.locator('[data-quick] [data-act="chat-say"]', { hasText: "Mir geht's nicht gut" }).click();
-    await expect(page.locator('.msg').last()).toContainText('Gute Besserung');
+    await expect(page.locator('.msg').last()).toContainText('Das tut mir leid');
     await page.locator('[data-act="chat-history"]').click();
-    await page.fill('#hist-q', 'Besserung'); await page.locator('#hist-q').blur();
-    await expect(page.locator('[data-history]')).toContainText('Gute Besserung');
+    await page.fill('#hist-q', 'schlapp'); await page.locator('#hist-q').blur();
+    await expect(page.locator('[data-history]')).toContainText('schlapp');
   });
   test('Neue Regel im Chat: ab jetzt mittwochs kein Laufen → im Wochenraster sichtbar', async ({ page }) => {
     await seed(page);

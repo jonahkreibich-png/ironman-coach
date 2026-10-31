@@ -209,12 +209,14 @@ const MASC = /(?:test|lauf|check|ruhetag|tag|block|wettkampf|koppellauf|dauerlau
 const SPORT_KEY: [RegExp, string][] = [[/schwimm|kraul|css/i, 'swim'], [/lauf|run/i, 'run'], [/rad|fahrt|bike|rolle/i, 'bike'], [/kraft/i, 'strength']];
 export function fixCoachText(text: string, ctx?: { today: string; baseWeeks?: any[]; state?: any }): string {
   let t = String(text || '');
+  // 0. Auftrag 25: „25.10..“ → „25.10.“, „…verschieben und warum?“ → „…verschieben?“, doppelte Leerzeichen
+  t = t.replace(/(\d\.)\.(?!\.)/g, '$1').replace(/(?<!\.)\.\.(?!\.)/g, '.').replace(/,?\s+(und|oder) warum(?=\s*\?)/gi, '').replace(/[ \t]{2,}/g, ' ');
   // 1. interne Texte
   if (INTERNAL_RE.test(t)) t = t.split(/(?<=[.!?])\s+|\n/).filter(s => !INTERNAL_RE.test(s)).join(' ').trim();
   // 2a. Wochentag passend zum genannten Datum
   const year = ctx ? +ctx.today.slice(0, 4) : new Date().getUTCFullYear();
-  t = t.replace(/\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\.?,? (?:den )?(\d{1,2})\.(\d{1,2})\./g, (m, w, dd, mm) => {
-    let y = year; if (ctx && +mm < +ctx.today.slice(5, 7) - 6) y++; if (ctx && +mm > +ctx.today.slice(5, 7) + 6) y--;
+  t = t.replace(/\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\.?,? (?:den )?(\d{1,2})\.(\d{1,2})\.(\d{4})?/g, (m, w, dd, mm, yy) => {
+    let y = year; if (ctx && +mm < +ctx.today.slice(5, 7) - 6) y++; if (ctx && +mm > +ctx.today.slice(5, 7) + 6) y--; if (yy) y = +yy;
     const iso = `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; const real = dowOfDate(iso);
     if (!Number.isFinite(real) || dowIdx(w) === real || dowIdx(w) < 0) return m;
     const long = w.length > 3; return m.replace(w, long ? DOW_LONG[real] : DOW_SHORT[real]);
