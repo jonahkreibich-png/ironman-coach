@@ -123,7 +123,7 @@ function renderTop() {
   const title = sub === 'vorlagen' ? 'Trainingsvorlagen' : sub ? t('sub.' + sub, { app: APP.name }) : HAS_PLAN ? t('tab.' + UI.tab) : APP.name;
   byId('top').innerHTML = sub
     ? `<button class="icon-btn" data-act="back" aria-label="${esc(t('common.back'))}">${ic('back')}</button><h1 class="top-title">${esc(title)}</h1><span style="width:40px"></span>`
-    : `<h1 class="top-title"><span class="mark" aria-hidden="true">${esc(APP.mark)}</span>${esc(title)}</h1>${HAS_PLAN && UI.tab === 'heute' ? `<button class="icon-btn" data-act="checkin-open" aria-label="${esc(t('heute.enterValues'))}">${ic('heart')}</button>` : '<span style="width:40px"></span>'}`;
+    : `<h1 class="top-title"><img class="mark" src="icons/icon-192.png" alt="" aria-hidden="true" width="26" height="26">${esc(title)}</h1>${HAS_PLAN && UI.tab === 'heute' ? `<button class="icon-btn" data-act="checkin-open" aria-label="${esc(t('heute.enterValues'))}">${ic('heart')}</button>` : '<span style="width:40px"></span>'}`;
   document.title = sub || UI.tab !== 'heute' ? `${title} · ${APP.name}` : APP.name;
 }
 function renderTabs() {

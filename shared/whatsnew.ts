@@ -1,5 +1,8 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.13.2', items: [
+    'Neues App-Icon: eine Welle, die in einen Bogen nach oben übergeht, mit dem Ziel als orangem Punkt. Das iPhone zeigt es erst, wenn du die App neu zum Home-Bildschirm hinzufügst. So geht nichts verloren: neue App in Safari hinzufügen, dort mit deinem Konto verbinden (in der alten App Mehr → Konto → „Gerät hinzufügen“, Code in der neuen eingeben), erst dann das alte Icon löschen.'
+  ] },
   { version: '3.13.1', items: [
     'Mitteilungen gehen jetzt: Mehr → Einstellungen → Mitteilungen → „Mitteilungen erlauben“ (auf dem iPhone in der App vom Home-Bildschirm). Ein Fehler hatte das bisher verhindert.',
     'Die App startet jetzt auch ohne Internet vom Home-Bildschirm und zeigt „Neue Version“, wenn es ein Update gibt.',

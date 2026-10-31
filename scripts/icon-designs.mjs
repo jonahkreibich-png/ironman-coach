@@ -138,7 +138,7 @@ const LINE_BG = {
   petrol: { light: ['#1a9aa3', '#0d6f7b', '#08505c'], dark: ['#17606b', '#0d4049', '#072a31'] },
   blue: { light: ['#2a7cf6', '#0a52c4', '#06409c'], dark: ['#17606b', '#0d4049', '#072a31'] }
 };
-function lineIcon(bgKey, mode, key, lineGrad) {
+function lineIcon(bgKey, mode, key, lineGrad, scale = 1) {
   const c = LINE_BG[bgKey][mode];
   const id = s => s + key;
   const stroke = lineGrad ? `url(#${id('l')})` : '#ffffff';
@@ -151,8 +151,8 @@ function lineIcon(bgKey, mode, key, lineGrad) {
     <filter id="${id('f')}" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="1.4" stdDeviation="1.4" flood-color="#00141a" flood-opacity=".3"/></filter>
   </defs>
   <rect width="100" height="100" fill="url(#${id('g')})"/><rect width="100" height="100" fill="url(#${id('h')})"/>
-  <g filter="url(#${id('f')})"><path d="${LINE}" fill="none" stroke="${stroke}" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="81.5" cy="27.5" r="8.8" fill="url(#${id('d')})"/></g></svg>`;
+  <g transform="translate(50 50) scale(${scale}) translate(-50 -50)"><g filter="url(#${id('f')})"><path d="${LINE}" fill="none" stroke="${stroke}" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="81.5" cy="27.5" r="8.8" fill="url(#${id('d')})"/></g></g></svg>`;
 }
 export const LINE_VARIANTS = [
   { id: 'w1', num: '1', name: 'Zum Vergleich: ursprüngliche Variante 1', idea: 'So sah Variante 1 in der ersten Runde aus.', svg: (mode = 'light', key = 'o') => VARIANTS[0].svg(mode, key) },
@@ -192,3 +192,6 @@ export const FINE_VARIANTS = [
   { id: 'f3a', num: '3a', name: 'Kleine Wellen, langer Bogen, weiß', idea: 'Zwei kleine, ruhige Wellen; der aufsteigende Bogen ist der Hauptteil und läuft oben flacher aus. Der Punkt sitzt mit Abstand wie eine Sonne.', svg: (mode = 'light', key = 'f3a') => fineIcon(mode, key, false) },
   { id: 'f3b', num: '3b', name: 'Kleine Wellen, langer Bogen, Hellblau → Weiß', idea: 'Gleiche Form; die Welle ist hellblau und geht im Bogen in Weiß über. Hellblau so hell gewählt, dass es auch bei 29 px deutlich bleibt.', svg: (mode = 'light', key = 'f3b') => fineIcon(mode, key, true) }
 ];
+
+/* Gewähltes App-Icon (Jonah, 31.10.): 2a, Petrol. maskable: Zeichen auf 72 % verkleinert, damit es in der sicheren Mitte liegt (Android/Chrome schneiden außen ab). */
+export const APP_ICON = { id: '2a', svg: (mode = 'light', key = 'app', o = {}) => lineIcon('petrol', mode, key, false, o.maskable ? 0.72 : 1) };

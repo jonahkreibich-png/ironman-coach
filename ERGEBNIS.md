@@ -1,5 +1,9 @@
 # Auftrag 25: Icon-Varianten, Mehr-Tab neu, Coach-KI gezielter, Gesamttest (31.10.)
 
+## Nachtrag 3.13.2: neues Icon
+- **2a (Petrol)** ist eingebaut: Home-Bildschirm-Icon, Browser-Icon, Android-Icon, alle iPhone-Startbilder hell und dunkel, kleines Zeichen oben in der App.
+- **Auf dem iPhone** erscheint das neue Icon erst, wenn du die App neu zum Home-Bildschirm hinzufügst (Anleitung in FUER-JONAH.md).
+
 ## Nachtrag 3.13.1
 - **Mitteilungen gingen nie:** Der Service Worker (Hintergrund-Teil der App) war seit dem Umbau am 11.10. kaputt, eine Zeile fehlte. In der echten App gab es deshalb keine einzige Mitteilungs-Anmeldung, dazu keinen Offline-Start und keinen Update-Hinweis. Repariert, Server-Antworten werden dabei nie zwischengespeichert. Neue feste Tests prüfen den Service Worker (auch in WebKit/Safari).
 - **Verbindungen** stehen jetzt in der Gruppe Einstellungen.
