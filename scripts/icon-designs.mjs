@@ -160,3 +160,35 @@ export const LINE_VARIANTS = [
   { id: 'l2b', num: '2b', name: 'Welle → Bogen, Blau', idea: 'Hintergrund Blau wie bisher; weiße Linie, oranger Punkt.', svg: (mode = 'light', key = 'b') => lineIcon('blue', mode, key, false) },
   { id: 'l2c', num: '2c', name: 'Welle → Bogen, Petrol mit Linienverlauf', idea: 'Hintergrund Petrol; die Linie geht von Hellblau (Welle) in Weiß (Bogen) über.', svg: (mode = 'light', key = 'c') => lineIcon('petrol', mode, key, true) }
 ];
+
+/* Auftrag 25, Runde 4 (Feinschliff von 2a): Wellen flacher und kleiner, der Bogen wird zum Hauptteil und läuft oben flacher aus;
+   der orange Punkt sitzt mit Abstand in Verlängerung des Linienendes (Sonne/Ziel). 3a weiß, 3b Welle hellblau → Bogen weiß. */
+function fineGeo({ x0 = 9, y0 = 75, half = 13, amp = 10, dip = 0.5, c2 = [52, 30], end = [68, 27], w = 9.5, r = 8.5, gap = 3.5 } = {}) {
+  let d = `M${x0} ${y0} q${half / 2} ${-amp} ${half} 0 t${half} 0 t${half} 0`;
+  const jx = x0 + 3 * half, jy = y0;
+  const c1 = [jx + (half / 2) * dip, jy + amp * dip];
+  d += ` C ${c1[0].toFixed(2)} ${c1[1].toFixed(2)}, ${c2[0]} ${c2[1]}, ${end[0]} ${end[1]}`;
+  const ux = end[0] - c2[0], uy = end[1] - c2[1], l = Math.hypot(ux, uy), dist = w / 2 + r + gap;
+  return { d, w, dot: [+(end[0] + ux / l * dist).toFixed(2), +(end[1] + uy / l * dist).toFixed(2), r] };
+}
+const FINE = fineGeo();
+function fineIcon(mode, key, lineGrad) {
+  const c = LINE_BG.petrol[mode];
+  const id = s => s + key;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="${id('g')}" x1="0.1" y1="0" x2="0.5" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="0.55" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient>
+    <radialGradient id="${id('h')}" cx="0.3" cy="0.05" r="0.75"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${id('d')}" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#ffc08a"/><stop offset="1" stop-color="#ff7a35"/></radialGradient>
+    ${lineGrad ? `<linearGradient id="${id('l')}" gradientUnits="userSpaceOnUse" x1="9" y1="75" x2="68" y2="27"><stop offset="0" stop-color="#a8defa"/><stop offset="0.42" stop-color="#bfe8fc"/><stop offset="0.62" stop-color="#ffffff"/></linearGradient>` : ''}
+    <filter id="${id('f')}" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="1.4" stdDeviation="1.4" flood-color="#00141a" flood-opacity=".3"/></filter>
+  </defs>
+  <rect width="100" height="100" fill="url(#${id('g')})"/><rect width="100" height="100" fill="url(#${id('h')})"/>
+  <g filter="url(#${id('f')})"><path d="${FINE.d}" fill="none" stroke="${lineGrad ? `url(#${id('l')})` : '#ffffff'}" stroke-width="${FINE.w}" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="${FINE.dot[0]}" cy="${FINE.dot[1]}" r="${FINE.dot[2]}" fill="url(#${id('d')})"/></g></svg>`;
+}
+export const FINE_VARIANTS = [
+  { ...LINE_VARIANTS[1], name: 'Zum Vergleich: 2a', idea: 'So sieht 2a aus der letzten Runde aus.' },
+  { id: 'f3a', num: '3a', name: 'Kleine Wellen, langer Bogen, weiß', idea: 'Zwei kleine, ruhige Wellen; der aufsteigende Bogen ist der Hauptteil und läuft oben flacher aus. Der Punkt sitzt mit Abstand wie eine Sonne.', svg: (mode = 'light', key = 'f3a') => fineIcon(mode, key, false) },
+  { id: 'f3b', num: '3b', name: 'Kleine Wellen, langer Bogen, Hellblau → Weiß', idea: 'Gleiche Form; die Welle ist hellblau und geht im Bogen in Weiß über. Hellblau so hell gewählt, dass es auch bei 29 px deutlich bleibt.', svg: (mode = 'light', key = 'f3b') => fineIcon(mode, key, true) }
+];
