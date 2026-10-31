@@ -65,3 +65,60 @@ export const VARIANTS = [
   }
 ];
 export const byId = id => VARIANTS.find(v => v.id === id);
+
+/* Auftrag 25, Runde 2: Jonah wählt Variante 1 als Grundlage. Weiche Welle unten (Wasser), daraus ein leicht geschwungener Weg,
+   der perspektivisch nach hinten oben läuft und an einer Sonne endet. Dicke Formen, damit es auch mit 20-29 px lesbar bleibt.
+   Dunkel: dunkles Petrol statt fast Schwarz. Gemeinsame Form, drei Farbwelten (1a Blau, 1b Petrol → Orange, 1c Petrol + Orange). */
+const PALETTES = {
+  '1a': {
+    light: { bg: ['#2a7cf6', '#0a4fc0', '#063a94'], waterLow: '#dce9ff', wave: '#ffffff', road: '#ffffff', sun: ['#ffd29a', '#ff9a5c'], shade: '#03255f' },
+    dark: { bg: ['#16586a', '#0b3a48', '#062530'], waterLow: '#86c6e6', wave: '#bfe9ff', road: '#e9f6ff', sun: ['#ffc58a', '#ff8a4c'], shade: '#021419' }
+  },
+  '1b': {
+    light: { bg: ['#ff9b54', '#d9645a', '#1f5f86', '#0b3c5d'], stops: [0, 0.32, 0.72, 1], waterLow: '#d6ecf5', wave: '#ffffff', road: '#ffffff', sun: ['#fff4d6', '#ffd08a'], shade: '#0a2a40' },
+    dark: { bg: ['#9a4a2c', '#5a3a44', '#14505f', '#072c37'], stops: [0, 0.3, 0.7, 1], waterLow: '#8fcfdc', wave: '#c8eef5', road: '#f3f8fa', sun: ['#ffe2b0', '#ffae66'], shade: '#03171d' }
+  },
+  '1c': {
+    light: { bg: ['#16a0a6', '#0b7c86', '#075a66'], waterLow: '#d3f1f2', wave: '#ffffff', road: '#ffffff', sun: ['#ffb36b', '#ff7a2f'], shade: '#03363d' },
+    dark: { bg: ['#12606a', '#0a414b', '#052a31'], waterLow: '#84cdd2', wave: '#bdeef0', road: '#eef9fa', sun: ['#ffae66', '#ff7a2f'], shade: '#021a1e' }
+  }
+};
+/* Weg mit Perspektive: Mittellinie als Bézier-Kurve, Breite nimmt nach hinten ab, Ränder als Versatz senkrecht zur Kurve */
+function roadPath() {
+  const P = [[50, 92], [49, 66], [67, 58], [70.5, 37.5]];
+  const at = t => { const u = 1 - t; return [0, 1].map(k => u * u * u * P[0][k] + 3 * u * u * t * P[1][k] + 3 * u * t * t * P[2][k] + t * t * t * P[3][k]); };
+  const dir = t => { const a = at(Math.max(0, t - 0.005)), b = at(Math.min(1, t + 0.005)); const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
+  const width = t => 30 * Math.pow(1 - t, 1.1) + 5.2;
+  const L = [], R = [];
+  for (let i = 0; i <= 40; i++) { const t = i / 40, c = at(t), d = dir(t), w = width(t) / 2; L.push([c[0] - d[1] * w, c[1] + d[0] * w]); R.push([c[0] + d[1] * w, c[1] - d[0] * w]); }
+  const f = q => q.map(v => v.toFixed(2)).join(' ');
+  const C = []; for (let i = 6; i <= 30; i++) C.push(at(i / 40));
+  return { edge: 'M' + L.map(f).join(' L') + ' L' + R.reverse().map(f).join(' L') + ' Z', mid: 'M' + C.map(f).join(' L') };
+}
+const { edge: ROAD, mid: LANE } = roadPath();
+function waveRoad(p, key) {
+  const stops = p.stops || p.bg.map((_, i) => i / (p.bg.length - 1));
+  const id = s => s + key;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="${id('g')}" x1="0.15" y1="0" x2="0.55" y2="1">${p.bg.map((c, i) => `<stop offset="${stops[i]}" stop-color="${c}"/>`).join('')}</linearGradient>
+    <radialGradient id="${id('s')}" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="${p.sun[0]}"/><stop offset="1" stop-color="${p.sun[1]}"/></radialGradient>
+    <radialGradient id="${id('h')}" cx="0.75" cy="0.2" r="0.55"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="${id('w')}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.wave}"/><stop offset="1" stop-color="${p.waterLow || p.wave}"/></linearGradient>
+    <linearGradient id="${id('r')}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.road}"/><stop offset="1" stop-color="${p.road}" stop-opacity=".82"/></linearGradient>
+    <filter id="${id('f')}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.6" stdDeviation="1.6" flood-color="${p.shade}" flood-opacity=".35"/></filter>
+  </defs>
+  <rect width="100" height="100" fill="url(#${id('g')})"/>
+  <rect width="100" height="100" fill="url(#${id('h')})"/>
+  <g filter="url(#${id('f')})">
+    <circle cx="70.5" cy="25.5" r="13.2" fill="url(#${id('s')})"/>
+    <path d="${ROAD}" fill="url(#${id('r')})"/>
+    <path d="${LANE}" fill="none" stroke="${p.shade}" stroke-opacity=".28" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="4 3.2"/>
+    <path d="M-2 75 C 10 66, 22 66, 34 74 S 58 83, 70 74.5 S 92 66, 102 71 L 102 102 L -2 102 Z" fill="url(#${id('w')})"/>
+  </g></svg>`;
+}
+export const WAVE_VARIANTS = [
+  { id: 'w1a', num: '1a', name: 'Welle → Weg, Blau', idea: 'Wie bisher in Blau: weiche Welle unten, geschwungener Weg nach hinten oben, Sonne als Ziel.', svg: (mode = 'light', key = 'a') => waveRoad(PALETTES['1a'][mode], key) },
+  { id: 'w1b', num: '1b', name: 'Welle → Weg, Sonnenaufgang', idea: 'Verlauf von Tiefblau/Petrol (Wasser) nach Orange (Ziel, Sonnenaufgang).', svg: (mode = 'light', key = 'b') => waveRoad(PALETTES['1b'][mode], key) },
+  { id: 'w1c', num: '1c', name: 'Welle → Weg, Petrol + Orange', idea: 'Petrol als Grundfarbe, die Sonne als oranger Akzent.', svg: (mode = 'light', key = 'c') => waveRoad(PALETTES['1c'][mode], key) }
+];

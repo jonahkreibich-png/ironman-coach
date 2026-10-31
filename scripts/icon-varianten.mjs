@@ -1,7 +1,7 @@
 // Erzeugt icon-varianten.html: jede Icon-Variante auf einem iPhone-Homescreen in echter Größe (393 × 852 pt, Icons 60 pt),
 // hell und dunkel, dazu kleine Größen und Startbilder. Aufruf: node scripts/icon-varianten.mjs
 import fs from 'node:fs';
-import { VARIANTS } from './icon-designs.mjs';
+import { WAVE_VARIANTS as VARIANTS } from './icon-designs.mjs';
 
 const brand = fs.readFileSync('shared/brand.ts', 'utf8');
 const NAME = /name:\s*'([^']*)'/.exec(brand)[1];
@@ -68,9 +68,9 @@ h3{font-size:15px;margin:18px 0 8px;color:#3f5064}
 .note{max-width:1100px;margin:10px auto 40px;padding:0 20px;color:#55667a;font-size:13px}
 </style></head><body>
 <header><h1>Icon-Varianten für ${NAME}</h1>
-<p>Vier Vorschläge statt des Buchstabens. Jede Variante hell und dunkel, auf einem iPhone-Homescreen in echter Größe (iPhone 15/16: 393 × 852 pt, Icon 60 pt), in kleinen Größen und als Startbild.</p>
-<p><b>Bitte wähle eine Nummer (1–4).</b> Der Name bleibt vorerst „${NAME}“.</p></header>
-${VARIANTS.map((v, i) => `<section id="${v.id}"><h2><b>${i + 1}</b>${v.name}</h2><p class="idea">${v.idea}</p>
+<p>Drei Weiterentwicklungen von Variante 1 (Welle → Weg). Jede hell und dunkel, auf einem iPhone-Homescreen in echter Größe (iPhone 15/16: 393 × 852 pt, Icon 60 pt), in kleinen Größen und als Startbild.</p>
+<p><b>Bitte wähle 1a, 1b oder 1c.</b> Der Name bleibt vorerst „${NAME}“.</p></header>
+${VARIANTS.map((v, i) => `<section id="${v.id}"><h2><b>${v.num || i + 1}</b>${v.name}</h2><p class="idea">${v.idea}</p>
   <h3>Kleine Größen</h3>${sizes(v)}
   <h3>Homescreen</h3><div class="row">${phone(v, 'light')}${phone(v, 'dark')}</div>
   <h3>Startbild beim Öffnen (verkleinert)</h3><div class="splashes">${splash(v, 'light')}${splash(v, 'dark')}</div></section>`).join('')}
