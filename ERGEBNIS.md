@@ -1,3 +1,25 @@
+# Auftrag 27: Design B + C, „Wieder gesund“ repariert (1.11.)
+
+**Stand:** Beides fertig und als Version 3.15.0 veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). Deine offene Krankheitsphase vom 30.10. habe ich beendet (letzter kranker Tag 31.10., Wiedereinstieg ab heute).
+
+## 1. „Wieder gesund“ – Ursache und Lösung
+**Ursache:** Die App merkt sich abgeleitete Werte (z. B. „heutige Krankheitsphase“) in einem Zwischenspeicher. Jeder Abgleich im Hintergrund (beim Öffnen, alle 3 Minuten, nach jedem Speichern) liest deine Daten frisch ein, der Zwischenspeicher zeigte aber weiter auf die alte Kopie. Der Knopf setzte das Ende an dieser Kopie, gespeichert wurde der echte Stand ohne Ende. Die Bestätigung kam trotzdem, sonst passierte nichts. Auf dem Server war deine Phase deshalb noch offen. Betroffen war auch Papa (offene Phase seit 28.10., die habe ich nicht angefasst).
+
+**Jetzt (für alle):**
+- „Ich bin wieder gesund“ beendet die Krankheit sofort: Wiedereinstieg ab heute in Stufen, vergangene Krank-Tage bleiben markiert. Auch doppelt angelegte Phasen enden.
+- Bestätigung „Krankheit überstanden – Wiedereinstieg ab heute“ mit **Rückgängig**, dazu eine Coach-Nachricht mit Rückgängig, auf allen Geräten gleich.
+- „Ich bin krank“, „Doch noch krank“ und der Coach nutzen denselben Weg. „Ich bin krank“ legt keine zweite Phase mehr an.
+- **Nach Verletzungen:** Auf Heute steht jetzt „Beschwerden: Knie seit …“ mit **„Wieder schmerzfrei“** (oder im Coach „Ich bin wieder schmerzfrei“). Das hebt die Schon-Regeln auf, plant neu, und alte Schmerz-Notizen bremsen nicht mehr. Bisher gab es keinen Weg zurück: Die Regel blieb, und sogar eine alte Wochennotiz wie „Leiste 3/10“ bremste das Laufen dauerhaft.
+
+**Tests** (WebKit und Chromium, mit Antippen): nach einem Hintergrund-Abgleich (stellte deinen Fehler nach), gleicher Tag, mehrere/doppelte Phasen, Rückgängig, Doch noch krank, zwei Geräte (PC überschreibt nichts), offline gedrückt und später synchronisiert, Verletzung per Knopf und Coach.
+
+## 2. Design B + C
+Basis B (ruhiges Dunkel, neutrale Karten, Akzente Petrol, sparsam Orange), oben dezentes Petrol wie die Icon-Oberkante, das nach etwa einem Drittel in den Hintergrund übergeht. Hell entsprechend mit leichtem Petrol-Schimmer. Gilt überall: Fragebogen, Mehr-Unterseiten, Blätter, Startbilder, Statusleiste. Alle Farben stehen jetzt an einer Stelle (`scripts/palettes.mjs`), Kontrast überall WCAG AA, Layout-Test hell/dunkel grün. Fotos: https://claude.ai/artifact/SNSLRpqJxcrCQD6DtR4YaT (B + C oben).
+
+**Für das neue Startbild** musst du nichts tun; es erscheint beim nächsten Öffnen nach dem Update (bei manchen iPhones erst nach erneutem „Zum Home-Bildschirm“).
+
+---
+
 # Auftrag 26: Ruhiger Start + Farben zum neuen Icon (1.11.)
 
 **Stand:** Punkt 2 (Flackern) ist behoben und als Version 3.14.0 veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). **Punkt 1 (Design) wartet auf deine Wahl.**
