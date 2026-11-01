@@ -1,3 +1,45 @@
+# Auftrag 26: Ruhiger Start + Farben zum neuen Icon (1.11.)
+
+**Stand:** Punkt 2 (Flackern) ist behoben und als Version 3.14.0 veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). **Punkt 1 (Design) wartet auf deine Wahl.**
+
+## 1. Design – bitte wählen
+Link (am besten auf dem iPhone): https://claude.ai/artifact/SNSLRpqJxcrCQD6DtR4YaT – oben das neue Icon, dann je Variante Heute, Plan, Einheit, Coach, Fortschritt, Mehr, dunkel und hell. Lokal: `design-varianten-2.html`.
+- **A Tiefes Petrol:** Hintergrund sehr dunkles Petrol, Akzent Türkis, Orange nur für Wichtiges (Ziel, Wettkampf, neue Nachrichten).
+- **B Mitternacht + Petrol:** fast neutral dunkel mit leichtem Blau-Grün-Stich, Akzente Petrol, Orange ganz sparsam.
+- **C Ozean:** Verlauf von Petrol (oben) nach fast Schwarz, mattes Glas, Akzent Türkis, Hauptknöpfe Orange.
+
+Ausprobieren: **Test-App → Mehr → Darstellung → Farbvariante**. Mischen ist erlaubt. Alle Varianten erfüllen WCAG AA (auch auf den Glas-Karten), die Ampel bleibt rot/gelb/grün. Nach deiner Wahl baue ich sie überall ein (eine zentrale Farbquelle, Startbilder, Layout-Test hell/dunkel).
+
+## 2. Flackern beim Öffnen – gemessen und behoben
+Gemessen in WebKit (Safari-Engine) mit einer Kopie deiner echten Daten auf meinem Rechner, Safari- und Homescreen-Modus, vom Öffnen bis die App ruhig ist.
+
+| Ursache (gemessen) | behoben |
+|---|---|
+| Weißer Blitz: Das Design kam erst mit dem nachgeladenen App-Code, bis dahin war die Seite weiß | Design lädt mit der Seite |
+| Ganze Ansicht 4-mal neu aufgebaut (Start, Verbindungen geladen, 2× nach dem Sync) | nur noch geänderte Teile werden angepasst, sanft |
+| 3 Sprünge um 46 px: Ladehinweis und „Wird gespeichert“ blitzten über dem Inhalt auf | Hinweise nur noch, wenn es wirklich länger dauert |
+| Neuer Plan vom Server (anderes Gerät, automatische Anpassung) lud die Seite neu | Plan wird ohne Neuladen übernommen |
+| Konto und KI-Stand wurden doppelt abgefragt | je einmal |
+| Service Worker: lädt beim Öffnen **nicht** neu (Updates erst beim nächsten Start/„Aktualisieren“) | war schon richtig |
+| Schriften: laden nicht nach, ändern keinen Text | war schon richtig |
+
+Neue Daten aus dem Sync gleiten jetzt kurz an ihren Platz, statt zu springen.
+
+**Vorher / nachher** (WebKit; erstes Bild = App mit deinen Daten sichtbar):
+
+| | erstes Bild | Neuaufbauten | Verschiebung (CLS) | heller Blitz | Neuladen |
+|---|---|---|---|---|---|
+| Deine Daten, vorher | 242 ms | 4 | 0,16 | ja | – |
+| Deine Daten, nachher (Safari / Homescreen) | 221 / 212 ms | 1 | 0 | nein | nein |
+| 1 Jahr Daten, vorher | 254 ms | 3 | 0,11 | ja | ja, bei neuem Plan |
+| 1 Jahr Daten, nachher | 231 ms | 1 | 0 (ohne neue Daten) | nein | nein |
+
+Ein iPhone ist langsamer als mein Rechner, die Unterschiede bleiben aber gleich. „Vorher“ im Homescreen-Modus habe ich nicht getrennt gemessen.
+
+**Fester Test:** `tests/e2e/kaltstart26.spec.ts` (Kaltstart mit einem Jahr Daten, mit und ohne Änderung von einem anderen Gerät, und erstes Öffnen) in Chromium und WebKit. In der Test-App fand ich so noch einen Sprung beim allerersten Öffnen, auch behoben. Messwerkzeug: `node scripts/startmessung.mjs`.
+
+---
+
 # Auftrag 25: Icon-Varianten, Mehr-Tab neu, Coach-KI gezielter, Gesamttest (31.10.)
 
 ## Nachtrag 3.13.2: neues Icon

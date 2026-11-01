@@ -1,5 +1,7 @@
 # Für Jonah
 
+**Design wählen (Auftrag 26):** Link öffnen https://claude.ai/artifact/SNSLRpqJxcrCQD6DtR4YaT, schreib mir A, B oder C (mischen geht, z. B. „Hintergrund C, Knöpfe A“). Live ausprobieren: Test-App → Mehr → Darstellung → Farbvariante.
+
 **Neues Icon aufs iPhone holen** (das iPhone tauscht es nicht von selbst):
 1. In **Safari** https://coach-app-efc7.pages.dev öffnen → Teilen → **Zum Home-Bildschirm**.
 2. In der **alten** App: Mehr → Konto → „Gerät hinzufügen“. Es erscheint ein Code.
