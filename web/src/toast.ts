@@ -3,11 +3,20 @@ import { storage, storageMessage } from './persistence';
 import { $ } from './util';
 
 let toastTimer: any = null;
-export function toast(msg: string): void {
+/* Auftrag 27: optional mit Knopf (z. B. „Rückgängig“), dann länger sichtbar */
+let toastAction: (() => void) | null = null;
+export function toast(msg: string, action?: { label: string; run: () => void }): void {
   if (/gespeichert|saved|consentSaved|revoked/i.test(msg) && storage.status !== 'saved') msg = storageMessage();
   const el = $('#toast'); if (!el) return;
-  el.textContent = msg; el.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+  el.textContent = msg; toastAction = null;
+  if (action) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-act'; b.textContent = action.label;
+    toastAction = action.run;
+    b.addEventListener('click', () => { const run = toastAction; toastAction = null; el.hidden = true; if (run) run(); });
+    el.appendChild(document.createTextNode(' ')); el.appendChild(b);
+  }
+  el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; toastAction = null; }, action ? 7000 : 2400);
 }
 export function armed(btn: HTMLElement, label?: string): boolean {
   if (btn.dataset.armed === '1') return true;

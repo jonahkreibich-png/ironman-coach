@@ -4,6 +4,7 @@ import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { APP_ICON } from './icon-designs.mjs';
+import { STATIC_COLORS } from './palettes.mjs';
 
 const brandSrc = fs.readFileSync('shared/brand.ts', 'utf8');
 const pick = k => (new RegExp(k + ":\\s*'([^']*)'").exec(brandSrc) || [])[1];
@@ -13,12 +14,13 @@ const CSS = 'html,body{margin:0;padding:0;background:transparent}svg{display:blo
 
 // Icon randlos (iOS und Browser runden selbst ab); maskable mit sicherer Mitte
 const icon = (s, o = {}) => `<div style="width:${s}px;height:${s}px;${o.radius ? `border-radius:${s * 0.225}px;overflow:hidden;` : ''}">${APP_ICON.svg(o.mode || 'light', 'i' + s + (o.mode || '') + (o.maskable ? 'm' : ''), o)}</div>`;
-// Startbild: Hintergrund wie die App (Glas-Design), Icon in der Mitte, Name darunter
+// Startbild: Hintergrund wie die App (Auftrag 27: Verlauf oben Petrol, nach einem Drittel der B-Hintergrund), Icon in der Mitte, Name darunter
+const C = dark => STATIC_COLORS[dark ? 'dark' : 'light'];
 function splashHtml(w, h, dark) {
   const s = Math.round(w * 0.285);
-  return `<div style="width:${w}px;height:${h}px;background:${dark ? '#060a12' : '#e8edf4'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${w * 0.065}px">
+  return `<div style="width:${w}px;height:${h}px;background:linear-gradient(180deg, ${C(dark).top} 0, color-mix(in srgb, ${C(dark).top} 45%, ${C(dark).bg}) 15%, ${C(dark).bg} 34%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${w * 0.065}px">
     <div style="box-shadow:0 ${s * 0.06}px ${s * 0.18}px rgba(${dark ? '0,0,0,.55' : '8,60,70,.22'});border-radius:${s * 0.225}px">${icon(s, { radius: true, mode: dark ? 'dark' : 'light' })}</div>
-    <div style="font:600 ${w * 0.072}px/1 ui-rounded,'SF Pro Rounded',-apple-system,'Segoe UI',system-ui,sans-serif;color:${dark ? '#eef3fa' : '#0b1b2b'};letter-spacing:.01em">${NAME}</div></div>`;
+    <div style="font:600 ${w * 0.072}px/1 ui-rounded,'SF Pro Rounded',-apple-system,'Segoe UI',system-ui,sans-serif;color:${C(dark).ink};letter-spacing:.01em">${NAME}</div></div>`;
 }
 
 const browser = await chromium.launch();

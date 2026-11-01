@@ -12,7 +12,7 @@ import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, 
 import { freeSettingsHtml } from './freeai';
 import { invalidate, D } from '../data';
 import { needsParentConsent } from '../../../shared/features';
-import { STORAGE, APP, APP_ENV } from '../config';
+import { STORAGE, APP } from '../config';
 import { nav } from '../nav';
 import { toast } from '../toast';
 import { keepDays } from './coach';
@@ -39,14 +39,6 @@ export const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navi
 let PUSH: any = undefined;
 
 const theme = () => { try { return localStorage.getItem(STORAGE.theme) || ''; } catch (e) { return ''; } };
-/* Auftrag 26: Farbvarianten zum neuen Icon (scripts/palettes.mjs). Nur in der Test-App und lokal umschaltbar, bis Jonah gewählt hat. */
-const PALETTE_KEY = 'palette_pref';
-export const palette = () => { try { return localStorage.getItem(PALETTE_KEY) || ''; } catch (e) { return ''; } };
-export function applyPalette(v: string) {
-  if (v) document.documentElement.setAttribute('data-palette', v); else document.documentElement.removeAttribute('data-palette');
-  try { if (v) localStorage.setItem(PALETTE_KEY, v); else localStorage.removeItem(PALETTE_KEY); } catch (e) {}
-}
-const paletteChoice = () => APP_ENV !== 'production';
 export function applyTheme(v: string) {
   if (v) document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme');
   try { localStorage.setItem(STORAGE.theme, v); } catch (e) {}
@@ -64,8 +56,7 @@ export function notifySummary(): string {
 }
 export function renderDarstellung(): string {
   return sec(t('set.look'), `<div class="card stack"><div class="seg" role="group" aria-label="${esc(t('set.theme'))}">${[['', t('set.system')], ['light', t('set.light')], ['dark', t('set.dark')]].map(([v, l]) => `<button class="${theme() === v ? 'on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${theme() === v}">${esc(l)}</button>`).join('')}</div>
-    <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div>
-    ${paletteChoice() ? `<div class="lbl">${esc(t('set.palette'))}</div><div class="seg" role="group" aria-label="${esc(t('set.palette'))}" data-palette-choice>${[['', t('set.paletteNow')], ['a', 'A'], ['b', 'B'], ['c', 'C']].map(([v, l]) => `<button class="${palette() === v ? 'on' : ''}" data-act="set-palette" data-v="${v}" aria-pressed="${palette() === v}">${esc(l)}</button>`).join('')}</div><div class="hint">${esc(t('set.paletteHint'))}</div>` : ''}</div>`);
+    <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`);
 }
 export function renderZonen(): string {
   return sec(t('set.zones'), zonesCard(), t('set.zonesAside')) + sec(t('set.tests'), testsCard()) + sec(t('set.ready'), readyCard(), t('set.readyAside')) + sec(t('set.score'), scoreCard(), t('set.scoreAside'));
@@ -302,7 +293,6 @@ on('score-adj', el => { const s = el.dataset.sport!; STATE.scoreAdjust = { ...(S
 on('score-reset', () => { STATE.scoreAdjust = {}; saveState(); invalidate(); nav.rerender(); toast(t('common.saved')); });
 
 on('set-theme', el => { applyTheme(el.dataset.v || ''); nav.rerender(); });
-on('set-palette', el => { applyPalette(el.dataset.v || ''); nav.rerender(); });
 on('set-variant', el => { UI.heuteVariant = el.dataset.v; saveUi(); nav.rerender(); });
 void fmtDate; void refreshSheet; void saveProfile;
 

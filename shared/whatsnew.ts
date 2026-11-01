@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.15.0', items: [
+    'Neue Farben passend zum Icon: ruhiges Dunkel mit dezentem Petrol oben, Akzente in Petrol, Orange nur für Wichtiges.',
+    '„Ich bin wieder gesund“ funktioniert wieder zuverlässig: Wiedereinstieg ab heute, auf allen Geräten gleich, mit Rückgängig. Nach Schmerzen gibt es jetzt „Wieder schmerzfrei“ (auf Heute oder im Coach).'
+  ] },
   { version: '3.14.0', items: [
     'Die App öffnet ruhiger: kein heller Blitz mehr, nichts springt, sie zeigt sofort deinen letzten Stand. Was der Abgleich Neues bringt, gleitet sanft an seinen Platz statt die Seite neu aufzubauen.',
     'Ein neuer Plan von einem anderen Gerät lädt die App nicht mehr neu, er erscheint einfach.'

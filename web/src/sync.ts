@@ -6,7 +6,7 @@ import { storage as localStorage } from "./persistence";
    Konflikte: die neueste Änderung pro Datensatz gewinnt. Offline bleibt alles in der Warteschlange.
    Dazu: Einrichtung (Einrichtungscode, Kopplung, Einladung), allgemeiner Server-Aufruf, KI-Status, Mitteilungen. */
 // @ts-nocheck
-import { canPersist, refreshStoredState, saveState, STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData, HAS_PLAN, replacePlanInPlace } from './store';
+import { canPersist, refreshStoredState, saveState, STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData, HAS_PLAN, replacePlanInPlace, notifyStateChanged } from './store';
 import { esc, fmtDate, ymd } from './util';
 import { toast } from './toast';
 import { STORAGE, API_BASE, APP_VERSION, APP_RELEASE } from './config';
@@ -273,6 +273,7 @@ async function drainSync(): Promise<boolean> {
    sah das wie Flackern aus. Hat das Gerät schon einen Plan und war es schon abgeglichen, wird der Plan an Ort und Stelle übernommen
    (wie bei Änderungen aus einem anderen Tab). Nur beim Einrichten/Koppeln oder ohne Plan wird weiter neu geladen. */
 function afterRemoteApply(routine = false) {
+  notifyStateChanged(); // Auftrag 27: Datensätze vom Server haben Objekte ersetzt
   if (planChanged) {
     let inPlace = false;
     if (routine && HAS_PLAN) { try { const next = JSON.parse(rawPlan() || 'null'); if (next && Array.isArray(next.weeks) && next.weeks.length) { replacePlanInPlace(next); inPlace = true; } } catch (e) { inPlace = false; } }

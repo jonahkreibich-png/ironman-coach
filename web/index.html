@@ -10,8 +10,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="%APP_SHORT%">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#e8edf4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#060a12" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="%THEME_TOP_LIGHT%" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="%THEME_TOP_DARK%" media="(prefers-color-scheme: dark)">
 <meta name="format-detection" content="telephone=no">
 <meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.webmanifest">
@@ -39,8 +39,6 @@
 <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (prefers-color-scheme: dark)" href="splash/dark-750x1334.png">
 <script>
 try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
-// Auftrag 26: Farbvariante vor dem ersten Bild setzen (sonst kurz die alte Farbe)
-try { var pa = localStorage.getItem('palette_pref'); if (pa) document.documentElement.setAttribute('data-palette', pa); } catch (e) {}
 </script>
 </head>
 <body>

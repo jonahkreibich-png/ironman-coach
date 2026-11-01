@@ -5,7 +5,7 @@ import { startApplication } from './startup';
 // ungestaltet (weißer Blitz vor dem dunklen Design). So steht es als <link> im Kopf von index.html und gilt ab dem ersten Bild.
 import './styles.css';
 import './design.css';
-import './palettes.css'; // Auftrag 26: Farbvarianten (nur Test-Umgebung umschaltbar)
+import './theme.css'; // Auftrag 27: alle Farben aus scripts/palettes.mjs (B + C)
 // Auftrag 22: „heute“ und Uhrzeiten in der Zeitzone des Geräts (Reisen, Nutzer in anderen Ländern); Standard Europe/Berlin
 try { setAppTz(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (_) { /* Standard bleibt */ }
 // Messpunkte für den Start (Auftrag 26, tests/e2e/kaltstart26.spec.ts): Speicher gelesen, App-Code geladen, erstes Bild gezeichnet (main.ts)

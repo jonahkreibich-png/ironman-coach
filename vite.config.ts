@@ -2,6 +2,8 @@ import { defineConfig, type Plugin } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { BRAND } from './shared/brand';
+// @ts-ignore reines JS: zentrale Farben (Auftrag 27)
+import { STATIC_COLORS } from './scripts/palettes.mjs';
 
 const RELEASE = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
 const VERSION = process.env.APP_VERSION || new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
@@ -13,7 +15,8 @@ function brandAndOffline(): Plugin {
     name: 'brand-and-offline',
     configResolved(c) { outDir = c.build.outDir; },
     transformIndexHtml(html, ctx) {
-      let out = html.replace(/%APP_NAME%/g, BRAND.name).replace(/%APP_SHORT%/g, BRAND.shortName).replace(/%APP_DESCRIPTION%/g, BRAND.description);
+      let out = html.replace(/%APP_NAME%/g, BRAND.name).replace(/%APP_SHORT%/g, BRAND.shortName).replace(/%APP_DESCRIPTION%/g, BRAND.description)
+        .replace(/%THEME_TOP_LIGHT%/g, STATIC_COLORS.light.top).replace(/%THEME_TOP_DARK%/g, STATIC_COLORS.dark.top);
       // Auftrag 26: den App-Code (main, per import() nachgeladen) gleich mit der Seite anfordern, parallel zum Lesen des Speichers
       if (ctx && ctx.bundle) {
         const lazy = Object.values(ctx.bundle).filter((c: any) => c.type === 'chunk' && c.isDynamicEntry && /(^|[\/])main-[^/]*.js$/.test(c.fileName)).map((c: any) => c.fileName);
@@ -25,7 +28,7 @@ function brandAndOffline(): Plugin {
       const manifest = {
         name: BRAND.name, short_name: BRAND.shortName, description: BRAND.description, lang: 'de',
         start_url: './', scope: './', display: 'standalone', orientation: 'portrait',
-        background_color: '#e8edf4', theme_color: '#e8edf4',
+        background_color: STATIC_COLORS.light.bg, theme_color: STATIC_COLORS.light.top,
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },

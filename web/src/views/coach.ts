@@ -163,6 +163,22 @@ export function runOps(ops: Op[]): { undo: any; summary: string[] } {
   if (res.replan) replanFuture(res.replan, t('chat.replanWhy'));
   return { undo: res.undo, summary: res.summary };
 }
+/* Auftrag 27: „Ich bin krank“, „Wieder gesund“, „Doch noch krank“, „Wieder schmerzfrei“ (Heute) laufen über denselben Weg wie der Coach:
+   gemeinsame Aktion (shared/coach/ops), Coach-Nachricht mit Rückgängig (wird synchronisiert, auf allen Geräten gleich) und Bestätigung. */
+export function healthAction(ops: Op[], text: string): void {
+  const r = runOps(ops);
+  const now = Date.now(); const id = `msg-h-${now}`;
+  STATE.coachMsgs[id] = { id, at: now, date: todayStr(), kind: 'answer', from: 'coach', intent: 'health', text, undo: r.undo };
+  saveState(); invalidate(); nav.rerender();
+  toast(text, { label: t('chat.undo'), run: () => undoMsg(id) });
+}
+function undoMsg(id: string): void {
+  const m = STATE.coachMsgs[id]; if (!m || !m.undo || m.undone) return;
+  undoOps(store(), m.undo);
+  rebuildPlanIndex(); STATE.coachMsgs[m.id] = { ...m, undone: true }; saveState(); invalidate();
+  if ((m.undo.rules || []).length || m.undo.goal || (m.undo.injury && m.undo.injury.rules.length)) replanFuture(t('chat.undoneReplan'), t('chat.replanWhy'));
+  nav.rerender(); toast(t('chat.undone'));
+}
 function addMsgs(list: any[]) { list.forEach(m => { STATE.coachMsgs[m.id] = m; }); saveState(); nav.rerender(); scrollCoachBottom(); }
 /* Frage beantworten: mit aktivem KI-Coach über den Server, sonst lokal mit der Gesprächsführung */
 let busy = false;
@@ -216,13 +232,7 @@ on('chat-opt', el => {
   if (o.go) { STATE.coachMsgs[m.id] = { ...m, answered: true }; saveState(); const g = String(o.go); if (g.startsWith('session:')) { openSession(g.slice(8)); return; } nav.go(g); return; }
   ask(o.say || o.label);
 });
-on('chat-undo', el => {
-  const m = STATE.coachMsgs[el.dataset.id!]; if (!m || !m.undo) return;
-  undoOps(store(), m.undo);
-  rebuildPlanIndex(); STATE.coachMsgs[m.id] = { ...m, undone: true }; saveState(); invalidate();
-  if ((m.undo.rules || []).length || m.undo.goal) replanFuture(t('chat.undoneReplan'), t('chat.replanWhy'));
-  nav.rerender(); toast(t('chat.undone'));
-});
+on('chat-undo', el => undoMsg(el.dataset.id!));
 on('chat-adj-undo', el => {
   const m = STATE.coachMsgs[el.dataset.id!]; if (!m) return; const ids: string[] = (m.refs && m.refs.adjustmentIds) || [];
   const undo = !ids.every(id => !STATE.adjustments[id] || STATE.adjustments[id].undone);

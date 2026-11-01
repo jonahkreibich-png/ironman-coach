@@ -1,11 +1,11 @@
-/* Auftrag 26: Farbvarianten passend zum neuen Icon (Petrol, weiße Linie, oranger Punkt).
-   Eine Quelle für alle Farben je Variante: daraus entsteht web/src/palettes.css (node scripts/palettes.mjs),
-   und tests/unit/contrast26.test.ts prüft jede Variante hell und dunkel auf WCAG AA.
-   Umschalten in der Test-App: Mehr → Darstellung → Farbvariante (nur Test-Umgebung), gespeichert als palette_pref.
+/* Zentrale Farbquelle der App. Auftrag 26: Varianten A, B, C passend zum neuen Icon (Petrol, weiße Linie, oranger Punkt);
+   Auftrag 27: Jonah wählte B + C (THEME unten). Daraus entsteht web/src/theme.css (node scripts/palettes.mjs), die einzige Farbdatei
+   der App; Startbilder (make-icons), Statusleiste und Manifest (vite.config.ts) lesen STATIC_COLORS. tests/unit/contrast26.test.ts prüft
+   WCAG AA und dass theme.css aktuell ist. A, B, C bleiben als Herkunft und für die Vergleichsseite (scripts/design-shots-2.mjs).
 
    Begriffe: bg Hintergrund, surface Karten (Glas, halbdurchsichtig), ink Text, accent Akzent (Tabs, Links, Auswahl),
    hl Hervorhebung (Orange wie der Punkt im Icon: Ziel, Wettkampf, neue Nachrichten), btn Hauptknopf,
-   good/warn/bad Ampel, swim/bike/run/strength/football Sportarten, blob-1..3 weiche Farbflecken im Hintergrund. */
+   good/warn/bad Ampel, swim/bike/run/strength/football Sportarten, grad-top Farbe oben im Verlauf. */
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -81,20 +81,40 @@ ${p} .tabbar { background: color-mix(in srgb, var(--grad-bottom) 62%, transparen
   }
 ];
 
+/* Auftrag 27 (Jonahs Wahl): B + C. Alles von B (Hintergrund, neutrale Karten, Texte, Akzent Petrol, sparsam Orange);
+   von C nur der Verlauf: oben dezentes Petrol (wie die Icon-Oberkante), nach etwa einem Drittel der Höhe weich im B-Hintergrund.
+   Hell entsprechend: B-hell mit leichtem Petrol-Schimmer oben. Karten werden nicht eingefärbt.
+   Deckende Flächen (surface-solid) gelten bei „Transparenz reduzieren“ und in Browsern ohne Glas. */
+const B = PALETTES.find(p => p.id === 'b');
+const withoutBlobs = t => Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith('blob-')));
+export const THEME = {
+  id: 'bc', name: 'B + C',
+  idea: 'Variante B (Mitternacht + Petrol) mit dem Hintergrund-Verlauf von C: oben dezentes Petrol, das nach etwa einem Drittel weich in den dunklen B-Hintergrund übergeht. Karten neutral wie B.',
+  light: { ...withoutBlobs(B.light), 'grad-top': '#d2e8ea', 'surface-solid': '#ffffff', 'surface-2-solid': '#f3f6f7' },
+  dark: { ...withoutBlobs(B.dark), 'grad-top': '#0c3238', 'surface-solid': '#161d20', 'surface-2-solid': '#1d2629' }
+};
+/* Verlauf als Ebene hinter allem (position: fixed – Safari auf dem iPhone kennt background-attachment: fixed nicht) */
+export const GRADIENT_STOPS = 'var(--grad-top) 0, color-mix(in srgb, var(--grad-top) 45%, var(--bg)) 15vh, var(--bg) 34vh';
+
 const block = t => Object.entries(t).map(([k, v]) => `--${k}: ${v};`).join(' ');
-export function paletteCss() {
-  let out = '/* Erzeugt von scripts/palettes.mjs (Auftrag 26) – nicht von Hand ändern. Farbvarianten über <html data-palette="a|b|c">. */\n';
-  for (const p of PALETTES) {
-    const sel = `:root[data-palette="${p.id}"]`;
-    out += `\n/* ${p.name} */\n${sel} { ${block(p.light)} color-scheme: light; }\n`;
-    out += `@media (prefers-color-scheme: dark) { ${sel}:not([data-theme="light"]) { ${block(p.dark)} color-scheme: dark; } }\n`;
-    out += `${sel}[data-theme="dark"] { ${block(p.dark)} color-scheme: dark; }\n`;
-    if (p.css) out += p.css(`[data-palette="${p.id}"]`) + '\n';
-  }
+export function themeCss() {
+  let out = '/* Erzeugt von scripts/palettes.mjs (Auftrag 27: B + C) – nicht von Hand ändern: node scripts/palettes.mjs */\n';
+  out += `:root { ${block(THEME.light)} color-scheme: light; }\n`;
+  out += `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${block(THEME.dark)} color-scheme: dark; } }\n`;
+  out += `:root[data-theme="dark"] { ${block(THEME.dark)} color-scheme: dark; }\n`;
+  out += `html { background: var(--bg); }\n`;
+  out += `body { background: transparent; }\n`;
+  out += `body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, ${GRADIENT_STOPS}); }\n`;
+  // Transparenz reduzieren (iOS-Bedienungshilfen) und Browser ohne Glas: deckende Karten
+  const solid = '--surface: var(--surface-solid); --surface-2: var(--surface-2-solid);';
+  out += `@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root:root { ${solid} } }\n`;
+  out += `@media (prefers-reduced-transparency: reduce) { :root:root { ${solid} } }\n`;
   return out;
 }
+/* Farben ohne CSS-Variablen (Startbilder, Statusleiste, Manifest) */
+export const STATIC_COLORS = { light: { top: THEME.light['grad-top'], bg: THEME.light.bg, ink: THEME.light.ink }, dark: { top: THEME.dark['grad-top'], bg: THEME.dark.bg, ink: THEME.dark.ink } };
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  fs.writeFileSync('web/src/palettes.css', paletteCss());
-  console.log('web/src/palettes.css geschrieben');
+  fs.writeFileSync('web/src/theme.css', themeCss());
+  console.log('web/src/theme.css geschrieben');
 }

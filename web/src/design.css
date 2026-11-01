@@ -1,45 +1,14 @@
 /* Design „Glas“ (Auftrag 13, Punkt 4, von Jonah gewählt): iOS-26-Anmutung. Gilt für alle über <html data-design="glas">.
-   Farben hell und dunkel, Systemschrift, Glas-Karten, schwebende Tab-Leiste, „Liquid“-Knöpfe.
+   Systemschrift, Glas-Karten, schwebende Tab-Leiste, „Liquid“-Knöpfe.
    „Bewegung reduzieren“ schaltet alle Übergänge ab (Regel in styles.css), „Transparenz reduzieren“ macht Glas deckend. */
 
 :root[data-design="glas"] {
-  --bg: #e8edf4; --surface: rgba(255,255,255,.62); --surface-2: rgba(255,255,255,.5); --ink: #0b1b2b; --ink-2: #3f5064; --ink-3: #55667a; --line: rgba(255,255,255,.75);
-  --accent: #0652c4; --accent-ink: #ffffff; --accent-soft: rgba(6,82,196,.12);
-  --good: #0a6e42; --warn: #8a5000; --bad: #b8232a; --info: #2457c0;
-  --good-soft: rgba(15,138,84,.13); --warn-soft: rgba(178,106,0,.13); --bad-soft: rgba(208,47,47,.12); --info-soft: rgba(42,99,212,.12);
-  --shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 8px 28px rgba(30,50,80,.10);
+  /* Farben: web/src/theme.css (erzeugt aus scripts/palettes.mjs, Auftrag 27: B + C). Hier nur Form, Schrift, Glas. */
   --r-sm: 14px; --r: 24px; --r-lg: 30px;
   --f-display: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --f-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --t-hero: 56px; --nav-h: 66px;
   --glass-blur: blur(22px) saturate(170%);
-  --blob-1: #9cc6ff; --blob-2: #ffc2ad; --blob-3: #a9e9d2;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-design="glas"]:not([data-theme="light"]) {
-    --bg: #060a12; --surface: rgba(30,40,58,.55); --surface-2: rgba(40,52,74,.5); --ink: #eef3fa; --ink-2: #a6b4c6; --ink-3: #93a2b6; --line: rgba(255,255,255,.12);
-    --accent: #4b9bff; --accent-ink: #04122b; --accent-soft: rgba(75,155,255,.16);
-    --good: #43d08f; --warn: #ffb547; --bad: #ff7468; --info: #7aaeff;
-    --good-soft: rgba(67,208,143,.15); --warn-soft: rgba(255,181,71,.15); --bad-soft: rgba(255,116,104,.15); --info-soft: rgba(122,174,255,.15);
-    --shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 10px 30px rgba(0,0,0,.45);
-    --blob-1: #1d3f86; --blob-2: #6b2a1a; --blob-3: #0f4d40;
-  }
-}
-:root[data-design="glas"][data-theme="dark"] {
-  --bg: #060a12; --surface: rgba(30,40,58,.55); --surface-2: rgba(40,52,74,.5); --ink: #eef3fa; --ink-2: #a6b4c6; --ink-3: #93a2b6; --line: rgba(255,255,255,.12);
-  --accent: #4b9bff; --accent-ink: #04122b; --accent-soft: rgba(75,155,255,.16);
-  --good: #43d08f; --warn: #ffb547; --bad: #ff7468; --info: #7aaeff;
-  --good-soft: rgba(67,208,143,.15); --warn-soft: rgba(255,181,71,.15); --bad-soft: rgba(255,116,104,.15); --info-soft: rgba(122,174,255,.15);
-  --shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 10px 30px rgba(0,0,0,.45);
-  --blob-1: #1d3f86; --blob-2: #6b2a1a; --blob-3: #0f4d40;
-}
-[data-design="glas"] body {
-  background:
-    radial-gradient(60% 40% at 0% 0%, color-mix(in srgb, var(--blob-1) 70%, transparent), transparent 70%),
-    radial-gradient(55% 35% at 100% 30%, color-mix(in srgb, var(--blob-2) 55%, transparent), transparent 70%),
-    radial-gradient(70% 40% at 30% 100%, color-mix(in srgb, var(--blob-3) 55%, transparent), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
 }
 [data-design="glas"] .card, [data-design="glas"] .list, [data-design="glas"] .answer, [data-design="glas"] .score, [data-design="glas"] .tcard,
 [data-design="glas"] .msg.coach, [data-design="glas"] .composer, [data-design="glas"] .wd {
@@ -48,7 +17,7 @@
 [data-design="glas"] .tcard.locked { background: var(--surface-2); border-style: solid; }
 [data-design="glas"] .crit, [data-design="glas"] .session-hero { background: var(--surface-2); border: 1px solid var(--line); }
 /* Kopf: Glas, damit gescrollter Inhalt den Titel nicht überdeckt */
-[data-design="glas"] .top { background: color-mix(in srgb, var(--bg) 70%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+[data-design="glas"] .top { background: color-mix(in srgb, var(--grad-top) 72%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 [data-design="glas"] .composer { bottom: calc(var(--nav-h) + 26px + env(safe-area-inset-bottom, 0px)); }
 [data-design="glas"] .top-title { text-transform: none; letter-spacing: -.01em; font: 700 30px/1.1 var(--f-body); }
 [data-design="glas"] .sec-h h2 { text-transform: none; letter-spacing: 0; font: 700 var(--t-lg)/1.2 var(--f-body); color: var(--ink); }
@@ -82,16 +51,4 @@
 [data-design="glas"] .seg { border-radius: 999px; background: var(--surface-2); border-color: var(--line); }
 [data-design="glas"] .seg button { border-radius: 999px; }
 [data-design="glas"] .check { background: var(--surface); }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root[data-design="glas"] { --surface: #ffffff; --surface-2: #f2f5f9; }
-}
-
-/* Transparenz reduzieren (iOS: Bedienungshilfen) und ältere Browser ohne Glas: deckende Flächen */
-@media (prefers-reduced-transparency: reduce) {
-  :root[data-design="glas"] { --surface: #ffffff; --surface-2: #f2f5f9; }
-  :root[data-design="glas"][data-theme="dark"] { --surface: #1a2232; --surface-2: #222c3e; }
-  [data-design="glas"] body { background: var(--bg); }
-}
-@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  :root[data-design="glas"]:not([data-theme="light"]) { --surface: #1a2232; --surface-2: #222c3e; }
-}
+/* Transparenz reduzieren und Browser ohne Glas: deckende Flächen, siehe theme.css (surface-solid) */

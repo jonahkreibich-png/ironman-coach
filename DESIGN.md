@@ -1,5 +1,7 @@
 # Design
 
+> Seit Version 3.15.0 (Auftrag 27): Farben „B + C“ zum neuen Icon – Basis Variante B (Mitternacht + Petrol, neutrale Karten), dazu der Verlauf von C (oben dezentes Petrol, nach einem Drittel der Höhe im Hintergrund). Einzige Farbquelle: `scripts/palettes.mjs` → `web/src/theme.css` (erzeugt), Startbilder, Statusleiste und Manifest lesen dieselbe Quelle. Vergleich: `design-varianten-2.html`.
+
 > Seit Version 3.0.0 (Auftrag 13) gilt das Design „Glas“: Tokens und Regeln in `web/src/design.css` (über `<html data-design="glas">`), Grundbausteine weiter in `web/src/styles.css`. Vergleich der Varianten: `design-varianten.html`.
 
 Stand: 11.10.2026. Bilder: `docs/design/vorher/` (alte App) und `docs/design/nachher/` (neue App). Alle Bilder sind 390 px breit (iPhone), hell und dunkel, mit erfundenen Demo-Daten (`fixtures/demo.mjs`).

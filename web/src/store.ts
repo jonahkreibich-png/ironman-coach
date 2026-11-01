@@ -105,10 +105,17 @@ export function hasLocalData(): boolean {
 export const STATE: any = loadState();
 // Auftrag 22: Zeitzone des Geräts in den Einstellungen, damit der Server morgens zur richtigen Ortszeit plant (wird beim nächsten Speichern abgeglichen)
 try { const tz = appTz(); if (STATE.settings && STATE.settings.tz !== tz) STATE.settings.tz = tz; } catch (_) { /* egal */ }
+/* Auftrag 27: Wer aus STATE abgeleitete Daten zwischenspeichert (data.ts D()), muss nach einem Austausch neu rechnen. Vorher zeigte der
+   Zwischenspeicher nach jedem Hintergrund-Abgleich auf die alten Objekte: „Wieder gesund“ setzte das Ende an einer veralteten Kopie. */
+const replaced: (() => void)[] = [];
+export function onStateReplaced(fn: () => void): void { replaced.push(fn); }
+/** Teile von STATE wurden ersetzt (z. B. Datensätze vom Server übernommen): Zwischenspeicher leeren */
+export function notifyStateChanged(): void { replaced.forEach(fn => { try { fn(); } catch (e) { /* nie scheitern */ } }); }
 export function replaceState(next: any): void {
   if (next === STATE) return;
   Object.keys(STATE).forEach(k => { delete STATE[k]; });
   Object.assign(STATE, next);
+  replaced.forEach(fn => { try { fn(); } catch (e) { /* Zwischenspeicher leeren darf nie scheitern */ } });
 }
 
 let saveListener: (() => void) | null = null;

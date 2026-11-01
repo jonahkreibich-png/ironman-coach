@@ -97,7 +97,7 @@ export const de: Record<string, string> = {
   'return.s1': 'Stufe 1: 20-30 min ganz locker (Spaziergang oder Rad), Puls unter 130.',
   'return.s2': 'Stufe 2: lockere Zone-2-Einheit, 30-40 min, Rad oder Lauf.',
   'return.s3': 'Stufe 3: Intervalle wieder möglich, wenn Ruhepuls und HFV passen.',
-  'ill.started': 'Krankheitsphase gestartet. Gute Besserung!', 'ill.ended': 'Pause beendet. Jetzt langsam wieder einsteigen.',
+  'ill.started': 'Krankheitsphase gestartet. Gute Besserung!', 'ill.ended': 'Krankheit überstanden – Wiedereinstieg ab heute', 'inj.ended': 'Beschwerden vorbei – der Plan gilt wieder normal', 'heute.injury': 'Beschwerden: {part}', 'heute.injurySince': 'Beschwerden: {part} seit {d}', 'heute.injuryHint': 'Der Plan ist schonender (keine harten Einheiten, bei Schmerz ab 4/10 kein Laufen). Wird es nicht besser: ärztlich anschauen lassen.', 'heute.painFree': 'Wieder schmerzfrei',
   'ill.reopened': 'Krankheitsphase läuft wieder',
 
   /* ---------- Einheiten ---------- */
@@ -289,7 +289,7 @@ export const de: Record<string, string> = {
 
   /* ---------- Einstellungen ---------- */
   'set.look': 'Darstellung', 'set.theme': 'Farbschema', 'set.system': 'System', 'set.light': 'Hell', 'set.dark': 'Dunkel',
-  'set.heuteVariant': 'Startseite „Heute“', 'set.variantA': 'Antwort-Karte', 'set.variantB': 'Tages-Feed', 'set.palette': 'Farbvariante (nur Test-App)', 'set.paletteNow': 'Bisher', 'set.paletteHint': 'Vorschau der neuen Farben passend zum Icon. Gilt nur auf diesem Gerät.',
+  'set.heuteVariant': 'Startseite „Heute“', 'set.variantA': 'Antwort-Karte', 'set.variantB': 'Tages-Feed',
   'set.zones': 'Zonen und Schwellen', 'set.zonesAside': 'nach einem Test anpassen', 'set.lthrRun': 'Schwellenpuls Laufen', 'set.paceRun': 'Schwellen-Pace (min/km)',
   'set.lthrBike': 'Schwellenpuls Rad', 'set.ftp': 'FTP (Watt)', 'set.speedBike': 'Schwelle Rad (km/h)', 'set.bikeSpeed': 'Schwellen-Tempo {bike} (km/h, flach)', 'set.derivedShort': '(abgeleitet)', 'set.speedZones': 'Rad-Tempo flach (km/h), nur als Anhalt', 'set.speedIndoor': 'Drinnen gilt die virtuelle Geschwindigkeit der App (z. B. Zwift).', 'set.css': 'CSS Schwimmen (min/100 m)', 'set.maxHr': 'Maximalpuls',
   'set.zonesHint': 'Passt Pace oder Leistung, aber der Puls ist hoch, war es ein schwerer Tag und kein Rückschritt. Nach einem Test oder neuen Messwerten hier anpassen.',

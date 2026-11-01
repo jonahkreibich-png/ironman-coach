@@ -470,13 +470,21 @@ function returnStageActive(illness, date) {
 /* Schmerz über 2/10 in Notizen der letzten 7 Tage (z. B. "Leiste zieht, 3/10", "Knie 4/10"). Liefert den Körperteil oder null. */
 const PAIN_RE = /(leist|knie|achill|schienbein|hüft|hueft|rücken|ruecken|fuß|fuss|wade|oberschenkel|schulter|sprunggelenk|schmerz)\w*[^0-9\n]{0,25}(\d+(?:[.,]\d)?)\s*(?:\/|von)\s*10/gi;
 const PAIN_NAMES: Record<string, string> = { leist: 'Leiste', knie: 'Knie', achill: 'Achillessehne', schienbein: 'Schienbein', hüft: 'Hüfte', hueft: 'Hüfte', rücken: 'Rücken', ruecken: 'Rücken', fuß: 'Fuß', fuss: 'Fuß', wade: 'Wade', oberschenkel: 'Oberschenkel', schulter: 'Schulter', sprunggelenk: 'Sprunggelenk', schmerz: '' };
-function painFlag(state, weeks, date) {
-  const from = addDays(date, -6);
+/* Auftrag 27: Texte mit Schmerzangaben der letzten 7 Tage. Nach „Wieder schmerzfrei“ (settings.painClearedOn) zählen nur noch Notizen
+   von Tagen danach; Wochennotizen (ohne Datum) nur, wenn noch nie als schmerzfrei gemeldet wurde. Vorher bremste eine alte Wochennotiz
+   wie „Leiste 3/10“ das Laufen dauerhaft. */
+function painTexts(state, weeks, date, withWeekNotes) {
+  const cleared = state && state.settings && state.settings.painClearedOn;
+  const from = cleared && addDays(cleared, 1) > addDays(date, -6) ? addDays(cleared, 1) : addDays(date, -6);
   const texts = [];
   planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); if (st && st.deviation) texts.push(st.deviation); }); });
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.notes ?? w.description) texts.push(w.notes ?? w.description); }); });
   (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
-  Object.values(state.weekNotes || {}).forEach(t => { if (t) texts.push(String(t)); });
+  if (withWeekNotes && !cleared) Object.values(state.weekNotes || {}).forEach(t => { if (t) texts.push(String(t)); });
+  return texts;
+}
+function painFlag(state, weeks, date) {
+  const texts = painTexts(state, weeks, date, true);
   for (const t of texts) {
     let m; PAIN_RE.lastIndex = 0;
     while ((m = PAIN_RE.exec(t))) { if (parseFloat(m[2].replace(',', '.')) > 2) { const k = m[1].toLowerCase(); return PAIN_NAMES[k] || 'Schmerz'; } }
@@ -486,10 +494,7 @@ function painFlag(state, weeks, date) {
 const painLabel = p => p && p !== 'Schmerz' ? `Schmerz (${p})` : 'Schmerz';
 /* Auftrag 18: stärkster Schmerz der letzten 7 Tage (Körperteil und Wert 0-10); ab 4/10 ersetzt die App Laufen durch Rad oder Schwimmen */
 function painInfo(state, weeks, date) {
-  const from = addDays(date, -6); const texts = [];
-  planDays(weeks).forEach(d => { if (d.date >= from && d.date <= date) d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.notes) texts.push(st.notes); if (st && st.deviation) texts.push(st.deviation); }); });
-  Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => { if (d >= from && d <= date) (l || []).forEach(w => { if (w.notes ?? w.description) texts.push(w.notes ?? w.description); }); });
-  (state.trend || []).forEach(p => { if (p && p.date >= from && p.date <= date && p.illness) texts.push(p.illness); });
+  const texts = painTexts(state, weeks, date, false);
   let best = null;
   for (const t of texts) { let m; PAIN_RE.lastIndex = 0; while ((m = PAIN_RE.exec(t))) { const v = parseFloat(m[2].replace(',', '.')); if (v <= 10 && (!best || v > best.level)) best = { part: PAIN_NAMES[m[1].toLowerCase()] || 'Schmerz', level: v }; } }
   return best;
@@ -1205,6 +1210,6 @@ export {
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
-  recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
+  recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, painInfo, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
   isLocked, stageVerdict, stageSession, ladderVerdict as ladderVerdictOf, libStatus, canonicalActivityId, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

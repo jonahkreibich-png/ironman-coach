@@ -2,7 +2,7 @@ import {effectiveCustomWorkouts} from './store';
 /* Abgeleitete Daten für die Bildschirme, pro Zeichnen einmal berechnet. */
 import * as C from '../../shared/core';
 import { readinessInputs, readinessSnapshot } from '../../shared/readiness';
-import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon } from './store';
+import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon, onStateReplaced } from './store';
 import { todayStr } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
 import { mainGoal, goalSports, type Goal } from '../../shared/goals';
@@ -34,6 +34,8 @@ export function prognosisFor(goal: Goal, date: string): Prognosis | null {
   } catch (e) { return null; }
 }
 export function invalidate() { cache = null; }
+// Auftrag 27: nach jedem Austausch des Zustands (Abgleich, anderer Tab, Wiederherstellung) neu rechnen
+onStateReplaced(invalidate);
 /* Auftrag 23: Prognose für ein (auch gerade bearbeitetes) Ziel mit allen Daten – dieselbe Rechnung wie im Fortschritt */
 export function goalPrognosis(goal: Goal): Prognosis | null {
   const d = D(); if (!lastInp || !goal.date || goal.type === 'fitness') return null;

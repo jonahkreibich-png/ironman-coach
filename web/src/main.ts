@@ -13,7 +13,7 @@ import { D, invalidate } from './data';
 import './sync';
 import { renderHeute } from './views/heute';
 import { renderPlan, scrollToPlanDay, centerWeekBar } from './views/plan';
-import { renderCoach, scrollCoachBottom } from './views/coach';
+import { renderCoach, scrollCoachBottom, healthAction } from './views/coach';
 import { renderFortschritt } from './views/fortschritt';
 import { renderMehr, resetMehrSearch } from './views/mehr';
 import { renderLexikon, setLexiconQuery } from './views/lexikon';
@@ -233,14 +233,12 @@ on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!;
 on('lex', el => { if (sheetOpen()) closeSheet(); setLexiconQuery(el.dataset.q || ''); go('lexikon'); });
 on('go-sub', el => { if (sheetOpen()) closeSheet(); go(el.dataset.sub!); });
 on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; leaveSubHistory(); UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
-on('ill-start', () => { STATE.illnessPeriods.push({ id: 'ill-' + Date.now(), start: todayStr(), end: null, note: '' }); saveState(); rerender(); toast(t('ill.started')); });
-on('ill-end', () => {
-  const ill = D().ill; if (!ill) return; const t0 = todayStr();
-  // Am selben Tag begonnen und beendet: war ein Versehen, Phase entfernen. Sonst endet sie gestern, heute beginnt der Wiedereinstieg.
-  if (ill.start >= t0) STATE.illnessPeriods = STATE.illnessPeriods.filter((p: any) => p !== ill); else ill.end = addDays(t0, -1);
-  saveState(); rerender(); toast(t('ill.ended'));
-});
-on('ill-reopen', () => { const r = D().ret; if (r) { r.period.end = null; saveState(); rerender(); toast(t('ill.reopened')); } });
+// Auftrag 27: Gesundheits-Knöpfe über den gemeinsamen Weg (views/coach.ts healthAction, shared/coach/ops): Phasen werden frisch aus STATE
+// gesucht (nie aus dem Zwischenspeicher), alle laufenden Phasen enden, Rückgängig über Bestätigung und Coach-Nachricht.
+on('ill-start', () => healthAction([{ op: 'illness-start', date: todayStr() }], t('ill.started')));
+on('ill-end', () => healthAction([{ op: 'illness-end', date: addDays(todayStr(), -1) }], t('ill.ended')));
+on('ill-reopen', () => healthAction([{ op: 'illness-reopen' }], t('ill.reopened')));
+on('inj-end', () => healthAction([{ op: 'injury-end' }], t('inj.ended')));
 on('reload', () => location.reload());
 
 document.addEventListener('click', async e => {

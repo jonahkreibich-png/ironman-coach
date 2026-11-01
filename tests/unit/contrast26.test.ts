@@ -5,7 +5,7 @@
 import { test, expect } from 'vitest';
 import fs from 'node:fs';
 // @ts-ignore reines JS
-import { PALETTES, paletteCss } from '../../scripts/palettes.mjs';
+import { PALETTES, THEME, themeCss } from '../../scripts/palettes.mjs';
 
 type RGB = [number, number, number];
 const parse = (c: string): [RGB, number] => {
@@ -22,19 +22,22 @@ const hueDist = (a: string, b: string) => { const d = Math.abs(hue(a) - hue(b));
 /* Hintergründe, auf denen Karten liegen können: Grundfarbe und Farbflecken (so stark wie in design.css gemischt) bzw. Verlauf */
 function backdrops(t: Record<string, string>): RGB[] {
   const bg = parse(t.bg)[0];
-  const out: RGB[] = [bg, mix(parse(t['blob-1'])[0], bg, 0.7), mix(parse(t['blob-2'])[0], bg, 0.55), mix(parse(t['blob-3'])[0], bg, 0.55)];
-  if (t['grad-top']) out.push(parse(t['grad-top'])[0], parse(t['grad-bottom'])[0]);
+  const out: RGB[] = [bg];
+  if (t['blob-1']) out.push(mix(parse(t['blob-1'])[0], bg, 0.7), mix(parse(t['blob-2'])[0], bg, 0.55), mix(parse(t['blob-3'])[0], bg, 0.55));
+  if (t['grad-top']) out.push(parse(t['grad-top'])[0]);
+  if (t['grad-bottom']) out.push(parse(t['grad-bottom'])[0]);
   return out;
 }
 const TEXT_ON_CARD = ['ink', 'ink-2'];
 const UI_ON_CARD = ['ink-3', 'accent', 'hl', 'good', 'warn', 'bad', 'swim', 'bike', 'run', 'strength', 'football'];
 
-for (const p of PALETTES) for (const mode of ['light', 'dark'] as const) {
+// Auftrag 27: THEME (B + C) ist das Design der App; A, B, C bleiben als Herkunft geprüft
+for (const p of [THEME, ...PALETTES]) for (const mode of ['light', 'dark'] as const) {
   const t = p[mode] as Record<string, string>;
   const label = `${p.name} ${mode === 'light' ? 'hell' : 'dunkel'}`;
   test(`${label}: Text auf Karten und Hintergrund mindestens 4,5:1`, () => {
     const bad: string[] = [];
-    for (const b of backdrops(t)) for (const surf of ['surface', 'surface-2']) {
+    for (const b of backdrops(t)) for (const surf of ['surface', 'surface-2', ...(t['surface-solid'] ? ['surface-solid', 'surface-2-solid'] : [])]) {
       const card = over(t[surf], b);
       for (const f of TEXT_ON_CARD) { const r = ratio(parse(t[f])[0], card); if (r < 4.5) bad.push(`${f} auf ${surf}: ${r.toFixed(2)}`); }
     }
@@ -61,6 +64,16 @@ for (const p of PALETTES) for (const mode of ['light', 'dark'] as const) {
   });
 }
 
-test('palettes.css ist aus scripts/palettes.mjs erzeugt', () => {
-  expect(fs.readFileSync('web/src/palettes.css', 'utf8')).toBe(paletteCss());
+test('theme.css ist aus scripts/palettes.mjs erzeugt (keine Handänderung)', () => {
+  expect(fs.readFileSync('web/src/theme.css', 'utf8')).toBe(themeCss());
+});
+
+/* Auftrag 27: keine verstreuten Farbwerte – außer theme.css legen die Stylesheets keine Farb-Variablen fest */
+test('Farb-Variablen nur in theme.css', () => {
+  const names = Object.keys(THEME.dark);
+  for (const file of ['web/src/styles.css', 'web/src/design.css']) {
+    const css = fs.readFileSync(file, 'utf8');
+    const hits = names.filter(n => new RegExp('--' + n + '\\s*:').test(css));
+    expect(hits, file).toEqual([]);
+  }
 });

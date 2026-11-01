@@ -19,7 +19,7 @@ import { paceCtx } from '../plangen';
 import { GOALS, mainGoal, type Goal, type GoalType } from '../goals';
 import { isMinor } from '../profile';
 import { sportAllowed } from '../sports';
-import type { Op } from './ops';
+import { activeInjury, type Op } from './ops';
 import { explainDay, explainWanted, limitIn } from './explain';
 import { parseSwimSkill, swimSkillUpdate } from '../swimskill';
 import { reviewAnswer } from './review';
@@ -161,7 +161,9 @@ function doneText(ops: Op[], fallback?: string): string {
   const out: string[] = [];
   for (const o of ops) {
     if (o.op === 'illness-start') out.push('Krankheitsphase ab heute eingetragen, der Plan pausiert. Gute Besserung!');
-    if (o.op === 'illness-end') out.push('Krankheitsphase beendet. Die nächsten Tage steigst du in Stufen wieder ein.');
+    if (o.op === 'illness-end') out.push('Krankheit überstanden – Wiedereinstieg ab heute: die nächsten Tage steigst du in Stufen wieder ein.');
+    if (o.op === 'illness-reopen') out.push('Krankheitsphase läuft wieder, der Plan pausiert.');
+    if (o.op === 'injury-end') out.push('Beschwerden vorbei – der Plan gilt wieder normal. Steig die ersten Tage locker ein.');
     if (o.op === 'add-rules') out.push(`Gespeichert: ${joinDe(o.rules.map(ruleText))}.`);
     if (o.op === 'goal') out.push(`Ziel gespeichert: ${o.goal.name}${o.goal.date ? ' am ' + o.goal.date.split('-').reverse().join('.') : ''}.`);
   }
@@ -363,6 +365,13 @@ function action(ctx: EngineCtx, d: DialogState, toks: string[], raw: string): Re
     return propose('swim-skill', u.text + ' Soll ich diese Angabe und die gezeigten Änderungen übernehmen?', [{ op: 'swim-skill', skills: u.skills }, ...(u.adjustments.length ? [{ op: 'adjust', adj: u.adjustments } as Op] : [])], YES_OPTS('Angabe und Änderungen übernehmen'));
   }
   const illNow = C.illnessAt(ctx.state.illnessPeriods, ctx.today);
+  // Auftrag 27: nach einer Verletzung zurück zum normalen Plan („schmerzfrei“, „tut nicht mehr weh“; „wieder fit“, wenn nicht krank)
+  const injNow = activeInjury(ctx.state, ctx.profile, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), ctx.today);
+  const painGone = has(toks, ['schmerzfrei', 'keine schmerzen mehr', 'tut nicht mehr weh', 'nicht mehr weh', 'verletzung vorbei', 'verletzung ist vorbei', 'wieder heil', 'beschwerden weg', 'beschwerden vorbei']);
+  if (painGone || (injNow && !illNow && has(toks, ['wieder gesund', 'wieder fit', 'geht wieder', 'bin gesund']))) {
+    if (!injNow) return { intent: 'healthy', text: 'Schön! Es sind keine Beschwerden eingetragen, der Plan läuft normal weiter.' };
+    return propose('healthy', `Schön! Soll ich die Beschwerden (${injNow.part}) beenden? Dann gilt der Plan wieder normal, ältere Schmerz-Notizen zählen nicht mehr. Steig die ersten Tage locker ein.`, [{ op: 'injury-end' }], YES_OPTS('Ja, Beschwerden beenden'));
+  }
   // Gesund / krank
   if (has(toks, ['wieder gesund', 'wieder fit', 'symptomfrei', 'nicht mehr krank', 'bin gesund', 'geht wieder', 'gesund'])) {
     if (!illNow) return { intent: 'healthy', text: 'Schön! Du bist nicht als krank eingetragen, der Plan läuft normal weiter.' };

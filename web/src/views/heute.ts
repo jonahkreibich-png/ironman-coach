@@ -2,7 +2,8 @@ import { cycleHint, shoeHint } from '../../../shared/care';
 /* Heute: das Zentrum der App. Oben die Antwort des Tages (Ampel + Einheit + ein Satz vom Coach), darunter Morgen,
    Zuletzt, Woche. Details erst beim Antippen. Zwei Entwürfe: A „Antwort“ (Standard) und B „Feed“ (siehe DESIGN.md). */
 import * as C from '../../../shared/core';
-import { STATE, UI, PLAN, findDay, BASE_WEEKS } from '../store';
+import { STATE, UI, PLAN, findDay, BASE_WEEKS, profile } from '../store';
+import { activeInjury } from '../../../shared/coach/ops';
 import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
 import { t, tn, num, duration } from '../../../shared/i18n';
 import { D, RETURN_STAGES } from '../data';
@@ -81,15 +82,25 @@ function answerCard(): string {
   </div>`;
 }
 
+/* Auftrag 27: Beschwerden aus dem Schmerz-Ablauf sichtbar, mit „Wieder schmerzfrei“ (vorher gab es keinen Weg zurück) */
+function injuryBlock(): string {
+  const d = D();
+  const inj = activeInjury(STATE, profile(), C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), d.today);
+  if (!inj) return '';
+  const title = inj.since ? t('heute.injurySince', { part: inj.part, d: `${dowShort(inj.since)} ${fmtDate(inj.since)}` }) : t('heute.injury', { part: inj.part });
+  return `<div class="card" style="margin-top:var(--s3)" data-injury><b>${esc(title)}${inj.level != null ? ` · ${esc(String(inj.level).replace('.', ','))}/10` : ''}</b><div class="hint">${esc(t('heute.injuryHint'))}</div><button class="btn block soft" data-act="inj-end">${esc(t('heute.painFree'))}</button></div>`;
+}
 function illnessBlock(): string {
   const d = D();
+  const inj = injuryBlock();
   if (d.ill) {
     const n = daysBetween(d.ill.start, d.today) + 1;
     return `<div class="card" style="margin-top:var(--s3)"><div class="spread"><b>${esc(t('heute.sickSince', { d: `${dowShort(d.ill.start)} ${fmtDate(d.ill.start)}`, n }))}</b></div>
       <div class="hint">${esc(t('heute.sickHint'))}</div><div class="banner info">${esc(t('heute.doctor'))}</div>
-      <button class="btn block" data-act="ill-end">${esc(t('heute.healthy'))}</button></div>`;
+      <button class="btn block" data-act="ill-end">${esc(t('heute.healthy'))}</button></div>` + inj;
   }
-  if (d.ret) return `<div class="card" style="margin-top:var(--s3)"><b>${esc(t('heute.returnDay', { n: d.ret.day }))}</b><div class="hint">${esc(t(RETURN_STAGES[d.ret.stage]))}</div><button class="link" data-act="ill-reopen">${esc(t('heute.stillSick'))}</button></div>`;
+  if (d.ret) return `<div class="card" style="margin-top:var(--s3)"><b>${esc(t('heute.returnDay', { n: d.ret.day }))}</b><div class="hint">${esc(t(RETURN_STAGES[d.ret.stage]))}</div><button class="link" data-act="ill-reopen">${esc(t('heute.stillSick'))}</button></div>` + inj;
+  if (inj) return inj;
   // Auftrag 19: sichtbar statt versteckt – krank (Plan pausiert, danach Wiedereinstieg in Stufen) oder Schmerzen (Coach fragt wo und wie stark)
   return `<div class="health-row" data-health><span class="xs muted">${esc(t('heute.sickOrHurt'))}</span><div class="row wrap"><button class="btn ghost sm" data-act="ill-start">${ic('sick')} ${esc(t('heute.imSick'))}</button><button class="btn ghost sm" data-act="coach-ask" data-text="${esc(t('heute.painSay'))}">${ic('pulse')} ${esc(t('heute.pain'))}</button></div></div>`;
 }

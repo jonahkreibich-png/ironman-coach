@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 import { makeDemo } from '../fixtures/demo.mjs';
-import { PALETTES } from './palettes.mjs';
+import { PALETTES, THEME } from './palettes.mjs';
 import { APP_ICON } from './icon-designs.mjs';
 
 const OUT = 'docs/design-varianten-2';
@@ -18,7 +18,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const demo = makeDemo(TODAY);
 const plan = demo.plan; const state = { ...demo }; delete state.plan;
 
-const VARIANTS = [{ id: '', name: 'Bisher (zum Vergleich)', idea: 'Blau-Akzente vom alten Icon, neutrales Dunkelblau.' }, ...PALETTES];
+// Auftrag 27: B + C ist eingebaut (App-Standard, kein Umschalter mehr). --only bc fotografiert nur B + C; A, B, C, Bisher bleiben als Bilder.
+const VARIANTS = [{ ...THEME, name: 'B + C (gewählt, eingebaut)' }, { id: '', name: 'Bisher (zum Vergleich)', idea: 'Blau-Akzente vom alten Icon, neutrales Dunkelblau.' }, ...PALETTES];
+const ONLY = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
+const fileId = v => v.id || 'bisher';
 const SCREENS = [
   { id: 'heute', name: 'Heute', url: '/?go=heute' },
   { id: 'plan', name: 'Plan', url: '/?go=plan' },
@@ -30,7 +33,7 @@ const SCREENS = [
 
 const problems = [];
 const browser = PAGE_ONLY ? null : await chromium.launch();
-if (browser) for (const v of VARIANTS) for (const theme of ['dark', 'light']) for (const s of SCREENS) {
+if (browser) for (const v of VARIANTS.filter(v => !ONLY || fileId(v) === ONLY)) for (const theme of ['dark', 'light']) for (const s of SCREENS) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: theme, locale: 'de-DE', timezoneId: 'Europe/Berlin', serviceWorkers: 'block' });
   const page = await ctx.newPage();
   await page.clock.setFixedTime(new Date(`${TODAY}T07:30:00+02:00`));
@@ -79,7 +82,7 @@ body.only-dark .light, body.only-light .dark{display:none}
 <header><div class="icons">${icon('light')}${icon('dark')}</div>
 <h1>Farben passend zum neuen Icon</h1>
 <p>Echte Bildschirme der App mit erfundenen Demo-Daten in iPhone-Größe (390 × 844): Heute, Plan, Einheit, Coach, Fortschritt, Mehr – je Variante dunkel und hell.</p>
-<p>Du kannst mischen (z. B. „Hintergrund von C, Knöpfe von A“). Auf dem iPhone ausprobieren: Test-App → Mehr → Darstellung → Farbvariante.</p>
+<p>Gewählt und eingebaut: B + C (oben). Darunter die Varianten zum Vergleich.</p>
 <p class="note">Alle Varianten erfüllen WCAG AA (Text 4,5:1, Symbole 3:1, auch auf den Glas-Karten über dem hellsten Hintergrund). Ampel rot/gelb/grün bleibt eindeutig, Orange ist klar von Gelb getrennt.</p>
 <div class="toggle" role="group" aria-label="Ansicht"><button data-v="" class="on">Dunkel und hell</button><button data-v="only-dark">Nur dunkel</button><button data-v="only-light">Nur hell</button></div>
 ${problems.length ? `<p class="note">Layout-Hinweise: ${esc(problems.join('; '))}</p>` : ''}
