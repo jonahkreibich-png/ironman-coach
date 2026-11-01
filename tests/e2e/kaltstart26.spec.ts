@@ -91,3 +91,19 @@ test('Kaltstart mit einem Jahr Daten: sofort letzter Stand, kein Blitz, kein Spr
   const syncAt = (b.apiCalls.find((x: any) => x.path === '/api/sync') || { at: 0 }).at;
   expect(b.shifts.filter((s: any) => s.at < syncAt), 'Verschiebung vor dem Abgleich').toEqual([]);
 });
+
+/* Allererstes Öffnen (Daten nur auf dem Gerät, noch kein Konto): auch hier kein Sprung. Fand eine Speicher-Leiste, die sichtbar startete. */
+test('Erstes Öffnen ohne Konto: kein heller Blitz, keine Verschiebung, ein Aufbau', async ({ page }) => {
+  const T = today();
+  const demo = makeDemo(T); const plan = demo.plan; const state: any = { ...demo }; delete state.plan;
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.addInitScript(([p, s]: any) => { if (sessionStorage.getItem('__seeded')) return; localStorage.clear(); localStorage.setItem('ec_plan', p); localStorage.setItem('ec_state_v2', s); localStorage.setItem('ec_ui', JSON.stringify({ seenRelease: '9.9.9' })); sessionStorage.setItem('__seeded', '1'); }, [JSON.stringify(plan), JSON.stringify(state)]);
+  await page.addInitScript(instrument);
+  await page.goto('/');
+  await waitQuiet(page, { minMs: 2500, quietMs: 1500 });
+  const r: any = await collect(page);
+  expect(r.whiteFlash).toBe(false);
+  expect(r.rebuilds).toBe(1);
+  expect(r.cls, JSON.stringify(r.shifts)).toBeLessThan(0.005);
+  expect(r.startupNotice).toBe(false);
+});

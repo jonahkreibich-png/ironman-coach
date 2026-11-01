@@ -47,7 +47,7 @@ import { checkSwimSkill } from './testupdate';
 initErrorLog();
 const storageBanner = document.createElement('div');
 storageBanner.id = 'storage-status'; storageBanner.setAttribute('role', 'status');
-storageBanner.className = 'banner warn';
+storageBanner.className = 'banner warn'; storageBanner.hidden = true; // Auftrag 26: versteckt starten, sonst erschien sie beim ersten Laden sofort
 /* Auftrag 26: „Wird gespeichert“ erschien bei jedem Speichern für Sekundenbruchteile über dem Inhalt und schob ihn 46 px nach unten
    (Sprung beim Start). Jetzt erst, wenn das Speichern länger als 1,5 s dauert; Fehler und Sperre sofort. */
 let pendingSince = 0, pendingTimer = 0;
