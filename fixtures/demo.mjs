@@ -26,15 +26,18 @@ function weekSessions(w, mon, recovery) {
   ];
 }
 
-export function makeDemo(today) {
+/* opts (Auftrag 26, Kaltstart-Test mit großen Datenmengen): pastWeeks = Wochen vor der aktuellen (Standard 3), trendDays = Tage mit Morgenwerten (40).
+   Mit den Standardwerten entsteht genau der bisherige Datensatz. */
+export function makeDemo(today, opts = {}) {
+  const pastWeeks = opts.pastWeeks ?? 3, trendDays = opts.trendDays ?? 40;
   const r = rng(42);
   const todayDow = (dow(today) + 6) % 7; // Mo = 0
   const thisMon = addDays(today, -todayDow);
-  const start = addDays(thisMon, -21); // Block begann vor 3 Wochen
+  const start = addDays(thisMon, -7 * pastWeeks); // Block begann vor 3 Wochen (Standard)
   const weeks = [];
-  for (let w = 0; w < 8; w++) {
+  for (let w = 0; w < pastWeeks + 5; w++) {
     const mon = addDays(start, w * 7);
-    const recovery = w === 3 || w === 7;
+    const recovery = w % 4 === 3;
     const sess = weekSessions(w, mon, recovery);
     weeks.push({
       weekNumber: w + 1, label: 'Woche ' + (w + 1), startDate: mon, endDate: addDays(mon, 6), isRecoveryWeek: recovery,
@@ -66,7 +69,7 @@ export function makeDemo(today) {
   // Morgenwerte der letzten 40 Tage
   const trend = [];
   let ctl = 38, atl = 40;
-  for (let i = 40; i >= 0; i--) {
+  for (let i = trendDays; i >= 0; i--) {
     const d = addDays(today, -i);
     const sick = ill(d);
     ctl += (sick ? -0.6 : 0.25 + r() * 0.3); atl += (sick ? -3 : (r() - 0.45) * 6);
@@ -77,7 +80,7 @@ export function makeDemo(today) {
       bodyTemp: Math.round(((sick ? 0.6 : 0) + (r() - 0.5) * 0.3) * 100) / 100, breathingRate: Math.round((14 + r()) * 10) / 10,
       remSleep: Math.round(90 + r() * 40), deepSleep: Math.round(70 + r() * 40), sleepLatency: Math.round(5 + r() * 15), spo2: Math.round((96 + r() * 2) * 10) / 10,
       ctl: Math.round(ctl * 10) / 10, atl: Math.round(Math.max(10, atl) * 10) / 10, tsb: Math.round((ctl - Math.max(10, atl)) * 10) / 10,
-      vo2max: i % 4 === 0 ? Math.round((54 + (40 - i) * 0.04 + (r() - 0.5)) * 10) / 10 : null,
+      vo2max: i % 4 === 0 ? Math.round((54 + (trendDays - i) * 0.04 + (r() - 0.5)) * 10) / 10 : null,
       cardioRecovery: i % 4 === 0 ? Math.round(30 + r() * 6) : null, illness: sick ? 'Halskratzen, müde' : null
     };
     trend.push(p);

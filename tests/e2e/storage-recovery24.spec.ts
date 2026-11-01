@@ -51,7 +51,7 @@ test('A: angemeldeter Testnutzer, Werte, Reload, geschlossene App und neue leere
 test('LocalStorage-Quota: bestaetigte IndexedDB-Werte ueberleben Neustart',async({page})=>{
  await prepare(page);await page.addInitScript(()=>{const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='ec_state_v2' && (window as any).__quota)throw new DOMException('quota','QuotaExceededError');return original.call(this,k,v);};});
  await open(page,'/?go=plan');await page.evaluate(()=>{(window as any).__quota=true;});await editMetric(page,'64');
- await expect.poll(async()=>JSON.parse((await readJournal(page,'ec_state_v2'))!).sessions[sid]?.metrics?.min).toBe('64');await expect(page.locator('#storage-status')).toBeHidden();
+ await expect.poll(async()=>JSON.parse((await readJournal(page,'ec_state_v2'))!).sessions[sid]?.metrics?.min).toBe('64');await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');
  await page.reload();await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).click();await expect(page.locator('#fd-min')).toHaveValue('64');
 });
 test('B: beide Speicher blockiert, kein falscher Erfolg; Backup rettet ungespeicherte Eingaben',async({page})=>{
@@ -59,7 +59,7 @@ test('B: beide Speicher blockiert, kein falscher Erfolg; Backup rettet ungespeic
  const set=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='ec_state_v2'&&(window as any).__fail)throw Error('synthetic quota');return set.call(this,k,v);};
  const tx=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(...args:any[]){if(args[1]==='readwrite'&&(window as any).__fail)throw Error('synthetic DB failure');return (tx as any).apply(this,args);};
  });
- await open(page,'/?go=plan');await expect(page.locator('#storage-status')).toBeHidden();const before=await page.evaluate(()=>localStorage.getItem('ec_state_v2'));await page.evaluate(()=>{(window as any).__fail=true;});await editMetric(page,'67');
+ await open(page,'/?go=plan');await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');const before=await page.evaluate(()=>localStorage.getItem('ec_state_v2'));await page.evaluate(()=>{(window as any).__fail=true;});await editMetric(page,'67');
  await expect(page.locator('#storage-status')).toContainText('Nicht gespeichert');expect(await page.evaluate(()=>localStorage.getItem('ec_state_v2'))).toBe(before);
  await page.locator('button[data-act="sheet-close"]').click();await page.locator('#storage-status button').click();
  const raw=await exportFileText(page);expect(JSON.parse(raw).sessions[sid].metrics.min).toBe('67');
@@ -103,7 +103,7 @@ test('Netzwerk-/Datenbankfehler wird angezeigt, lokale Werte bleiben nach Reload
 });
 
 test('zwei offene Tabs behalten gleichzeitig geaenderte Einheiten nach Neustart',async({page,context})=>{
- await prepare(page);await open(page,'/?go=plan');await expect(page.locator('#storage-status')).toBeHidden();
+ await prepare(page);await open(page,'/?go=plan');await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');
  const second=await context.newPage();await second.clock.setFixedTime(new Date(TODAY+'T07:30:00+02:00'));await open(second,'/?go=plan');
  await page.locator('[data-act="sess-open"][data-sid="'+sid+'"]').click();await second.locator('[data-act="sess-open"][data-sid="'+sid+'-2"]').click();
  await Promise.all([page.locator('#fd-min').fill('81'),second.locator('#fd-min').fill('82')]);
@@ -117,14 +117,14 @@ test('Werte werden schon beim Tippen gespeichert, ohne das Feld vorher zu verlas
  await prepare(page);await open(page,'/?go=plan');await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).click();
  await page.locator('#fd-min').fill('83');
  await expect.poll(async()=>JSON.parse((await readJournal(page,'ec_state_v2'))!).sessions[sid]?.metrics?.min).toBe('83');
- await expect(page.locator('#fd-min')).toBeFocused();await expect(page.locator('#storage-status')).toBeHidden();
+ await expect(page.locator('#fd-min')).toBeFocused();await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');
  await page.reload();await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).click();await expect(page.locator('#fd-min')).toHaveValue('83');
 });
 
 
 test('Speicherbestaetigungen bauen den eigenen Bildschirm nicht endlos neu auf',async({page})=>{
  await prepare(page);await open(page,'/?go=coach');
- await expect(page.locator('#storage-status')).toBeHidden();
+ await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');
  await page.evaluate(async()=>{
   const d=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('stamio-durable-storage',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   await new Promise<void>((resolve,reject)=>{const tx=d.transaction('values','readwrite');tx.objectStore('values').put(localStorage.getItem('ec_ui'),'ec_ui');tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error);});d.close();
@@ -172,4 +172,4 @@ test('Verzoegerter Speicherstart zeigt Ladestatus und wartet auf die echte App',
  await expect(page.locator('#app-startup')).toBeHidden();
 });
 
-async function readStoredMove26(page:Page){await expect(page.locator('#storage-status')).toBeHidden();return page.evaluate(()=>JSON.parse(localStorage.getItem('ec_state_v2')||'null'));}
+async function readStoredMove26(page:Page){await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');return page.evaluate(()=>JSON.parse(localStorage.getItem('ec_state_v2')||'null'));}

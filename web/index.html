@@ -13,6 +13,7 @@
 <meta name="theme-color" content="#e8edf4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#060a12" media="(prefers-color-scheme: dark)">
 <meta name="format-detection" content="telephone=no">
+<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/favicon-64.png">
@@ -36,15 +37,15 @@
 <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (prefers-color-scheme: dark)" href="splash/dark-1242x2688.png">
 <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (prefers-color-scheme: light)" href="splash/light-750x1334.png">
 <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (prefers-color-scheme: dark)" href="splash/dark-750x1334.png">
-<link rel="preload" href="fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <script>
 try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
+// Auftrag 26: Farbvariante vor dem ersten Bild setzen (sonst kurz die alte Farbe)
+try { var pa = localStorage.getItem('palette_pref'); if (pa) document.documentElement.setAttribute('data-palette', pa); } catch (e) {}
 </script>
 </head>
 <body>
 <header class="top"><div class="top-in" id="top"></div></header>
-<p id="app-startup" role="status" style="padding:16px">Deine gespeicherten Daten werden geladen …</p>
+<p id="app-startup" role="status" hidden>Deine gespeicherten Daten werden geladen …</p>
 <main id="app" data-app-state="loading"></main>
 <nav class="tabbar" aria-label="Bereiche"><div class="tabbar-in" id="tabs"></div></nav>
 <div id="sheet" class="sheet-wrap" hidden>

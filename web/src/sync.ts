@@ -6,7 +6,7 @@ import { storage as localStorage } from "./persistence";
    Konflikte: die neueste Änderung pro Datensatz gewinnt. Offline bleibt alles in der Warteschlange.
    Dazu: Einrichtung (Einrichtungscode, Kopplung, Einladung), allgemeiner Server-Aufruf, KI-Status, Mitteilungen. */
 // @ts-nocheck
-import { canPersist, refreshStoredState, saveState, STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData } from './store';
+import { canPersist, refreshStoredState, saveState, STATE, PLAN_KEY, LS_KEY, mergeIntoDefaults, rebuildPlanIndex, onSave, wipeLocalData, hasLocalData, HAS_PLAN, replacePlanInPlace } from './store';
 import { esc, fmtDate, ymd } from './util';
 import { toast } from './toast';
 import { STORAGE, API_BASE, APP_VERSION, APP_RELEASE } from './config';
@@ -219,6 +219,8 @@ async function prepareSync(): Promise<boolean> {
 }
 async function drainSync(): Promise<boolean> {
   STATUS = 'syncing'; updateStatusEls();
+  // Auftrag 26: Gerät war schon abgeglichen (kein Einrichten/Koppeln) – ein neuer Plan wird dann ohne Neuladen übernommen
+  const routine = !!META.lastSyncAt;
   let appliedAny = false, uncommittedHashes = null;
   try {
     let more = true, guard = 0;
@@ -263,22 +265,24 @@ async function drainSync(): Promise<boolean> {
     return false;
   } finally {
     again = false; saveMeta();
-    if (appliedAny) afterRemoteApply();
+    if (appliedAny) afterRemoteApply(routine);
     updateStatusEls();
   }
 }
-function afterRemoteApply() {
-  if (planChanged) { planChanged = false; toast(t('sync.reloading')); setTimeout(() => location.reload(), 900); return; }
-  if (adjustChanged) { adjustChanged = false; if (true) rebuildPlanIndex(); }
-  safeRerender();
+/* Auftrag 26: Neuer Plan vom Server (anderes Gerät, automatische Anpassung) lud bisher nach 0,9 s die ganze Seite neu – beim Öffnen
+   sah das wie Flackern aus. Hat das Gerät schon einen Plan und war es schon abgeglichen, wird der Plan an Ort und Stelle übernommen
+   (wie bei Änderungen aus einem anderen Tab). Nur beim Einrichten/Koppeln oder ohne Plan wird weiter neu geladen. */
+function afterRemoteApply(routine = false) {
+  if (planChanged) {
+    let inPlace = false;
+    if (routine && HAS_PLAN) { try { const next = JSON.parse(rawPlan() || 'null'); if (next && Array.isArray(next.weeks) && next.weeks.length) { replacePlanInPlace(next); inPlace = true; } } catch (e) { inPlace = false; } }
+    if (!inPlace) { planChanged = false; toast(t('sync.reloading')); setTimeout(() => location.reload(), 900); return; }
+    planChanged = false; adjustChanged = false;
+  }
+  if (adjustChanged) { adjustChanged = false; rebuildPlanIndex(); }
+  // gebündelt und nie mitten in einer Eingabe (main.ts refresh), nur geänderte Teile werden neu gezeichnet (morph)
+  nav.refresh();
 }
-let rerenderPending = false;
-function safeRerender() {
-  const a = document.activeElement;
-  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { rerenderPending = true; return; }
-  if (true) nav.rerender();
-}
-document.addEventListener('focusout', () => { if (rerenderPending) setTimeout(() => { if (!rerenderPending) return; const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; rerenderPending = false; nav.rerender(); }, 300); });
 
 /* ---------- Auslöser ---------- */
 let notifyTimer = null;
@@ -421,7 +425,9 @@ export async function signOut() {
 /* KI-Status (der KI-Coach ist im Testbetrieb abgeschaltet, solange kein Schlüssel hinterlegt ist) */
 let AI: any = { entitled: false, food: false, active: false, keyPresent: false, enabled: false, consent: false, monthUsd: 0, budgetUsd: 5, todayMessages: 0, maxPerDay: 30, free: null, chatActive: false, tier: null };
 export function aiState() { return AI; }
-export async function loadAiState() { if (!AUTH) return AI; try { AI = await api('GET', '/api/coach/ai/status'); } catch (e) {} return AI; }
+/* Auftrag 26: beim Start fragten main.ts und sync.ts gleichzeitig – jetzt teilen sich gleichzeitige Aufrufe eine Anfrage */
+let aiFlight: Promise<any> | null = null;
+export function loadAiState() { if (!AUTH) return Promise.resolve(AI); return aiFlight || (aiFlight = (async () => { try { AI = await api('GET', '/api/coach/ai/status'); } catch (e) {} return AI; })().finally(() => { aiFlight = null; })); }
 /* Auftrag 16: gibt es kostenlose KI-Antworten? (auch ohne Konto, für das Angebot im Coach) */
 let FREE_PUBLIC: boolean | null = null;
 export function freePublic(): boolean { return !!FREE_PUBLIC; }
@@ -433,7 +439,9 @@ let ME = readJson('ec_me', null);
 export function me() { return ME || { role: null, entitlements: {} }; }
 export function isAdmin() { return !!ME && ME.role === 'admin'; }
 export function entitled(k: string) { return !!(ME && ME.entitlements && ME.entitlements[k]); }
-export async function loadMe() {
+let meFlight: Promise<any> | null = null;
+export function loadMe() { if (!AUTH) return Promise.resolve(me()); return meFlight || (meFlight = loadMeOnce().finally(() => { meFlight = null; })); }
+async function loadMeOnce() {
   if (!AUTH) return me();
   try {
     ME = await api('GET', '/api/me'); writeJson('ec_me', ME);
@@ -514,14 +522,23 @@ export function statusText() {
   return t('sync.never');
 }
 function statusClass() { return STATUS === 'offline' || STATUS === 'error' ? 'warn' : 'ok'; }
+/* Auftrag 26: Eine Warteschlange ist normal (jede Änderung steht kurz darin, bis der Abgleich sie abholt). Angezeigt wird sie erst,
+   wenn sie länger als 20 s wartet – sonst blitzte die Leiste bei jedem Speichern auf und schob den Inhalt nach unten. */
+const STALE_MS = 20000;
+function stalePending(): boolean { const t0 = now() - STALE_MS; return Object.values(META.pending).some((p: any) => !p || !(p.updatedAt > t0)); }
+function showProblem(): boolean { return !!AUTH && (STATUS === 'error' || STATUS === 'offline' || stalePending()); }
+let shownProblem = false;
 function updateStatusEls() {
+  // Problem entsteht oder ist behoben: Ansichten mit Statuszeile (syncStatusLine) sanft nachziehen
+  const problem = showProblem();
+  if (problem !== shownProblem) { shownProblem = problem; try { nav.refresh(); } catch (e) { /* vor dem Start */ } }
   const global = document.getElementById?.('global-sync-status');
-  if (global) { global.hidden = !AUTH || (STATUS !== 'error' && STATUS !== 'offline' && !Object.keys(META.pending).length); global.textContent = statusText(); }
+  if (global) { const hide = !showProblem(); if (global.hidden !== hide) global.hidden = hide; const txt = statusText(); if (global.textContent !== txt) global.textContent = txt; }
   document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = statusText(); el.className = 'sync-st ' + statusClass(); });
 }
 /* Nur sichtbar, wenn etwas nicht stimmt (offline, Fehler, Warteschlange) */
 export function syncStatusLine() {
-  if (!AUTH || (STATUS !== 'offline' && STATUS !== 'error' && !Object.keys(META.pending).length)) return '';
+  if (!showProblem()) return '';
   return `<div class="sync-line"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span></div>`;
 }
 export function syncStatusBadge() { return AUTH ? `<span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>` : ''; }
@@ -542,7 +559,8 @@ if (!localStorage.blocked && (typeof canPersist !== 'function' || canPersist()))
   META.pending = pending;
 }
 onSave(() => { detect(); syncNotify(); });
-if (AUTH) setTimeout(() => { syncNow(); loadAiState(); loadMe(); }, 300);
+// Auftrag 26: Konto und KI-Stand lädt main.ts direkt beim Start; hier lief beides ein zweites Mal
+if (AUTH) setTimeout(() => { syncNow(); }, 300);
 
 /* Import ist ein ausdruecklicher Ersatz. Ausgang und Zustand werden gemeinsam
    committed; eine alte Netzwerkantwort darf ihn anschliessend nicht ueberrollen. */

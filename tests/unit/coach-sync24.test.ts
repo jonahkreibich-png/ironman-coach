@@ -4,7 +4,7 @@ const H = vi.hoisted(() => ({ state: {} as any, saved: null as any, converse: vi
 vi.mock('../../web/src/store', () => ({ canPersist: () => true, refreshStoredState: () => true, STATE: H.state, UI: {}, PLAN_KEY: 'plan', LS_KEY: 'state', onSave: (f: any) => H.saved = f, saveState: () => H.saved?.(), profile: () => H.state.profile, saveProfile: vi.fn(), mergeIntoDefaults: () => ({}), rebuildPlanIndex: vi.fn(), wipeLocalData: vi.fn(), hasLocalData: () => false }));
 vi.mock('../../web/src/config', () => ({ STORAGE: { syncAuth: 'auth', syncMeta: 'meta', owner: 'owner' }, API_BASE: 'https://synthetic.invalid', APP_VERSION: 'test', APP_RELEASE: 'test' }));
 vi.mock('../../web/src/util', () => ({ esc: (s: any) => s, fmtDate: (s: any) => s, ymd: () => '2026-10-24', todayStr: () => '2026-10-24', dowShort: () => 'Sa', addDays: (s: any) => s }));
-vi.mock('../../web/src/nav', () => ({ nav: { rerender: vi.fn(), go: vi.fn() } }));
+vi.mock('../../web/src/nav', () => ({ nav: { rerender: vi.fn(), refresh: vi.fn(), go: vi.fn() } }));
 vi.mock('../../web/src/toast', () => ({ toast: vi.fn() }));
 vi.mock('../../web/src/kit', () => ({ on: vi.fn(), onChange: vi.fn(), ic: () => '', openSheet: vi.fn(), refreshSheet: vi.fn(), empty: () => '', pill: () => '' }));
 vi.mock('../../web/src/data', () => ({ D: () => ({ engine: { state: H.state }, scores: [], prognosis: null }), invalidate: vi.fn() }));

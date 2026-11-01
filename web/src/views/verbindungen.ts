@@ -3,7 +3,7 @@ import { fetchStatusText } from '../../../shared/fetchnow';
    Quellen-Reihenfolge je Messwert. Hinweise, wenn eine Verbindung neu angemeldet werden muss.
    Auftrag 4 A2/A3: Jeder Knopf verbindet oder sagt klar, was fehlt und was man stattdessen tun kann.
    Garmin, COROS, Suunto, Wahoo: geführter Weg über intervals.icu. Aus dem Fragebogen geht es nach dem Verbinden dorthin zurück. */
-import { STATE, saveState } from '../store';
+import { STATE, saveState, UI, HAS_PLAN } from '../store';
 import { esc, fmtDate, ymd } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, openSheet, refreshSheet, closeSheet, armed, field, more, empty } from '../kit';
@@ -25,11 +25,15 @@ export async function loadConnections(force = false) {
   if (LOADING || (!force && ACCOUNT === isSyncOn() && (CONN || ERR))) return;
   if (ACCOUNT !== isSyncOn()) CONN = null;
   ACCOUNT = isSyncOn();
+  const before = JSON.stringify([CONN, ERR]);
   LOADING = true; ERR = '';
   // Auftrag 15: ohne Konto die Liste der Dienste (ohne Anmeldung); „Verbinden“ legt dann das Konto an
   try { CONN = isSyncOn() ? (await apiCall('GET', '/api/connections')).connections : (await publicCall('GET', '/api/connect/catalog')).connections; ACCOUNT = isSyncOn(); }
   catch (e: any) { ERR = isSyncOn() ? e.message : t('conn.offline'); }
-  LOADING = false; nav.rerender();
+  LOADING = false;
+  // Auftrag 26: beim Start baute das jedes Mal die ganze Ansicht neu (auch auf Heute). Jetzt nur, wenn sich etwas geändert hat
+  // und die Ansicht Verbindungen zeigt (Mehr: Hinweis „neu anmelden“, Verbindungen, Fragebogen).
+  if (JSON.stringify([CONN, ERR]) !== before && (!HAS_PLAN || UI.sub === 'verbindungen' || UI.sub === 'onboarding' || (UI.tab === 'mehr' && !UI.sub))) nav.refresh();
 }
 function connectionRetry(): string { return ERR ? '<button class="btn ghost" data-act="conn-retry">Erneut versuchen</button>' : ''; }
 on('conn-retry', () => loadConnections(true));

@@ -27,7 +27,7 @@ async function confirmed(page:Page){
 async function save(page:Page){
  await page.locator('[data-act="tpl-save"]').click();
  await expect(page.locator('[data-template-editor]')).toHaveCount(0);
- await expect(page.locator('#storage-status')).toBeHidden();
+ await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');
  return confirmed(page);
 }
 for(const sport of ['swim','bike','run','strength'])test(`${sport}: echte Vorlagen-CRUD ueber UI mit bestaetigtem IndexedDB und Reload`,async({page})=>{

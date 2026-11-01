@@ -29,7 +29,7 @@ export async function open(page: Page, path = '/') {
   await expect(page.locator('#app')).not.toBeEmpty();
 }
 export async function stored(page: Page): Promise<any> {
-  await expect(page.locator('#storage-status')).toBeHidden();
+  await expect(page.locator('#storage-status')).toHaveAttribute('data-status','saved');
   return page.evaluate(() => JSON.parse(localStorage.getItem('ec_state_v2') || 'null'));
 }
 /* Auftrag 19 (Plan-Tab C): Einheit im Plan öffnen – Woche wählen und den Tag aufklappen, falls er zu ist */

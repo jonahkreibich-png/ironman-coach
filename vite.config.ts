@@ -12,8 +12,14 @@ function brandAndOffline(): Plugin {
   return {
     name: 'brand-and-offline',
     configResolved(c) { outDir = c.build.outDir; },
-    transformIndexHtml(html) {
-      return html.replace(/%APP_NAME%/g, BRAND.name).replace(/%APP_SHORT%/g, BRAND.shortName).replace(/%APP_DESCRIPTION%/g, BRAND.description);
+    transformIndexHtml(html, ctx) {
+      let out = html.replace(/%APP_NAME%/g, BRAND.name).replace(/%APP_SHORT%/g, BRAND.shortName).replace(/%APP_DESCRIPTION%/g, BRAND.description);
+      // Auftrag 26: den App-Code (main, per import() nachgeladen) gleich mit der Seite anfordern, parallel zum Lesen des Speichers
+      if (ctx && ctx.bundle) {
+        const lazy = Object.values(ctx.bundle).filter((c: any) => c.type === 'chunk' && c.isDynamicEntry && /(^|[\/])main-[^/]*.js$/.test(c.fileName)).map((c: any) => c.fileName);
+        if (lazy.length) out = out.replace('</head>', lazy.map(f => '<link rel="modulepreload" crossorigin href="./' + f + '">').join('') + '</head>');
+      }
+      return out;
     },
     generateBundle(_opts, bundle) {
       const manifest = {

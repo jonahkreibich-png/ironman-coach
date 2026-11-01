@@ -161,7 +161,7 @@ function careHints(): string {
 }
 export function renderHeute(): string {
   const d = D();
-  const head = `<div class="spread" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill accent">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
+  const head = `<div class="spread" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill hl">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
   if (UI.heuteVariant === 'feed') return head + feedVariant() + illnessBlock() + raceBanner() + sec(t('heute.week'), weekStrip()) + foodMini();
   return head + answerCard() + illnessBlock() + raceBanner() + careHints() + nextRows() + sec(t('heute.week'), weekStrip()) + coachPreview() + foodMini();
 }

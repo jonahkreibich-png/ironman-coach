@@ -16,6 +16,8 @@ test('Fragebogen: ohne Plan starten, Antworten prüfen, bestätigen, Plan entste
   await expect(page.locator('[data-act="ob-start"]').first()).toBeVisible();
   await page.locator('[data-act="ob-start"]').first().click();
   await expect(page.locator('.ob')).toBeVisible();
+  // erst das Speichern von „Start“ abwarten, sonst überschreibt es die eingeschleusten Antworten (Auftrag 26: genauer Speicherstand)
+  await expect(page.locator('#storage-status')).toHaveAttribute('data-status', 'saved');
   // Antworten wie nach dem Ausfüllen (Test-Person), dann „verstanden“-Seite und Vorschau
   const answers = PERSONAS.find(x => x.id === 'olympisch-erfahren')!.answers;
   await page.evaluate(a => { const raw = JSON.parse(localStorage.getItem('ec_state_v2') || '{}'); raw.onboarding = { answers: a, block: 0, done: true }; localStorage.setItem('ec_state_v2', JSON.stringify(raw)); }, answers);

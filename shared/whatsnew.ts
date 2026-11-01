@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.14.0', items: [
+    'Die App öffnet ruhiger: kein heller Blitz mehr, nichts springt, sie zeigt sofort deinen letzten Stand. Was der Abgleich Neues bringt, gleitet sanft an seinen Platz statt die Seite neu aufzubauen.',
+    'Ein neuer Plan von einem anderen Gerät lädt die App nicht mehr neu, er erscheint einfach.'
+  ] },
   { version: '3.13.2', items: [
     'Neues App-Icon: eine Welle, die in einen Bogen nach oben übergeht, mit dem Ziel als orangem Punkt. Das iPhone zeigt es erst, wenn du die App neu zum Home-Bildschirm hinzufügst. So geht nichts verloren: neue App in Safari hinzufügen, dort mit deinem Konto verbinden (in der alten App Mehr → Konto → „Gerät hinzufügen“, Code in der neuen eingeben), erst dann das alte Icon löschen.'
   ] },

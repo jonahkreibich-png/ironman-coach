@@ -2,8 +2,7 @@ import { storage, storageMessage, STORAGE_TAB } from './persistence';
 import { storage as localStorage } from "./persistence";
 /* Einstieg: Tabs (Heute, Plan, Coach, Fortschritt, Mehr), Unterseiten unter „Mehr“, Aktionen, Deep Links. */
 import { guardLeave } from './staged';
-import './styles.css';
-import './design.css';
+import { morph } from './morph';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
@@ -42,15 +41,24 @@ import { initTabLens } from './tablens';
 import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
-import { isSyncOn, loadAiState, loadMe, entitled, onSynced } from './sync';
+import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState } from './sync';
 import { checkSwimSkill } from './testupdate';
 
 initErrorLog();
 const storageBanner = document.createElement('div');
 storageBanner.id = 'storage-status'; storageBanner.setAttribute('role', 'status');
 storageBanner.className = 'banner warn';
+/* Auftrag 26: „Wird gespeichert“ erschien bei jedem Speichern für Sekundenbruchteile über dem Inhalt und schob ihn 46 px nach unten
+   (Sprung beim Start). Jetzt erst, wenn das Speichern länger als 1,5 s dauert; Fehler und Sperre sofort. */
+let pendingSince = 0, pendingTimer = 0;
 const updateStorageBanner = () => {
-  storageBanner.textContent = storageMessage(); storageBanner.hidden = storage.status === 'saved';
+  const st = storage.status;
+  storageBanner.dataset.status = st; // für Tests und Hilfsmittel: genauer Speicherstand, auch während die Leiste noch wartet
+  if (st === 'pending') {
+    if (!pendingSince) { pendingSince = Date.now(); clearTimeout(pendingTimer); pendingTimer = window.setTimeout(updateStorageBanner, 1600); }
+    if (Date.now() - pendingSince < 1500) { if (storageBanner.hidden) return; }
+  } else { pendingSince = 0; clearTimeout(pendingTimer); }
+  storageBanner.textContent = storageMessage(); storageBanner.hidden = st === 'saved';
   if (storage.status === 'error') {
     const button = document.createElement('button'); button.className = 'btn'; button.textContent = 'Backup exportieren';
     button.onclick = () => nav.go('daten'); storageBanner.appendChild(button);
@@ -121,17 +129,18 @@ function coachUnread(): number {
 function renderTop() {
   const sub = UI.tab === 'mehr' || !HAS_PLAN ? UI.sub : null;
   const title = sub === 'vorlagen' ? 'Trainingsvorlagen' : sub ? t('sub.' + sub, { app: APP.name }) : HAS_PLAN ? t('tab.' + UI.tab) : APP.name;
-  byId('top').innerHTML = sub
+  morph(byId('top'), sub
     ? `<button class="icon-btn" data-act="back" aria-label="${esc(t('common.back'))}">${ic('back')}</button><h1 class="top-title">${esc(title)}</h1><span style="width:40px"></span>`
-    : `<h1 class="top-title"><img class="mark" src="icons/icon-192.png" alt="" aria-hidden="true" width="26" height="26">${esc(title)}</h1>${HAS_PLAN && UI.tab === 'heute' ? `<button class="icon-btn" data-act="checkin-open" aria-label="${esc(t('heute.enterValues'))}">${ic('heart')}</button>` : '<span style="width:40px"></span>'}`;
+    : `<h1 class="top-title"><img class="mark" src="icons/icon-192.png" alt="" aria-hidden="true" width="26" height="26">${esc(title)}</h1>${HAS_PLAN && UI.tab === 'heute' ? `<button class="icon-btn" data-act="checkin-open" aria-label="${esc(t('heute.enterValues'))}">${ic('heart')}</button>` : '<span style="width:40px"></span>'}`);
   document.title = sub || UI.tab !== 'heute' ? `${title} · ${APP.name}` : APP.name;
 }
 function renderTabs() {
-  if (!HAS_PLAN) { byId('tabs').innerHTML = ''; return; }
+  if (!HAS_PLAN) { morph(byId('tabs'), ''); return; }
   const unread = coachUnread();
-  byId('tabs').innerHTML = TABS.map(x => `<button class="tab ${UI.tab === x.id ? 'on' : ''}" data-act="go-tab" data-tab="${x.id}" ${UI.tab === x.id ? 'aria-current="page"' : ''}>${ic(x.icon)}<span>${esc(t('tab.' + x.id))}</span>${x.id === 'coach' && unread && UI.tab !== 'coach' ? `<i class="dot" aria-label="${esc(t('tab.unread', { n: unread }))}">${unread > 9 ? '9+' : unread}</i>` : ''}</button>`).join('');
+  morph(byId('tabs'), TABS.map(x => `<button class="tab ${UI.tab === x.id ? 'on' : ''}" data-act="go-tab" data-tab="${x.id}" ${UI.tab === x.id ? 'aria-current="page"' : ''}>${ic(x.icon)}<span>${esc(t('tab.' + x.id))}</span>${x.id === 'coach' && unread && UI.tab !== 'coach' ? `<i class="dot" aria-label="${esc(t('tab.unread', { n: unread }))}">${unread > 9 ? '9+' : unread}</i>` : ''}</button>`).join(''));
 }
 
+let softInserted: Element[] | null = null;
 function render() {
   // Auftrag 18: automatische Plan-Änderungen erst nach dem ersten Abgleich (sonst überschreibt ein alter Stand auf dem Gerät den neueren Plan vom Server)
   if (HAS_PLAN && autoReady && checkSwimSkill()) saveState();
@@ -142,7 +151,12 @@ function render() {
   if (!HAS_PLAN) html = UI.sub && NO_PLAN_SUBS.has(UI.sub) ? SUBS[UI.sub]() : pendingInvite() ? inviteHtml() : introStep() ? introHtml() : renderWelcome();
   else if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) html = SUBS[UI.sub]();
   else html = TABS.find(x => x.id === UI.tab)!.render();
-  byId('app').innerHTML = `<div class="view" data-view="${esc(UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab)}">${html}</div>`;
+  // Auftrag 26: gleiche Ansicht nur angleichen (kein Flackern, Bilder und offene Bereiche bleiben), neue Ansicht neu aufbauen
+  const viewId = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab;
+  const app = byId('app'), cur = app.firstElementChild as HTMLElement | null;
+  if (cur && app.childElementCount === 1 && cur.classList.contains('view') && cur.dataset.view === viewId) morph(cur, html, softInserted || undefined);
+  else app.innerHTML = `<div class="view" data-view="${esc(viewId)}">${html}</div>`;
+  document.getElementById('app-startup')?.setAttribute('hidden', '');
   if (HAS_PLAN && UI.tab === 'coach') { if (!UI.coachVisit) { UI.coachSeenPrev = UI.coachSeenAt || 0; UI.coachVisit = true; } UI.coachSeenAt = Date.now(); saveUi(); } else if (UI.coachVisit) { UI.coachVisit = false; saveUi(); }
   // Letzte Bildschirme (für „Fehler melden“)
   const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');
@@ -168,6 +182,36 @@ function go(target: string, scroll?: string | null) {
   window.scrollTo(0, 0);
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+/* Auftrag 26: Aktualisierung aus dem Hintergrund – gebündelt (ein Neuzeichnen je Bild), nie mitten in einer Eingabe */
+let refreshFrame = 0, refreshLater = false;
+const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+function refresh() {
+  if (typing()) { refreshLater = true; return; }
+  if (refreshFrame) return;
+  refreshFrame = requestAnimationFrame(() => { refreshFrame = 0; if (typing()) { refreshLater = true; return; } softRerender(); });
+}
+/* Neue Daten aus dem Hintergrund gleiten an ihren Platz (240 ms) statt zu springen: Bausteine, die sich verschieben, starten an ihrer
+   alten Position (FLIP), neu eingefügte blenden ein. Mit „Bewegung reduzieren“ ohne Animation. */
+function softRerender() {
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const view = byId('app').firstElementChild as HTMLElement | null;
+  const canAnimate = !reduce && !!view && typeof (view as any).animate === 'function';
+  const level1 = canAnimate ? Array.from(view!.children) as HTMLElement[] : [];
+  const tracked: [HTMLElement, HTMLElement | null, number][] = [];
+  for (const a of level1) { tracked.push([a, null, a.getBoundingClientRect().top]); for (const b of Array.from(a.children).slice(0, 30) as HTMLElement[]) tracked.push([b, a, b.getBoundingClientRect().top]); }
+  softInserted = [];
+  const inserted = softInserted;
+  try { rerender(); } finally { softInserted = null; }
+  if (!canAnimate) return;
+  const moved = new Map<HTMLElement, number>();
+  for (const [el, , top] of tracked) if (el.isConnected) moved.set(el, top - el.getBoundingClientRect().top);
+  for (const [el, parent] of tracked) {
+    const dy = (moved.get(el) || 0) - (parent ? moved.get(parent) || 0 : 0);
+    if (Math.abs(dy) > 1) el.animate([{ transform: `translateY(${Math.round(dy)}px)` }, { transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.2,.7,.3,1)' });
+  }
+  for (const el of inserted) if ((el as HTMLElement).animate) (el as HTMLElement).animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
+}
+document.addEventListener('focusout', () => { if (refreshLater) setTimeout(() => { if (!refreshLater || typing()) return; refreshLater = false; refresh(); }, 300); });
 /* Auftrag 25: Zurück-Wischen (iPhone, App auf dem Homescreen) und Browser-Zurück. Eine Unterseite legt einen Verlaufseintrag an;
    Zurück schließt zuerst ein offenes Blatt, sonst geht es zur Liste „Mehr“. Höchstens ein Eintrag (2 Ebenen). */
 let subPushed = false, skipPop = false;
@@ -182,7 +226,7 @@ window.addEventListener('popstate', () => {
   UI.sub = null; saveUi(); render(); window.scrollTo(0, 0);
 });
 function leaveSubHistory() { if (subPushed) { subPushed = false; skipPop = true; try { history.back(); } catch (e) { skipPop = false; } } }
-nav.render = render; nav.rerender = rerender; nav.go = go;
+nav.render = render; nav.rerender = rerender; nav.refresh = refresh; nav.go = go;
 
 /* ---------- Aktionen ---------- */
 on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!; if (tab === UI.tab && !UI.sub) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } if (tab === 'plan') UI.planDate = null; go(tab); });
@@ -255,18 +299,34 @@ function updateBadge() {
 /* ---------- Start ---------- */
 try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } catch (e) {}
 // „Stunden bisher: weiß ich nicht“: nach 2 Wochen an die echten Daten anpassen (Auftrag 11)
-{ const cal = () => { try { if (HAS_PLAN && calibrateIfDue()) rerender(); } catch (e) { /* nie den Start verhindern */ } };
-  if (isSyncOn()) onSynced(() => { if (!autoReady) { autoReady = true; cal(); rerender(); } }); else cal(); }
+// Auftrag 26: nach dem ersten Abgleich nur neu zeichnen, wenn eine Prüfung wirklich etwas geändert hat (vorher immer: ganzer Neuaufbau beim Start)
+{ const cal = () => { try { return HAS_PLAN && calibrateIfDue(); } catch (e) { return false; /* nie den Start verhindern */ } };
+  if (isSyncOn()) onSynced(() => {
+    if (autoReady) return;
+    autoReady = true;
+    let changed = cal();
+    try { if (HAS_PLAN && checkSwimSkill()) { saveState(); changed = true; } } catch (e) { /* nie den Start verhindern */ }
+    if (changed) nav.refresh();
+  });
+  else if (cal()) rerender(); }
 // Auftrag 15: nur gewählte Sportarten, gleiche Sportart nicht an zwei Tagen hintereinander. Mit Sync erst nach dem ersten Abgleich
 // (sonst könnte ein alter Stand auf diesem Gerät den neueren Plan vom Server überschreiben).
-{ let ran = false; const check = () => { if (ran) return; ran = true; try { if (HAS_PLAN && planRulesOnStart()) rerender(); } catch (e) { /* nie den Start verhindern */ } };
+{ let ran = false; const check = () => { if (ran) return; ran = true; try { if (HAS_PLAN && planRulesOnStart()) nav.refresh(); } catch (e) { /* nie den Start verhindern */ } };
   if (isSyncOn()) onSynced(check); else check(); }
+try { performance.mark('stamio:render-start'); } catch (e) { /* alte Browser */ }
 render();
+try { performance.mark('stamio:first-render'); } catch (e) { /* alte Browser */ }
 if (UI.sub) pushSub();
 openFromUrl(location.href);
 startPwa();
 setTimeout(maybeWhatsNew, 400);
-if (isSyncOn()) { loadMe().then(() => { if (UI.tab === 'mehr') rerender(); }); loadAiState().then(() => { if (UI.tab === 'coach' || UI.sub === 'coachset') rerender(); }); loadConnections(); }
+// Auftrag 26: Konto und KI-Stand im Hintergrund; neu gezeichnet wird nur, wenn sie sich geändert haben und die Ansicht sie zeigt
+if (isSyncOn()) {
+  const meBefore = JSON.stringify(me()), aiBefore = JSON.stringify(aiState());
+  loadMe().then(() => { if (UI.tab === 'mehr' && JSON.stringify(me()) !== meBefore) nav.refresh(); });
+  loadAiState().then(() => { if ((UI.tab === 'coach' || UI.sub === 'coachset') && JSON.stringify(aiState()) !== aiBefore) nav.refresh(); });
+  loadConnections();
+}
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); rerender(); } });
 void checkForUpdate;

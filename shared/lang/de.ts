@@ -289,7 +289,7 @@ export const de: Record<string, string> = {
 
   /* ---------- Einstellungen ---------- */
   'set.look': 'Darstellung', 'set.theme': 'Farbschema', 'set.system': 'System', 'set.light': 'Hell', 'set.dark': 'Dunkel',
-  'set.heuteVariant': 'Startseite „Heute“', 'set.variantA': 'Antwort-Karte', 'set.variantB': 'Tages-Feed',
+  'set.heuteVariant': 'Startseite „Heute“', 'set.variantA': 'Antwort-Karte', 'set.variantB': 'Tages-Feed', 'set.palette': 'Farbvariante (nur Test-App)', 'set.paletteNow': 'Bisher', 'set.paletteHint': 'Vorschau der neuen Farben passend zum Icon. Gilt nur auf diesem Gerät.',
   'set.zones': 'Zonen und Schwellen', 'set.zonesAside': 'nach einem Test anpassen', 'set.lthrRun': 'Schwellenpuls Laufen', 'set.paceRun': 'Schwellen-Pace (min/km)',
   'set.lthrBike': 'Schwellenpuls Rad', 'set.ftp': 'FTP (Watt)', 'set.speedBike': 'Schwelle Rad (km/h)', 'set.bikeSpeed': 'Schwellen-Tempo {bike} (km/h, flach)', 'set.derivedShort': '(abgeleitet)', 'set.speedZones': 'Rad-Tempo flach (km/h), nur als Anhalt', 'set.speedIndoor': 'Drinnen gilt die virtuelle Geschwindigkeit der App (z. B. Zwift).', 'set.css': 'CSS Schwimmen (min/100 m)', 'set.maxHr': 'Maximalpuls',
   'set.zonesHint': 'Passt Pace oder Leistung, aber der Puls ist hoch, war es ein schwerer Tag und kein Rückschritt. Nach einem Test oder neuen Messwerten hier anpassen.',
