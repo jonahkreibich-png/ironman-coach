@@ -13,7 +13,7 @@ export function scrub(s: unknown, n?: number): string {
 export async function logError(env: Env, source: string, msg: unknown, place?: unknown, extra?: { version?: unknown; view?: unknown; uid?: number | null }): Promise<void> {
   try {
     await env.DB.prepare('INSERT INTO error_log (at, source, msg, place, version, view, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(Date.now(), source, scrub(msg), scrub(place, 160), scrub((extra && extra.version) || '', 40), scrub((extra && extra.view) || '', 40), (extra && extra.uid) || null).run();
+      .bind(Date.now(), source, scrub(msg), scrub(place, 160), String((extra && extra.version) || '').replace(/[^\w.+-]/g, '').slice(0, 40) /* Auftrag 28: Version lesbar lassen (keine Gesundheitsdaten), sonst stand dort nur „#“ */, scrub((extra && extra.view) || '', 40), (extra && extra.uid) || null).run();
     await env.DB.prepare('DELETE FROM error_log WHERE id <= (SELECT MAX(id) FROM error_log) - ?').bind(MAX_ROWS).run();
   } catch (e) { /* Protokoll darf nie selbst Fehler werfen */ }
 }

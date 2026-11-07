@@ -57,7 +57,14 @@ export function progMove(goal: Goal): Move | null {
   if (moveCache.size > 30) moveCache.clear();
   moveCache.set(key, m); return m;
 }
-export function D(): Derived { if (!cache || cache.today !== todayStr()) { cache = compute(); afterCompute(cache); } return cache; }
+/* Auftrag 28: Rückgabe ist immer der eben berechnete Wert. afterCompute kann speichern; das Speichern ersetzt den Zustand und leert den
+   Zwischenspeicher (onStateReplaced). Vorher gab D() danach `cache` zurück – inzwischen null – und die App startete nicht mehr.
+   Der nächste Aufruf rechnet dann mit dem neuen Zustand neu. */
+export function D(): Derived {
+  if (cache && cache.today === todayStr()) return cache;
+  const d = compute(); cache = d; afterCompute(d);
+  return d;
+}
 
 /* Etappenziele merken und erreichte im Coach melden (Auftrag 12). Die neue Score-Skala erklärt „Neu in dieser Version“. */
 function afterCompute(d: Derived) {
@@ -88,7 +95,7 @@ function afterCompute(d: Derived) {
     // Auftrag 21: doppelte Coach-Meldungen (gleicher Anlass) aufräumen; die Löschung geht per Abgleich auch an den Server
     const dups = duplicateMsgIds(Object.values(STATE.coachMsgs || {}));
     if (dups.length) { dups.forEach(id => { delete STATE.coachMsgs[id]; }); changed = true; }
-    for (const m of Object.values(STATE.coachMsgs || {}) as any[]) { const c = compactDecided(m, Date.now()); if (c) { STATE.coachMsgs[m.id] = c; changed = true; } }
+    for (const m of Object.values(STATE.coachMsgs || {}) as any[]) { if (!m || !m.id) continue; const c = compactDecided(m, Date.now()); if (c && JSON.stringify(c) !== JSON.stringify(m)) { STATE.coachMsgs[m.id] = c; changed = true; } }
     if (changed) saveSoon();
   } catch (e) { /* Anzeige geht vor */ }
 }

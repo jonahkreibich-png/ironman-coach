@@ -1,3 +1,10 @@
+# Veröffentlichen (jede neue Version)
+
+`node scripts/veroeffentlichen.mjs` – alle Tests → Sicherung Test-App → Test-App veröffentlichen und prüfen → Sicherung echte App → Kopie der echten Daten prüfen → **Vorversion sichern** (live laufender Build, `scripts/lib/livebuild.mjs`) → **Start-Test aller echten Nutzer im Browser** (`scripts/startcheck.mjs`: WebKit, Homescreen-Modus, je Update vom lokalen Stand der Vorversion und neues Gerät) → echte App veröffentlichen und prüfen → **10 Minuten Startfehler beobachten, sonst automatisch zurück** (`scripts/nach-release.mjs`).
+Korrekturen an Nutzerdaten: nur `node scripts/korrektur.mjs` (Sicherung, normale Änderung mit Zeitstempel über den Sync). Nie direkt in der Datenbank.
+
+---
+
 # Freigeben: Umstellung der echten App
 
 Wird erst ausgeführt, wenn **alle Tests grün** sind **und Jonah „Freigeben“ gesagt hat**.

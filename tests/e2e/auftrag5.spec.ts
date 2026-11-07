@@ -207,9 +207,10 @@ test.describe('E: bereit für Tester', () => {
     // Safari-Daten gelöscht / neues Handy
     await page.evaluate(() => localStorage.clear());
     await page.goto('/?go=konto');
-    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click(); await page.locator('summary', { hasText: 'Wiederherstellungscode' }).click();
-    await page.fill('#rc-code', rc);
-    await page.locator('[data-act="rc-recover"]').click();
+    // Auftrag 28: ein Feld für Wiederherstellungs- und Kopplungscode (unter Mehr → Konto im aufklappbaren Bereich)
+    await page.locator('summary', { hasText: 'Ich habe schon ein Konto' }).click();
+    await page.fill('#acc-code', rc);
+    await page.locator('[data-act="acc-login"]').click();
     await page.waitForLoadState('load');
     await expect.poll(async () => (await page.evaluate(() => (JSON.parse(localStorage.getItem('ec_state_v2') || '{}').profile || {}).notes)), { timeout: 10000 }).toEqual(['dienstags gar nichts']);
     // Export und Löschen

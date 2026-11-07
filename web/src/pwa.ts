@@ -2,6 +2,7 @@ import { storage, storageMessage } from './persistence';
 /* Service Worker, Updates und dauerhafter Speicher. */
 import { saveState } from './store';
 import { toast } from './toast';
+import { registerServiceWorker, swSupported } from './swreg';
 
 let reg: ServiceWorkerRegistration | null = null;
 let waitingWorker: ServiceWorker | null = null;
@@ -29,10 +30,12 @@ export async function checkForUpdate(manual?: boolean): Promise<void> {
 
 export function startPwa(): void {
   // Im Entwicklungsmodus (vite dev) gibt es keinen Service Worker
-  if (import.meta.env.DEV || !('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  if (!swSupported()) return;
   const register = async () => {
     try {
-      reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+      // Auftrag 28: angemeldet wird schon im Einstieg (bootstrap.ts, swreg.ts), auch wenn die App nicht startet; hier nur Update-Hinweis
+      reg = await registerServiceWorker();
+      if (!reg) return;
       if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
       reg.addEventListener('updatefound', () => {
         const nw = reg!.installing;

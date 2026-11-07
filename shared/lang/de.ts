@@ -388,7 +388,7 @@ export const de: Record<string, string> = {
   'welcome.connectedNoData': 'Verbunden – aber in deinem Konto ist noch kein Trainingsplan.',
   'welcome.connectedNoDataHint': 'Sobald dein Plan da ist, lädt die App von selbst neu. Du kannst auch unten ein Backup laden oder mit dem Fragebogen neu starten.',
   'welcome.recheck': 'Nochmal nachsehen', 'welcome.stillNoData': 'Noch kein Plan in deinem Konto.',
-  'welcome.newBtn': 'Los geht’s', 'welcome.haveTitle': 'Schon dabei?', 'welcome.backupTitle': 'Backup laden',
+  'welcome.newBtn': 'Los geht’s', 'welcome.haveTitle': 'Ich habe schon ein Konto', 'welcome.backupTitle': 'Backup laden',
   'welcome.backupHint': 'Ein Backup aus der App (Text oder Datei) enthält Plan und Daten.', 'welcome.load': 'Daten laden',
   'welcome.noPlanInBackup': 'In diesem Backup fehlt der Trainingsplan. Erstelle es nochmal mit der aktuellen App-Version.',
   'welcome.privacy': 'Deine Daten bleiben auf deinem Gerät und in deinem privaten Konto.',
@@ -638,5 +638,10 @@ export const de: Record<string, string> = {
   'prof.photoHint': 'Nur für dich sichtbar, klein gespeichert.',
   'set.shoeHint': 'Freiwillig: Die App zählt die Kilometer deiner Laufschuhe und sagt Bescheid, wenn ein neues Paar fällig wird.',
   'set.cycleHint': 'Freiwillig: Mit eingetragenem Zyklus gibt der Coach sanfte Hinweise, der Plan bleibt gleich.',
+  'acc.loginHint': 'Wiederherstellungscode (16 Zeichen) eingeben – oder auf einem Gerät, auf dem die App läuft: Mehr → Konto → „Gerät hinzufügen“ und den Code (8 Zeichen) hier eingeben.', 'acc.loginCode': 'Wiederherstellungscode oder Kopplungscode', 'acc.loginBtn': 'Anmelden',
+  'acc.loginLen': 'Der Code hat 16 Zeichen (Wiederherstellungscode, z. B. ABCD-EFGH-JKLM-NPQR) oder 8 Zeichen (Kopplungscode).', 'acc.loginBadRc': 'Dieser Wiederherstellungscode passt zu keinem Konto. Hast du noch ein Gerät, auf dem die App läuft? Dort: Mehr → Konto → „Gerät hinzufügen“ und den Code hier eingeben.', 'acc.loginBadPair': 'Der Kopplungscode stimmt nicht oder ist abgelaufen (10 Minuten gültig). Bitte auf dem anderen Gerät einen neuen erzeugen.',
+  'rc.title': 'Wiederherstellungscode sichern', 'rc.why': 'Damit kommst du auf einem neuen iPhone oder nach dem Löschen der App wieder an alle deine Daten. Antippen zeigt dir einen neuen Code; ein älterer gilt dann nicht mehr.', 'rc.show': 'Neuen Code anzeigen',
+  'rc.saveHow': 'Speichere ihn in der Passwörter-App (Kopieren → Passwörter → + → Name „Stamio“, Code als Passwort) oder mach ein Foto.', 'rc.saved': 'Gesichert',
+  'err.blockTitle': 'Dieser Bereich konnte nicht geladen werden.', 'err.blockHint': 'Deine Daten sind sicher. Alles andere in der App funktioniert weiter.', 'err.retry': 'Erneut versuchen',
   'push.noWorker': 'Mitteilungen sind noch nicht bereit. Schließ die App einmal ganz und öffne sie wieder vom Home-Bildschirm.'
 };

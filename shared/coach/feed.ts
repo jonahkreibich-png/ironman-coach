@@ -86,7 +86,9 @@ export function dedupeIncoming(existing: Record<string, any>, incoming: any[]): 
    Es bleiben Titel, Text, Status und die Zeilen „was, von wann, nach wann“. Liefert die verkleinerte Meldung oder null. */
 export function compactDecided(m: any, now: number): any | null {
   const p = m && m.proposal;
-  if (!p || p.status === 'open' || !Array.isArray(p.changes) || !p.changes.length || (m.at || 0) > now - 7 * 86400000) return null;
+  // Auftrag 28: schon verkleinerte nie erneut melden. Vorher kam jede verkleinerte Meldung bei jedem Aufruf wieder als „geändert“ zurück:
+  // afterCompute (web/src/data.ts) speicherte bei jedem Start, und seit 3.15.0 startete die App bei Nutzer 1 deshalb nicht mehr.
+  if (!p || typeof p !== 'object' || p.compacted || p.status === 'open' || !Array.isArray(p.changes) || !p.changes.length || !(Number(m.at) <= now - 7 * 86400000)) return null;
   const lines = p.changes.filter((c: any) => c && c.data && c.data.what).map((c: any) => ({ kind: c.kind, key: c.key, data: { what: String(c.data.what) } }));
   return { ...m, proposal: { ...p, changes: lines, compacted: true } };
 }

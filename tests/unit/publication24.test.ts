@@ -18,9 +18,9 @@ test('Rückweg-Zeitpunkt nicht lesbar: Release läuft weiter (Sicherung liegt vo
 });
 test('publication checks both backups and test deployment before updating production', async () => {
   const h = harness(); await h.go();
-  expect(h.calls).toEqual(['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'realdata:production', 'bookmark:production', 'deploy:production', 'verify:production']);
+  expect(h.calls).toEqual(['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'realdata:production', 'livebuild:production', 'startcheck:production', 'bookmark:production', 'deploy:production', 'verify:production', 'watch:production']);
 });
-for (const fail of ['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'realdata:production']) test('failure at ' + fail + ' prevents production deployment', async () => {
+for (const fail of ['checks', 'backup:test', 'validate:test', 'deploy:test', 'verify:test', 'backup:production', 'validate:production', 'realdata:production', 'livebuild:production', 'startcheck:production']) test('failure at ' + fail + ' prevents production deployment', async () => {
   const h = harness(fail); await expect(h.go()).rejects.toThrow(); expect(h.calls).not.toContain('deploy:production');
 });
 

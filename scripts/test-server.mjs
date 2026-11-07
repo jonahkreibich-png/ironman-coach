@@ -8,7 +8,8 @@ import { build } from 'esbuild';
 import { D1Shim } from '../server/test/d1-shim.mjs';
 
 const port = +(process.argv[2] || 4180);
-const root = path.resolve('dist');
+const ROOT0 = path.resolve(process.env.DIST_DIR || 'dist');
+let root = ROOT0; // Auftrag 28: ältere Builds (Start-Test mit Vorversion), umschaltbar über /__dist
 const out = path.resolve('node_modules/.cache/worker-test.mjs');
 await build({ entryPoints: ['server/src/index.ts'], bundle: true, format: 'esm', platform: 'neutral', outfile: out, logLevel: 'error', mainFields: ['module', 'main'], external: ['node:*'], conditions: ['workerd', 'worker', 'import'] });
 const worker = (await import('file://' + out.replace(/\\/g, '/') + '?t=' + Date.now())).default;
@@ -51,10 +52,16 @@ function fakeAI(mode) {
   };
 }
 
+let breakMain = false;
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${port}`);
-  if (u.pathname === '/__reset' && req.method === 'POST') { env.DB = freshDb(); delete env.AI; res.writeHead(204); return res.end(); }
+  if (u.pathname === '/__reset' && req.method === 'POST') { breakMain = false; root = ROOT0; env.DB = freshDb(); delete env.AI; res.writeHead(204); return res.end(); }
+  // Auftrag 28: anderen Build ausliefern (gleiche Adresse, gleicher Browser-Speicher) – „Update“ von der Vorversion auf die neue
+  if (u.pathname === '/__dist' && req.method === 'POST') { const chunks = []; for await (const c of req) chunks.push(c); const d = JSON.parse(Buffer.concat(chunks).toString() || '{}').dir; if (d && fs.existsSync(path.join(path.resolve(d), 'index.html'))) { root = path.resolve(d); res.writeHead(204); } else res.writeHead(400); return res.end(); }
+  // Auftrag 28: App-Code absichtlich kaputt ausliefern (Startfehler-Test: Fehlerseite, „Erneut versuchen“)
+  if (u.pathname === '/__break-main' && req.method === 'POST') { const chunks = []; for await (const c of req) chunks.push(c); breakMain = !!JSON.parse(Buffer.concat(chunks).toString() || '{}').on; res.writeHead(204); return res.end(); }
+  if (breakMain && /^\/assets\/main-[^/]+\.js$/.test(u.pathname)) { res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' }); return res.end('throw new Error("Testfehler beim Start");'); }
   if (u.pathname === '/__fake-ai' && req.method === 'POST') { const chunks = []; for await (const c of req) chunks.push(c); const b = JSON.parse(Buffer.concat(chunks).toString() || '{}'); if (b.on) env.AI = fakeAI(b.mode); else delete env.AI; res.writeHead(204); return res.end(); }
   if (u.pathname.startsWith('/api/')) {
     const chunks = []; for await (const c of req) chunks.push(c);

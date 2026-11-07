@@ -48,6 +48,17 @@ Code: wrangler rollback (Worker), Pages: vorherige Bereitstellung im Cloudflare-
 
 ${r.stdout || ''}${r.stderr || ''}`);
     if (r.status !== 0) throw new Error('Rückweg-Zeitpunkt nicht lesbar (Sicherung liegt trotzdem in data-export).');
+  } else if (step.kind === 'livebuild') {
+    // Auftrag 28: genau den Build sichern, den die Nutzer gerade haben (Vorversion für den Start-Test und Rückweg)
+    runNode(['--input-type=module', '-e', `import { downloadLiveBuild } from ${JSON.stringify(new URL('./lib/livebuild.mjs', import.meta.url).href)}; const b = await downloadLiveBuild(${JSON.stringify(TARGETS[step.target].url)}, ${JSON.stringify(step.dir)}); console.log('Vorversion ' + b.version + ' gesichert (' + b.files + ' Dateien)');`]);
+  } else if (step.kind === 'startcheck') {
+    // Auftrag 28: Start im Browser (WebKit, Homescreen-Modus) mit Kopien aller echten Nutzer, je mit lokalem Stand der Vorversion und als neues Gerät
+    const npm = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    runNode([npm, 'run', 'build'], ROOT, { VITE_APP_ENV: TARGETS[step.target].env });
+    runNode([path.join(ROOT, 'scripts', 'startcheck.mjs'), step.file, '--prev', step.prev]);
+  } else if (step.kind === 'watch') {
+    // Auftrag 28: nach dem Release Startfehler beobachten, bei Startfehlern der neuen Version automatisch zurück auf die Vorversion
+    runNode([path.join(ROOT, 'scripts', 'nach-release.mjs'), step.target, '--prev', step.prev, '--minuten', String(process.env.STAMIO_WATCH_MIN || 10), '--seit', String(step.since)]);
   } else if (step.kind === 'deploy') runNode([path.join(ROOT, 'scripts', 'deploy.mjs'), step.target]);
   else throw new Error('Unbekannter Veröffentlichungsschritt.');
 }
@@ -104,12 +115,17 @@ export async function publishRelease({ run = execute, checkBackup = verifyBackup
     await run({ kind: 'backup', target, file });
     const backup = await checkBackup(file);
     console.log('Sicherung geprüft: ' + file + ' (' + backup.bytes + ' Bytes)');
+    const prev = path.join(ROOT, 'scratch', 'vorversion-' + target);
     if (target === 'production') {
       await run({ kind: 'realdata', target, file });
+      await run({ kind: 'livebuild', target, dir: prev });
+      await run({ kind: 'startcheck', target, file, prev });
       try { await run({ kind: 'bookmark', target, file: file.replace(/\.sql$/, '-rueckweg.txt') }); } catch (e) { console.log('Hinweis: ' + e.message); }
     }
+    const since = Date.now();
     await run({ kind: 'deploy', target });
     await verify(target);
+    if (target === 'production') await run({ kind: 'watch', target, prev, since });
   }
   console.log('Veröffentlicht und geprüft: ' + TARGETS.production.url + ' — Version ' + VERSION);
   // Auftrag 21: nur die 5 neuesten Sicherungen je Umgebung unverändert behalten, ältere komprimieren
@@ -124,7 +140,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(SELF)) {
     console.log('Aufruf: node scripts/veroeffentlichen.mjs — Tests, Sicherungen, Testumgebung und echte App.');
     console.log('--plan zeigt den Ablauf ohne Netzwerkaufrufe.');
   } else if (args[0] === '--plan') {
-    console.log('Version ' + VERSION + ': alle Tests → Testsicherung prüfen → Testdeploy prüfen → Produktionssicherung prüfen → Produktionsdeploy prüfen.');
+    console.log('Version ' + VERSION + ': alle Tests → Testsicherung prüfen → Testdeploy prüfen → Produktionssicherung prüfen → Kopie echter Daten → Vorversion sichern → Start-Test aller Nutzer im Browser → Produktionsdeploy prüfen → Startfehler beobachten (sonst zurück).');
     console.log('Plananzeige: keine Netzwerkaufrufe und keine Veröffentlichung.');
   } else if (process.env.STAMIO_RELEASE_READY !== '1') {
     // CA-Konfiguration muss bereits beim Start des Prozesses gesetzt sein.

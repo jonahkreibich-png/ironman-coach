@@ -6,7 +6,7 @@ import { morph } from './morph';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
-import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen  } from './kit';
+import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, safeBlock, safeRun } from './kit';
 import { CHARTS, chartTap } from './charts';
 import { effStatus } from './domain';
 import { D, invalidate } from './data';
@@ -28,7 +28,7 @@ import { renderDaten, resetDatenCache, renderKonto, renderUeber, renderBetreiber
 import { renderWettkampf } from './views/wettkampf';
 import { renderBeruecksichtigungen, renderAusruestung } from './views/beruecksichtigungen';
 import { focusFeedback } from './views/feedback';
-import { takeInviteFromUrl, pendingInvite, inviteHtml, introStep, introHtml, maybeWhatsNew } from './views/intro';
+import { takeInviteFromUrl, pendingInvite, inviteHtml, introStep, introHtml, maybeWhatsNew, loadRecoveryStatus } from './views/intro';
 import { renderFeedback } from './views/feedback';
 import { renderOnboarding, renderWelcome } from './views/onboarding';
 import './views/session';
@@ -143,16 +143,18 @@ function renderTabs() {
 let softInserted: Element[] | null = null;
 function render() {
   // Auftrag 18: automatische Plan-Änderungen erst nach dem ersten Abgleich (sonst überschreibt ein alter Stand auf dem Gerät den neueren Plan vom Server)
-  if (HAS_PLAN && autoReady && checkSwimSkill()) saveState();
+  safeRun('swim-skill', () => { if (HAS_PLAN && autoReady && checkSwimSkill()) saveState(); });
   invalidate();
   for (const k in CHARTS) delete (CHARTS as any)[k];
   document.body.classList.toggle('no-plan', !HAS_PLAN);
-  let html: string;
-  if (!HAS_PLAN) html = UI.sub && NO_PLAN_SUBS.has(UI.sub) ? SUBS[UI.sub]() : pendingInvite() ? inviteHtml() : introStep() ? introHtml() : renderWelcome();
-  else if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) html = SUBS[UI.sub]();
-  else html = TABS.find(x => x.id === UI.tab)!.render();
   // Auftrag 26: gleiche Ansicht nur angleichen (kein Flackern, Bilder und offene Bereiche bleiben), neue Ansicht neu aufbauen
   const viewId = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : UI.tab;
+  // Auftrag 28: ein Fehler in einer Ansicht zeigt nur dort „konnte nicht geladen werden“ – Tab-Leiste, andere Tabs und Mehr bleiben bedienbar
+  const html = safeBlock(viewId || 'start', () => {
+    if (!HAS_PLAN) return UI.sub && NO_PLAN_SUBS.has(UI.sub) ? SUBS[UI.sub]() : pendingInvite() ? inviteHtml() : introStep() ? introHtml() : renderWelcome();
+    if (UI.tab === 'mehr' && UI.sub && SUBS[UI.sub]) return SUBS[UI.sub]();
+    return TABS.find(x => x.id === UI.tab)!.render();
+  }, true);
   const app = byId('app'), cur = app.firstElementChild as HTMLElement | null;
   if (cur && app.childElementCount === 1 && cur.classList.contains('view') && cur.dataset.view === viewId) morph(cur, html, softInserted || undefined);
   else app.innerHTML = `<div class="view" data-view="${esc(viewId)}">${html}</div>`;
@@ -161,10 +163,11 @@ function render() {
   // Letzte Bildschirme (für „Fehler melden“)
   const here = UI.sub && (UI.tab === 'mehr' || !HAS_PLAN) ? UI.sub : (HAS_PLAN ? UI.tab : 'start');
   const trail: string[] = UI.trail || []; if (trail[trail.length - 1] !== here && here !== 'feedback') { UI.trail = [...trail, here].slice(-6); saveUi(); }
-  if (HAS_PLAN && UI.tab === 'plan' && !UI.sub) centerWeekBar();
-  renderTop(); renderTabs(); updateBadge();
-  if (HAS_PLAN) initTabLens();
+  if (HAS_PLAN && UI.tab === 'plan' && !UI.sub) safeRun('week-bar', centerWeekBar);
+  safeRun('top', renderTop); safeRun('tabs', renderTabs); safeRun('badge', updateBadge);
+  if (HAS_PLAN) safeRun('tab-lens', initTabLens);
 }
+on('view-retry', () => { invalidate(); rerender(); });
 function go(target: string, scroll?: string | null) {
   let [a, b] = target.split(':');
   if (a in SUB_ALIAS && !b) { const to = SUB_ALIAS[a]; if (to) a = to; else { a = 'mehr'; } }
@@ -324,6 +327,7 @@ if (isSyncOn()) {
   loadMe().then(() => { if (UI.tab === 'mehr' && JSON.stringify(me()) !== meBefore) nav.refresh(); });
   loadAiState().then(() => { if ((UI.tab === 'coach' || UI.sub === 'coachset') && JSON.stringify(aiState()) !== aiBefore) nav.refresh(); });
   loadConnections();
+  void loadRecoveryStatus(); // Auftrag 28: Karte „Wiederherstellungscode sichern“
 }
 let renderedDay = todayStr();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && todayStr() !== renderedDay) { renderedDay = todayStr(); rerender(); } });

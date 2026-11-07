@@ -5,7 +5,7 @@ import { STATE, HAS_PLAN, hasLocalData } from '../store';
 import { esc, fmtDate, dowShort, ymd, daysBetween, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, armed, more, empty } from '../kit';
-import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify, deleteAccount, setupSignup } from '../sync';
+import { isSyncOn, syncNow, statusText, syncStatusBadge, apiCall, setupFirst, setupWithInvite, pair, stopSync, signOut, backupFromRecords, ago, syncInfo, syncNotify, deleteAccount, setupSignup, recoverWith } from '../sync';
 import { profile, saveProfile } from '../store';
 import { recoveryBanner } from './intro';
 import { backupText, parseBackupText, isBackup, isPlan, applyBackup, markBackedUp, shareBackupFile } from '../backup';
@@ -51,10 +51,14 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2
 /* Liegen schon Daten auf dem Gerät, fragt die App, ob es die eigenen sind. Standard: nein (dann werden sie gelöscht). */
 function keepLocalToggle(id: string): string { return hasLocalData() ? `<label class="switch"><input type="checkbox" id="${id}"><span>${esc(t('data.keepLocal'))}</span></label><div class="hint">${esc(t('data.keepLocalHint'))}</div>` : ''; }
 export function connectPanel(): string {
-  return `<div class="stack">
-    ${more(t('data.pairTitle'), `<div class="hint">${esc(t('data.pairHint'))}</div><div class="row"><input class="inp grow" id="sync-code" autocomplete="off" autocapitalize="characters" placeholder="ABCD-EFGH" aria-label="${esc(t('data.pairCode'))}"><button class="btn" data-act="sync-pair">${esc(t('data.pairBtn'))}</button></div>${keepLocalToggle('keep-pair')}`, true)}
+  // Auftrag 28: ein Feld für beide Codes, immer offen. Vorher war nur „Koppeln“ (8 Zeichen) aufgeklappt; ein Wiederherstellungscode
+  // (16 Zeichen) dort eingegeben wurde als „Code stimmt nicht“ abgelehnt. Jetzt erkennt die App die Art am Code.
+  return `<div class="stack" data-account-login>
+    <div class="hint">${esc(t('acc.loginHint'))}</div>
+    <input class="inp" type="text" name="username" autocomplete="username" value="${esc(APP.name)}" hidden aria-hidden="true" tabindex="-1">
+    <div class="row"><input class="inp grow" id="acc-code" autocomplete="current-password" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM-NPQR" aria-label="${esc(t('acc.loginCode'))}"><button class="btn" data-act="acc-login">${esc(t('acc.loginBtn'))}</button></div>
+    ${keepLocalToggle('keep-pair')}
     ${more(t('data.inviteTitle'), `<div class="hint">${esc(t('data.inviteHint'))}</div><div class="fgrid">${field('inv-code', t('data.inviteCode'), '', { placeholder: 'ABCD-EFGH' })}${field('inv-name', t('data.yourName'), '')}</div>${keepLocalToggle('keep-inv')}<button class="btn" data-act="sync-invite">${esc(t('data.inviteBtn'))}</button>`)}
-    ${more(t('data.recoverTitle'), `<div class="hint">${esc(t('data.recoverHint'))}</div><div class="row"><input class="inp grow" id="rc-code" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="${esc(t('data.recoverCode'))}"><button class="btn" data-act="rc-recover">${esc(t('data.recoverBtn'))}</button></div>`)}
     ${isStandalone() ? `<button class="btn ghost" data-act="intro-paste">${esc(t('data.pasteInvite'))}</button>` : ''}
     ${more(t('data.setupTitle'), `<div class="hint">${esc(t('data.setupHint'))}</div><div class="row"><input class="inp grow" id="setup-code" type="password" autocomplete="off" aria-label="${esc(t('data.setupCode'))}" placeholder="${esc(t('data.setupCode'))}"><button class="btn ghost" data-act="sync-setup">${esc(t('data.setupBtn'))}</button></div>`)}
   </div>`;
@@ -206,6 +210,21 @@ on('sync-now', el => busy(el, async () => { await syncNow(); toast(statusText())
 on('sync-setup', el => {
   const code = val('setup-code');
   return busy(el, async () => { await setupFirst(code || undefined); resetDatenCache(); toast(t('data.setupDone')); afterConnect(); });
+});
+/* Auftrag 28: „Ich habe schon ein Konto“ – 16 Zeichen = Wiederherstellungscode, 8 Zeichen = Kopplungscode von einem anderen Gerät */
+on('acc-login', el => {
+  const raw = val('acc-code'), n = raw.replace(/[^A-Za-z0-9]/g, '').length;
+  if (n !== 8 && n !== 16) { toast(t('acc.loginLen')); return; }
+  const keep = !!(document.getElementById('keep-pair') as HTMLInputElement | null)?.checked;
+  return busy(el, async () => {
+    try {
+      if (n === 16) { await recoverWith(raw); toast(t('intro.rcRecovered')); }
+      else { await pair(raw, keep); resetDatenCache(); toast(t('data.paired')); afterConnect(); }
+    } catch (e: any) {
+      if (e && e.status === 403) throw new Error(t(n === 16 ? 'acc.loginBadRc' : 'acc.loginBadPair'));
+      throw e;
+    }
+  });
 });
 on('sync-pair', el => {
   const code = val('sync-code'); if (code.replace(/[^A-Za-z0-9]/g, '').length !== 8) { toast(t('data.codeLen')); return; }

@@ -7,7 +7,7 @@ import { activeInjury } from '../../../shared/coach/ops';
 import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
 import { t, tn, num, duration } from '../../../shared/i18n';
 import { D, RETURN_STAGES } from '../data';
-import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed } from '../kit';
+import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed, safeBlock } from '../kit';
 import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '../domain';
 import { saveState } from '../store';
 import { toast } from '../toast';
@@ -18,6 +18,7 @@ import { SPORT_COLOR, sportIcon } from '../icons';
 import { nutritionToday } from './essen';
 import { daysUntil } from '../../../shared/race';
 import { syncStatusLine } from '../sync';
+import { recoveryReminder } from './intro';
 
 const STATUS_KEY = ['heute.st.ready', 'heute.st.easy', 'heute.st.rest', 'heute.st.novalues'];
 
@@ -173,8 +174,11 @@ function careHints(): string {
 export function renderHeute(): string {
   const d = D();
   const head = `<div class="spread" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill hl">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
-  if (UI.heuteVariant === 'feed') return head + feedVariant() + illnessBlock() + raceBanner() + sec(t('heute.week'), weekStrip()) + foodMini();
-  return head + answerCard() + illnessBlock() + raceBanner() + careHints() + nextRows() + sec(t('heute.week'), weekStrip()) + coachPreview() + foodMini();
+  // Auftrag 28: jede Karte für sich – ein Fehler in einer Karte zeigt nur dort „konnte nicht geladen werden“
+  const b = (name: string, fn: () => string) => safeBlock('heute-' + name, fn);
+  const week = () => sec(t('heute.week'), weekStrip());
+  if (UI.heuteVariant === 'feed') return head + b('feed', feedVariant) + b('illness', illnessBlock) + b('race', raceBanner) + b('week', week) + b('food', foodMini);
+  return head + b('answer', answerCard) + b('illness', illnessBlock) + b('race', raceBanner) + b('care', careHints) + b('next', nextRows) + b('week', week) + b('coach', coachPreview) + b('food', foodMini) + b('recovery', recoveryReminder); // Auftrag 28: unten, damit nichts verrutscht
 }
 
 on('plan-day', el => { UI.planDate = el.dataset.date; nav.go('plan'); });

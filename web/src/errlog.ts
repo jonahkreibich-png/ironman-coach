@@ -16,12 +16,12 @@ export function readErrors(): ErrEntry[] {
 function view(): string { try { return (JSON.parse(localStorage.getItem(STORAGE.ui) || '{}') || {}).view || ''; } catch (e) { return ''; } }
 let pending: ErrEntry[] = [];
 let timer: any = null;
-export function logError(msg: unknown, where?: unknown): void {
+export function logError(msg: unknown, where?: unknown, urgent = false): void {
   const e: ErrEntry = { at: Date.now(), msg: scrub(msg), where: scrub(where).slice(0, 160), version: APP_VERSION, view: view() };
   const list = readErrors(); list.push(e);
   try { localStorage.setItem(STORAGE.errors, JSON.stringify(list.slice(-MAX))); } catch (x) {}
   pending.push(e);
-  clearTimeout(timer); timer = setTimeout(flush, 3000);
+  clearTimeout(timer); timer = setTimeout(flush, urgent ? 0 : 3000); // Auftrag 28: Startfehler sofort senden (die Seite wird oft gleich geschlossen)
 }
 async function flush() {
   const auth = (() => { try { return JSON.parse(localStorage.getItem(STORAGE.syncAuth) || 'null'); } catch (e) { return null; } })();
@@ -31,7 +31,10 @@ async function flush() {
     await fetch(API_BASE + '/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token }, body: JSON.stringify({ errors: batch }) });
   } catch (e) { /* egal, lokal liegt es noch */ }
 }
+let listening = false;
+/* Auftrag 28: schon im Einstieg (bootstrap.ts) aktiv, damit auch Startfehler ankommen; ein zweiter Aufruf (main.ts) ändert nichts */
 export function initErrorLog(): void {
+  if (listening) return; listening = true;
   window.addEventListener('error', ev => logError(ev.message, (ev.filename || '').split('/').pop() + ':' + ev.lineno));
   window.addEventListener('unhandledrejection', ev => logError(ev.reason && ev.reason.message ? ev.reason.message : ev.reason, 'promise'));
 }

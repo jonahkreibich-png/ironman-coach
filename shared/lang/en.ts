@@ -55,5 +55,10 @@ export const en: Record<string, string> = {
   'v.feel': 'Feeling', 'v.load': 'Load', 'v.ill': 'Illness', 'heute.restDay': 'Rest day',
   'heute.goalIn': '{name} in {n} days', 'heute.week': 'This week', 'heute.values': 'Metrics',
   'sub.strength': 'Strength templates', 'sub.werte': 'Metrics', 'sub.essen': 'Nutrition', 'sub.profil': 'Profile and goals', 'sub.verbindungen': 'Connections',
+  'acc.loginHint': 'Enter your recovery code (16 characters) – or on a device where the app runs: More → Account → “Add device” and enter that code (8 characters) here.', 'acc.loginCode': 'Recovery code or pairing code', 'acc.loginBtn': 'Sign in',
+  'acc.loginLen': 'The code has 16 characters (recovery code) or 8 characters (pairing code).', 'acc.loginBadRc': 'This recovery code does not match any account. On a device where the app runs: More → Account → “Add device” and enter that code here.', 'acc.loginBadPair': 'The pairing code is wrong or expired (valid for 10 minutes). Please create a new one on the other device.',
+  'rc.title': 'Save your recovery code', 'rc.why': 'With it you get all your data back on a new phone or after deleting the app. Tapping shows a new code; an older one stops working.', 'rc.show': 'Show new code',
+  'rc.saveHow': 'Save it in your password manager (copy → add a new entry, code as password) or take a photo.', 'rc.saved': 'Saved',
+  'err.blockTitle': 'This section could not be loaded.', 'err.blockHint': 'Your data is safe. Everything else in the app keeps working.', 'err.retry': 'Try again',
   'sub.einstellungen': 'Settings', 'sub.daten': 'Data and devices', 'sub.wettkampf': 'Race', 'sub.onboarding': 'Questionnaire'
 };

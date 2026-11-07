@@ -5,6 +5,7 @@ import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
 import { t } from '../../shared/i18n';
 import { SOURCE_LABEL } from '../../shared/activity/merge';
 import { storage } from './persistence';
+import { logError } from './errlog';
 
 /* ---------- Aktionen ---------- */
 export type ActFn = (el: HTMLElement, ev: Event) => void | Promise<void>;
@@ -14,6 +15,28 @@ export const CHANGE: Record<string, ActFn> = {};
 export function onChange(name: string, fn: ActFn) { CHANGE[name] = fn; }
 export const INPUT: Record<string, ActFn> = {};
 export function onInput(name: string, fn: ActFn) { INPUT[name] = fn; }
+
+/* ---------- Auftrag 28: Fehler bleiben in ihrem Bereich ---------- */
+/* Ein Fehler in einem Bereich (Karte, Ansicht) zeigt nur dort „konnte nicht geladen werden“, statt die ganze App zu blockieren.
+   Gemeldet wird jeder Fehler einmal je Sitzung (Fehlerprotokoll, ohne Gesundheitsdaten). */
+const reportedBlocks = new Set<string>();
+export function failedBlock(name: string, retry = false): string {
+  return `<div class="card stack" data-failed="${esc(name)}" role="status"><b>${esc(t('err.blockTitle'))}</b><div class="hint">${esc(t('err.blockHint'))}</div>${retry ? `<button class="btn ghost" data-act="view-retry">${esc(t('err.retry'))}</button>` : ''}</div>`;
+}
+export function safeBlock(name: string, fn: () => string, retry = false): string {
+  try {
+    // nur für Tests (tests/e2e/start28.spec.ts): einen Bereich gezielt scheitern lassen
+    if ((globalThis as any).__stamioFailBlock === name) throw new Error('Testfehler in ' + name);
+    return fn();
+  }
+  catch (e: any) {
+    const msg = (e && e.message) || String(e);
+    if (!reportedBlocks.has(name + msg)) { reportedBlocks.add(name + msg); try { logError(msg, 'view:' + name + ' ' + (String((e && e.stack) || '').split('\n')[1] || '')); } catch (_) { /* nie scheitern */ } }
+    return failedBlock(name, retry);
+  }
+}
+/* Für Teile ohne Ausgabe (Kopfzeile, Tab-Leiste, Abzeichen): Fehler melden, weiterlaufen */
+export function safeRun(name: string, fn: () => void): void { safeBlock(name, () => { fn(); return ''; }); }
 
 /* ---------- Text und Kleinteile ---------- */
 export const sportLabel = (s: string) => t(SPORT_LABEL_KEY[s] || 'sport.other');

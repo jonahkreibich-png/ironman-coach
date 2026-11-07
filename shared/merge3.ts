@@ -31,7 +31,9 @@ export function mergeStored(base: any, local: any, remote: any, conflicts: any[]
 /* Auftrag 22: Zwei Geräte (oder Gerät und Import) ändern denselben Datensatz. Mit dem Stand, auf dem das Gerät seine Änderung gemacht hat
    (base), werden beide Änderungen feldweise zusammengeführt: was nur eine Seite geändert hat, bleibt; ändern beide dasselbe Feld,
    gewinnt die neuere Änderung. Ohne base gilt wie bisher: die neuere Änderung gewinnt. */
-export const MERGE_KINDS = new Set(['session', 'custom', 'trend', 'settings', 'profile', 'goal', 'nutrition', 'weekNote']);
+/* Auftrag 28: auch Krankheitsphasen. Ändert ein Gerät mit altem Stand (Phase noch offen) etwas anderes an der Phase, bleibt das Ende
+   vom Server erhalten – eine beendete Krankheit wird nie versehentlich wieder geöffnet. „Doch noch krank“ (Ende bewusst entfernt) gilt weiter. */
+export const MERGE_KINDS = new Set(['session', 'custom', 'trend', 'settings', 'profile', 'goal', 'nutrition', 'weekNote', 'illness']);
 export function mergeVersions(base: any, incoming: any, incomingAt: number, stored: any, storedAt: number): { data: any; updatedAt: number; merged: boolean } {
   const eq = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
   if (base === undefined || stored == null || eq(base, stored)) return { data: incoming, updatedAt: Math.max(incomingAt, storedAt + 1), merged: false };

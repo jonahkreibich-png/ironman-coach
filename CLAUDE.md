@@ -11,6 +11,8 @@
 - Branch `entwicklung`; `main` nur nach scripts/release.md.
 - Vor jeder Übergabe: `npm run typecheck && npm test && npm run build && npm run e2e`.
 - Echte Daten nie verändern ohne vorheriges Backup (`wrangler d1 export … --remote` nach `data-export/`).
+- Nutzerdaten auf dem Server nie direkt in der Datenbank ändern. Korrekturen nur mit `node scripts/korrektur.mjs` (Sicherung + normale Änderung mit Zeitstempel über den Sync, mit Ausgangsstand `base`), damit die Geräte sie sauber übernehmen (Auftrag 28).
+- Veröffentlichen mit `node scripts/veroeffentlichen.mjs`: enthält Start-Test aller echten Nutzer im Browser (auch mit lokalem Stand der Vorversion) und die Prüfung danach mit automatischem Zurückrollen.
 - Ergebnis eines Auftrags kurz in `ERGEBNIS.md`.
 
 ## Bestehende Implementierung zuerst pruefen

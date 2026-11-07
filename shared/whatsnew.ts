@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.16.0', items: [
+    'Die App startet wieder bei allen. Ein Fehler in einem Bereich zeigt jetzt nur dort „konnte nicht geladen werden“, der Rest funktioniert weiter. Startet die App doch einmal nicht, gibt es „Erneut versuchen“ (holt auch eine neue Version).',
+    'Startbildschirm: „Ich habe schon ein Konto“ nimmt Wiederherstellungscode und Kopplungscode im selben Feld. Auf Heute erinnert eine Karte daran, deinen Wiederherstellungscode zu sichern.'
+  ] },
   { version: '3.15.0', items: [
     'Neue Farben passend zum Icon: ruhiges Dunkel mit dezentem Petrol oben, Akzente in Petrol, Orange nur für Wichtiges.',
     '„Ich bin wieder gesund“ funktioniert wieder zuverlässig: Wiedereinstieg ab heute, auf allen Geräten gleich, mit Rückgängig. Nach Schmerzen gibt es jetzt „Wieder schmerzfrei“ (auf Heute oder im Coach).'

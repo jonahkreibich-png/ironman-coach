@@ -182,6 +182,27 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     }
     // Test-Nutzer: Einladung erzeugen (der Tester richtet sich damit selbst ein)
     if (p === '/api/admin/testusers' && M === 'POST') return await createInvite(env, a, (await readJson(req)).note || 'Test-Nutzer', true);
+    /* Auftrag 28: Korrekturen an Nutzerdaten nur noch als normale Änderung mit Zeitstempel – derselbe Weg wie der Abgleich der Geräte
+       (Prüfung, feldweises Zusammenführen mit „base“, neue Revision). Die Geräte übernehmen sie beim nächsten Abgleich wie eine Änderung
+       von einem anderen Gerät; noch nicht hochgeladene Eingaben auf den Geräten bleiben erhalten. Nie mehr direkt in die Datenbank schreiben.
+       Aufruf: scripts/korrektur.mjs (mit Sicherung vorher). */
+    const cm = /^\/api\/admin\/users\/(\d+)\/changes$/.exec(p);
+    if (cm && M === 'POST') {
+      const target = +cm[1];
+      if (!(await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(target).first())) throw new HttpError(404, 'Nutzer nicht gefunden.');
+      const body = await readJson(req);
+      const at = Date.now();
+      const list: any[] = (Array.isArray(body.changes) ? body.changes : []).map((c: any) => ({ kind: c && c.kind, key: c && c.key, data: c && c.data, deleted: !!(c && c.deleted), updatedAt: at, ...(c && c.base !== undefined ? { base: c.base } : {}) }));
+      if (!list.length || list.length > 200) throw new HttpError(400, 'Zwischen 1 und 200 Änderungen.');
+      const bad = list.find(c => !validChange(c));
+      if (bad) throw new HttpError(400, 'Ungültiger Datensatz: ' + String(bad.kind) + '/' + String(bad.key));
+      const merged = await mergeConcurrent(env, target, list);
+      await putRecords(env, target, list);
+      const job = onRecordsChanged(env, target, list, 'korrektur');
+      if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
+      await logError(env, 'korrektur', list.map(c => c.kind + '/' + c.key + (c.deleted ? ' gelöscht' : '')).join(', ') + (body.reason ? ' – ' + body.reason : ''), 'admin', { uid: target });
+      return { ok: true, updatedAt: at, merged, changes: list.map(c => ({ kind: c.kind, key: c.key, deleted: c.deleted, data: c.data, updatedAt: c.updatedAt })) };
+    }
     const um = /^\/api\/admin\/users\/(\d+)(?:\/(reset))?$/.exec(p);
     if (um) {
       const target = +um[1];

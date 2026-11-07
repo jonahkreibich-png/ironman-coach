@@ -6,11 +6,11 @@ import { storage as localStorage } from "../persistence";
    - Danach eine kurze Begrüßung in 3 Seiten: was die App kann, Home-Bildschirm (iOS 26), dann der Fragebogen.
    - Wiederherstellungscode einmal zeigen (zum Aufschreiben).
    - Nach einem Update einmal „Neu in dieser Version“. */
-import { UI, saveUi, HAS_PLAN } from '../store';
+import { UI, saveUi, HAS_PLAN, STATE, saveState } from '../store';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
 import { on, ic, openSheet, closeSheet } from '../kit';
-import { setupWithInvite, isSyncOn, recoverWith } from '../sync';
+import { setupWithInvite, isSyncOn, recoverWith, apiCall } from '../sync';
 import { isIOS, isStandalone } from './einstellungen';
 import { installSteps } from './daten';
 import { APP, APP_RELEASE } from '../config';
@@ -77,7 +77,42 @@ export function recoveryBanner(): string {
   const c = ls.get('ec_rc_show'); if (!c) return '';
   return `<div class="banner warn stack" data-recovery><b>${esc(t('intro.rcTitle'))}</b><div class="pair-code num">${esc(c)}</div><div>${esc(t('intro.rcHint'))}</div><div class="row"><button class="btn sm" data-act="rc-done">${esc(t('intro.rcDone'))}</button><button class="btn ghost sm" data-act="rc-copy">${esc(t('common.copy'))}</button></div></div>`;
 }
-on('rc-done', () => { ls.del('ec_rc_show'); nav.rerender(); });
+on('rc-done', () => { ls.del('ec_rc_show'); markRcSaved(); nav.rerender(); });
+
+/* ---------- Auftrag 28: Wiederherstellungscode sichern ---------- */
+/* Wer seinen Code nie als gesichert bestätigt hat (oder dessen Code abgelehnt wurde), sieht auf Heute eine Karte. Antippen erzeugt einen
+   neuen, gültigen Code und zeigt ihn an (Kopieren, in der Passwörter-App speichern). „Gesichert“ merkt sich das (settings.rcSavedAt,
+   synchronisiert): die Karte erscheint dann auf keinem Gerät mehr, bis ein neuer Code erzeugt wird. */
+// zuletzt bekannter Stand lokal gemerkt: die Karte steht schon im ersten Bild (kein Nachrutschen beim Start, Auftrag 26)
+let RC_STATUS: { exists: boolean; createdAt: number | null } | null = (() => { try { return JSON.parse(ls.get('ec_rc_status') || 'null'); } catch (_) { return null; } })();
+let RC_NEW: string | null = null;
+export async function loadRecoveryStatus(): Promise<void> {
+  if (!isSyncOn()) return;
+  try {
+    const next = await apiCall('GET', '/api/recovery'); const changed = JSON.stringify(next) !== JSON.stringify(RC_STATUS);
+    RC_STATUS = { exists: !!next.exists, createdAt: next.createdAt ?? null }; ls.set('ec_rc_status', JSON.stringify(RC_STATUS));
+    if (changed) nav.refresh();
+  } catch (_) { /* offline: Karte kommt beim nächsten Start */ }
+}
+// Uhr des Geräts kann vom Server abweichen: nie früher als der Zeitpunkt des Codes auf dem Server merken
+function markRcSaved() { try { STATE.settings = STATE.settings || {}; STATE.settings.rcSavedAt = Math.max(Date.now(), (RC_STATUS && RC_STATUS.createdAt) || 0); saveState(); } catch (_) { /* egal */ } }
+export function recoveryReminder(): string {
+  if (!isSyncOn() || !RC_STATUS) return '';
+  const saved = Number((STATE.settings || {}).rcSavedAt) || 0;
+  if (!RC_NEW && RC_STATUS.exists && saved >= (RC_STATUS.createdAt || 0)) return '';
+  const body = RC_NEW
+    ? `<div class="pair-code num" data-rc-new>${esc(RC_NEW)}</div><div class="hint">${esc(t('rc.saveHow'))}</div>
+       <div class="row"><button class="btn sm" data-act="rc-saved">${esc(t('rc.saved'))}</button><button class="btn ghost sm" data-act="rc-copy-new">${esc(t('common.copy'))}</button></div>`
+    : `<div class="hint">${esc(t('rc.why'))}</div><button class="btn block" data-act="rc-show">${esc(t('rc.show'))}</button>`;
+  return `<div class="card stack" data-rc-reminder style="margin-top:var(--s3)"><b>${esc(t('rc.title'))}</b>${body}</div>`;
+}
+on('rc-show', async el => {
+  (el as HTMLButtonElement).disabled = true;
+  try { RC_NEW = (await apiCall('POST', '/api/recovery', {})).code; await loadRecoveryStatus(); nav.rerender(); }
+  catch (e: any) { toast(e && e.message ? e.message : t('sync.offline')); (el as HTMLButtonElement).disabled = false; }
+});
+on('rc-copy-new', async () => { try { await navigator.clipboard.writeText(RC_NEW || ''); toast(t('common.copied')); } catch (e) { toast(t('common.copyManual')); } });
+on('rc-saved', () => { RC_NEW = null; markRcSaved(); nav.rerender(); });
 on('rc-copy', async () => { try { await navigator.clipboard.writeText(ls.get('ec_rc_show') || ''); toast(t('common.copied')); } catch (e) { toast(t('common.copyManual')); } });
 /* Anmelden mit Wiederherstellungscode (neues Handy, App gelöscht, Safari-Daten gelöscht) */
 on('rc-recover', async el => {

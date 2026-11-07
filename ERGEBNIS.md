@@ -1,3 +1,34 @@
+# Auftrag 28: Echte App startete bei dir nicht mehr (7.11.)
+
+**Stand:** STAND_PLATZHALTER
+
+## Ursache
+Nicht die Krankheitsphase und nicht die Warteschlange – beides habe ich geprüft, beides war in Ordnung.
+- Im Fehlerprotokoll standen von dir zwei Meldungen (1.11. 18:07, 3.11. 12:13): `null is not an object (evaluating 'e.today')` auf Heute.
+- Nachgestellt in WebKit (iPhone-Engine, Homescreen-Modus) mit einer Kopie deiner echten Daten: 3.15.0 stürzte **bei jedem Öffnen** ab, sogar auf einem frisch verbundenen Gerät.
+- Auslöser: alte, schon entschiedene Coach-Vorschläge (älter als 7 Tage). Die App verkleinert sie, meldete sie aber bei jedem Start erneut als „geändert“ und speicherte. Seit 3.15.0 leert jedes Speichern einen Zwischenspeicher – und genau dann gab die App „nichts“ statt deiner Daten zurück. Papa und Mama hatten noch keine so alten Vorschläge; sie hätte es später auch getroffen.
+
+## Fix (3.16.0)
+- Ursache behoben (Vorschläge werden nur einmal verkleinert, die Daten kommen immer zurück). Mit deinen echten Daten startet die App jetzt bei allen drei.
+- **Startfehler werden gemeldet** (vorher still verschluckt, deshalb kaum Spuren).
+- **Update kommt auch bei einem Absturz an:** Der Service Worker startet unabhängig von der App. Die Fehlerseite hat **„Erneut versuchen“** (sucht ein Update und lädt neu) und übernimmt eine bereitliegende neue Version selbst.
+- **Ein Fehler blockiert nie mehr die ganze App:** Jede Ansicht und jede Karte auf Heute für sich – bei einem Fehler steht nur dort „Dieser Bereich konnte nicht geladen werden“.
+- **Abgleich:** Krankheitsphasen werden feldweise zusammengeführt – eine beendete Krankheit wird nie versehentlich wieder geöffnet; deine noch nicht hochgeladenen Einträge bleiben. Keine Lösung löscht lokale Daten.
+- **Korrekturen am Server** nur noch als normale Änderung mit Zeitstempel über den Abgleich (`scripts/korrektur.mjs`, mit Sicherung). Steht als feste Regel in CLAUDE.md.
+- **Wiederherstellungscode:** Auf dem Server liegt für dich ein gültiger Code vom 13.10. Wahrscheinlicher Grund für „falsch“: Auf dem Startbildschirm war nur das Feld für den 8-stelligen Kopplungscode offen, der 16-stellige Code gehörte in ein zugeklapptes Feld (oder es war ein älterer Code aus der alten App). Jetzt: **„Ich habe schon ein Konto“** gut sichtbar auf dem Startbildschirm, ein Feld für beide Codes. Auf Heute erscheint **„Wiederherstellungscode sichern“** mit einem neuen, gültigen Code.
+- **Papa:** Er hat seine Krankheit am 6.11. selbst beendet (der Fix aus 3.15.0 wirkte) – deshalb keine Nachfrage „Bist du wieder gesund?“.
+
+## Absicherung
+- Dauertest `tests/e2e/start28.spec.ts` (Chromium + WebKit) mit genau deinem Zustand: Server-Korrektur + alter lokaler Stand + Warteschlange + alte Vorschläge. Mit 3.15.0 rot (dieselbe Meldung wie bei dir), mit 3.16.0 grün.
+- **Vor jedem Release** (`scripts/veroeffentlichen.mjs`): Start im Browser mit Kopien aller echten Nutzer, jeweils als Update vom lokalen Stand der gerade laufenden Version und als neues Gerät.
+- **Nach jedem Release:** 10 Minuten Startfehler beobachten, bei Startfehlern der neuen Version automatisch zurück auf die Vorversion.
+
+TESTS_PLATZHALTER
+
+**Was du am iPhone tun musst:** siehe FUER-JONAH.md.
+
+---
+
 # Auftrag 27: Design B + C, „Wieder gesund“ repariert (1.11.)
 
 **Stand:** Beides fertig und als Version 3.15.0 veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). Deine offene Krankheitsphase vom 30.10. habe ich beendet (letzter kranker Tag 31.10., Wiedereinstieg ab heute).
