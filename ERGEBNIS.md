@@ -1,6 +1,6 @@
 # Auftrag 28: Echte App startete bei dir nicht mehr (7.11.)
 
-**Stand:** STAND_PLATZHALTER
+**Stand:** Behoben und als **Version 3.16.0** veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). Mit Kopien eurer echten Daten starten alle drei (du, Papa, Mama) im Browser wie auf dem iPhone.
 
 ## Ursache
 Nicht die Krankheitsphase und nicht die Warteschlange – beides habe ich geprüft, beides war in Ordnung.
@@ -23,7 +23,7 @@ Nicht die Krankheitsphase und nicht die Warteschlange – beides habe ich geprü
 - **Vor jedem Release** (`scripts/veroeffentlichen.mjs`): Start im Browser mit Kopien aller echten Nutzer, jeweils als Update vom lokalen Stand der gerade laufenden Version und als neues Gerät.
 - **Nach jedem Release:** 10 Minuten Startfehler beobachten, bei Startfehlern der neuen Version automatisch zurück auf die Vorversion.
 
-TESTS_PLATZHALTER
+**Tests (ausgeführt):** Unit 2.690 grün, Browser-Tests 601 grün (Chromium + WebKit). Start-Test mit echten Daten vor dem Release: Mit der alten Version 3.15.0 startete deine App nicht, nach dem Update bei allen drei Nutzern fehlerfrei (beim 2. Öffnen). Nach dem Release: echte App startet im Browser, 10 Minuten keine Startfehler. In der Test-App habe ich deine damalige Korrektur mit dem neuen Werkzeug nachgemacht und die App mit deinen kopierten Daten geöffnet: startet jedes Mal, Krankheit beendet.
 
 **Was du am iPhone tun musst:** siehe FUER-JONAH.md.
 
