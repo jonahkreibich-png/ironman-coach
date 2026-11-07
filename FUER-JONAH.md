@@ -1,5 +1,15 @@
 # Für Jonah
 
+**Update auf 3.17.0:** App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen (beim zweiten Öffnen ist sie da). **Keine Browserdaten löschen.**
+
+**Ausprobieren (optional):** Beim nächsten Training nach dem Abhaken „Anders gemacht“ wählen, wenn du etwas anderes gemacht hast. Und im Plan das „+“ neben einem Tag für eine Extra-Einheit.
+
+Sonst musst du nichts tun. Siehst du noch einmal eine gelbe Meldung oben, tippe „Erneut versuchen“. Bleibt sie, schick mir ein Foto. Der Fehler steht dann jetzt auch im Protokoll.
+
+---
+
+## Frühere Hinweise
+
 **App wieder starten** (Version 3.16.0):
 1. Die App vom Home-Bildschirm öffnen. Kommt noch die Fehlermeldung: App ganz schließen (vom unteren Rand nach oben wischen und die App nach oben wegschieben) und wieder öffnen. Beim zweiten Öffnen ist die neue Version da. **Keine Browserdaten löschen.**
 2. Auf Heute erscheint **„Wiederherstellungscode sichern“** → „Neuen Code anzeigen“ → „Kopieren“ → in der Passwörter-App speichern (+ → Name „Stamio“, Code als Passwort) → „Gesichert“.

@@ -1,3 +1,47 @@
+# Auftrag 29: Stabilisierung (7.11.)
+
+**Stand:** Alles behoben und mit Tests abgesichert, als **Version 3.17.0** veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). Keine Daten von dir verändert.
+
+## Gefundene Fehler: Ursache → behoben
+| Bereich | Ursache | Behoben |
+|---|---|---|
+| „Abgleich fehlgeschlagen“ | Deine Einträge sind alle auf dem Server (heute 18:10–18:26 hochgeladen), das Fehlerprotokoll hatte keine Abgleich-Fehler, weil der Abgleich nie etwas meldete. Wahrscheinliche Ursache: ein Absturz beim Neuzeichnen direkt nach dem Abgleich (der Startfehler aus 3.15.0) zählte als „Abgleich fehlgeschlagen“, obwohl alles oben war. Außerdem hätte ein einziger abgelehnter Eintrag alles für immer blockiert. | Neuzeichnen getrennt vom Abgleich. Kurze Aussetzer werden still nachgeholt. Die Meldung kommt nur, wenn Einträge länger als 2 Minuten ungesichert sind: „Deine letzten 2 Einträge sind noch nicht gesichert – Internet prüfen“ mit **Erneut versuchen**. Abgelehnte Einträge bleiben auf dem Gerät und blockieren nichts. Echte Fehler stehen jetzt im Fehlerprotokoll. |
+| Schrittlänge 102 → 1 | Beim Tippen speicherte die App jeden gültigen Zwischenstand („1“ = 1 m), „102“ wurde beim Verlassen abgelehnt, stehen blieb „1“. Betraf jedes Feld mit Grenzen. | Einheit „cm“. 102, „102 cm“, „1,02 m“ und „1,02“ werden erkannt. Ungültig → Meldung, der alte Wert bleibt. |
+| Coach: Entkopplung 4,5 % statt 3 % | 4,5 % war der Schnitt mehrerer Läufe, die Meldung klang wie dein Wert. | Ein Prüfer läuft vor jeder Coach-Nachricht (Regel-Coach, KI, Etappenziele, auch alte Nachrichten): Jede Zahl wird mit dem gespeicherten Wert (Hand vor Uhr vor berechnet) verglichen, berichtigt oder weggelassen. Deine Meldung zeigt jetzt 3 %. Neue Etappenziel-Meldungen sagen „im Schnitt deiner letzten Läufe“ und nennen den letzten Wert. |
+| Schwimmen „?“ | Extra-Einheit ohne Werte gespeichert: die Dauer der Liste blieb leer, die Minuten standen nur in den Werten. | Liste, Tageskopf und Woche nehmen die eingetragene Dauer, auch beim Nachtragen. |
+| 52 vs. 40 min | Die Ampel-Anpassung setzte Titel, Dauer und Beschreibung einzeln, die Bausteine blieben (52 min). Das Gleiche bei 7 weiteren Arten von Anpassungen. | Die Dauer kommt überall aus den Bausteinen. Deine Einheit heißt jetzt „Zone 2 statt: Ausfahrt mit Sweet Spot“, 40 min, Bausteine 10 + 25 + 5 min. |
+| Dashboard-Schrift | Titel im abgerundeten Feld ohne Innenabstand, lief links über die Rundung. | Innenabstand. Der neue Überlauf-Test fand 3 weitere Stellen (Diagramm-Achse bei großen Zahlen, Belastungs-Kacheln, Regel-Raster bei sehr großer Schrift): behoben. |
+| Weitere | Negative Werte (Entkopplung −2,1 %, Temperatur) fielen still weg; Intervalle wurden still gerundet; „Weitere Werte“ klappte nach jeder Puls-Eingabe zu; Bewertung lief nicht, wenn man die App schnell schloss. | Alles behoben. |
+
+## Neu
+- **„+“ an jedem Tag** im Plan: dort sofort eine Extra-Einheit anlegen (der Knopf unten bleibt).
+- **Anders gemacht:** In jeder Einheit „So wie geplant / Anders gemacht“. Bei „Anders“: was (locker Zone 2, kürzer, andere Intervalle, andere Sportart) und optional warum (müde, krank, keine Zeit, Wetter, Schmerzen). Groß steht dann z. B. „Rad Zone 2 · 60 min“, klein „geplant: Sweet Spot 2×12“ (Einheit, Liste, Plan, Heute, Coach). Die Intervall-Liste ist dann nicht nötig. Der Coach bewertet das Gemachte („Sweet Spot ausgefallen – kein Problem, Zone 2 war sinnvoll“). Scores, Stufen und Belastung zählen nur das Gemachte. Eine ausgefallene Schlüsseleinheit wird nur nachgeholt, wenn ein Tag ohne harte Einheit daneben frei ist (höchstens eine pro Woche).
+- **Anpassungen der App:** neuer Titel oben, Abzeichen „angepasst“ mit Grund, Antippen zeigt „vorher → nachher“.
+- **Normalized Power** nur noch mit echten Wattdaten (nicht auf einfacher Rolle), mit Lexikon-Eintrag.
+
+## Alle Felder (automatischer Test wie ein Mensch: eintippen → speichern → neu laden → gleiche Zahl in Feld, Speicher, Liste und Coach-Kontext; Nachtragen und Ändern)
+| Bereich | Felder | Eingabe-Varianten | Ergebnis |
+|---|---|---|---|
+| Laufen | Dauer, Distanz, Pace, Puls, max. Puls, Entkopplung, Effizienz, Kadenz, vert. Verhältnis, VO2max, Cardio-Erholung, Höhenmeter, Schrittlänge, Bodenkontakt, Leistung, Temperatur, Untergrund, Schuh | „1:05“, „10,5 km“, „152 bpm“, „3 %“, „-2,1“, „102“/„1,05 m“, „-3 °C“ | ✅ |
+| Rad | Dauer, Distanz, Ø/max. Watt, Trittfrequenz, Puls, Wo, Rad, Tempo, Normalized Power, Höhenmeter, Temperatur, Kohlenhydrate, Trinken | „27,4 km/h“, „216 W“, „0,75 l“ | ✅ |
+| Schwimmen | Dauer, Distanz, Pace Kraul/Brust, Züge/Bahn, Züge/min, m/Zug, Kraul/Pull Buoy am Stück, Kraul-Anteil, Technik, Puls, SWOLF, Becken, Hilfsmittel | „1.500“, „1,6 km“, „75 m“, „46 %“ | ✅ |
+| Kraft | Bereich, Dauer, Übungen | „1:05“ | ✅ |
+| Teamsport | Art, Minuten, Puls, Distanz, Sprints | | ✅ |
+| Intervalle | Strecke, Puls, Leistung, Tempo, Kadenz, RPE | „155,5“ (nicht mehr gerundet), „1,2 km“ | ✅ (Unit-Test) |
+| Morgenwerte | Schlaf, HFV, Ruhepuls, Temperatur, SpO2, Atemfrequenz, Tiefschlaf | „7:30“, „61 ms“, „1 h 20“ | ✅ |
+| Profil | Größe, Gewicht, Geburtsjahr | „1,80 m“, „72,5 kg“, „197“ (abgelehnt) | ✅ |
+| Essen | kcal, Kohlenhydrate, Eiweiß, Fett, Gewicht | „2.400“, „120 g“ | ✅ |
+| Fragebogen, Schwellen, Können, Teamsport | alle Zahlenfelder | gleiche Prüfung (Einheit, Grenzen, Meldung) | ✅ (Unit-Test) |
+Ungültige Eingaben (z. B. Puls 400, „150 kg“, Schrittlänge 10) → verständliche Meldung, der vorige Wert bleibt, auch nach dem Neuladen.
+
+## Damit es nicht wiederkommt
+- Vor jedem Release Pflicht (rot = kein Release): Feld-Tests, Coach-Prüfer (300 Fälle inkl. nachträglich korrigierter Werte), Überlauf-Test (alle Bildschirme, 320–430 px, hell/dunkel, große Schrift bis 33 px, lange Texte, große Zahlen), Abgleich-Tests, „Anders gemacht“-Tests, **Plan-Check aller Einheiten aller echten Nutzer** und Start-Test mit echten Daten.
+- Neue Regel in CLAUDE.md: Jedes neue Feld bzw. jeder neue Bildschirm bekommt sofort Eingabe-, Anzeige- und Überlauf-Tests.
+
+**Tests (ausgeführt):** Unit 3.102 grün (davon neu: 300 Coach-Fälle, 42 Plan-Fälle aller Anpassungsarten × Sportarten, Eingaben, „Anders gemacht“ in allen Sportarten), Browser-Tests 636 grün (Chromium + WebKit, neu: Felder, Überlauf bis 33 px Schrift, Abgleich, „Anders gemacht“). Release-Prüfung mit Kopien eurer echten Daten: Plan-Check 0 Widersprüche bei allen drei (692 Einheiten), alle laden fehlerfrei, App startet bei allen dreien (Update vom alten Stand und neues Gerät). Nach dem Release: 10 Minuten keine Startfehler. Gegenproben: Plan-Check und Dashboard-Test sind mit dem alten Code rot, mit dem neuen grün.
+
+---
+
 # Auftrag 28: Echte App startete bei dir nicht mehr (7.11.)
 
 **Stand:** Behoben und als **Version 3.16.0** veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). Mit Kopien eurer echten Daten starten alle drei (du, Papa, Mama) im Browser wie auf dem iPhone.
