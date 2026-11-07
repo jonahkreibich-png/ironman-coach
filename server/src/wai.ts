@@ -4,7 +4,7 @@ import { guardReadinessAnswer } from '../../shared/readiness';
    Regel-Coach (in der App). Ist das Kontingent leer oder gibt es einen Fehler, antwortet die App selbst mit dem Regel-Coach.
    Fair: jede Person höchstens WAI_MAX_PER_DAY Fragen (30) und höchstens ein Viertel des Tageskontingents.
    Oura-Daten gehen nie an die KI (aiSafeCtx). Planänderungen nur als Vorschlag. Zahlen nur aus Daten und Werkzeugen (Zahlen-Wächter). */
-import { claimFacts, unsupportedClaims, fixCoachText } from '../../shared/coach/claims';
+import { claimFacts, unsupportedClaims, fixCoachText, checkValueClaims, valueFacts } from '../../shared/coach/claims';
 import { type Env, berlinDate } from './store';
 import { HttpError } from './http';
 import { aiSafeCtx, type ChatResult, type ChatStream } from './ai';
@@ -193,6 +193,8 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   // Auftrag 25: nur Vorschläge für den genannten Tag, keine doppelten
   if (props.length) { const kept = limitToMentioned(ctx, userMsg.text, props); if (!kept.length) { await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 }); throw new FallbackError('proposal for other day'); } props.splice(0, props.length, ...kept); }
   final = fixCoachText(cleanAnswer(final), ctx);
+  // Auftrag 29: jede genannte Zahl gegen die gespeicherten Ist-Werte
+  try { final = checkValueClaims(final, valueFacts(ctx), ctx.today).text || final; } catch (e) { /* unverändert */ }
   // Auftrag 25: Mit Vorschlag ist noch nichts geändert: Sätze wie „Ich habe den Lauf gekürzt.“ fallen weg, „Ich habe dir einen Vorschlag gemacht …“ bleibt
   if (props.length) { const kept = final.split(/(?<=[.!?])\s+/).filter(x => /vorschlag/i.test(x) || !claimsChange(x)); if (kept.length) final = kept.join(' '); }
   const bad = inventedNumbers(final, sources);

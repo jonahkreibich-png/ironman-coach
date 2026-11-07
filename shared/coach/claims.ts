@@ -8,6 +8,7 @@ import * as C from '../core';
 import type { EngineCtx } from './engine';
 import { doneItems, valsOf } from './review';
 import { sleepNeed } from '../profile';
+import { actualMetrics } from '../results';
 
 export interface ClaimFacts {
   /** längste Strecke Kraul am Stück (Einzelwert), bestätigt (in 2 Einheiten) und eigene Angabe im Profil */
@@ -247,4 +248,119 @@ export function fixCoachText(text: string, ctx?: { today: string; baseWeeks?: an
     return m;
   });
   return t.replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+/* ---------- Auftrag 29: jede Zahl einer Coach-Aussage gegen die gespeicherten Ist-Werte ----------
+   „Etappenziel erreicht, aerobe Entkopplung 4,5 %“ – eingetragen waren 3 %. Geprüft werden gemessene Werte, die als Ist behauptet werden
+   (Entkopplung, Puls, max. Puls, Ruhepuls, HFV, Schlaf, Pace, Leistung, Kadenz, RPE). Quelle sind die wirksamen Werte (Hand vor Uhr vor
+   berechnet, shared/results.ts) des Tages, um den es geht (Datum/Wochentag/„heute“/„gestern“ im Satz, sonst der Tag der Nachricht).
+   Stimmt die Zahl nicht: genau ein gespeicherter Wert → Zahl wird berichtigt; keiner oder mehrere verschiedene → Satz fällt weg.
+   Ziele, Bereiche, Pläne, Durchschnitte und Bedingungen sind keine Ist-Behauptung. Läuft beim Anzeigen, also auch nach Korrekturen. */
+export interface ValueItem { date: string; sport: string; v: Record<string, number | null> }
+export interface ValueFacts { items: ValueItem[]; trend: Record<string, Record<string, number | null>> }
+const numOrNull = (x: any): number | null => { if (x == null || x === '') return null; const n = typeof x === 'number' ? x : Number(String(x).replace(',', '.')); return Number.isFinite(n) ? n : null; };
+export function valueFacts(ctx: EngineCtx, days = 21): ValueFacts {
+  const items: ValueItem[] = [];
+  for (const d of doneItems(ctx, C.addDays(ctx.today, -days), ctx.today)) {
+    const v: any = valsOf(d); const m: any = actualMetrics(d.st, d.act);
+    items.push({ date: d.date, sport: d.sport, v: { dec: numOrNull(v.dec), hr: numOrNull(v.hr), maxHr: numOrNull(m.maxHr), pace: numOrNull(v.pace), power: numOrNull(v.power), cadence: numOrNull(v.cadence), rpe: numOrNull(v.rpe) } });
+  }
+  const trend: ValueFacts['trend'] = {};
+  for (const p of (ctx.state.trend || []) as any[]) if (p && p.date >= C.addDays(ctx.today, -days)) trend[p.date] = { restingHR: numOrNull(p.restingHR), hrv: numOrNull(p.hrv), sleepHours: numOrNull(p.sleepHours) };
+  return { items, trend };
+}
+const LEAD = String.raw`(?:\s+(?:[a-zäöüß]{1,12}\.?|\d{1,2}\.\d{1,2}\.(?:\d{4})?)){0,5}?\s*:?\s*`;
+const VALUE_METRICS: { key: string; scope: 'session' | 'trend'; sport?: string; re: RegExp; sec?: boolean }[] = [
+  { key: 'dec', scope: 'session', re: new RegExp(String.raw`(?:aerobe[n]?\s+)?entkopplung` + LEAD + String.raw`(-?\d+(?:[.,]\d+)?)\s*%`, 'gi') },
+  { key: 'maxHr', scope: 'session', re: new RegExp(String.raw`max(?:\.|imale[rn]?)?\s*puls` + LEAD + String.raw`(\d{2,3})\b(?!\s*[-–]\s*\d)`, 'gi') },
+  { key: 'restingHR', scope: 'trend', re: new RegExp(String.raw`ruhepuls` + LEAD + String.raw`(\d{2,3})\b(?!\s*[-–]\s*\d)`, 'gi') },
+  { key: 'hr', scope: 'session', re: new RegExp(String.raw`(?<![a-zäöüß])(?<!max\.?\s?)(?:ø\s*|durchschnittliche[rn]?\s+)?puls` + LEAD + String.raw`(?:ø\s*)?(\d{2,3})(?:\s*(?:bpm|schläge))?\b(?!\s*[-–]\s*\d)`, 'gi') },
+  { key: 'hrv', scope: 'trend', re: new RegExp(String.raw`\b(?:hfv|hrv)` + LEAD + String.raw`(\d{1,3})\s*ms\b`, 'gi') },
+  { key: 'sleepHours', scope: 'trend', re: new RegExp(String.raw`\bschlaf` + LEAD + String.raw`(\d{1,2}(?:[.,]\d)?)\s*(?:h|std\.?|stunden)\b|(\d{1,2}(?:[.,]\d)?)\s*(?:h|std\.?|stunden)\s+(?:geschlafen|schlaf)\b`, 'gi') },
+  { key: 'pace', scope: 'session', sport: 'run', sec: true, re: new RegExp(String.raw`\b(?:pace|tempo)` + LEAD + String.raw`(\d{1,2}:\d{2})\s*(?:min)?\s*\/\s*km`, 'gi') },
+  { key: 'power', scope: 'session', re: new RegExp(String.raw`(?:ø\s*)?(?:leistung|watt)` + LEAD + String.raw`(\d{2,4})\s*(?:w|watt)\b`, 'gi') },
+  { key: 'cadence', scope: 'session', re: new RegExp(String.raw`(?:kadenz|trittfrequenz)` + LEAD + String.raw`(\d{2,3})\b(?!\s*[-–]\s*\d)`, 'gi') },
+  { key: 'rpe', scope: 'session', re: new RegExp(String.raw`\brpe` + LEAD + String.raw`(\d{1,2})\b(?!\s*[-–/]\s*\d)`, 'gi') }
+];
+// Ist-Behauptung nur mit Bezug auf Gemessenes; Ziele, Bereiche, Durchschnitte, Bedingungen und Pläne zählen nicht
+const MEASURED = /\b(war|waren|lag|lagen|hattest|hatte|hast|gemessen|eingetragen|erreicht|zeigte|zeigt|betrug|gelaufen|gefahren|geschwommen|dein|deine|deinem|deinen|deiner|zuletzt|gestern|vorgestern|heute morgen|heute früh|letzte[nrm]?)\b/i;
+const NOT_CLAIM = /\b(schnitt|durchschnitt der|im mittel|mittelwert|trend|basis|normalbereich|zielbereich|ziel|soll|sollte|solltest|halte|halten|bleib\w*|versuch\w*|höchstens|mindestens|zwischen|unter|über|bis zu|bis|ab|zone|schwelle|lthr|ftp|grenze|plan\w*|nächste\w*|morgen|wenn|falls|sobald|ob|etwa|ca|rund|ungefähr|prognose|score)\b|\?/i;
+const DOW_RE = /\b(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b/i;
+function refDates(s: string, ref: string): string[] {
+  const out: string[] = []; const y = +ref.slice(0, 4);
+  for (const m of s.matchAll(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})?/g)) { let yy = m[3] ? +m[3] : y; if (!m[3] && +m[2] > +ref.slice(5, 7) + 6) yy--; out.push(`${yy}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`); }
+  if (out.length) return out;
+  if (/\bvorgestern\b/i.test(s)) return [C.addDays(ref, -2)];
+  if (/\bgestern\b/i.test(s)) return [C.addDays(ref, -1)];
+  const w = DOW_RE.exec(s); if (w) { const idx = DOW_LONG.findIndex(x => x.toLowerCase() === w[1].toLowerCase()); for (let k = 0; k <= 7; k++) { const d = C.addDays(ref, -k); if (dowOfDate(d) === idx) return [d]; } }
+  return [];
+}
+const sportOfSentence = (s: string) => /\b(lauf|läufe|gelaufen|laufen|joggen)/i.test(s) ? 'run' : /\b(rad|ausfahrt|gefahren|radfahrt)/i.test(s) ? 'bike' : /schwimm/i.test(s) ? 'swim' : null;
+const secOf = (t: string) => { const m = /^(\d{1,2}):(\d{2})$/.exec(t); return m ? +m[1] * 60 + +m[2] : NaN; };
+const fmtSec = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+function fmtLike(v: number, sample: string): string {
+  const dec = ((/[.,](\d+)$/.exec(sample) || [])[1] || '').length;
+  const r = String(dec ? Number(v.toFixed(dec)) : Math.round(v * 10) / 10);
+  return r.replace('.', ',');
+}
+export interface ValueCheck { text: string; corrected: string[]; dropped: string[] }
+export function checkValueClaims(text: string, f: ValueFacts, refDate: string): ValueCheck {
+  const corrected: string[] = [], dropped: string[] = [];
+  // nicht nach einem Datum („am 5.11. war …“) trennen
+  const parts = String(text || '').split(/((?<=[.!])(?<!\b\d{1,2}\.\d{1,2}\.)(?<!\b\d{1,2}\.)\s+|\n)/);
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!part || !part.trim()) { out.push(part || ''); continue; }
+    let s = part; let drop = false;
+    // Klammern („(Ziel war 5 %)“) zählen nicht; Positionen bleiben gleich
+    const masked = s.replace(/\([^()]*\)/g, m => ' '.repeat(m.length));
+    if (!MEASURED.test(masked)) { out.push(s); continue; }
+    const edits: { at: number; len: number; to: string }[] = [];
+    for (const M of VALUE_METRICS) {
+      M.re.lastIndex = 0;
+      for (const m of masked.matchAll(M.re)) {
+        const numTxt = m[1] || m[2]; if (!numTxt) continue;
+        const at = (m.index || 0) + m[0].lastIndexOf(numTxt);
+        if (edits.some(e => e.at === at)) continue;
+        // Satzteil um die Zahl: Ziel/Bereich/Durchschnitt → keine Behauptung
+        const from = Math.max(masked.lastIndexOf(',', at), masked.lastIndexOf(';', at)) + 1;
+        const toC = [masked.indexOf(',', at), masked.indexOf(';', at)].filter(x => x >= 0);
+        const clause = masked.slice(from, toC.length ? Math.min(...toC) : masked.length);
+        if (NOT_CLAIM.test(clause)) continue;
+        const stated = M.sec ? secOf(numTxt) : +numTxt.replace(',', '.');
+        if (!Number.isFinite(stated)) continue;
+        const dates = refDates(masked, refDate); const sport = M.sport || sportOfSentence(masked);
+        let vals: number[] = [];
+        if (M.scope === 'trend') {
+          const ds = dates.length ? dates : [refDate, C.addDays(refDate, -1)];
+          for (const d of ds) { const v = f.trend[d] && f.trend[d][M.key]; if (v != null) { vals.push(v); break; } }
+        } else {
+          const pick = (ds: string[]) => f.items.filter(x => ds.includes(x.date) && (!sport || x.sport === sport) && x.v[M.key] != null).map(x => x.v[M.key] as number);
+          vals = pick(dates.length ? dates : [refDate]);
+          if (!vals.length && !dates.length) { const recent = f.items.filter(x => x.date <= refDate && x.date >= C.addDays(refDate, -7) && (!sport || x.sport === sport) && x.v[M.key] != null).sort((a, b) => b.date.localeCompare(a.date)); if (recent.length) vals = [recent[0].v[M.key] as number]; }
+        }
+        const dec = ((/[.,](\d+)$/.exec(numTxt) || [])[1] || '').length;
+        const tol = M.sec ? 2 : M.key === 'hr' || M.key === 'maxHr' || M.key === 'restingHR' ? 1 : dec ? 0.5 * Math.pow(10, -dec) + 1e-9 : 0.5;
+        if (vals.some(v => Math.abs(v - stated) <= tol)) continue;
+        const uniq = [...new Set(vals.map(v => M.sec ? fmtSec(v) : fmtLike(v, numTxt)))];
+        // eine Wertung („nur 6 h“, „zu wenig“) passt nicht mehr zur berichtigten Zahl → Satz weglassen statt schief berichtigen
+        if (uniq.length === 1 && /\b(nur|lediglich|zu wenig|zu kurz|zu hoch|zu niedrig|wenig|kaum|deutlich|sehr|stark)\b/i.test(clause)) drop = true;
+        else if (uniq.length === 1) { edits.push({ at, len: numTxt.length, to: uniq[0] }); corrected.push(`${numTxt} → ${uniq[0]}`); }
+        else drop = true;
+      }
+    }
+    if (drop) { dropped.push(part.trim()); continue; }
+    for (const e of edits.sort((a, b) => b.at - a.at)) s = s.slice(0, e.at) + e.to + s.slice(e.at + e.len);
+    out.push(s);
+  }
+  const res = out.join('').replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return { text: res, corrected, dropped };
+}
+/* Ein Prüfer für jede Coach-Nachricht (Regel-Coach, Server, KI, Etappenziele) vor dem Anzeigen */
+export function verifyCoachText(text: string, ctx: EngineCtx, refDate?: string, facts?: { claims?: ClaimFacts; values?: ValueFacts }): string {
+  if (!text) return text;
+  let t = fixCoachText(text, ctx);
+  try { t = stripUnsupported(t, (facts && facts.claims) || claimFacts(ctx, refDate)); } catch (e) { /* Prüfung darf die Anzeige nie verhindern */ }
+  try { t = checkValueClaims(t, (facts && facts.values) || valueFacts(ctx), refDate || ctx.today).text; } catch (e) { /* dito */ }
+  return t || String(text).split(/(?<=[.!?])\s/)[0];
 }

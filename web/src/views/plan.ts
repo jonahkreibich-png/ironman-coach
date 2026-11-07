@@ -4,7 +4,7 @@ import { STATE, PLAN, UI, saveState, rebuildPlanIndex, currentWeekIdx, findDay, 
 import { esc, fmtDate, dowShort, dowLong, addDays, todayStr } from '../util';
 import { t, num, hours } from '../../../shared/i18n';
 import { on, sec, ic, pill, empty, more } from '../kit';
-import { metaLine, statusIcon, sessionTitle } from './session';
+import { metaLine, statusIcon, sessionTitle, plannedHtml } from './session';
 import { editBar, editing, canUndoGroups } from './planedit';
 import { sportIc, gearChips } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
@@ -49,7 +49,7 @@ function planRow(s: any): string {
   const check = status === 'done' || status === 'open' || status === 'missed'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   const badge = s._adj && s._adj.length ? ' ' + pill(s.movedFrom ? t('st.moved') : t('st.adjusted'), 'warn') : '';
-  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${gearChips(s)}${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
+  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${plannedHtml(s, st)}${gearChips(s)}${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
 }
 
 export function renderPlan(): string {
@@ -138,7 +138,7 @@ function weekMix(w: any, today: string): string {
     const sum = x.rest ? `<span class="muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span>`
       : !x.summary.active.length ? `<span class="muted">${esc(t('st.cancelled'))}</span>` : x.summary.active.map(({ session: s, completed }: any) => `<span title="${esc(completed ? t('sess.isDone') : s.title)}" class="pm-si" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('') + `<span class="pm-st">${esc(shortTitles(x))}</span>`;
     return `<div class="cday ${x.d.date === today ? 'today' : ''} ${open ? 'open' : ''} ${x.rest ? 'rest' : ''}" id="day-${x.d.date}" data-day="${x.d.date}">
-      <button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m" data-planned-minutes="${x.min}" aria-label="Soll ${x.min}${x.summary.unknownPlannedMinutes ? ' + ?' : ''} min; Ist ${x.summary.actualMinutes} min${x.summary.unknownActualMinutes ? '; Dauer offen bei weiteren Einheiten' : ''}">${x.min ? esc(mins(x.min)) : ''}${x.summary.unknownPlannedMinutes ? ' + ?' : ''}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span><span class="chev">${ic('down')}</span></button>
+      <div class="cday-hr"><button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m" data-planned-minutes="${x.min}" aria-label="Soll ${x.min}${x.summary.unknownPlannedMinutes ? ' + ?' : ''} min; Ist ${x.summary.actualMinutes} min${x.summary.unknownActualMinutes ? '; Dauer offen bei weiteren Einheiten' : ''}">${x.min ? esc(mins(x.min)) : ''}${x.summary.unknownPlannedMinutes ? ' + ?' : ''}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span><span class="chev">${ic('down')}</span></button><button class="cday-add" data-act="custom-add" data-date="${x.d.date}" aria-label="${esc('Extra-Einheit am ' + dowShort(x.d.date) + ' ' + shortDate(x.d.date) + ' hinzufügen')}" title="Extra-Einheit hinzufügen">${ic('plus')}</button></div>
       ${open ? `<div class="cday-b">${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div>` : ''}</div>`;
   }).join('');
   return `<div class="card pmix" data-plan-mix><div class="pm-bars">${bars}</div></div><div class="list cdays">${days}</div>`;

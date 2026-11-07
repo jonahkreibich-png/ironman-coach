@@ -8,7 +8,10 @@ import * as C from '../../shared/core';
 
 export function reviewMode(): 'full' | 'short' | 'off' { const m = (STATE.settings || {}).coachReview; return m === 'short' || m === 'off' ? m : 'full'; }
 let timer: any = null;
-export function reviewSoon(key: string, date: string, delay = 1500) { clearTimeout(timer); timer = setTimeout(() => { try { reviewNow(key, date); } catch (e) { /* Bewertung darf nie stören */ } }, delay); }
+let pendingReview: [string, string] | null = null;
+export function reviewSoon(key: string, date: string, delay = 1500) { clearTimeout(timer); pendingReview = [key, date]; timer = setTimeout(() => { pendingReview = null; try { reviewNow(key, date); } catch (e) { /* Bewertung darf nie stören */ } }, delay); }
+/* Auftrag 29: App wird verlassen oder neu geladen, bevor die verzögerte Bewertung lief → sofort bewerten (sonst blieb die alte stehen) */
+if (typeof document !== 'undefined') { const flush = () => { if (!pendingReview) return; const [k, d] = pendingReview; pendingReview = null; clearTimeout(timer); try { reviewNow(k, d); } catch (e) { /* egal */ } }; document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); }); window.addEventListener('pagehide', flush); }
 export function reviewNow(key: string, date: string): boolean {
   const mode = reviewMode(); if (mode === 'off') return false;
   invalidate();

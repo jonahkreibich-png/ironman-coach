@@ -8,6 +8,7 @@ import { on, onChange, srcBadge, more } from '../kit';
 import { toast } from '../toast';
 import { evaluateIntervals, plannedIntervals, actualRows, paceToSec, secToPace, IV_LIMITS, type IvRow, type IvEval, type IvTarget, type IvThresholds } from '../../../shared/intervals';
 import { setSessionMetricManual } from '../../../shared/activity/merge';
+import { parseInput } from '../../../shared/validate';
 
 export interface IvHost { rec: (tg: any) => any; put: (tg: any, next: any) => void; redraw: () => void; rev: (tg: any) => void; activities: () => Record<string, any>; thresholds: () => IvThresholds }
 let HOST: IvHost | null = null;
@@ -148,11 +149,13 @@ export function readIvValue(f: string, kind: string, raw: string, sport: string)
     if (s < lim[0] || s > lim[1]) return { ok: false, msg: `${secToPace(s)} min ist als ${f === 'restSec' ? 'Pause' : 'Dauer'} unrealistisch.` };
     return { ok: true, v: s };
   }
-  const n = parseFloat(v.replace(',', '.'));
-  if (!Number.isFinite(n) || !/^-?\d+([.,]\d+)?$/.test(v)) return { ok: false, msg: 'Bitte eine Zahl eingeben.' };
-  const lim = IV_LIMITS[f];
-  if (lim && (n < lim[0] || n > lim[1])) return { ok: false, msg: f === 'hr' || f === 'maxHr' || f === 'restHr' ? `Puls ${n} ist unrealistisch (möglich: 30 bis 230).` : f === 'rpe' ? 'RPE geht von 1 (sehr leicht) bis 10 (maximal).' : `${n} ist hier unrealistisch (möglich: ${lim[0]} bis ${lim[1]}).` };
-  return { ok: true, v: f === 'speed' ? Math.round(n * 10) / 10 : Math.round(n) };
+  // Auftrag 29: dieselbe Prüfung wie überall, ohne stilles Runden (vorher wurde z. B. 155,5 bpm still zu 156)
+  const lim = IV_LIMITS[f] || [-1e9, 1e9];
+  const IV: Record<string, [string, string?, Record<string, number>?]> = { m: ['Strecke', 'm', { km: 1000 }], hr: ['Ø Puls', 'bpm'], maxHr: ['max. Puls', 'bpm'], restHr: ['Puls in der Pause', 'bpm'], power: ['Leistung', 'W'], speed: ['Tempo', 'km/h'], cad: ['Kadenz', '/min', { spm: 1, rpm: 1 }], spl: ['Züge pro Bahn'], rpe: ['RPE'] };
+  const d = IV[f] || ['Wert'];
+  const r = parseInput({ label: d[0], unit: d[1], units: d[2], min: lim[0], max: lim[1], int: f === 'rpe' || f === 'm' }, v);
+  if (!r.ok) return { ok: false, msg: r.msg! };
+  return { ok: true, v: r.value };
 }
 onChange('iv', el => {
   if (!HOST) return; const tg = tgOf(el); const i = +el.dataset.i!; const f = el.dataset.f!;

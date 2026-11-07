@@ -94,7 +94,8 @@ test('Netzwerk-/Datenbankfehler wird angezeigt, lokale Werte bleiben nach Reload
  await page.locator('button[data-act="sheet-close"]').click();
  await page.route('**/api/sync',route=>route.fulfill({status:500,json:{error:'synthetic database write failure'}}));
  await editMetric(page,'72');await page.locator('button[data-act="sheet-close"]').click();await page.locator('[data-act="go-tab"][data-tab="heute"]').click();
- await expect(page.locator('[data-sync-status]').first()).toContainText(/Fehler|fehlgeschlagen/i,{timeout:15000});
+ // Auftrag 29: Serverfehler (5xx) sind Aussetzer: still wiederholen, die Meldung kommt erst nach 2 Minuten (eigener Test auftrag29-sync.spec.ts)
+ await expect.poll(()=>page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('ec_sync')||'{}').pending||{}).length),{timeout:15000}).toBeGreaterThan(0);
  await page.reload();await page.goto('/?go=plan');await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).click();await expect(page.locator('#fd-min')).toHaveValue('72');
  await page.unroute('**/api/sync');await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await expect.poll(async()=>{

@@ -41,7 +41,9 @@ import { initTabLens } from './tablens';
 import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
-import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState } from './sync';
+import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState, retrySync } from './sync';
+/* Auftrag 29: „Erneut versuchen“ in der Abgleich-Meldung */
+on('sync-retry', () => { void retrySync().then(ok => toast(ok ? 'Alles gesichert.' : 'Noch nicht gesichert – ich versuche es automatisch weiter. Deine Einträge bleiben auf dem Gerät.')); });
 import { checkSwimSkill } from './testupdate';
 
 initErrorLog();

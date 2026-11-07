@@ -3,6 +3,8 @@ import {effectiveCustomWorkouts} from '../store';
    Essen per Foto ist vorbereitet: ohne KI-Coach geht Foto und Frage per Teilen-Menü an die Claude-App. */
 import { STATE, saveState, findDay, UI } from '../store';
 import { esc, fmtDate, dowShort, dowLong, addDays, parseNum, todayStr } from '../util';
+import { INPUTS } from '../../../shared/validate';
+import { readNumberInput } from '../kit';
 import { t, num, weight } from '../../../shared/i18n';
 import { D } from '../data';
 import { on, onChange, sec, field, select, ic, more, openSheet, closeSheet, refreshSheet } from '../kit';
@@ -106,7 +108,7 @@ function photoSheet(): string {
 function setFood(date: string, patch: any) { STATE.nutrition[date] = { ...(STATE.nutrition[date] || {}), ...patch }; saveState(); nav.rerender(); }
 onChange('food-date', el => { UI.foodDate = (el as HTMLInputElement).value || todayStr(); nav.rerender(); });
 onChange('food-type', el => { const v = (el as HTMLSelectElement).value; setFood(UI.foodDate || D().today, { typeOverride: v === 'auto' ? null : v }); });
-onChange('food-field', el => { const k = el.dataset.k!; const n = parseNum((el as HTMLInputElement).value); setFood(UI.foodDate || D().today, { [k]: n == null || n < 0 ? null : n, ...(k === 'weight' ? { weightManual: true } : {}) }); });
+onChange('food-field', el => { const k = el.dataset.k!; const n = INPUTS.food[k] ? readNumberInput(el, INPUTS.food[k]) : parseNum((el as HTMLInputElement).value); if (n === undefined) return; setFood(UI.foodDate || D().today, { [k]: n, ...(k === 'weight' ? { weightManual: true } : {}) }); });
 on('food-edit', () => openSheet(t('food.enter'), editSheet));
 on('food-add', el => {
   const m = mealsFor(el.dataset.cat!).find(x => x.n === el.dataset.n); if (!m) return;

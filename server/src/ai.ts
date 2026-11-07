@@ -5,7 +5,7 @@
    Ohne das läuft nur die Regel-Engine. Budget: Monatsbudget und Höchstzahl an Nachrichten pro Tag. */
 import { readinessSnapshot, withheldReadiness, guardReadinessAnswer } from '../../shared/readiness';
 import * as C from '../../shared/core';
-import { claimFacts, stripUnsupported, fixCoachText } from '../../shared/coach/claims';
+import { claimFacts, stripUnsupported, fixCoachText, checkValueClaims, valueFacts } from '../../shared/coach/claims';
 import Anthropic from '@anthropic-ai/sdk';
 import { type Env, berlinDate, putRecords, getRecord, userEntitlements } from './store';
 import { needsParentConsent } from '../../shared/features';
@@ -197,6 +197,8 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen; unbelegte Sätze werden nicht gezeigt
   let shown = finalText || 'Erledigt.'; try { shown = stripUnsupported(shown, claimFacts(ctx)) || shown; } catch (e) { /* unverändert */ }
   shown = fixCoachText(guardReadinessAnswer(shown, text, ctx0), ctx) || 'Erledigt.';
+  // Auftrag 29: jede genannte Zahl gegen die gespeicherten Ist-Werte
+  try { shown = checkValueClaims(shown, valueFacts(ctx), ctx.today).text || shown; } catch (e) { /* unverändert */ }
   if (live) { live.reset(); shown.split(/(?<=\s)/).forEach(t => live.delta(t)); }
   out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown, aiExcluded: shown.startsWith('Ampel der App:') });
   { const props = out.messages.filter(m => m.kind === 'proposal'); const merged = mergeSwapProposals(props as any[]).map((m: any) => ({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx) })); out.messages = [...out.messages.filter(m => m.kind !== 'proposal'), ...merged]; }

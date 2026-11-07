@@ -7,7 +7,7 @@ import type { Profile, SportKey } from './profile';
 import { isMinor, progressionOf } from './profile';
 import type { Goal } from './goals';
 import { mainGoal } from './goals';
-import { addDays } from './core';
+import { addDays, sessionTitleIssue } from './core';
 import { validateWeeks, isIntense } from './rules';
 import * as W from './workouts';
 import { abilityCap, dayCap, freqOf, teamActive } from './plangen';
@@ -124,6 +124,39 @@ export function checkPlan(weeks: any[], profile: Profile, goals: Goal[], today: 
 }
 
 /* Eine Einheit: Titel, Dauer, Distanz und Beschreibung aus denselben Zahlen? Pace × Distanz ≈ Dauer? */
+/* Auftrag 29: Titel, Beschreibung, Dauer, Distanz und Summe der Bausteine einer Einheit müssen übereinstimmen.
+   Gilt für den wirksamen Plan (nach allen Anpassungen). Pflicht vor jedem Release für alle Einheiten aller Nutzer. */
+export function consistencyIssues(s: any): string[] {
+  const out: string[] = [];
+  if (!s || s.sport === 'rest' || s.race || s.cancelled || s.removed) return out;
+  const min = typeof s.plannedMinutes === 'number' ? s.plannedMinutes : null;
+  const spec: W.Spec | undefined = s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length ? s.spec : undefined;
+  const desc = String(s.description || '');
+  if (spec && spec.sport === s.sport && !['team', 'game', 'race'].includes(spec.kind)) {
+    const t = W.totals(spec);
+    if (min == null || Math.abs(t.min - min) > 1) out.push(`Dauer ${min ?? '–'} min, Bausteine ergeben ${t.min} min.`);
+    if (t.km != null && t.km > 0 && s.plannedKm != null && Math.abs(t.km - s.plannedKm) > 0.051) out.push(`Distanz ${s.plannedKm} km, Bausteine ergeben ${t.km} km.`);
+    if (['run', 'bike'].includes(s.sport) && spec.kind !== 'test') {
+      const g = /\bGesamt: (\d+) min/.exec(desc);
+      if (!g) out.push('Beschreibung ohne Bausteine und Gesamtdauer.');
+      else if (min != null && +g[1] !== min) out.push(`Beschreibung sagt ${g[1]} min, geplant sind ${min} min.`);
+      // Bausteine in der Beschreibung (Aufwärmen + Hauptteil + Auslaufen) zusammenzählen
+      const sum = W.totals({ ...spec, steps: spec.steps }).min;
+      if (g && Math.abs(sum - +g[1]) > 1) out.push(`Bausteine ergeben ${sum} min, Beschreibung sagt ${g[1]} min.`);
+    }
+    if (s.sport === 'swim') {
+      const sm = /\bSumme: ([\d.]+) m · ca\. (\d+) min/.exec(desc);
+      if (!sm) out.push('Beschreibung ohne Summe.');
+      else {
+        if (min != null && Math.abs(+sm[2] - min) > 1) out.push(`Beschreibung sagt ${sm[2]} min, geplant sind ${min} min.`);
+        if (s.plannedKm != null && Math.abs(+sm[1].replace(/\./g, '') - s.plannedKm * 1000) > 1) out.push(`Beschreibung sagt ${sm[1]} m, geplant sind ${Math.round(s.plannedKm * 1000)} m.`);
+      }
+    }
+  }
+  const ti = sessionTitleIssue(s, spec || null); if (ti) out.push(ti);
+  return out;
+}
+
 export function checkSession(s: any, week?: number, date?: string): CheckIssue[] {
   const out: CheckIssue[] = [];
   const bad = (msg: string) => out.push({ rule: 'distance', week, date, msg: `${s.title}: ${msg}` });

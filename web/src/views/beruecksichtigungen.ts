@@ -6,7 +6,8 @@ import { profile, saveProfile, HAS_PLAN } from '../store';
 import { stage, draftProfile, stageBarHtml, lastApplied } from '../staged';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, sec, field, select, toggle } from '../kit';
+import { on, onChange, sec, field, select, toggle, readNumberInput } from '../kit';
+import { INPUTS } from '../../../shared/validate';
 import { BIKE_OPTIONS, SWIM_GEAR_OPTIONS } from '../../../shared/onboarding';
 import { invalidate } from '../data';
 import { replanFuture } from '../replan';
@@ -77,7 +78,8 @@ export function renderAusruestung(): string {
 onChange('cs', el => {
   const k = el.dataset.k!; const inp = el as HTMLInputElement;
   let v: any = el.dataset.bool ? inp.checked : inp.value;
-  if (el.dataset.num) v = v === '' ? null : +v;
+  if (el.dataset.num && INPUTS.skills[k]) { v = readNumberInput(el, INPUTS.skills[k]); if (v === undefined) return; }
+  else if (el.dataset.num) v = v === '' ? null : +v;
   if (k === 'poolM') v = v === '50' ? 50 : v === '25' ? 25 : v === 'both' ? 'both' : null;
   if (k === 'openWater' && v) { stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), openWater: true, openWaterFrom: (p.skills || {}).openWaterFrom || 6, openWaterTo: (p.skills || {}).openWaterTo || 9 }; }); return; }
   stage(SCREEN, (p: any) => { p.skills = { ...(p.skills || {}), [k]: v || (v === 0 ? 0 : null) }; });
@@ -108,4 +110,4 @@ on('ct-yes', el => stage(SCREEN, (p: any) => {
 }));
 on('ct-games', el => stage(SCREEN, (p: any) => { if (!p.teamSport) return; if (el.dataset.v === '1') p.teamSport = { ...p.teamSport, gameMinutes: p.teamSport.gameMinutes || 90 }; else p.teamSport = { ...p.teamSport, gameDays: [], gameMinutes: 0 }; }));
 on('ct-day', el => stage(SCREEN, (p: any) => { if (!p.teamSport) return; const k = el.dataset.k!; const d = +el.dataset.d!; const cur: number[] = p.teamSport[k] || []; p.teamSport = { ...p.teamSport, [k]: cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort() }; }));
-onChange('ct', el => { const k = el.dataset.k!; let v: any = (el as HTMLInputElement).value; if (el.dataset.num) { v = parseInt(v, 10); if (!(v >= 15 && v <= 240)) { toast(t('ob.range', { min: 15, max: 240 })); return; } } stage(SCREEN, (p: any) => { if (!p.teamSport) return; p.teamSport = { ...p.teamSport, [k]: v }; if (k === 'name') p.teamSportName = v; }); });
+onChange('ct', el => { const k = el.dataset.k!; let v: any = (el as HTMLInputElement).value; if (el.dataset.num) { v = readNumberInput(el, INPUTS.skills[k] || { label: 'Dauer', unit: 'min', min: 15, max: 240 }); if (v == null) return; } stage(SCREEN, (p: any) => { if (!p.teamSport) return; p.teamSport = { ...p.teamSport, [k]: v }; if (k === 'name') p.teamSportName = v; }); });

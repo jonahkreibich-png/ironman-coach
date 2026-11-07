@@ -14,7 +14,7 @@ test('Einheit: Felder je Sportart, RPE und Gefühl, Pulszone automatisch, Notiz 
   await openPlanSession(page, run.id);
   const sheet = page.locator('#sheetPanel');
   await expect(sheet.locator('[data-fields="run"]')).toBeVisible();
-  await expect(sheet.locator('#fd-km')).toHaveValue('5.07');
+  await expect(sheet.locator('#fd-km')).toHaveValue('5,07') // Auftrag 29: Anzeige mit deutschem Komma, gespeichert 5.07;
   await expect(sheet.locator('#fd-hr')).toHaveValue('153');
   await expect(sheet.locator('#fd-cadence')).toHaveValue('163');
   await expect(sheet.locator('[data-fields="run"] .src').first()).toContainText('Notiz');

@@ -12,6 +12,8 @@ import { toast } from './toast';
 import { STORAGE, API_BASE, APP_VERSION, APP_RELEASE } from './config';
 import { nav } from './nav';
 import { t } from '../../shared/i18n';
+import { SYNC_KINDS } from '../../shared/kinds';
+import { logError } from './errlog';
 
 const AUTH_KEY = STORAGE.syncAuth;
 /* Datensatz-Arten, die als Wörterbuch im Zustand liegen: kind → Feld */
@@ -24,7 +26,8 @@ function readJson(k, fb) { try { return JSON.parse(localStorage.getItem(k) || 'n
 function writeJson(k, v) { return localStorage.setItem(k, JSON.stringify(v)); }
 let AUTH = readJson(AUTH_KEY, null);
 let identityReady = !!AUTH?.userId && AUTH.userId === readJson(STORAGE.owner, null);
-const META = Object.assign({ cursor: 0, hashes: {}, pending: {}, lastSyncAt: null, offset: 0, lastError: null, base: {} }, readJson(META_KEY, {}));
+const META = Object.assign({ cursor: 0, hashes: {}, pending: {}, lastSyncAt: null, offset: 0, lastError: null, base: {}, held: {} }, readJson(META_KEY, {}));
+if (!META.held) META.held = {};
 if (!META.base) META.base = {};
 /* Auftrag 22: zuletzt mit dem Server abgeglichener Stand je Datensatz (für das feldweise Zusammenführen bei gleichzeitigen Änderungen) */
 const setBase = (k, kind, data, del) => { if (!MERGE_KINDS.has(kind)) return; if (del || data == null) delete META.base[k]; else META.base[k] = JSON.parse(JSON.stringify(data)); };
@@ -215,7 +218,56 @@ async function prepareSync(): Promise<boolean> {
       META.pending = pending; META.hashes = {...(stored.hashes || {})}; META.cursor = Math.max(META.cursor || 0, stored.cursor || 0);
     }
     return await drainSync();
-  } catch (e) { STATUS = 'error'; META.lastError = e.message; updateStatusEls(); return false; }
+  } catch (e) { failed(e, !identityReady && !navigator.onLine ? 'offline' : 'prepare'); return false; }
+}
+/* ---------- Auftrag 29: Fehler einordnen, still wiederholen, melden ----------
+   Kurze Aussetzer (kein Netz, Zeitüberschreitung, Server überlastet) werden still mit wachsendem Abstand nachgeholt. Angezeigt wird nur,
+   wenn Einträge länger als 2 Minuten nicht gesichert sind oder der Server etwas ablehnt – verständlich und mit „Erneut versuchen“.
+   Abgelehnte Datensätze bleiben auf dem Gerät (META.held) und blockieren den Rest nicht. Jeder echte Fehler geht ins Fehlerprotokoll. */
+let retryTimer: any = null, retryN = 0, failingSince = 0, maxBytes = 2500000;
+const logged: Record<string, number> = {};
+const transient = (e: any) => !e || !e.status || e.status === 408 || e.status === 425 || e.status === 429 || e.status >= 500;
+function failed(e: any, where: string) {
+  const temp = where === 'offline' || transient(e);
+  STATUS = temp ? 'offline' : 'error';
+  META.lastError = String((e && e.message) || e || '');
+  if (!failingSince) failingSince = Date.now();
+  // melden: echte Fehler sofort, Aussetzer erst, wenn sie über 10 Minuten anhalten (je Art höchstens einmal pro Stunde)
+  if (!temp || Date.now() - failingSince > 10 * 60000) {
+    const k = where + ':' + ((e && e.status) || 0) + ':' + META.lastError.slice(0, 50);
+    if (Date.now() - (logged[k] || 0) > 3600000) { logged[k] = Date.now(); logError('Abgleich: ' + ((e && e.status) ? 'HTTP ' + e.status + ' ' : '') + META.lastError + ' · ' + Object.keys(META.pending).length + ' offen', 'sync-' + where); }
+  }
+  clearTimeout(retryTimer);
+  const ms = [3000, 10000, 30000, 60000, 120000, 300000][Math.min(retryN++, 5)];
+  retryTimer = setTimeout(() => { if (typeof document === 'undefined' || document.visibilityState === 'visible') syncNow(); }, ms);
+  try { updateStatusEls(); } catch (x) { /* Anzeige */ }
+}
+function validRecord(c: any): boolean {
+  return !!c && (SYNC_KINDS as readonly string[]).includes(c.kind) && typeof c.key === 'string' && c.key.length > 0 && c.key.length <= 200 &&
+    Number.isFinite(c.updatedAt) && c.updatedAt > 0 && (c.deleted ? true : c.data !== undefined);
+}
+function hold(k: string, why: string) {
+  const r = META.pending[k]; if (!r) return;
+  META.held[k] = { ...r, heldWhy: String(why || '').slice(0, 200), heldAt: Date.now() }; delete META.pending[k];
+  logError('Abgleich: Datensatz zurückgehalten ' + k.split('|')[0] + ' · ' + String(why || '').slice(0, 80), 'sync-held');
+}
+function holdInvalid() { for (const [k, r] of Object.entries(META.pending)) if (!validRecord(r)) hold(k, 'Ungültiger Datensatz'); }
+/* höchstens 800 Datensätze und etwa 2,5 MB je Anfrage (Server nimmt bis 6 MB); ein einzelner zu großer Datensatz wird zurückgehalten */
+function batchOf(list: any[]): any[] {
+  const out: any[] = []; let bytes = 0;
+  for (const r of list) {
+    const n = JSON.stringify(r).length;
+    if (n > 5500000) { hold(r.kind + '|' + r.key, 'Datensatz zu groß'); continue; }
+    if (out.length && (out.length >= 800 || bytes + n > maxBytes)) break;
+    out.push(r); bytes += n;
+  }
+  return out;
+}
+/* „Erneut versuchen“: zurückgehaltene Datensätze noch einmal senden */
+export function retrySync(): Promise<boolean> {
+  for (const [k, r] of Object.entries(META.held || {}) as any[]) { if (!META.pending[k]) { const { heldWhy, heldAt, ...rec } = r; void heldWhy; void heldAt; META.pending[k] = { ...rec, updatedAt: Math.max(rec.updatedAt || 0, now()) }; } delete META.held[k]; }
+  retryN = 0; clearTimeout(retryTimer); saveMeta();
+  return syncNow();
 }
 async function drainSync(): Promise<boolean> {
   STATUS = 'syncing'; updateStatusEls();
@@ -227,7 +279,8 @@ async function drainSync(): Promise<boolean> {
     while ((more || again) && guard++ < 50) {
       again = false;
       detect();
-      const sent = Object.values(META.pending).slice(0, 800);
+      holdInvalid();
+      const sent = batchOf(Object.values(META.pending));
       const epoch = localStorage.epoch;
       const res = await api('POST', '/api/sync', { since: META.cursor || 0, changes: sent });
       if (epoch !== localStorage.epoch || localStorage.changing) throw new Error('Wiederherstellung hat den laufenden Abgleich ersetzt.');
@@ -248,7 +301,7 @@ async function drainSync(): Promise<boolean> {
       more = !!res.more || Object.keys(META.pending).length > 0;
     }
     if (more || again) throw new Error('Synchronisierung noch nicht vollstaendig. Bitte erneut versuchen.');
-    initialRemoteOnly = false; META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok';
+    initialRemoteOnly = false; META.lastSyncAt = Date.now(); META.lastError = null; STATUS = 'ok'; retryN = 0; failingSince = 0; clearTimeout(retryTimer);
     saveMeta();
     if (!await localStorage.settled()) throw new Error('Speicherbestaetigung fehlt. App offen lassen.');
     SYNCED.forEach(f => { try { f(); } catch (e) {} });
@@ -260,13 +313,19 @@ async function drainSync(): Promise<boolean> {
       AUTH = null; localStorage.removeItem(AUTH_KEY);
       toast('Anmeldung abgelaufen. Lokale Daten bleiben erhalten. Bitte erneut verbinden.');
     }
-    STATUS = (e.status && e.status !== 0) ? 'error' : 'offline';
-    META.lastError = e.message;
+    // Auftrag 29: vom Server abgelehnter Datensatz blockiert nicht mehr alles – er bleibt auf dem Gerät (zurückgehalten), der Rest geht hoch
+    const bad = e.status === 400 && /Ungültiger Datensatz: ([^/]+)\/(.+)$/.exec(String(e.message || ''));
+    let retryNow = false;
+    if (bad && META.pending[bad[1] + '|' + bad[2]]) { hold(bad[1] + '|' + bad[2], e.message); retryNow = true; }
+    if (e.status === 413 && maxBytes > 50000) { maxBytes = Math.max(50000, Math.floor(maxBytes / 2)); retryNow = true; }
+    failed(e, 'sync');
+    if (retryNow) setTimeout(() => syncNow(), 50);
     return false;
   } finally {
     again = false; saveMeta();
-    if (appliedAny) afterRemoteApply(routine);
-    updateStatusEls();
+    // Auftrag 29: Ein Fehler beim Neuzeichnen nach dem Abgleich ist kein Abgleich-Fehler (3.15.0: Startfehler → dauerhaft „Abgleich fehlgeschlagen“)
+    if (appliedAny) { try { afterRemoteApply(routine); } catch (x) { logError('Nach dem Abgleich: ' + (x && (x as any).message), 'sync-apply'); } }
+    try { updateStatusEls(); } catch (x) { /* Anzeige */ }
   }
 }
 /* Auftrag 26: Neuer Plan vom Server (anderes Gerät, automatische Anpassung) lud bisher nach 0,9 s die ganze Seite neu – beim Öffnen
@@ -339,7 +398,7 @@ function disconnect(silent?) {
 /* ---------- Für die Bildschirme ---------- */
 export const isSyncOn = () => !!AUTH;
 export { deviceName };
-export function syncInfo() { return { status: STATUS, lastSyncAt: META.lastSyncAt, pending: Object.keys(META.pending).length, lastError: META.lastError, deviceId: AUTH && AUTH.deviceId, intervals: META.intervals || null }; }
+export function syncInfo() { return { status: STATUS, lastSyncAt: META.lastSyncAt, held: Object.keys(META.held || {}).length, pending: Object.keys(META.pending).length, lastError: META.lastError, deviceId: AUTH && AUTH.deviceId, intervals: META.intervals || null }; }
 /* Allgemeiner Server-Aufruf mit Geräte-Schlüssel. Fehlermeldungen kommen schon deutsch vom Server. */
 export async function apiCall(method: string, path: string, body?: any): Promise<any> {
   if (!AUTH) throw Object.assign(new Error(t('sync.notConnected')), { status: 0 });
@@ -512,6 +571,13 @@ export function ago(ts: number) {
   const h = Math.floor(m / 60); if (h < 24) return t('sync.hAgo', { n: h });
   return fmtDate(ymd(new Date(ts)));
 }
+/* Auftrag 29: verständlich, mit Anzahl (z. B. „Deine letzten 2 Einträge sind noch nicht gesichert – Internet prüfen“) */
+export function problemText(): string {
+  const held = Object.keys(META.held || {}).length, pend = Object.keys(META.pending).length;
+  if (held) return held === 1 ? '1 Eintrag konnte nicht gesichert werden. Er bleibt auf diesem Gerät.' : held + ' Einträge konnten nicht gesichert werden. Sie bleiben auf diesem Gerät.';
+  if (pend) return (pend === 1 ? 'Dein letzter Eintrag ist' : 'Deine letzten ' + pend + ' Einträge sind') + ' noch nicht gesichert – ' + (navigator.onLine ? 'Internet prüfen' : 'du bist offline') + '.';
+  return 'Abgleich gerade nicht möglich – Internet prüfen.';
+}
 export function statusText() {
   if (!AUTH) return '';
   const pend = Object.keys(META.pending).length;
@@ -525,22 +591,23 @@ export function statusText() {
 function statusClass() { return STATUS === 'offline' || STATUS === 'error' ? 'warn' : 'ok'; }
 /* Auftrag 26: Eine Warteschlange ist normal (jede Änderung steht kurz darin, bis der Abgleich sie abholt). Angezeigt wird sie erst,
    wenn sie länger als 20 s wartet – sonst blitzte die Leiste bei jedem Speichern auf und schob den Inhalt nach unten. */
-const STALE_MS = 20000;
+const STALE_MS = 120000;
 function stalePending(): boolean { const t0 = now() - STALE_MS; return Object.values(META.pending).some((p: any) => !p || !(p.updatedAt > t0)); }
-function showProblem(): boolean { return !!AUTH && (STATUS === 'error' || STATUS === 'offline' || stalePending()); }
+// nur echte Probleme: zurückgehaltene Einträge oder Einträge, die länger als 2 Minuten nicht gesichert sind (kurze Aussetzer still)
+function showProblem(): boolean { return !!AUTH && STATUS !== 'syncing' && (Object.keys(META.held || {}).length > 0 || stalePending() || (STATUS === 'error' && Object.keys(META.pending).length > 0)); }
 let shownProblem = false;
 function updateStatusEls() {
   // Problem entsteht oder ist behoben: Ansichten mit Statuszeile (syncStatusLine) sanft nachziehen
   const problem = showProblem();
   if (problem !== shownProblem) { shownProblem = problem; try { nav.refresh(); } catch (e) { /* vor dem Start */ } }
   const global = document.getElementById?.('global-sync-status');
-  if (global) { const hide = !showProblem(); if (global.hidden !== hide) global.hidden = hide; const txt = statusText(); if (global.textContent !== txt) global.textContent = txt; }
+  if (global) { const hide = !showProblem(); if (global.hidden !== hide) global.hidden = hide; const txt = hide ? '' : problemText(); if (global.dataset.txt !== txt) { global.dataset.txt = txt; global.innerHTML = txt ? '<span class="grow">' + esc(txt) + '</span> <button class="btn sm" data-act="sync-retry">Erneut versuchen</button>' : ''; } }
   document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = statusText(); el.className = 'sync-st ' + statusClass(); });
 }
 /* Nur sichtbar, wenn etwas nicht stimmt (offline, Fehler, Warteschlange) */
 export function syncStatusLine() {
   if (!showProblem()) return '';
-  return `<div class="sync-line"><span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span></div>`;
+  return `<div class="sync-line"><span class="sync-st warn">${esc(problemText())}</span> <button class="btn ghost sm" data-act="sync-retry">Erneut versuchen</button></div>`;
 }
 export function syncStatusBadge() { return AUTH ? `<span class="sync-st ${statusClass()}" data-sync-status>${esc(statusText())}</span>` : ''; }
 

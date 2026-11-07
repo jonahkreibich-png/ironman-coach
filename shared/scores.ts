@@ -1,5 +1,5 @@
 import {effectiveCustomBuckets} from './custom-state26';
-import { actualMetrics, crawlOf } from './results';
+import { actualMetrics, crawlOf, actualTitle, actualSport, plannedLoadDropped } from './results';
 /* Leistungs-Scores je Sportart (Auftrag 12): feste Leistungsskala 0-100 statt „Anteil am Ziel“.
    20 = Einsteiger, 50 = solider Hobbysportler, 70 = stark, 85 = Spitzenamateur, 100 = Elite; alters- und geschlechtsbereinigt, wenn bekannt.
    Kein Abschneiden bei 100 mehr: wer besser wird, steigt weiter.
@@ -890,7 +890,13 @@ function addMarks(sport: ScoreSport, now: ReturnType<typeof scoreAt>, past: Retu
     const rate = q && q.raw ? (lower ? (q.raw - p.raw) / q.raw : (p.raw - q.raw) / q.raw) : 0;
     let st = inp.stages && inp.stages[id];
     const hit = st && (lower ? p.raw <= st.target : p.raw >= st.target);
-    if (st && hit) { reached.push({ key: id, text: `${SPORT_LABEL[sport]}: Etappenziel erreicht, ${p.label} ${fmt(p.raw)} (Ziel war ${fmt(st.target)}).` }); st = undefined; }
+    if (st && hit) {
+      // Auftrag 29: die Entkopplung ist ein gewichteter Schnitt mehrerer Einheiten – so benennen und den zuletzt eingetragenen Wert dazu
+      // (vorher klang „aerobe Entkopplung 4,5 %“ wie der heutige Wert, eingetragen waren 3 %)
+      let text = `${SPORT_LABEL[sport]}: Etappenziel erreicht, ${p.label}${p.key === 'dec' ? ` im Schnitt deiner letzten ${sport === 'run' ? 'Läufe' : 'Fahrten'}` : ''} ${fmt(p.raw)} (Ziel war ${fmt(st.target)}).`;
+      if (p.key === 'dec') { const last = inp.activities.filter(a => a.sport === sport && a.decouplingPct != null && a.date <= inp.today).sort((x, y) => y.date.localeCompare(x.date))[0]; if (last) text += ` Zuletzt eingetragen: ${fmt(last.decouplingPct!)} am ${last.date.slice(8, 10)}.${last.date.slice(5, 7)}.`; }
+      reached.push({ key: id, text }); st = undefined;
+    }
     if (st && st.set < addDays(inp.today, -70)) st = undefined;
     if (!st) { const nx = nextFor(sport, p, rate); if (nx != null && nx !== p.raw) st = { target: nx, from: p.raw, set: inp.today }; }
     if (st) { stages[id] = st; p.marks.push({ kind: 'next', label: 'Nächstes Etappenziel', raw: st.target, text: `Nächstes Etappenziel: ${fmt(st.target)}`, done: false, pos: posOf(sport, p.key, st.target, now.c, extra) }); }
@@ -1009,7 +1015,7 @@ function testLap(sport: string, m: any): any[] {
 /* Erledigte geplante Einheiten mit Aufzeichnung: der Name der Einheit aus dem Plan (z. B. „Radtest 20 min“), wenn die Uhr keinen hat */
 export function namedFromPlan(state: any, weeks: any[], acts: Activity[]): Activity[] {
   const title = new Map<string, string>();
-  planDays(weeks).forEach(d => d.sessions.forEach((s: any) => { const st = (state.sessions || {})[s.id]; if (st && st.activityId && s.title) title.set(st.activityId, s.title); }));
+  planDays(weeks).forEach(d => d.sessions.forEach((s: any) => { const st = (state.sessions || {})[s.id]; if (st && st.activityId && s.title) title.set(st.activityId, actualTitle(s, st)); }));
   return acts.map(a => a.name || !title.has(a.id) ? a : { ...a, name: title.get(a.id)! });
 }
 /* Alte Einträge ohne Aufzeichnung (Werte von Hand oder von intervals.icu) als einfache Aktivitäten, damit sie zählen */
@@ -1045,7 +1051,7 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {})
     } as Activity);
   };
-  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, s.sport, st.metrics || {}, s.title, { ...st, zone: s.zone, race: !!s.race }, s.plannedMinutes); }));
+  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, actualTitle(s, st), { ...st, zone: plannedLoadDropped(st) ? 'Zone 2' : s.zone, race: !!s.race }, s.plannedMinutes); }));
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
   return out;
 }

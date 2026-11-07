@@ -20,6 +20,8 @@ import { dataCheck } from '../shared/datacheck';
 import { mainGoal } from '../shared/goals';
 import { localDate } from '../shared/tz';
 import * as C from '../shared/core';
+import { consistencyIssues } from '../shared/plancheck';
+import { checkValueClaims, valueFacts } from '../shared/coach/claims';
 
 export async function releaseDataCheck(src: string, today = localDate()): Promise<{ ok: boolean; users: any[]; migrated: string[]; counts: { before: number; after: number } }> {
   const file = src.endsWith('.sqlite') ? src : src.replace(/\.sql$/, '') + '-releasecheck.sqlite';
@@ -54,6 +56,19 @@ export async function releaseDataCheck(src: string, today = localDate()): Promis
           if (e) iv++;
         }
         stats.intervalSessions = iv;
+        // Auftrag 29: Plan-Check – Titel, Beschreibung, Dauer, Distanz und Summe der Bausteine jeder Einheit stimmen überein (Pflicht)
+        await step('Plan-Check', () => {
+          const bad: string[] = []; let n = 0;
+          for (const d of C.planDays(C.applyAdjustments(L.baseWeeks, L.state.adjustments || {}))) for (const s of d.sessions) { if (s.sport === 'rest' || s.cancelled) continue; n++; const is = consistencyIssues(s); if (is.length) bad.push(d.date + ' ' + s.title + ': ' + is.join(' / ')); }
+          stats.planSessions = n;
+          if (bad.length) throw new Error(bad.length + ' Einheit(en) widersprüchlich: ' + bad.slice(0, 3).join(' | '));
+        });
+        // Auftrag 29: Coach-Prüfer gegen die echten Daten – jede gespeicherte Coach-Nachricht wird geprüft (Zählung, kein Abbruch: die App berichtigt beim Anzeigen)
+        await step('Coach-Prüfer', () => {
+          const f = valueFacts(ctx, 60); let fixed = 0;
+          for (const m of Object.values(L.state.coachMsgs || {}) as any[]) { if (!m || m.from === 'user' || !m.text) continue; const r = checkValueClaims(m.text, f, m.date || today); fixed += r.corrected.length + r.dropped.length; }
+          stats.coachFixed = fixed;
+        });
         await step('Daten-Check', () => { const r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today }); stats.findings = r.findings.length; stats.safeFixes = r.fixes.length; });
       }
       await step('Scores', () => { const acts = [...namedFromPlan(L.state, L.baseWeeks, C.recordedActivities(L.state)), ...legacyActivities(L.state, L.baseWeeks, L.profile)] as any[]; const chosen = ['swim', 'bike', 'run', 'strength'].filter(x => ((L.profile && L.profile.sports) || []).includes(x)); // wie die App (Auftrag 24): nur gewählte Sportarten

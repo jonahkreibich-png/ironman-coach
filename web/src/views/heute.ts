@@ -6,12 +6,13 @@ import { STATE, UI, PLAN, findDay, BASE_WEEKS, profile } from '../store';
 import { activeInjury } from '../../../shared/coach/ops';
 import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
 import { t, tn, num, duration } from '../../../shared/i18n';
-import { D, RETURN_STAGES } from '../data';
+import { D, RETURN_STAGES, coachText } from '../data';
 import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed, safeBlock } from '../kit';
 import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '../domain';
 import { saveState } from '../store';
 import { toast } from '../toast';
-import { sessionRow, metaLine, doneLine } from './session';
+import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml } from './session';
+import { changedOf } from '../../../shared/results';
 import { openCheckin } from './werte';
 import { nav } from '../nav';
 import { SPORT_COLOR, sportIcon } from '../icons';
@@ -69,7 +70,7 @@ function answerCard(): string {
     const st = sessState(x.id); const status = effStatus(x);
     return `<div class="session-hero ${st.completed ? 'done' : ''}" style="--c:${SPORT_COLOR[x.sport]}">
       <button class="row grow" data-act="sess-open" data-sid="${esc(x.id)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px"><span class="ic">${sportIcon(x.sport)}</span>
-      <span class="grow"><span class="t">${esc(x.title)}</span>${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
+      <span class="grow"><span class="t">${esc(sessionTitle(x, st))}</span>${plannedHtml(x, st)}${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
       ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}</div>`;
   }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t(beforeStart ? 'plan.beforeStart' : 'heute.restDay'))}</span><br><span class="m">${esc(t(beforeStart ? 'heute.startsSoon' : 'heute.restLine'))}</span></span></div>`;
   return `<div class="answer l${s.level}">
@@ -128,7 +129,7 @@ function nextRows(): string {
   // Zuletzt erledigt
   const last = d.activities.filter(a => a.date <= d.today).sort((a, b) => b.startMs - a.startMs)[0];
   const lastSess = [...(PLAN.weeks || [])].flatMap((w: any) => w.days.flatMap((x: any) => x.sessions.map((s: any) => ({ ...s, date: x.date })))).filter((s: any) => s.date <= d.today && sessState(s.id).completed).sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
-  if (lastSess) rows.push(li({ act: 'sess-open', data: { sid: lastSess.id }, icon: sportIcon(lastSess.sport), color: SPORT_COLOR[lastSess.sport], title: `${t('heute.last')}: ${doneLine(lastSess) ? lastSess.title.replace(/ \d+ min\b/, '') : lastSess.title}`, sub: `${dowShort(lastSess.date)} ${fmtDate(lastSess.date)} · ${doneLine(lastSess) || metaLine(lastSess)}`, value: srcBadge(sessState(lastSess.id).source) }));
+  if (lastSess) rows.push(li({ act: 'sess-open', data: { sid: lastSess.id }, icon: sportIcon(lastSess.sport), color: SPORT_COLOR[lastSess.sport], title: `${t('heute.last')}: ${changedOf(sessState(lastSess.id)) ? sessionTitle(lastSess) : doneLine(lastSess) ? lastSess.title.replace(/ \d+ min\b/, '') : lastSess.title}`, sub: `${dowShort(lastSess.date)} ${fmtDate(lastSess.date)} · ${doneLine(lastSess) || metaLine(lastSess)}`, value: srcBadge(sessState(lastSess.id).source) }));
   void last;
   const forgot = forgottenSessions();
   if (forgot.length) rows.push(li({ act: 'missed-open', icon: ic('info'), color: 'var(--warn)', title: tn('heute.open', forgot.length), sub: t('heute.openSub') }));
@@ -146,7 +147,7 @@ function coachPreview(): string {
   const msgs = Object.values(STATE.coachMsgs || {}).filter((m: any) => m && m.from !== 'user' && m.kind !== 'briefing').sort((a: any, b: any) => b.at - a.at);
   const m: any = msgs[0];
   if (!m || Date.now() - m.at > 3 * 86400000) return '';
-  return sec(t('heute.coach'), `<button class="card" data-act="go-tab" data-tab="coach"><div class="lbl">${esc(m.title || t('coach.title'))}</div><div class="small" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(m.text)}</div></button>`);
+  return sec(t('heute.coach'), `<button class="card" data-act="go-tab" data-tab="coach"><div class="lbl">${esc(m.title || t('coach.title'))}</div><div class="small" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(coachText(m))}</div></button>`);
 }
 
 function foodMini(): string {

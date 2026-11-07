@@ -33,7 +33,9 @@ describe('current day summary', () => {
     expect(summary.actualMinutes).toBe(75.5);
     expect(summary.extras.map(x => x.id)).toEqual(['extra', 'draft']);
     expect(summary.upcoming.map(x => x.id)).toEqual(['run', 'draft']);
-    expect(summary.plannedMinutes).toBe(130);
+    // Auftrag 29: eine erledigte Extra-Einheit ohne eigenen Sollwert zählt mit ihrer eingetragenen Dauer (vorher fehlte sie: „+ ?“)
+    expect(summary.plannedMinutes).toBe(150);
+    expect(summary.unknownPlannedMinutes).toBe(0);
   });
   test('does not invent actual minutes from planned time; unknown planned time stays explicit', () => {
     const s = state(); s.sessions.done = { completed: true };

@@ -14,6 +14,8 @@
 - Nutzerdaten auf dem Server nie direkt in der Datenbank ändern. Korrekturen nur mit `node scripts/korrektur.mjs` (Sicherung + normale Änderung mit Zeitstempel über den Sync, mit Ausgangsstand `base`), damit die Geräte sie sauber übernehmen (Auftrag 28).
 - Veröffentlichen mit `node scripts/veroeffentlichen.mjs`: enthält Start-Test aller echten Nutzer im Browser (auch mit lokalem Stand der Vorversion) und die Prüfung danach mit automatischem Zurückrollen.
 - Ergebnis eines Auftrags kurz in `ERGEBNIS.md`.
+- **Jedes neue Feld bzw. jeder neue Bildschirm bekommt sofort Eingabe-, Anzeige- und Überlauf-Tests, sonst gilt die Aufgabe als nicht fertig** (Auftrag 29). Felder: Eintrag in `tests/e2e/auftrag29-felder.spec.ts` (VALUES; eintippen wie ein Mensch, neu laden, gleiche Zahl in Liste und Coach-Kontext), Zahlen nur über `parseInput`/`checkField` (`shared/validate.ts`) mit Einheit und Grenzen. Bildschirme laufen automatisch in `layout.spec.ts` und `auftrag29-ueberlauf.spec.ts` mit. Coach-Texte mit Zahlen laufen durch `verifyCoachText`/`checkValueClaims`, Plan-Änderungen über `applyAdjustments` (Dauer aus den Bausteinen).
+- Pflicht vor jedem Release (Rot = kein Release, steckt in `node scripts/veroeffentlichen.mjs`): alle Tests inkl. Felder, Coach-Prüfer (300 Fälle), Überlauf, Abgleich; Plan-Check und Start-Test mit Kopien der echten Daten aller Nutzer.
 
 ## Bestehende Implementierung zuerst pruefen
 

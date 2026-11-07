@@ -3,6 +3,8 @@ import { storage as localStorage } from "../persistence";
    KI-Coach (Schalter, Einwilligung, Budget, Kosten) und die manuelle Score-Korrektur. */
 import { STATE, UI, saveState, saveUi, profile, saveProfile } from '../store';
 import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr, addDays } from '../util';
+import { INPUTS } from '../../../shared/validate';
+import { readNumberInput } from '../kit';
 import { t, num } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel, timeField, readTime } from '../kit';
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
@@ -120,11 +122,12 @@ function bikeSpeedTable(p: any): string {
     <div class="hint">${esc(SPEED_HINT)}${kinds.includes('indoor') ? ' ' + esc(t('set.speedIndoor')) : ''}</div>`;
 }
 onChange('bspeed', el => {
-  const p = profile(); const k = el.dataset.k as BikeKind; const v = parseNum((el as HTMLInputElement).value.trim());
-  if (v == null || isNaN(v) || v < 10 || v > 60) { toast(t('set.outOfRange')); return; }
-  const th: any = { ...p.thresholds, bikeSpeeds: { ...(p.thresholds.bikeSpeeds || {}), [k]: Math.round(v * 10) / 10 } };
+  const p = profile(); const k = el.dataset.k as BikeKind; const v = readNumberInput(el, INPUTS.thr.bikeSpeed);
+  if (v == null) return;
+  // Auftrag 29: kein stilles Runden mehr
+  const th: any = { ...p.thresholds, bikeSpeeds: { ...(p.thresholds.bikeSpeeds || {}), [k]: v } };
   let np: any = { ...p, thresholds: th };
-  if (k === mainKind(p)) np = setThreshold(np, 'thresholdSpeedBikeKmh', Math.round(v * 10) / 10);
+  if (k === mainKind(p)) np = setThreshold(np, 'thresholdSpeedBikeKmh', v);
   saveProfile(np); invalidate(); toast(t('common.saved'));
 });
 /* Geschätzte Werte: Hinweis mit Herkunft und Test-Vorschlag */
@@ -137,6 +140,7 @@ function estimatedNote(p: any): string {
 }
 onChange('thr', el => {
   const p = profile(); const k = el.dataset.k!; const raw = (el as HTMLInputElement).value.trim();
+  if (!el.dataset.tf && INPUTS.thr[k]) { const n = readNumberInput(el, INPUTS.thr[k]); if (n === undefined) return; if (n == null && !(k === 'ftp' || k === 'maxHr')) { toast(t('common.invalidNumber')); return; } saveProfile(setThreshold(p, k as ThresholdKey, n)); invalidate(); nav.rerender(); toast(t('common.saved')); return; }
   let v: number | null = el.dataset.tf ? readTime(el) : (k === 'thresholdPaceRunSec' || k === 'cssSec') ? paceToSec(raw) : parseNum(raw);
   if (el.dataset.tf && v == null && k !== 'cssSec') return; // Feld wird gerade geleert
   if (v != null && isNaN(v)) { toast(t('time.invalid')); return; }

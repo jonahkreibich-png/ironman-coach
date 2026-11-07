@@ -86,7 +86,7 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
   expect(await page.locator('#food-type option').allTextContents()).not.toContain('Spieltag');
   await page.locator('[data-act="back"]').click();
   await tab(page, 'plan').click();
-  await page.locator('[data-act="custom-add"]').click();
+  await page.locator('[data-act="custom-add"]:not(.cday-add)').click();
   expect(await page.locator('#ca-sport option').allTextContents()).not.toContain('Teamsport');
 });
 

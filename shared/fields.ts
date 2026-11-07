@@ -20,7 +20,7 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
     { key: 'vo2max', label: 'VO2max', kind: 'num', more: true }, { key: 'cardioRecovery', label: 'Cardio-Erholung', unit: 'bpm', kind: 'num', more: true },
     { key: 'splits', label: 'Splits je km', kind: 'splits', more: true },
     // Auftrag 21: weitere Werte (aus Uhr bzw. Quelle, von Hand änderbar)
-    { key: 'ascent', label: 'Höhenmeter', unit: 'm', kind: 'num', more: true }, { key: 'strideLen', label: 'Schrittlänge', unit: 'm', kind: 'num', more: true },
+    { key: 'ascent', label: 'Höhenmeter', unit: 'm', kind: 'num', more: true }, { key: 'strideLen', label: 'Schrittlänge', unit: 'cm', kind: 'num', more: true },
     { key: 'gct', label: 'Bodenkontaktzeit', unit: 'ms', kind: 'num', more: true }, { key: 'power', label: 'Leistung', unit: 'W', kind: 'num', more: true },
     { key: 'temp', label: 'Temperatur', unit: '°C', kind: 'num', more: true },
     { key: 'surface', label: 'Untergrund', kind: 'select', more: true, options: [['', '–'], ['road', 'Straße/Asphalt'], ['trail', 'Wald/Trail'], ['track', 'Bahn'], ['treadmill', 'Laufband'], ['mixed', 'gemischt']] },

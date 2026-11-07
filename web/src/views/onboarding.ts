@@ -6,7 +6,7 @@ import { storage as localStorage } from "../persistence";
 import { STATE, HAS_PLAN, PLAN_KEY, readPlan, saveState, profile, saveProfile } from '../store';
 import { esc, todayStr, parseNum } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, ic, field, select, armed, more, sportLabel, timeField, readTime } from '../kit';
+import { on, onChange, ic, field, select, armed, more, sportLabel, timeField, readTime, readNumberInput } from '../kit';
 import { BLOCKS, visibleQuestions, missingRequired, progress, prefillFromData, applyOnboarding, profileFromAnswers, understood, availableDays, goalTarget, DAYLOAD_OPTIONS, type Answers, type Question } from '../../../shared/onboarding';
 import { GOALS, type GoalType } from '../../../shared/goals';
 import { currentStages, replanFuture, replanFrom } from '../replan';
@@ -234,9 +234,11 @@ onChange('ob-q', el => {
   const v = (el as HTMLInputElement).value; const a = A(); const k = el.dataset.q!;
   // Zahlen nur im erlaubten Bereich (Auftrag 11: Geburtsjahr „197“ wurde angenommen)
   if (el.dataset.t === 'number') {
-    const n = parseNum(v); const q = BLOCKS.flatMap(b => b.questions).find(x => x.id === k);
-    if (v.trim() && (n == null || (q && q.min != null && n < q.min) || (q && q.max != null && n > q.max))) { el.setAttribute('aria-invalid', 'true'); toast(q && q.min != null && q.max != null ? t('ob.range', { min: q.min, max: q.max }) : t('common.invalidNumber')); return; }
-    el.removeAttribute('aria-invalid'); a[k] = n;
+    // Auftrag 29: dieselbe Prüfung wie überall (Komma/Punkt, Einheit, Tausenderpunkt, verständliche Meldung)
+    const q = BLOCKS.flatMap(b => b.questions).find(x => x.id === k);
+    const n = readNumberInput(el, { label: q ? q.label.replace(/[?]$/, '') : 'Wert', unit: q && q.unit, min: q && q.min != null ? q.min : -1e9, max: q && q.max != null ? q.max : 1e9, ...(q && /min/.test(q.unit || '') ? { hm: 'min' as const, units: { h: 60 } } : {}), ...(q && q.unit === 'h' ? { hm: 'h' as const } : {}) });
+    if (n === undefined) return;
+    a[k] = n;
   } else a[k] = v;
   saveState(); if (el.tagName === 'SELECT') nav.rerender();
 });

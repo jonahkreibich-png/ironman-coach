@@ -4,10 +4,11 @@ import { statsOf } from './activity/structure';
 import { checkField } from './validate';
 /* Tatsächliche Ergebnisse, ohne Planwerte. Eine manuelle Korrektur (auch ein bewusst
    geleertes Feld) hat Vorrang. Keine Mutation der importierten Originalaufzeichnung. */
-export function resultNumber(v: any): number | null {
+export function resultNumber(v: any, signed = false): number | null {
   if (v == null || v === '') return null;
   const n = Number(String(v).replace(',', '.'));
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  // Auftrag 29: Entkopplung und Temperatur dürfen negativ sein (vorher fiel z. B. −2,1 % still weg)
+  return Number.isFinite(n) && (signed || n >= 0) ? n : null;
 }
 const pace = (s: any): number | null => {
   const m = /^(\d+):([0-5]\d)$/.exec(String(s ?? ''));
@@ -99,7 +100,7 @@ export function actualStrength(st: any = {}, activity: any = null): { area: Stre
 export function effectiveActivity(a: any, st: any = {}): any {
   const m = actualMetrics(st, a), out = { ...a };
   const map: Record<string, string> = { min: 'min', km: 'km', hr: 'avgHr', maxHr: 'maxHr', power: 'avgPower', maxPower: 'maxPower', cadence: 'avgCadence', maxCadence: 'maxCadence', decoupling: 'decouplingPct', efficiency: 'efficiency', ascent: 'ascentM', temp: 'tempC', np: 'np' };
-  for (const [key, prop] of Object.entries(map)) out[prop] = resultNumber(m[key]);
+  for (const [key, prop] of Object.entries(map)) out[prop] = resultNumber(m[key], key === 'decoupling' || key === 'temp');
   if (a.sport === 'swim') out.km = resultNumber(m.meters) == null ? null : resultNumber(m.meters)! / 1000;
   out.paceSecKm = pace(m.pace) ?? (out.km > 0 && out.min > 0 ? out.min * 60 / out.km : null);
   out.speedKmh = resultNumber(m.speed) ?? (out.km > 0 && out.min > 0 ? out.km * 60 / out.min : null);
@@ -124,11 +125,44 @@ export function effectiveActivity(a: any, st: any = {}): any {
 /** Änderungskennung für Vorschläge; enthält keine Chattexte und löst keine Berechnung aus. */
 export function evidenceSignature(state: any, weeks?: any[]): string {
   const stable = (x: any): any => Array.isArray(x) ? x.map(stable) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map(k => [k, stable(x[k])])) : x;
-  const records = (obj: any) => Object.entries(obj || {}).sort(([a], [b]) => a.localeCompare(b)).map(([id, x]: any) => [id, { completed: x.completed, skipped: x.skipped, sport: x.sport, date: x.date, title: x.title, description: x.description, activityId: x.activityId, metrics: x.metrics, metricsSrc: x.metricsSrc, metricsManual: x.metricsManual, rpe: x.rpe, feel: x.feel, notes: x.notes, deviation: x.deviation }]);
+  const records = (obj: any) => Object.entries(obj || {}).sort(([a], [b]) => a.localeCompare(b)).map(([id, x]: any) => [id, { completed: x.completed, skipped: x.skipped, sport: x.sport, date: x.date, title: x.title, description: x.description, activityId: x.activityId, metrics: x.metrics, metricsSrc: x.metricsSrc, metricsManual: x.metricsManual, rpe: x.rpe, feel: x.feel, notes: x.notes, deviation: x.deviation, asPlanned: x.asPlanned, changed: x.changed }]);
   const custom: Record<string, any> = {};
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([date, list]: any) => (list || []).forEach((w: any) => { custom[date + ':' + w.id] = { ...w, date }; }));
   const input = JSON.stringify(stable({ sessions: records(state.sessions), custom: records(custom), activities: state.activities || {}, skills: state.profile?.skills || {}, adjustments: state.adjustments || {}, weeks: weeks || [] }));
   let hash = 2166136261;
   for (let i = 0; i < input.length; i++) hash = Math.imul(hash ^ input.charCodeAt(i), 16777619);
   return 'results-v1-' + (hash >>> 0).toString(16);
+}
+
+/* ---------- Auftrag 29: „Anders trainiert als geplant“ ----------
+   Am Zustand der Einheit: asPlanned (true = so wie geplant, false = anders) und changed { kind, sport?, reason? }.
+   Eine Stelle für Titel und „geplant: …“ (Einheit, Liste, Plan, Heute, Coach) und für Sportart/Art, die Bewertung, Scores, Stufen und
+   Belastung nutzen: gezählt wird nur das Gemachte. Das alte Freitextfeld „deviation“ bleibt als optionale Notiz. */
+export type ChangeKind = 'easy' | 'shorter' | 'otherIntervals' | 'otherSport';
+export const CHANGE_KINDS: [ChangeKind, string][] = [['easy', 'Locker (Zone 2) statt geplant'], ['shorter', 'Kürzer'], ['otherIntervals', 'Andere Intervalle'], ['otherSport', 'Andere Sportart']];
+export const CHANGE_REASONS: [string, string][] = [['tired', 'müde'], ['ill', 'krank'], ['time', 'keine Zeit'], ['weather', 'Wetter'], ['pain', 'Schmerzen'], ['other', 'anderes']];
+const SPORT_NAME: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', strength: 'Kraft', football: 'Teamsport' };
+export function changedOf(st: any): { kind: ChangeKind; sport?: string; reason?: string } | null {
+  if (!st || st.asPlanned !== false || !st.changed || !st.changed.kind) return null;
+  return st.changed;
+}
+export function actualSport(s: any, st: any): string { const c = changedOf(st); return c && c.kind === 'otherSport' && c.sport ? c.sport : s.sport; }
+/** Ist die geplante Härte weggefallen (locker statt hart, andere Sportart)? Dann zählt die Einheit nicht als Schlüsseleinheit/Stufe. */
+export function plannedLoadDropped(st: any): boolean { const c = changedOf(st); return !!c && (c.kind === 'easy' || c.kind === 'otherSport'); }
+const stripNums = (t: string) => String(t || '').replace(/\s*\d+(?:[.,]\d+)?\s*×\s*\d+(?:[.,]\d+)?\s*(?:min|s|m)\b|\s*\(\s*\d{1,3}(?:\.\d{3})*\s*m\s*\)|\s*\d+(?:[.,]\d+)?\s*(?:min|km|m)\b/g, '').replace(/\s+mit\s*$/, '').replace(/\s{2,}/g, ' ').trim();
+/** Titel dessen, was wirklich gemacht wurde („Rad Zone 2 · 60 min“); ohne Änderung der geplante Titel */
+export function actualTitle(s: any, st: any, act: any = null): string {
+  const c = changedOf(st); if (!c) return s.title;
+  const min = resultNumber(actualMetrics(st || {}, act).min); const dur = min ? ` · ${Math.round(min)} min` : '';
+  const sp = SPORT_NAME[actualSport(s, st)] || 'Training';
+  if (c.kind === 'easy') return `${sp} Zone 2${dur}`;
+  if (c.kind === 'shorter') return `${stripNums(s.title) || sp}${dur || ' (kürzer)'}`;
+  if (c.kind === 'otherIntervals') return `${sp}: andere Intervalle${dur}`;
+  return `${sp}${dur}`;
+}
+/** kleine Zeile darunter: „geplant: Sweet Spot 2×12“ (leer ohne Änderung) */
+export function plannedLine(s: any, st: any): string {
+  const c = changedOf(st); if (!c) return '';
+  const why = (CHANGE_REASONS.find(([k]) => k === c.reason) || [])[1];
+  return `geplant: ${s.title}${why ? ` · Grund: ${why}` : ''}`;
 }

@@ -20,9 +20,10 @@ export function lineChart(pts, series, o) {
   if (pts.length < 2 || !vals.length) return `<div class="empty">${o.empty || 'Noch nicht genug Datenpunkte für einen Verlauf.'}</div>`;
   (o.lines || []).forEach(l => vals.push(l.v));
   const id = 'c' + (++chartSeq);
-  const W = chartWidth(), H = o.h || 170, L = 36, R = o.endLabel === false ? 10 : 40, T = 12, B = 24;
+  const W = chartWidth(), H = o.h || 170, R = o.endLabel === false ? 10 : 40, T = 12, B = 24;
   let lo = o.min != null ? o.min : Math.min(...vals), hi = o.max != null ? o.max : Math.max(...vals);
-  if (lo === hi) { lo -= 1; hi += 1; }
+  // Auftrag 29: ein einzelner großer Wert (z. B. 19.999 m) bekam Achsen in 0,5er-Schritten (19997,5 …), die links herausragten
+  if (lo === hi) { const pad = Math.max(1, Math.abs(lo) * 0.05); lo -= pad; hi += pad; }
   const step = niceStep(hi - lo, 3);
   if (o.min == null) lo = Math.floor((lo - (hi - lo) * 0.06) / step) * step;
   if (o.max == null) hi = Math.ceil((hi + (hi - lo) * 0.06) / step) * step;
@@ -33,6 +34,9 @@ export function lineChart(pts, series, o) {
   const x = i => xd(di[i]);
   const y = v => { const r = (v - lo) / (hi - lo); return o.invert ? T + r * (H - T - B) : H - B - r * (H - T - B); };
   const fmt = o.fmt || (v => fmtTick(v, step));
+  // linker Rand so breit wie die längste Achsenbeschriftung (große Zahlen ragten sonst heraus)
+  let widest = 0; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) widest = Math.max(widest, String(fmt(t)).length);
+  const L = Math.max(36, Math.ceil(widest * 6.6) + 10);
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.label || 'Verlauf')}">`;
   (o.shade || []).forEach(r => {
     const a = daysBetween(pts[0].date, r.from) - 0.5, b2 = daysBetween(pts[0].date, r.to) + 0.5;

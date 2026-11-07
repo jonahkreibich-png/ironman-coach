@@ -29,12 +29,13 @@ async function flush() {
   const batch = pending.splice(0, 10);
   try {
     await fetch(API_BASE + '/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token }, body: JSON.stringify({ errors: batch }) });
-  } catch (e) { /* egal, lokal liegt es noch */ }
+  } catch (e) { pending.unshift(...batch); /* Auftrag 29: nicht verlieren, beim nächsten Mal senden */ }
 }
 let listening = false;
 /* Auftrag 28: schon im Einstieg (bootstrap.ts) aktiv, damit auch Startfehler ankommen; ein zweiter Aufruf (main.ts) ändert nichts */
 export function initErrorLog(): void {
   if (listening) return; listening = true;
+  window.addEventListener('online', () => { void flush(); });
   window.addEventListener('error', ev => logError(ev.message, (ev.filename || '').split('/').pop() + ':' + ev.lineno));
   window.addEventListener('unhandledrejection', ev => logError(ev.reason && ev.reason.message ? ev.reason.message : ev.reason, 'promise'));
 }

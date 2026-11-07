@@ -4,6 +4,8 @@
    Persönliche Angaben (Name, Gewicht, Sprache …) werden sofort gespeichert. */
 import { STATE, saveState, profile, goals, saveProfile } from '../store';
 import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr } from '../util';
+import { INPUTS } from '../../../shared/validate';
+import { readNumberInput } from '../kit';
 import { t, hhmm } from '../../../shared/i18n';
 import { on, onChange, sec, ic, pill, openSheet, closeSheet, refreshSheet, field, select, toggle, armed, more, sportLabel, timeField, readTime } from '../kit';
 import { realism } from '../../../shared/goalcheck';
@@ -64,8 +66,9 @@ onChange('pf', el => {
   const p: any = profile(); const k = el.dataset.k!;
   const inp = el as HTMLInputElement;
   let v: any = el.dataset.bool ? inp.checked : inp.value;
-  if (el.dataset.num) { v = parseNum(v); if (v == null && k !== 'birthYear' && k !== 'heightCm' && k !== 'weightKg' && k !== 'experienceYears') { toast(t('common.invalidNumber')); return; } }
-  if (k === 'birthYear' && v != null && (v < 1930 || v > +todayStr().slice(0, 4) - 5)) { toast(t('common.invalidNumber')); return; }
+  // Auftrag 29: Zahlen mit Einheit und Grenzen (z. B. Größe „1,80 m“ = 180 cm), Fehler mit Meldung, nichts still umgewandelt
+  if (el.dataset.num && inp.tagName !== 'SELECT') { const spec = INPUTS.profile[k]; v = spec ? readNumberInput(el, spec) : parseNum(v); if (v === undefined) return; if (v == null && !spec) { toast(t('common.invalidNumber')); return; } }
+  else if (el.dataset.num) v = parseNum(v);
   if (k === 'sex' && !v) v = null;
   if ((PLAN_FIELDS as readonly string[]).includes(k)) { stage(SCREEN, (x: any) => { x[k] = v; }); return; }
   p[k] = v;

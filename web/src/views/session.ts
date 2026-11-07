@@ -1,5 +1,5 @@
 import { isSyncOn, apiCall, syncNow } from '../sync';
-import { actualStrength } from '../../../shared/results';
+import { actualStrength, actualTitle, actualSport, plannedLine, changedOf } from '../../../shared/results';
 import {describeTrainingBlocks} from '../../../shared/training-templates26';
 /* Einheit: Ansicht und Bearbeiten im Sheet, Abhaken. Werte von der Uhr tragen ihre Quelle,
    Korrekturen von Hand gelten ab dann, „Auf Original zurücksetzen“ holt die Werte der Uhr zurück. */
@@ -30,8 +30,12 @@ export function metaLine(s: any): string {
 }
 /** Historical completed strength uses results; the sheet retains its original prescription. */
 export function sessionTitle(s: any, st: any = sessState(s.id)): string {
+  // Auftrag 29: anders gemacht → der Titel zeigt, was wirklich gemacht wurde (eine Quelle: shared/results actualTitle)
+  if (st?.completed && changedOf(st)) return actualTitle(s, st, st.activityId ? STATE.activities?.[st.activityId] : null);
   return s.sport === 'strength' && st?.completed ? actualStrength(st, st.activityId ? STATE.activities?.[st.activityId] : null).title : s.title;
 }
+/** kleine Zeile „geplant: …“ unter dem Titel (nur wenn anders gemacht) */
+export function plannedHtml(s: any, st: any = sessState(s.id)): string { const p = st?.completed ? plannedLine(s, st) : ''; return p ? `<span class="planned-was xs muted" data-planned-was>${esc(p)}</span>` : ''; }
 export function doneLine(s: any): string {
   const m = (sessState(s.id).metrics) || {};
   const parts: string[] = [];
@@ -56,7 +60,7 @@ export function sessionRow(s: any, opts: { check?: boolean } = {}): string {
     ? `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   return `<div class="li wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">
     <button class="row grow" data-act="sess-open" data-sid="${esc(s.id)}" style="border:0;background:none;text-align:left;padding:0;color:inherit;min-height:44px">
-      ${sportIc(s.sport)}<span class="grow"><span class="t">${esc(sessionTitle(s, st))}</span> ${gearChips(s)}${badges}<br><span class="s">${esc(sub)}</span></span></button>
+      ${sportIc(st.completed ? actualSport(s, st) : s.sport)}<span class="grow"><span class="t">${esc(sessionTitle(s, st))}</span> ${gearChips(s)}${badges}${plannedHtml(s, st) ? '<br>' + plannedHtml(s, st) : ''}<br><span class="s">${esc(sub)}</span></span></button>
     <span class="wo-status">${status === 'done' || status === 'open' || status === 'missed' ? check : statusIcon(status)}</span></div>`;
 }
 
@@ -89,12 +93,16 @@ function sessionSheet(id: string): string {
   const auto = st.metricsAuto || {};
   const fields = FIELDS[s.sport] || [['min', 'm.min']];
   let h = `<div class="stack">
-    <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div>${gearChips(s)}</div>${statusIcon(status)}</div>
+    <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div>${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
     ${s.sport === 'strength' && st.completed ? `<p class="xs muted">Geplant: ${esc(s.title)}. Die folgenden Trainingsvorgaben sind kein Leistungsnachweis; tatsächliche Übungen stehen in den Ergebnisfeldern.</p>` : ''}${structureHtml(s)}${templateButtons(s, !!st.completed)}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
     const o = s._orig || {};
-    h += `<div class="banner">${list.map((a: any) => `<b>${esc(a.what || '')}</b><br>${esc(t('adj.why'))}: ${esc(a.reason || '')}`).join('<br>')}${o.title ? `<br><span class="muted">${esc(t('adj.original'))}: ${esc([o.title, o.plannedMinutes ? o.plannedMinutes + ' min' : null, o.zone].filter(Boolean).join(' · '))}</span>` : ''}</div>`;
+    // Auftrag 29: oben steht der neue Titel; hier ein kleines Abzeichen „angepasst“ mit Grund, Antippen zeigt „vorher → nachher“
+    const why = [...new Set(list.map((a: any) => String(a.reason || '').trim()).filter(Boolean))].join('; ');
+    const was = [o.title, o.plannedMinutes ? o.plannedMinutes + ' min' : null, o.zone].filter(Boolean).join(' · ');
+    const now = [s.title, s.plannedMinutes ? s.plannedMinutes + ' min' : null, s.zone].filter(Boolean).join(' · ');
+    h += `<details class="adj-info card flat tight" data-adj-info><summary><span class="pill warn">${esc(s.movedFrom ? t('st.moved') : t('st.adjusted'))}</span> <span class="small">${esc(why || list.map((a: any) => a.what || '').join('; '))}</span><span class="chev">${ic('down')}</span></summary><div class="body small">${o.title ? `<div data-adj-before><span class="muted">vorher:</span> ${esc(was)}</div><div data-adj-after><span class="muted">nachher:</span> ${esc(now)}</div>` : ''}${list.map((a: any) => `<div class="muted">${esc(a.what || '')}</div>`).join('')}</div></details>`;
   }
   if (s.sport !== 'rest' && status !== 'cancelled') {
     h += `<div class="row">
@@ -103,7 +111,7 @@ function sessionSheet(id: string): string {
   }
   if (st.skipped) h += field('f-skipReason', t('sess.skipReason'), st.skipReason || '', { data: `data-sf="skipReason" data-sid="${esc(id)}"`, wide: true });
   // Felder statt Notizfeld (Auftrag 7): Werte je Sportart mit Quelle, RPE, Gefühl, Abweichung, optionale Notiz
-  if (s.sport !== 'rest' && (st.completed || status === 'missed' || status === 'open' || status === 'skipped')) h += fieldsBlock({ kind: 'session', id, date: s.date, sport: s.sport, planned: s });
+  if (s.sport !== 'rest' && (st.completed || status === 'missed' || status === 'open' || status === 'skipped')) h += fieldsBlock({ kind: 'session', id, date: s.date, sport: actualSport(s, st), planned: s });
   if (act) h += activityDetails(act);
   // Auftrag 21: „Jetzt abrufen“ in jeder Einheit (heute oder früher, noch ohne Aufzeichnung): holt neue Daten aller Quellen und ordnet sie zu
   if (s.sport !== 'rest' && isSyncOn() && s.date <= todayStr() && !st.activityId) h += `<div class="stack" data-fetch-now><button class="btn ghost block" data-act="fetch-now" data-sid="${esc(id)}" data-sport="${esc(s.sport)}">${ic('sync')} ${esc(t('conn.syncNow'))}</button>${FETCH_TEXT[id] ? `<div class="hint" data-fetch-status>${esc(FETCH_TEXT[id])}</div>` : `<div class="xs muted">${esc('Holt neue Aufzeichnungen von deiner Uhr bzw. deinen Verbindungen und trägt sie hier ein.')}</div>`}</div>`;

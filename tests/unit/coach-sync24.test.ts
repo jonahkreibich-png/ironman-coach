@@ -7,7 +7,7 @@ vi.mock('../../web/src/util', () => ({ esc: (s: any) => s, fmtDate: (s: any) => 
 vi.mock('../../web/src/nav', () => ({ nav: { rerender: vi.fn(), refresh: vi.fn(), go: vi.fn() } }));
 vi.mock('../../web/src/toast', () => ({ toast: vi.fn() }));
 vi.mock('../../web/src/kit', () => ({ on: vi.fn(), onChange: vi.fn(), ic: () => '', openSheet: vi.fn(), refreshSheet: vi.fn(), empty: () => '', pill: () => '' }));
-vi.mock('../../web/src/data', () => ({ D: () => ({ engine: { state: H.state }, scores: [], prognosis: null }), invalidate: vi.fn() }));
+vi.mock('../../web/src/data', () => ({ D: () => ({ engine: { state: H.state }, scores: [], prognosis: null }), invalidate: vi.fn(), coachText: (m: any) => (m && m.text) || '' }));
 vi.mock('../../shared/coach/dialog', () => ({ converse: H.converse, quickOptions: () => [] }));
 vi.mock('../../web/src/views/freeai', () => ({ freeOffer: () => false, freeConsentHtml: () => '' }));
 vi.mock('../../web/src/views/planedit', () => ({ propose: vi.fn() }));

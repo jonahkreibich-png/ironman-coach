@@ -5,7 +5,7 @@
 import { STATE, saveState, UI, profile, saveProfile, rebuildPlanIndex } from '../store';
 import { esc, fmtDate, dowShort, todayStr, addDays, ymd } from '../util';
 import { t } from '../../../shared/i18n';
-import { D, invalidate } from '../data';
+import { D, invalidate, coachText } from '../data';
 import { on, onChange, ic, openSheet, refreshSheet, empty, pill } from '../kit';
 import { type ChatAction } from '../../../shared/coach/intents';
 import { converse, quickOptions, type Opt } from '../../../shared/coach/dialog';
@@ -105,7 +105,7 @@ function msgHtml(m: any, latest: boolean): string {
   const sugg = (m.suggestions || []).length && latest ? `<div class="suggest">${m.suggestions.map((s: string) => `<button class="chip" data-act="chat-say" data-text="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '';
   const pin = m.from !== 'user' ? `<button class="msg-pin ${m.pinned ? 'on' : ''}" data-act="chat-pin" data-id="${esc(m.id)}" aria-label="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}" title="${esc(m.pinned ? t('chat.unpin') : t('chat.pin'))}">${ic('flag')}</button>` : '';
   const by = m.from === 'ai' && !m.title && m.kind === 'answer' ? `<div class="xs muted" data-by-ai>${esc(t('coach.byAi'))}</div>` : '';
-  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(m.text)}</span>${by}${prop}${m.details?.length ? '<details class="more"><summary>Details zu den betroffenen Einheiten</summary><div class="body">'+m.details.map((x:string)=>'<p>'+esc(x)+'</p>').join('')+'</div></details>' : ''}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
+  return `<div class="msg ${cls}${m.pinned ? ' pinned' : ''}" data-msg="${esc(m.id)}">${pin}${head}<span class="mt">${esc(coachText(m))}</span>${by}${prop}${m.details?.length ? '<details class="more"><summary>Details zu den betroffenen Einheiten</summary><div class="body">'+m.details.map((x:string)=>'<p>'+esc(x)+'</p>').join('')+'</div></details>' : ''}${acts}${opts}${undo}${adjUndo}${sugg}<div class="time">${time(m.at)}</div></div>`;
 }
 
 /* Was der Coach gerade sieht (Auftrag 7): die 3 wichtigsten Erkenntnisse der Analyse mit Begründung und Tipp.
@@ -127,7 +127,7 @@ function nowCard(open: any[]): string {
   const R = d.readiness; const lvl = d.ill ? t('chat.now.sick') : R && R.level < 3 ? [t('chat.now.green'), t('chat.now.yellow'), t('chat.now.red')][R.level] : '';
   const line = list.length ? `${t('chat.now.today')}: ${list.map((s: any) => s.title).join(', ')}${done ? ` (${done}/${list.length} ${t('chat.now.done')})` : ''}` : t('chat.now.rest');
   return `<div class="card now-card" data-now><div class="spread"><b>${esc(t('chat.now.title'))}</b>${lvl ? pill(lvl, R && R.level === 0 ? 'good' : R && R.level === 1 ? 'warn' : 'bad') : ''}</div>
-    <div class="small">${esc(line)}</div>${open.length ? `<div class="small" data-now-open>${esc(t('chat.now.open', { n: open.length }))}: ${open.map(m => `<button class="link" data-act="chat-jump" data-id="${esc(m.id)}">${esc((m.title || m.text || '').slice(0, 50))}</button>`).join(' · ')}</div>` : ''}</div>`;
+    <div class="small">${esc(line)}</div>${open.length ? `<div class="small" data-now-open>${esc(t('chat.now.open', { n: open.length }))}: ${open.map(m => `<button class="link" data-act="chat-jump" data-id="${esc(m.id)}">${esc((m.title || coachText(m) || '').slice(0, 50))}</button>`).join(' · ')}</div>` : ''}</div>`;
 }
 
 export function renderCoach(): string {
@@ -205,7 +205,7 @@ export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boo
         const streamed = !!(STREAM && STREAM.text); STREAM = null; delete STATE.coachMsgs[userMsg.id];
         const ms = (last.messages || []) as any[];
         // schon gestreamte KI-Antwort sofort ganz zeigen, alles andere (Hinweise, Vorschläge, Antwort ohne Strom) tippt sich auf
-        ms.filter(m => m.from !== 'user').forEach(m => { if (!(streamed && /^msg-ai-/.test(m.id))) typeMsg(m.id, m.text); });
+        ms.filter(m => m.from !== 'user').forEach(m => { if (!(streamed && /^msg-ai-/.test(m.id))) typeMsg(m.id, coachText(m)); });
         addMsgs(ms); if (last.applied) await syncNow(); loadAiState().then(() => nav.rerender()); return;
       }
       catch (e) { STREAM = null; delete STATE.coachMsgs[userMsg.id]; /* ohne Verbindung, Kontingent leer oder Fehler: der Regel-Coach antwortet */ if (!FELL_BACK) { FELL_BACK = true; toast(t('coach.freeFallback')); } loadAiState().then(() => nav.rerender()); } finally { if (el) el.disabled = false; }
@@ -216,7 +216,7 @@ export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boo
     const msg: any = { id: `msg-a-${now}`, at: now + 1, date: todayStr(), kind: reply.intent === 'safety' ? 'warning' : 'answer', from: 'coach', chat: true, intent: reply.intent, text: reply.text, options: reply.options || [], suggestions: reply.suggestions || [], pendingOpen: !!reply.pending };
     if ((reply as any).go) msg.options = [{ label: t('chat.open'), say: '', go: (reply as any).go }, ...msg.options];
     if (reply.apply && reply.apply.length) { const r = runOps(reply.apply); msg.undo = r.undo; }
-    typeMsg(msg.id, msg.text);
+    typeMsg(msg.id, coachText(msg));
     addMsgs([userMsg, msg]);
   } finally { busy = false; }
 }
@@ -280,7 +280,7 @@ function historySheet(): string {
   const list = searchMsgs(Object.values(STATE.coachMsgs || {}), Q).slice(0, 200);
   let lastDate = '';
   return `<div class="stack" data-history><input class="inp" id="hist-q" data-ch="hist-q" placeholder="${esc(t('chat.search'))}" value="${esc(Q)}" aria-label="${esc(t('chat.search'))}">
-    ${list.length ? list.map(m => { const dt = ymd(new Date(m.at)); const head = dt !== lastDate ? `<div class="lbl" style="margin-top:var(--s2)">${esc(dowShort(dt))} ${esc(fmtDate(dt))}</div>` : ''; lastDate = dt; return `${head}<div class="hist-item ${m.from === 'user' ? 'user' : ''}"><b>${esc(m.from === 'user' ? t('chat.you') : m.title || t('coach.title'))}</b> ${esc(m.text || '')}</div>`; }).join('') : empty(t('chat.historyEmpty'))}</div>`;
+    ${list.length ? list.map(m => { const dt = ymd(new Date(m.at)); const head = dt !== lastDate ? `<div class="lbl" style="margin-top:var(--s2)">${esc(dowShort(dt))} ${esc(fmtDate(dt))}</div>` : ''; lastDate = dt; return `${head}<div class="hist-item ${m.from === 'user' ? 'user' : ''}"><b>${esc(m.from === 'user' ? t('chat.you') : m.title || t('coach.title'))}</b> ${esc(coachText(m))}</div>`; }).join('') : empty(t('chat.historyEmpty'))}</div>`;
 }
 function openHistory() { openSheet(t('chat.history'), historySheet); }
 on('chat-history', () => { Q = ''; openHistory(); });

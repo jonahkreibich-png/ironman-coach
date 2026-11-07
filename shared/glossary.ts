@@ -41,6 +41,8 @@ const BASE: Term[] = [
   entry('Schwelle', 'intensity', 'Laktatschwelle anaerobe Schwelle', 'Das Tempo, das du etwa eine Stunde lang halten kannst (Zone 4). Darüber wird es schnell sehr anstrengend.'),
   entry('LTHR', 'intensity', 'Schwellenpuls Lactate Threshold Heart Rate', 'Dein Puls an der Schwelle. Aus dem Lauftest (Schnitt der letzten 20 min) oder dem Radtest; daraus rechnet die App deine Pulszonen.'),
   entry('FTP', 'intensity', 'Functional Threshold Power Schwellenleistung Watt', 'Die Leistung in Watt, die du auf dem Rad etwa eine Stunde halten kannst. Aus dem Radtest (95 % der 20 Minuten).'),
+  // Auftrag 29: Normalized Power – nur sichtbar, wenn echte Wattdaten da sind
+  entry('Normalized Power', 'values', 'NP normierte Leistung Watt', 'Leistung (Watt), die die Belastung bei schwankender Leistung besser zeigt als der Durchschnitt. Bei Anstiegen, Antritten oder Intervallen ist sie höher als die Ø-Leistung, bei gleichmäßiger Fahrt fast gleich. Gibt es nur mit Leistungsmesser oder Smart Trainer, nicht auf einer einfachen Rolle.'),
   entry('CSS', 'intensity', 'Critical Swim Speed Schwimmschwelle', 'Dein Schwellentempo im Wasser pro 100 m, aus 400 m und 200 m auf Zeit. Gibt es erst, wenn du 400 m am Stück kraulen kannst.'),
   entry('Pace', 'intensity', 'Tempo min/km min/100 m', 'Zeit pro Kilometer (Laufen) bzw. pro 100 m (Schwimmen). Kleinere Zahl heißt schneller.'),
   entry('Sweet Spot', 'intensity', 'SST knapp unter Schwelle', 'Rad-Intervalle knapp unter der Schwelle (oberes Zone 3): fordernd, aber gut durchzuhalten. Hebt die Schwelle, ohne so müde zu machen.'),

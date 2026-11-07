@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.17.0', items: [
+    '„Anders gemacht“: Beim Abhaken wählst du „So wie geplant“ oder „Anders gemacht“ (z. B. locker statt Intervalle, kürzer, andere Sportart, mit Grund). Der Titel zeigt dann, was du wirklich gemacht hast, der Coach bewertet genau das.',
+    'Plan: Mit dem „+“ an jedem Tag legst du dort sofort eine Extra-Einheit an. Titel, Dauer und Beschreibung stimmen jetzt immer überein.',
+    'Eingaben verstehen Einheiten (102 cm oder 1,02 m, 1:30 h, 1.500 m). Der Abgleich holt kurze Aussetzer still nach und meldet sich nur, wenn wirklich etwas nicht gesichert ist – mit „Erneut versuchen“.'
+  ] },
   { version: '3.16.0', items: [
     'Die App startet wieder bei allen. Ein Fehler in einem Bereich zeigt jetzt nur dort „konnte nicht geladen werden“, der Rest funktioniert weiter. Startet die App doch einmal nicht, gibt es „Erneut versuchen“ (holt auch eine neue Version).',
     'Startbildschirm: „Ich habe schon ein Konto“ nimmt Wiederherstellungscode und Kopplungscode im selben Feld. Auf Heute erinnert eine Karte daran, deinen Wiederherstellungscode zu sichern.'

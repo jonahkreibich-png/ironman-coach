@@ -30,9 +30,12 @@ export function daySummary(day: any, state: any) {
     const completed = source === 'custom' ? st.completed !== false : !!st.completed;
     const cancelled = !completed && !!(session.cancelled || session.skipped || st.skipped);
     const activity = aid ? state.activities?.[aid] : null;
+    const actual = completed ? minutes(actualMetrics(st, activity).min) : null;
+    // Auftrag 29: Eine erledigte Extra-Einheit hat keinen eigenen Sollwert – ihre Dauer ist die eingetragene (dasselbe Feld wie in der
+    // Einheit, auch wenn sie erst ohne Werte gespeichert und später nachgetragen wurde). Vorher blieb plannedMinutes leer: „+ ?“.
+    const planned = minutes(session.plannedMinutes) ?? (source === 'custom' && completed ? actual : null);
     return { id: session.id, source, session: { ...session, date: day.date }, completed, cancelled,
-      plannedMinutes: minutes(session.plannedMinutes),
-      actualMinutes: completed ? minutes(actualMetrics(st, activity).min) : null };
+      plannedMinutes: planned, actualMinutes: actual };
   };
   const planned = (day.sessions || []).map((s: any) => project(s, 'planned')).filter(Boolean) as SummaryRow[];
   const extras = (state.customWorkouts?.[day.date] || []).map((s: any) => project(s, 'custom')).filter(Boolean) as SummaryRow[];

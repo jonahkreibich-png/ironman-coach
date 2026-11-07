@@ -567,6 +567,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .cday { border-top: 1px solid var(--line); }
 .cday:first-child { border-top: 0; }
 .cday.today { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+/* Auftrag 29: „+“ je Tag für eine Extra-Einheit */
+.cday-hr { display: flex; align-items: center; min-width: 0; }
+.cday-hr > .cday-h { flex: 1 1 auto; }
+.cday-add { flex: 0 0 40px; width: 40px; height: 40px; margin-right: var(--s2); border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--accent); display: grid; place-items: center; padding: 0; }
+.cday-add svg { width: 18px; height: 18px; }
 .cday-h { display: flex; align-items: center; gap: var(--s2); width: 100%; min-height: 48px; padding: 4px var(--s3); border: 0; background: none; color: inherit; text-align: left; min-width: 0; }
 .cday-d { flex: 0 0 66px; font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
 .cday.today .cday-d b { color: var(--accent); }
@@ -606,8 +611,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .plan-c .pmix { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
 @media (max-width:360px) { .plan-dashboard { padding: var(--s3); } .plan-metric { padding: var(--s3); } .plan-sport { grid-template-columns: minmax(0,72px) minmax(12px,1fr) minmax(50px,max-content); gap: 5px; } }
 
-.plan-dashboard-title .btn { font: inherit; font-size: clamp(18px,5vw,24px); text-align: left; padding: 0; justify-content: space-between; }
-.plan-dashboard-label { min-width: 0; flex: 1 1 auto; overflow-wrap: normal; word-break: normal; }
+/* Auftrag 29: Innenabstand – der Titel lief links über die Rundung des Felds hinaus */
+.plan-dashboard-title .btn { font: inherit; font-size: clamp(15px,5vw,24px); text-align: left; padding: 8px 8px 8px 12px; justify-content: space-between; }
+/* Auftrag 29: bei großer Schrift und 320 px ragte „Trainingsdashboard“ aus dem Feld – Trennung an der Wortfuge, notfalls überall */
+.plan-dashboard-label { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; hyphens: manual; -webkit-hyphens: manual; }
 .plan-dashboard-chevron { flex: 0 0 18px; }
 [aria-expanded="false"] > .plan-dashboard-chevron { transform: rotate(-90deg); }
 #plan-dashboard-body[hidden] { display: none; }
@@ -695,3 +702,11 @@ body.no-plan .tab-lens { display: none; }
 .mgroup { margin-bottom: var(--s4); }
 .mgroup .li .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [hidden] { display: none !important; }
+/* Auftrag 29: Belastungswerte (CTL/ATL/TSB) bei großer Schrift und großen Zahlen: Kacheln brechen in weniger Spalten um */
+[data-load-values] .crit-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.6rem), 1fr)); }
+[data-load-values] .big { font-size: var(--t-xl); }
+/* Auftrag 29: Regel-Raster (7 Tage + Beschriftung) bei sehr großer Schrift auf 320 px: Tage und Zeichen wachsen höchstens mit der Spaltenbreite */
+.rg-h { font-size: min(var(--t-xs), 3.6vw); }
+.rg-c { font-size: min(var(--t-md), 4.4vw); }
+/* Auftrag 29: „geplant: …“ klein unter dem Titel, wenn anders trainiert wurde */
+.planned-was { display: block; font-weight: 400; overflow-wrap: anywhere; }

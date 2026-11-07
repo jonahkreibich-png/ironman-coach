@@ -7,7 +7,7 @@ import * as W from './workouts';
 import * as K from './keysessions';
 import { rulesOf, evaluate, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
-import { actualMetrics, effectiveActivity } from './results';
+import { actualMetrics, effectiveActivity, changedOf, actualSport, plannedLoadDropped } from './results';
 import { evaluateIntervals } from './intervals';
 import { LIB } from './workoutlib';
 import { runQualitySpec, bikeQualitySpec, runEasyForm, bikeEasyForm } from './workoutbuild';
@@ -278,7 +278,9 @@ function defaultMinutes(s) { if (s.plannedMinutes) return s.plannedMinutes; if (
 /* Belastung einer erledigten Einheit (TSS-ähnlich).
    intervals-Last > hrTSS mit Puls > RPE-Schätzung. Schwimmen und Kraft immer über RPE. */
 function sessionLoad(s, st, thr?) {
-  st = st || {}; const m = st.metrics || {};
+  st = st || {};
+  // Auftrag 29: anders gemacht → Belastung des Gemachten (Sportart, ohne die geplante Härte)
+  if (changedOf(st)) s = Object.assign({}, s, { sport: actualSport(s, st) }, plannedLoadDropped(st) ? { zone: 'Zone 2', hard: false, spec: null, title: 'Locker' } : {}); const m = st.metrics || {};
   const corrected = ['min', 'hr', 'power', 'normalizedPower'].some(k => st.metricsManual?.[k] || st.metricsSrc?.[k] === 'manual');
   if (toNum(st.icuLoad) != null && !corrected) return Math.max(0, Math.round(toNum(st.icuLoad)));
   const min = toNum(m.min) != null ? toNum(m.min) : defaultMinutes(s);
@@ -311,6 +313,78 @@ function plannedLoad(s) {
   return Math.round(min / 60 * IF * IF * 100);
 }
 
+/* ---------- Auftrag 29: Dauer aus einer Quelle ----------
+   Anpassungen (Ampel, Pause, Schmerz, Coach-Chat …) setzten Titel, Dauer und Beschreibung einzeln und ließen die Bausteine stehen:
+   „Zone 2 statt: Ausfahrt 52 min mit 12 min Sweet Spot“, rechts 40 min, die Bausteine ergaben 52 min. Jetzt gilt nach jeder Änderung:
+   Bausteine (spec) sind die Quelle; Dauer, Distanz, Zone, Titel und Beschreibung werden daraus gebaut. Fehlen passende Bausteine,
+   entstehen sie hier (locker gleicher Sportart bzw. die alten Bausteine auf die neue Dauer gebracht). Gilt für bestehende Anpassungen
+   aller Nutzer ohne Umbau der Daten, weil jede Ansicht, der Coach und der Server den Plan über applyAdjustments lesen. */
+const TITLE_NUMS = /\s*\d+(?:[.,]\d+)?\s*×\s*(?:\(\s*)?\d+(?:[.,]\d+)?(?:\s*\+\s*\d+(?:[.,]\d+)?)?\s*(?:min|s|m|km)\b\)?|\s*\(\s*\d{1,3}(?:\.\d{3})*(?:[.,]\d+)?\s*(?:m|km)\s*\)|\s*\d+(?:[.,]\d+)?\s*(?:min|km|m|s)\b/g;
+const STATT = /^((?:Zone \d(?:-\d)?|Locker(?: und kurz)?|Lockerer?|Kürzer) statt: )(.*)$/;
+function titleWithoutNumbers(t) {
+  return String(t || '').replace(TITLE_NUMS, '').replace(/\s+mit\s*(?=,|\(|$)/g, '').replace(/\s+mit\s+mit\s+/g, ' mit ').replace(/\s{2,}/g, ' ').replace(/\s+([,)])/g, '$1').replace(/^(\S+ statt: )+/, m => m.split(': ')[0] + ': ').trim();
+}
+function specMinutes(spec) { try { return spec && Array.isArray(spec.steps) && spec.steps.length ? W.totals(spec).min : null; } catch (e) { return null; } }
+function fitSpecTo(spec, min) {
+  let sp = JSON.parse(JSON.stringify(spec)); if (sp.stage && sp.sport !== 'swim') sp.stage = null;
+  for (let k = 0; k < 8 && Math.abs(W.totals(sp).min - min) > 2; k++) { const now = Math.max(1, W.totals(sp).min); sp = W.scaleSpec(sp, Math.max(0.3, Math.min(2.5, min / now))); }
+  return sp;
+}
+function stepDescription(text, built) {
+  const t = String(text || '').trim();
+  if (!t || t === built || /\bGesamt: \d+ min|\bSumme: [\d.]+ m/.test(t)) return built;
+  return t + '\n' + built;
+}
+function harmonizeModified(s, set, prevSpec) {
+  if (!s || s.sport === 'rest' || s.race || !set) return;
+  if (!('plannedMinutes' in set || 'spec' in set || 'title' in set || 'zone' in set || 'plannedKm' in set)) return;
+  let spec = 'spec' in set ? set.spec : s.spec;
+  const min = num(s.plannedMinutes);
+  const easy = set.hard === false || STATT.test(String(set.title || '')) || /^Zone [12](?:-2)?$/.test(String(set.zone || ''));
+  const sportChanged = prevSpec && prevSpec.sport && prevSpec.sport !== s.sport;
+  // Bausteine fehlen oder passen nicht zur neuen Dauer: aus den alten Bausteinen ableiten
+  if ((!spec || !Array.isArray(spec.steps)) && prevSpec && Array.isArray(prevSpec.steps) && !sportChanged && min) {
+    if (easy && (s.sport === 'run' || s.sport === 'bike')) {
+      spec = s.sport === 'run' ? W.runEasy(prevSpec.ctx || {}, min) : W.bikeEasy(prevSpec.ctx || {}, min);
+      if (/Zone 1/.test(String(set.zone || ''))) spec.steps = spec.steps.map(x => ({ ...x, zone: 1 }));
+    } else if (s.sport !== 'strength') spec = fitSpecTo(prevSpec, min);
+    else spec = prevSpec;
+  } else if (spec && Array.isArray(spec.steps) && 'plannedMinutes' in set && !('spec' in set) && min && Math.abs((specMinutes(spec) || 0) - min) > 1) {
+    spec = easy && !(s.spec && s.spec.kind === 'easy') && (s.sport === 'run' || s.sport === 'bike') ? (s.sport === 'run' ? W.runEasy(spec.ctx || {}, min) : W.bikeEasy(spec.ctx || {}, min)) : fitSpecTo(spec, min);
+  }
+  if (spec && Array.isArray(spec.steps) && spec.steps.length && spec.sport === s.sport) {
+    const tot = specMinutes(spec);
+    const statt = STATT.exec(String(s.title || ''));
+    const needsBuild = tot == null || Math.abs(tot - (min || 0)) > 1 || spec !== s.spec || titleIssue(s, spec) || (['run', 'bike', 'swim', 'strength'].includes(s.sport) && !['team', 'game', 'race', 'test'].includes(spec.kind) && !/\bGesamt: \d+ min|\bSumme: [\d.]+ m|Übungen:/.test(String(s.description || '')));
+    if (!needsBuild) return;
+    let b; try { b = W.build(spec); } catch (e) { return; }
+    s.spec = b.spec; s.plannedMinutes = b.plannedMinutes; s.plannedKm = b.plannedKm ?? null;
+    if (b.zone) s.zone = b.zone;
+    if (easy) s.hard = !!b.hard;
+    s.title = statt ? statt[1] + titleWithoutNumbers(statt[2]) : ('title' in set && set.title && !titleIssue({ ...s, title: set.title }, b.spec) ? set.title : b.title);
+    s.description = stepDescription('description' in set ? set.description : '', b.description);
+    return;
+  }
+  // ohne Bausteine (Teamsport, Schwimmen ohne Aufbau …): Zahlen im Titel dürfen der Dauer nicht widersprechen
+  if (min && titleIssue(s, null)) { const st = STATT.exec(String(s.title || '')); s.title = st ? st[1] + titleWithoutNumbers(st[2]) : String(s.title || '').replace(/(?<![×\d])\d+ min\b/, min + ' min'); }
+}
+/* Stimmen die Zahlen im Titel mit Dauer, Distanz und Bausteinen überein? (null = in Ordnung) */
+function titleIssue(s, spec) {
+  const t = String(s.title || ''); const min = num(s.plannedMinutes);
+  const steps = (spec && spec.steps) || [];
+  const mainMins = new Set(steps.flatMap(x => [x.min, x.walkMin, (x.reps || 1) * (x.min || 0)]).filter(Boolean).map(x => Math.round(x * 10) / 10));
+  for (const m of t.matchAll(/(\d+)\s*×\s*(\d+(?:[.,]\d+)?)\s*min\b/g)) { if (spec && !steps.some(x => (x.reps || 1) === +m[1] && Math.abs((x.min || 0) - +m[2].replace(',', '.')) < 0.05)) return `Titel nennt ${m[0]}, die Bausteine nicht.`; }
+  const flat = t.replace(/\d+\s*×\s*\(?[\d.,+\s]+(?:min|s|m)\)?/g, '');
+  const mins = [...flat.matchAll(/(?<![\d.,])(\d+(?:[.,]\d+)?) min\b/g)].map(m => +m[1].replace(',', '.'));
+  if (mins.length && min != null) {
+    const first = mins[0];
+    if (first !== min && !(mainMins.has(first) && !/^(Langer?|Lange|Lockerer?|Lockere|Ausfahrt|Lauf|Koppeltraining|Kraft)(?=\s)/.test(t.replace(STATT, '$2')))) return `Titel sagt ${first} min, geplant sind ${min} min.`;
+    for (const x of mins.slice(1)) if (spec && !mainMins.has(x) && x !== min) return `Titel nennt ${x} min, die Bausteine nicht.`;
+  }
+  const meters = /\((\d{1,3}(?:\.\d{3})*|\d+) m\)/.exec(t);
+  if (meters && s.plannedKm != null && Math.abs(+meters[1].replace(/\./g, '') - s.plannedKm * 1000) > 1) return `Titel sagt ${meters[1]} m, geplant sind ${Math.round(s.plannedKm * 1000)} m.`;
+  return null;
+}
 /* ---------- Effektiver Plan: Coach-Plan + Anpassungen ---------- */
 const ADJ_FIELDS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description'];
 function activeAdjustments(adjustments) {
@@ -333,7 +407,7 @@ function applyAdjustments(weeks, adjustments) {
     s._adj = (s._adj || []).concat(a.id);
     // bewusste Ausnahme von einer harten Regel: gilt nur für diese eine Einheit (Auftrag 5 A4)
     if (a.override) s.ruleOverride = true;
-    if (a.type === 'modify') Object.assign(s, a.set || {});
+    if (a.type === 'modify') { const prevSpec = s.spec || null; Object.assign(s, a.set || {}); harmonizeModified(s, a.set || {}, prevSpec); }
     // Auftrag 21: vom Coach gekürzte Woche (weniger Umfang nach Krankheit/verpassten Einheiten) gilt als reduzierte Woche: die Woche danach
     // darf wieder zum Plan zurück, ohne als zu großer Sprung zu zählen (wie bei geplanten reduzierten Wochen)
     if (a.type === 'modify' && /-vol-/.test(a.id || '') && /Umfang -/.test(a.reason || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) w.reduced = true; }
@@ -387,7 +461,7 @@ function dailyLoadEntries(state, weeks) {
     const record = { ...st, metrics: actualMetrics(st, a), rpe: st.rpe ?? a?.rpe };
     // Abgehakt bedeutet abgeschlossen, nicht dass die geplante Dauer gemessen wurde.
     if (toNum(record.metrics?.min) == null && toNum(record.icuLoad) == null) return;
-    out.push({ date, sport: s.sport, key, load: sessionLoad(s, record, thrOf(state)) });
+    out.push({ date, sport: actualSport(s, st), key, load: sessionLoad(s, record, thrOf(state)) });
   };
   planDays(weeks).forEach(d => (d.sessions || []).forEach(s => { const st = state.sessions?.[s.id]; if (st?.completed) add(d.date, s, st, 'session:' + s.id); }));
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, list]) => (list || []).forEach(w => add(d, w, w, 'custom:' + w.id)));
@@ -562,7 +636,7 @@ function libTarget(stage, result, prevResult) { return result === 'up' ? stage +
 function libStatus(state, weeks, date) {
   const thr = { ...thrOf(state), lthrBike: (thrOf(state).lthrBike) || LTHR_DEFAULT.bike };
   const libDone = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -28)).flatMap(d => d.sessions.filter(x => x && x.spec && x.spec.lib && LIB[x.spec.lib.key] && LIB[x.spec.lib.key].quality && ['run', 'bike'].includes(x.sport) && !x.cancelled).map(x => ({ s: x, st: (state.sessions || {})[x.id] || {}, date: d.date }))).sort((a, b) => a.date.localeCompare(b.date));
-  const verdictOf = (x) => x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], thr) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
+  const verdictOf = (x) => x.st.completed && changedOf(x.st) ? { result: 'stay', why: 'anders trainiert als geplant' } : x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], thr) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
   const out = {};
   for (const key of [...new Set(libDone.map(x => x.s.spec.lib.key))]) { const list = libDone.filter(x => x.s.spec.lib.key === key); const last = list[list.length - 1], prev = list[list.length - 2]; const v = verdictOf(last); if (!v) continue; const pv = prev ? verdictOf(prev) : null; out[key] = { stage: last.s.spec.lib.stage, target: libTarget(last.s.spec.lib.stage, v.result, pv && pv.result), why: v.why, date: last.date }; }
   return out;
@@ -687,6 +761,25 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
         break;
       }
     });
+    // Auftrag 29: Schlüsseleinheit „anders gemacht“ (locker oder andere Sportart): sie ist erledigt, die Härte fehlt aber. Nachholen nur
+    // nach denselben Regeln wie oben (freier/lockerer Tag, nie neben einer harten Einheit, nicht vor einem Spiel, Regeln der Person),
+    // höchstens eine nachgeholte Einheit pro Woche und nur einmal je Einheit (nicht stapeln).
+    live(from).filter(s => isKey(s) && !isTestOrRace(s) && sessDone(state, s) && plannedLoadDropped((state.sessions || {})[s.id]) && !s.added).forEach(s => {
+      if (Object.values(existing).some(a => a && a.id === 'redo-' + s.id) || res.some(a => /^redo-/.test(a.id))) return;
+      const wk = weekRange(from)[0];
+      if (Object.values(existing).some(a => a && /^redo-/.test(a.id) && !a.undone && a.to && weekRange(a.to)[0] === wk)) return;
+      for (let k = 1; k <= 2; k++) {
+        const to = addDays(from, k);
+        if (to < date || !dayOf(to) || illnessAt(illness, to)) continue;
+        if (to === date && R.level > 0) continue;
+        if (hardDay(to, s.id) || hardDay(addDays(to, -1), s.id) || hardDay(addDays(to, 1), s.id) || gameDay(addDays(to, 1))) continue;
+        if (!ruleOk(rules, s, to, live(to))) continue;
+        const copy = Object.assign({}, s, { id: s.id + '-nach', title: s.title, nachVon: from }); delete copy._adj; delete copy._orig; delete copy.movedFrom; delete copy.date;
+        push({ id: 'redo-' + s.id, type: 'add', to, session: copy, group: 'redo-' + s.id,
+          what: `${s.title}: am ${dowDe(to)} ${dm(to)} nachholen`, reason: `Am ${dowDe(from)} ${dm(from)} anders trainiert (locker statt hart) – Platz ohne harte Einheit daneben gefunden` });
+        break;
+      }
+    });
   }
   return res;
 }
@@ -695,6 +788,8 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
    Sehr hart (RPE 9-10) oder „abgebrochen“ in der Notiz: Stufe wiederholen. Ohne Daten: wiederholen. */
 function stageVerdict(s, st, act): { ok: boolean; why: string } {
   st = st || {}; const m = actualMetrics(st, act);
+  // Auftrag 29: anders gemacht (locker, andere Sportart, andere Intervalle) ist kein Nachweis für die Stufe
+  if (changedOf(st) && changedOf(st).kind !== 'shorter') return { ok: false, why: 'anders trainiert als geplant' };
   const rpe = toNum(st.rpe), min = toNum(m.min);
   if (/abgebrochen|nicht geschafft|zu schwer/i.test(st.notes || '')) return { ok: false, why: 'laut Notiz zu schwer' };
   if (rpe != null && rpe >= 9) return { ok: false, why: 'RPE ' + rpe + ' (sehr hart)' };
@@ -1209,7 +1304,7 @@ export {
   ruleOk, hashOf,
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
-  isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays,
+  isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays, titleIssue as sessionTitleIssue, titleWithoutNumbers,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, painInfo, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
   isLocked, stageVerdict, stageSession, ladderVerdict as ladderVerdictOf, libStatus, canonicalActivityId, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

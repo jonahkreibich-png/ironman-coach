@@ -5,7 +5,7 @@ import {customDraft} from './custom-draft27';
 import { findCustomRecord, STATE, BASE_WEEKS, saveSoon, saveState, profile } from '../store';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, secToMmss } from '../kit';
+import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, secToMmss, termLink } from '../kit';
 import { SPORT_FIELDS, FEEL, zoneVerdict, loadOn, type FieldDef } from '../../../shared/fields';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
@@ -16,8 +16,8 @@ import * as C from '../../../shared/core';
 import { strengthNumber } from '../../../shared/strength';
 import { editStrengthTemplate } from './strength';
 import { intervalsBlock, registerIntervalHost, registerPlannedLookup } from './intervalsui';
-import { checkField, crossCheck, applyDoubtFix } from '../../../shared/validate';
-import { actualMetrics } from '../../../shared/results';
+import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay } from '../../../shared/validate';
+import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, plannedLoadDropped } from '../../../shared/results';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
 /* Datensatz der Einheit (Zustand einer geplanten Einheit oder die Extra-Einheit selbst) */
@@ -26,6 +26,8 @@ function rec(tg: Target): any {
   return customDraft(tg.id) || findCustomRecord(tg.id);
 }
 function put(tg: Target, next: any) {
+  // Auftrag 29: bei einer erledigten Extra-Einheit sind Dauer/Distanz der Liste dieselben Werte wie in der Einheit (eine Quelle, auch beim Nachtragen)
+  if (tg.kind === 'custom' && next && next.completed !== false && (next.source === 'manual' || next.plannedMinutes == null) && !next.trainingBlocks && !next.strengthTemplateId) { const n = (v: any) => { const x = parseNum(v); return x == null || !Number.isFinite(x) ? null : x; }; next = { ...next, plannedMinutes: n(next.metrics?.min) }; if (tg.sport === 'run' || tg.sport === 'bike') next.plannedKm = n(next.metrics?.km); }
   const draft=customDraft(tg.id);if(tg.kind==='custom' && draft){Object.keys(draft).forEach(k=>delete draft[k]);Object.assign(draft,next);return;}
   if (tg.kind === 'session') { STATE.sessions[tg.id] = next; return; }
   for (const list of Object.values(STATE.customWorkouts||{}) as any[][]) { const i=list.findIndex((w:any)=>w.id===tg.id); if(i>=0){list[i]=next;return;} }
@@ -34,16 +36,23 @@ const attrs = (tg: Target) => `data-tk="${tg.kind}" data-tid="${esc(tg.id)}" dat
 const tgOf = (el: HTMLElement): Target => ({ kind: el.dataset.tk as any, id: el.dataset.tid!, date: el.dataset.tdate!, sport: el.dataset.tsport! });
 const paceSecOf = (v: any): number | null => { const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v == null ? '' : v).trim()); return m ? +m[1] * 60 + +m[2] : null; };
 
+/* Auftrag 29: Normalized Power nur mit echten Wattdaten (Leistungsmesser, Smart Trainer oder Watt aus der Aufzeichnung), nie auf einer einfachen Rolle */
+function realWatts(st: any): boolean {
+  const m = st.metrics || {}; if (m.indoor === 'basic') return false;
+  if (m.np != null && m.np !== '') return true;
+  const p: any = profile(); const act = st.activityId ? (STATE.activities || {})[st.activityId] : null;
+  return !!(p.powerMeter || (m.indoor === 'in' && p.trainerType === 'smart') || (act && (act.avgPower || act.np)) || (st.metricsSrc && st.metricsSrc.power && st.metricsSrc.power !== 'manual'));
+}
 function oneField(tg: Target, f: FieldDef, st: any): string {
   const m = st.metrics || {}; const src = (st.metricsSrc || {})[f.key] || (st.metricsManual && st.metricsManual[f.key] ? 'manual' : null);
-  const lab = `${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''} ${srcBadge(src)}`;
+  const lab = `${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''} ${srcBadge(src)}${f.key === 'np' ? ' ' + termLink('Normalized Power', '?') : ''}`;
   const id = `fd-${f.key}`;
   if (f.kind === 'pace') return timeField(id, f.label + (f.unit ? ` (${f.unit})` : ''), paceSecOf(m[f.key]), 'ms', `data-ch="fd" data-k="${f.key}" data-pace="1" ${attrs(tg)}`);
   if (f.kind === 'select') return `<div class="fld"><label for="${id}">${lab}</label><select class="inp" id="${id}" data-ch="fd" data-k="${f.key}" ${attrs(tg)}>${(f.options || []).map(([v, l]) => `<option value="${esc(v)}" ${String(m[f.key] ?? '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
   if (f.kind === 'text') return `<div class="fld wide"><label for="${id}">${lab}</label><input class="inp" id="${id}" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(m[f.key] ?? '')}" placeholder="${esc(f.ph || '')}"></div>`;
   if (f.kind === 'splits') return splitsHtml(tg, m.splits || []);
   if (f.kind === 'exercises') return exercisesHtml(tg, m.exercises, st);
-  return `<div class="fld"><label for="${id}">${lab}</label><input class="inp" id="${id}" type="text" inputmode="decimal" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(m[f.key] ?? '')}" placeholder="${esc((st.metricsAuto || {})[f.key] ?? '')}"></div>`;
+  return `<div class="fld"><label for="${id}">${lab}</label><input class="inp" id="${id}" type="text" inputmode="decimal" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(inputDisplay(tg.sport, f.key, m[f.key]))}" placeholder="${esc(inputDisplay(tg.sport, f.key, (st.metricsAuto || {})[f.key]))}"></div>`;
 }
 function splitsHtml(tg: Target, list: any[]): string {
   return `<div class="fld wide" data-splits><span class="lab">${esc(t('fd.splits'))}</span>${list.length ? `<div class="splits">${list.map((s: any, i: number) => `<div class="split-row"><b class="xs">${s.km} km</b>
@@ -69,7 +78,7 @@ export function fieldsBlock(tg: Target): string {
   const st = rec(tg) || {};
   // Testfelder nur bei Tests (Lauftest, Radtest, Schwimmtest)
   const isTest = /test/i.test(String((tg.planned && tg.planned.title) || ''));
-  const defs = (SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }]).filter(f => !f.test || isTest);
+  const defs = (SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }]).filter(f => (!f.test || isTest) && (f.key !== 'np' || realWatts(st)));
   const main = defs.filter(f => !f.more), extra = defs.filter(f => f.more);
   const prof = profile();
   const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds);
@@ -80,9 +89,10 @@ export function fieldsBlock(tg: Target): string {
   return `<div class="card flat tight stack" data-fields="${tg.sport}">
     <div class="spread"><div class="lbl">${esc(t('fd.values'))} ${srcs.map(s => srcBadge(s)).join(' ')}</div>${hasOrig ? `<button class="link" data-act="fd-reset" ${attrs(tg)}>${esc(t('common.resetOriginal'))}</button>` : ''}</div>
     ${auto ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-auto>${auto}</div>` : ''}
+    ${tg.kind === 'session' && tg.planned ? changeHtml(tg, st) : ''}
     ${doubtsHtml(tg, st)}
     <div class="fgrid">${main.map(f => oneField(tg, f, st)).join('')}</div>
-    ${intervalsBlock(tg, st, attrs(tg))}
+    ${plannedLoadDropped(st) ? '' : intervalsBlock(tg, st, attrs(tg))}
     ${extra.length ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}
     <div class="fld wide"><span class="lab">${esc(t('fd.rpe'))}</span><div class="rpe-row" role="group" aria-label="${esc(t('fd.rpe'))}">${Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button class="chip ${String(st.rpe ?? '') === String(n) ? 'on' : ''}" aria-pressed="${String(st.rpe ?? '') === String(n)}" data-act="fd-rpe" data-v="${n}" ${attrs(tg)}>${n}</button>`).join('')}</div><div class="xs muted">${esc(t('fd.rpeHint'))}</div></div>
     <div class="fld wide"><span class="lab">${esc(t('fd.feel'))}</span><div class="chips" style="flex-wrap:wrap">${FEEL.map(([v, l]) => `<button class="chip ${String(st.feel ?? '') === v ? 'on' : ''}" aria-pressed="${String(st.feel ?? '') === v}" data-act="fd-feel" data-v="${v}" ${attrs(tg)}>${esc(l)}</button>`).join('')}</div></div>
@@ -92,6 +102,22 @@ export function fieldsBlock(tg: Target): string {
 }
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
+/* Auftrag 29: „So wie geplant / Anders gemacht“ mit Art und optionalem Grund (Intervall-Liste dann nicht nötig) */
+function changeHtml(tg: Target, st: any): string {
+  const c = st.changed || {}; const other = st.asPlanned === false;
+  const chip = (act: string, v: string, label: string, on: boolean) => `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="${act}" data-v="${esc(v)}" ${attrs(tg)}>${esc(label)}</button>`;
+  const sports: [string, string][] = [['run', 'Laufen'], ['bike', 'Rad'], ['swim', 'Schwimmen'], ['strength', 'Kraft'], ['football', 'Teamsport']];
+  return `<div class="fld wide" data-as-planned><span class="lab">Wie lief es?</span><div class="chips" role="group" aria-label="Wie lief es?" style="flex-wrap:wrap">${chip('fd-asplanned', '1', 'So wie geplant', st.asPlanned === true)}${chip('fd-asplanned', '0', 'Anders gemacht', other)}</div>
+    ${other ? `<span class="lab">Was hast du gemacht?</span><div class="chips" style="flex-wrap:wrap" data-change-kind>${CHANGE_KINDS.filter(([k]) => k !== 'otherSport' || true).map(([k, l]) => chip('fd-chg-kind', k, k === 'easy' && tg.planned && !/intervall|sweet|schwelle|tempo|test|vo2|hart/i.test(String(tg.planned.title || '') + ' ' + (tg.planned.hard ? 'hart' : '')) ? 'Locker (Zone 2)' : l, c.kind === k)).join('')}</div>
+      ${c.kind === 'otherSport' ? `<label class="fld"><span class="lab">Sportart</span><select class="inp" data-ch="fd-chg-sport" ${attrs(tg)}><option value="">–</option>${sports.filter(([k]) => k !== tg.planned.sport).map(([k, l]) => `<option value="${k}" ${c.sport === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+      <span class="lab">Grund (optional)</span><div class="chips" style="flex-wrap:wrap" data-change-reason>${CHANGE_REASONS.map(([k, l]) => chip('fd-chg-reason', k, l, c.reason === k)).join('')}</div>` : ''}</div>`;
+}
+function setChange(tg: Target, f: (st: any) => void) { const st = rec(tg); if (!st) return; f(st); if (st.asPlanned === false && !st.changed) st.changed = {}; redraw(); rev(tg); }
+on('fd-asplanned', el => setChange(tg0(el), st => { st.asPlanned = el.dataset.v === '1'; if (st.asPlanned) delete st.changed; }));
+on('fd-chg-kind', el => setChange(tg0(el), st => { st.asPlanned = false; st.changed = { ...(st.changed || {}), kind: el.dataset.v }; if (el.dataset.v !== 'otherSport') delete st.changed.sport; }));
+on('fd-chg-reason', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}) }; st.changed.reason = st.changed.reason === el.dataset.v ? undefined : el.dataset.v; }));
+onChange('fd-chg-sport', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), kind: 'otherSport', sport: (el as HTMLSelectElement).value || undefined }; }));
+function tg0(el: HTMLElement): Target { return tgOf(el); }
 /* Auftrag 22: Rückfrage bei widersprüchlichen Werten (z. B. 200 km in 30 min, Puls über max. Puls) mit Vorschlag */
 function doubtsHtml(tg: Target, st: any): string {
   const act = st && st.activityId ? (STATE.activities || {})[st.activityId] : null;
@@ -113,13 +139,25 @@ registerPlannedLookup((id, date) => { const d = C.planDays(C.applyAdjustments(BA
 const rev = (tg: Target) => { if(customDraft(tg.id))return; const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
 // Beim Tippen sichern, ohne Formular/Fokus neu aufzubauen. Fachliche
 // Neubewertung und Meldungen folgen weiterhin erst beim bestaetigten change.
+/* Auftrag 29: Stand vor dem Tippen merken. Beim Tippen werden gültige Zwischenstände gesichert („1“ auf dem Weg zu „102“);
+   ist die fertige Eingabe ungültig, gilt wieder der Wert von vorher – nie der Zwischenstand (Schrittlänge 102 → 1). */
+const BEFORE = new WeakMap<HTMLElement, { has: boolean; v: any; manual: any; src: any }>();
+function remember(el: HTMLElement, st: any, k: string) { if (!BEFORE.has(el)) BEFORE.set(el, { has: Object.prototype.hasOwnProperty.call(st.metrics || {}, k), v: (st.metrics || {})[k], manual: (st.metricsManual || {})[k], src: (st.metricsSrc || {})[k] }); }
+function restore(el: HTMLElement, tg: Target, st: any, k: string) {
+  const b = BEFORE.get(el); BEFORE.delete(el); if (!b) return;
+  const next = { ...st, metrics: { ...(st.metrics || {}) }, metricsManual: { ...(st.metricsManual || {}) }, metricsSrc: { ...(st.metricsSrc || {}) } };
+  if (b.has) next.metrics[k] = b.v; else delete next.metrics[k];
+  if (b.manual != null) next.metricsManual[k] = b.manual; else delete next.metricsManual[k];
+  if (b.src != null) next.metricsSrc[k] = b.src; else delete next.metricsSrc[k];
+  put(tg, next); saveSoon();
+}
 onInput('fd', el => {
-  const tg=tgOf(el), st=rec(tg); if(!st)return;
+  const tg=tgOf(el), st=rec(tg); if(!st)return; remember(el, st, el.dataset.k!);
   let value:any=(el as HTMLInputElement).value.trim();
   if(el.dataset.pace || el.dataset.tf){const sec=readTime(el);if(sec!=null && isNaN(sec))return;value=sec?secToMmss(sec):'';}
   // Auftrag 22: unvollständige oder unmögliche Werte beim Tippen nicht speichern (Prüfung mit Hinweis beim Verlassen des Felds)
   const c=checkField(tg.sport,el.dataset.k!,value);if(!c.ok)return;
-  put(tg,setSessionMetricManual(st,el.dataset.k!,value));saveSoon();
+  put(tg,setSessionMetricManual(st,el.dataset.k!,c.value));saveSoon();
 });
 onInput('fd-top',(el,ev)=>CHANGE['fd-top'](el,ev));
 onInput('fd-split',(el,ev)=>{
@@ -138,8 +176,12 @@ onChange('fd', el => {
   if (el.dataset.pace || el.dataset.tf) { const s = readTime(el); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } v = s ? secToMmss(s) : ''; }
   // Auftrag 22: Grenzen je Feld – unmögliche Werte freundlich ablehnen, der gespeicherte Wert bleibt
   const chk = checkField(tg.sport, k, v);
-  if (!chk.ok) { toast(chk.msg!); refreshSheet(); return; }
-  put(tg, setSessionMetricManual(st, k, v));
+  if (!chk.ok) { restore(el, tg, st, k); el.setAttribute('aria-invalid', 'true'); toast(chk.msg!); refreshSheet(); nav.rerender(); return; }
+  BEFORE.delete(el); el.removeAttribute('aria-invalid');
+  if (chk.note) toast(chk.note);
+  // Auftrag 29: das Feld zeigt sofort, was gespeichert ist (z. B. „1:05“ → 65 min, „1,02 m“ → 102 cm)
+  if (el.tagName === 'INPUT' && !el.dataset.pace && !el.dataset.tf) (el as HTMLInputElement).value = inputDisplay(tg.sport, k, chk.value);
+  put(tg, setSessionMetricManual(rec(tg) || st, k, chk.value));
   saveSoon(); if (el.tagName === 'SELECT' || k === 'hr') refreshSheet(); nav.rerender();
   if (!customDraft(tg.id) && (k === 'hr' || k === 'pace' || /^test|^css|^crawl25|^breast200/.test(k)) && checkTestResult()) { saveState(); refreshSheet(); nav.rerender(); }
   if (!customDraft(tg.id) && (k === 'longestCrawl' || k === 'longestPull') && checkSwimSkill()) { saveState(); refreshSheet(); nav.rerender(); }

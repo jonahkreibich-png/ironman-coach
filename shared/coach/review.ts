@@ -11,7 +11,7 @@ import * as W from '../workouts';
 import type { EngineCtx } from './engine';
 import { readinessFacts } from './engine';
 import { fieldsOf } from '../fields';
-import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea } from '../results';
+import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea, changedOf, actualSport, actualTitle, plannedLoadDropped } from '../results';
 import { HR_ZONES } from '../sports';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
@@ -28,7 +28,7 @@ const weeksOf = (ctx: EngineCtx) => C.applyAdjustments(ctx.baseWeeks, ctx.state.
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 
 /* ---------- Erledigte Einheiten finden ---------- */
-export interface Done { key: string; date: string; sport: string; title: string; planned: any | null; st: any; act: any | null; custom: boolean }
+export interface Done { key: string; date: string; sport: string; title: string; planned: any | null; st: any; act: any | null; custom: boolean; /** Auftrag 29: anders gemacht – die geplante Einheit und die Art der Änderung */ changedFrom?: any; change?: any }
 export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
   const out: Done[] = []; const usedActs = new Set<string>();
   const acts: Record<string, any> = ctx.state.activities || {};
@@ -38,6 +38,9 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
     if (!st || !st.completed) return;
     const act = st.activityId ? acts[st.activityId] || null : Object.values(acts).find((a: any) => a && !a.mergedInto && a.sessionId === s.id) || null;
     if (act) usedActs.add(act.id);
+    // Auftrag 29: anders gemacht → bewertet wird das Gemachte (Sportart, Titel); die geplante Härte zählt dann nicht als Vorgabe
+    const ch = changedOf(st);
+    if (ch) { const dropped = plannedLoadDropped(st); out.push({ key: s.id, date: d.date, sport: actualSport(s, st), title: actualTitle(s, st, act), planned: dropped ? null : ch.kind === 'otherIntervals' ? { ...s, spec: null } : s, st, act, custom: false, changedFrom: s, change: ch }); return; }
     out.push({ key: s.id, date: d.date, sport: s.sport, title: s.sport === 'strength' ? actualStrength(st, act).title : s.title, planned: s, st, act, custom: false });
   }));
   Object.entries(effectiveCustomBuckets(ctx.state) || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => {
@@ -96,6 +99,7 @@ function similarBefore(ctx: EngineCtx, d: Done, v: Vals): { d: Done; v: Vals } |
 }
 
 /* ---------- Eine Einheit bewerten ---------- */
+const stripTitle = (t: string) => String(t).replace(/^(Rad|Lauf)-Intervalles*/, '').replace(/s*((Gravelbike|Rennrad|Mountainbike|Rolle))/, '') || t;
 export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: string[]; next: string[]; missing: string[]; head: string; fatigue: number } {
   const v = valsOf(d); const p = ctx.profile; const th = p.thresholds;
   const good: string[] = [], better: string[] = [...v.conflicts], missing: string[] = [];
@@ -111,7 +115,16 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (v.km) facts.push(`${de(v.km)} km`); if (v.meters) facts.push(`${v.meters} m`);
   if (v.pace) facts.push(`${mmss(v.pace)}/km`); if (v.speed && d.sport === 'bike') facts.push(`${de(v.speed)} km/h`); if (v.power) facts.push(`${Math.round(v.power)} W`);
   if (v.hr && d.sport !== 'strength') facts.push(`Puls ${Math.round(v.hr)}`);
-  const head = `${d.sport === 'strength' ? actualStrength(d.st, d.act).title : d.title} (${fmtD(d.date)})${facts.length ? ': ' + facts.join(', ') : ''}.`;
+  const head = `${d.sport === 'strength' && !d.change ? actualStrength(d.st, d.act).title : d.title} (${fmtD(d.date)})${facts.length ? ': ' + facts.join(', ') : ''}.`;
+  // Auftrag 29: kurz einordnen, was die Änderung bedeutet (die geplante Einheit wird nicht gegen das Gemachte bewertet)
+  if (d.change && d.changedFrom) {
+    const was = String(d.changedFrom.title || 'die geplante Einheit'); const why = d.change.reason;
+    const keyPlanned = C.isKey(d.changedFrom) || C.isIntervals(d.changedFrom);
+    if (d.change.kind === 'easy') good.push(`${keyPlanned ? stripTitle(was) + ' ausgefallen' : 'Lockerer als geplant'} – kein Problem, Zone 2 war ${why === 'tired' || why === 'ill' || why === 'pain' ? 'heute genau richtig' : 'sinnvoll'}.${keyPlanned ? ' Ob die Schlüsseleinheit nachgeholt wird, prüfe ich mit den Regeln (nie neben einer anderen harten Einheit).' : ''}`);
+    else if (d.change.kind === 'otherSport') good.push(`Statt ${was} ${d.title.split(' · ')[0]} gemacht – zählt als ${d.title.split(' · ')[0]}-Einheit.${why === 'pain' ? ' Mit Schmerzen war das die richtige Wahl.' : ''}`);
+    else if (d.change.kind === 'shorter') good.push(`Kürzer als geplant${why === 'time' ? ' (keine Zeit)' : why ? '' : ''} – besser kurz als gar nicht.`);
+    else if (d.change.kind === 'otherIntervals') good.push('Andere Intervalle als geplant – bewertet werden die gemachten.');
+  }
 
   // Dauer gegen Vorgabe
   if (s && s.plannedMinutes && v.min) {
@@ -504,7 +517,7 @@ export function reviewInputSig(ctx: { state: any }, key: string): string {
   const custom = Object.values(st.customWorkouts || {}).flat().find((c: any) => c && c.id === key) as any;
   const s: any = (st.sessions || {})[key] || custom || {};
   const act: any = (st.activities || {})[s.activityId || key] || null;
-  const pick = (x: any) => x ? { metrics: x.metrics || null, manual: x.metricsManual || null, rpe: x.rpe ?? null, feel: x.feel ?? null, deviation: x.deviation || '', completed: x.completed ?? null, skipped: !!x.skipped } : null;
+  const pick = (x: any) => x ? { metrics: x.metrics || null, manual: x.metricsManual || null, rpe: x.rpe ?? null, feel: x.feel ?? null, deviation: x.deviation || '', asPlanned: x.asPlanned ?? null, changed: x.changed || null, completed: x.completed ?? null, skipped: !!x.skipped } : null;
   return C.hashOf(JSON.stringify([pick(s), act ? [act.id, act.min, act.km, act.avgHr, act.avgPower, act.manual || null] : null]));
 }
 /* Was mit einer neu gerechneten Bewertung passiert: 'same' (nichts), 'quiet' (still aktualisieren), 'corrected' (mit Hinweis) */

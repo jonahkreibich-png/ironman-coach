@@ -1,6 +1,8 @@
 import { swimAids, GEAR_TXT } from '../../shared/workouts';
 /* UI-Bausteine nach DESIGN.md: Karten, Listen, Ring, Sparkline, Quellen-Symbol, Sheets, Aktionen. */
 import { esc, $ } from './util';
+import { parseInput, type InputSpec } from '../../shared/validate';
+import { toast as showToast } from './toast';
 import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
 import { t } from '../../shared/i18n';
 import { SOURCE_LABEL } from '../../shared/activity/merge';
@@ -147,7 +149,21 @@ export function openSheet(title: string, render: () => string): void {
   $('#sheetPanel').innerHTML = sheetRender();
   $('#sheet').hidden = false; document.body.style.overflow = 'hidden';
 }
-export function refreshSheet(): void { if (sheetRender && !$('#sheet').hidden) { const p = $('#sheetPanel'); const y = p.scrollTop; p.innerHTML = sheetRender(); p.scrollTop = y; } }
+export function refreshSheet(): void {
+  if (sheetRender && !$('#sheet').hidden) {
+    const p = $('#sheetPanel'); const y = p.scrollTop;
+    // Auftrag 29: aufgeklappte Abschnitte („Weitere Werte“, Notiz …) bleiben beim Neuzeichnen offen (vorher klappten sie nach jeder Eingabe zu)
+    const key = (d: Element) => (d.querySelector(':scope > summary')?.textContent || '').trim();
+    const open = new Set(Array.from(p.querySelectorAll('details[open]')).map(key));
+    // Auftrag 29: tippt man schon im nächsten Feld, bleiben Fokus und angefangene Eingabe erhalten (vorher ersetzte das Neuzeichnen das Feld)
+    const act = document.activeElement as HTMLInputElement | null;
+    const keep = act && act.id && p.contains(act) && /^(INPUT|TEXTAREA)$/.test(act.tagName) ? { id: act.id, value: act.value, typed: act.value !== act.defaultValue, sel: (() => { try { return act.selectionStart; } catch (e) { return null; } })() } : null;
+    p.innerHTML = sheetRender();
+    p.querySelectorAll('details').forEach(d => { if (open.has(key(d))) (d as HTMLDetailsElement).open = true; });
+    if (keep) { const el = document.getElementById(keep.id) as HTMLInputElement | null; if (el && p.contains(el)) { if (keep.typed) el.value = keep.value; el.focus({ preventScroll: true }); try { if (keep.sel != null) el.setSelectionRange(keep.sel, keep.sel); } catch (e) { /* Feldart ohne Auswahl */ } } }
+    p.scrollTop = y;
+  }
+}
 export function closeSheet(): void { sheetRender = null; $('#sheet').hidden = true; $('#sheetPanel').innerHTML = ''; document.body.style.overflow = ''; }
 export function sheetOpen(): boolean { return !$('#sheet').hidden; }
 on('sheet-close', () => closeSheet());
@@ -161,3 +177,13 @@ export function armed(btn: HTMLElement, label?: string): boolean {
   return false;
 }
 export { ic, sportIcon, esc };
+/* Auftrag 29: Zahl aus einem Eingabefeld lesen (shared/validate parseInput). Ungültig: Meldung, Feld zeigt wieder den gespeicherten Wert,
+   nichts wird gespeichert. Umgerechnet (andere Einheit): Hinweis. Ergebnis undefined = nicht speichern, null = Feld geleert. */
+export function readNumberInput(el: HTMLElement, spec: InputSpec): number | null | undefined {
+  const inp = el as HTMLInputElement;
+  const r = parseInput(spec, inp.value);
+  if (!r.ok) { inp.setAttribute('aria-invalid', 'true'); inp.value = inp.defaultValue; showToast(r.msg!); return undefined; }
+  inp.removeAttribute('aria-invalid');
+  if (r.note) showToast(r.note);
+  return r.value;
+}
