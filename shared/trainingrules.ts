@@ -333,8 +333,10 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
   }
   // Auftrag 30: Tiefe der Erholungswoche – etwa 60–70 % des eigenen Umfangs der letzten Aufbauwoche (geprüft mit Spielraum 50–78 %, damit
   // feste Termine, Tests und Lernstufen nicht zu Fehlalarmen führen)
-  // Lernstufen (Lauf-Geh, Kraul lernen) bleiben jede Woche gleich und werden nicht gekürzt – sie zählen hier nicht mit
-  const ownMin = (w: any) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.sport !== 'football' && !s.stage).reduce((b: number, s: any) => b + minOf(s), 0), 0);
+  const ownMin = (w: any) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.sport !== 'football').reduce((b: number, s: any) => b + minOf(s), 0), 0);
+  // Lernstufen (Lauf-Geh, Kraul lernen) bleiben jede Woche gleich und werden nicht gekürzt: besteht die Erholungswoche zu mindestens 30 %
+  // daraus, ist „zu flach“ kein Fehler
+  const stageMin = (w: any) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.stage).reduce((b: number, s: any) => b + minOf(s), 0), 0);
   for (let i = 1; i < weeks.length; i++) {
     // Woche mit Rennen oder direkt danach: dort gelten „Wettkampfwoche“ und „Locker nach dem Wettkampf“
     const w = weeks[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe || (o.from && w.startDate < o.from) || (races.some(r => r.date >= addD(w.startDate, -7) && r.date <= w.endDate))) continue;
@@ -344,7 +346,8 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
     const pct = cur / ref;
     // unter 30 %: Urlaub/Sperrzeit (eigene Regel), kein Fehler; über 78 % mit Test in der Woche: der Test (erlaubt) bringt die Minuten
     const hasTest = (w.days || []).some((d: any) => live(d).some((s: any) => isTestS(s)));
-    if ((pct < 0.5 && pct >= 0.3) || (pct > 0.78 && !hasTest)) add('recoveryDepth', w, undefined, `Woche ${w.weekNumber}: Erholungswoche ${Math.round(pct * 100)} % der Aufbauwoche (Ziel etwa 60–70 %).`);
+    const stageHeavy = cur > 0 && stageMin(w) / cur >= 0.3;
+    if ((pct < 0.5 && pct >= 0.3) || (pct > 0.78 && !hasTest && !stageHeavy)) add('recoveryDepth', w, undefined, `Woche ${w.weekNumber}: Erholungswoche ${Math.round(pct * 100)} % der Aufbauwoche (Ziel etwa 60–70 %).`);
   }
   return out;
 }
