@@ -1,6 +1,6 @@
 # Auftrag 31: Coach-Tab ruckelt, Mitteilungen kommen nicht an (8.11.)
 
-**Stand:** Umgesetzt und getestet, Version **3.19.0**. Test-App veröffentlicht (vorher gesichert). **Echte App noch nicht:** Das Veröffentlichen wurde vom automatischen Sicherheitscheck gestoppt und braucht Jonahs Freigabe. Danach folgt die Test-Mitteilung an Jonah. Keine Nutzerdaten verändert.
+**Stand:** Umgesetzt, getestet und **veröffentlicht**: Version **3.19.0** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert.
 
 ## 1. Coach-Tab
 **Ursache** (Messung mit Kopie deiner Daten, WebKit): Vor dem Anzeigen wird jede Coach-Nachricht auf richtige Zahlen geprüft. Diese Prüfung hat für jede Nachricht den ganzen Plan mit allen 182 Anpassungen neu aufgebaut. Außerdem hat jeder Tab-Wechsel alles neu berechnet. Das waren 86 % der Zeit.
@@ -30,10 +30,11 @@ Dauertest: `tests/e2e/auftrag31-coach.spec.ts` (1.000 Nachrichten; mit der alten
 | App → Mitteilungen | ✅ „Auf diesem Gerät aktiv / nicht aktiv – erneut erlauben“, „Letzte Mitteilung zugestellt vor …“, „Test senden“ mit ehrlichem Ergebnis, Auswahl und Uhrzeiten, Ruhezeit nachts und **neu in der Schule** (Mo–Fr, Standard 07:45–13:15, aus), iPhone-Hinweis (nur Home-Bildschirm-App, Fokus kann ausblenden) |
 | Betreiber | ✅ Mehr → Betreiber → Mitteilungen: Nutzer mit aktiven Mitteilungen, Geräte, Fehler, abgelaufene, Zustellungen der letzten 7 Tage, Test je Nutzer. Dazu `scripts/push-test.mjs`. |
 | Tests | ✅ Erlauben → Test kommt an; neue Geräte-Kennung → App meldet sich selbst neu an; nach Update bleibt sie aktiv; 410 wird erkannt und ersetzt; 403-Ablehnung mit Grund gespeichert; Briefing zur richtigen Uhrzeit vor/nach beiden Zeitumstellungen und in anderer Zeitzone; Schul-Ruhezeit |
-| Test-Mitteilung an dich | ⏳ nach dem Veröffentlichen der echten App |
+| Test-Mitteilung an dich | ✅ 8.11. 22:55 verschickt. Apple hat sie für **beide** gespeicherten iPhone-Anmeldungen angenommen (201): die neue von heute 18:51 und die alte vom 31.10. Ob sie auf dem iPhone angezeigt wurde, sieht nur das iPhone. Kamen zwei, gehören beide Anmeldungen zu diesem iPhone. |
 
 ## Tests (ausgeführt)
 Typen ✅ · 3.185 Unit-/Server-Tests ✅ · Build ✅ · 676 Browser-Tests (Chromium + WebKit) ✅. Ein älterer Abgleich-Test wackelte auch mit der Vorversion (lud neu, bevor gespeichert war) – er wartet jetzt aufs Speichern, 24/24 grün.
+**Beim Release gefunden und behoben (älterer Fehler):** Zwei schnelle Eingaben hintereinander → die zweite konnte verloren gehen, weil die App vor dem Abgleich ihren Speicher neu las und dabei die frische Eingabe mit dem älteren Stand überschrieb. Jetzt bleibt eine Eingabe, die während des Lesens gespeichert wird, erhalten (Test nachgestellt: vorher rot, jetzt grün; Speicher-Tests 34/34, Release-Tests alle grün).
 
 ---
 

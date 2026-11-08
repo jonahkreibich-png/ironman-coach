@@ -1,6 +1,6 @@
 # Für Jonah
 
-**3.19.0 freigeben (nur du kannst das):** Das Veröffentlichen der echten App hat der automatische Sicherheitscheck von Claude Code gestoppt. Sag mir „Freigeben“ (oder erlaube den Befehl `node scripts/veroeffentlichen.mjs`), dann veröffentliche ich und schicke dir danach eine Test-Mitteilung.
+**Test-Mitteilung:** Um 22:55 habe ich dir eine geschickt („Test: Mitteilungen kommen wieder an.“). Apple hat sie angenommen. Ist sie nicht angekommen: Fokus prüfen (Punkt 4) und unter Mehr → Mitteilungen „Test senden“ drücken.
 
 **Nach dem Update auf 3.19.0:**
 1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
