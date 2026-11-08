@@ -1,3 +1,61 @@
+# Auftrag 30: Anders gemacht, Übersicht, Wissen, Ruckeln, Coach (8.11.)
+
+**Stand:** Alles umgesetzt und getestet, Version **3.18.0**. Veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei). Keine Daten von euch verändert.
+
+## 1. „Anders gemacht“ vollständig
+Je nach Auswahl die passenden Felder: **lockerer/härter** (tatsächliche Zone), **kürzer/länger/abgebrochen** (Dauer und Distanz bzw. „abgebrochen nach“), **andere Intervalle** (eigene Liste, gleich offen), **andere Sportart** (Felder dieser Sportart), **drinnen/draußen** (Laufband/Rolle/Halle bzw. draußen/Freiwasser), **aufgeteilt** (Teile mit je Dauer, Summe = Dauer), **ohne Teil** (Koppel, ohne Hilfsmittel, nur Brust, Ein-/Auslaufen). Grund optional, neu „Motivation“.
+Titel, Liste, Symbol, Belastung, Scores, Stufen und Coach nutzen das Gemachte (eine Stelle im Code). Neu: Nach „härter als geplant“ (Zone 4–5) wird eine harte Einheit am nächsten Tag automatisch locker.
+
+## 2. Tab-Leiste nach Drehen
+Ursache: Die Linse rechnete ihre Höhe aus der Fensterhöhe – die meldet das iPhone nach dem Drehen kurz noch falsch; kam die Safe Area später, wurde nicht nachgemessen. Jetzt: Position wie die Leiste selbst, Nachmessen bei jeder Größenänderung/Drehung/Rückkehr. Test auf WebKit und Chromium (auch mit „falscher“ Fensterhöhe): mit altem Code rot, jetzt grün.
+
+## 3. Ruckeln nach App-Wechsel (gemessen, viele Daten, CPU gebremst)
+| | vorher | nachher |
+|---|---|---|
+| Lange Aufgabe in den ersten 0,5 s nach der Rückkehr | 56–78 ms | **0 ms** |
+| Bilder in den ersten 0,5 s (WebKit) | bis 44 ms | **30 ms** |
+| „Heute“ neu berechnen | 60 ms | **41 ms** |
+| Neuaufbau der Ansicht / Scrollposition | nein / bleibt | nein / bleibt |
+Ursachen: Abgleich und Speichern liefen sofort im ersten Bild nach der Rückkehr, gespeichert wurde auch ohne Änderung, Neuzeichnen sofort, Datumsrechnung tausendfach. Jetzt: erst der gespeicherte Stand, Abgleich in einer Ruhepause, Angleichen nur des Geänderten und nie während du scrollst. Dauertest `auftrag30-rueckkehr.spec.ts` (Gegenprobe mit altem Code rot).
+
+## 4. Doppeltes entfernt
+| Weg | jetzt |
+|---|---|
+| Berücksichtigungen „In eigenen Worten“ | weg – Sonderwünsche über den Coach. Alte Sätze bleiben sichtbar und wirken weiter („Deine weiteren Regeln“), nicht verstandene mit Hinweis |
+| Plan: Knopf „Extra-Einheit“ unten | weg – „+“ am Tag |
+| Plan: „Trainingsvorlage einfügen“ in jedem Tag | weg – im „+“ steht „Aus Vorlage“ |
+| Heute: „Werte ändern“ unter „Warum?“ | weg – die Kacheln und das Herz oben öffnen dasselbe |
+| Einheit: Freitext „Abweichung vom Plan“ | weg – „Anders gemacht“ mit Grund (alter Text bleibt sichtbar, wenn vorhanden) |
+
+## 5. Bestwert, Tageswert, Trend
+Ursache deines Falls: Die Analyse verglich den ersten mit dem letzten Wert der letzten 6 Wochen. Jetzt überall getrennt: Bestwert (mit Datum), Tageswert, Trend erst ab mehreren Einheiten – für Kraul/Pull Buoy am Stück, Lauf-Pace ab 5 km, längsten Lauf, Rad-Watt ab 20 min, Schwimm-Pace. Dein Fall heißt jetzt: **„Heute 75 m Kraul am Stück, dein Bestwert sind 100 m (27.10.).“** Ein Prüfer berichtigt auch KI-Antworten („von … auf …“ unter dem Bestwert, „Rückschritt“ ohne schwächeren Trend). Bewertungen übersichtlicher: ein Punkt je Zeile, doppelte Sätze raus. Nebenbei behoben: 12,5 m wurden als 13 m angezeigt.
+
+## 6. Übersicht
+Einheitliche Icons an Einheiten und Tagen (hart, Test, Wettkampf, Koppel, Erholung, Technik, lang, angepasst), Farbstreifen locker/mittel/hart, Tests als eigene Karte mit Ablauf und „frisch sein“, oben je Woche z. B. „1 harte Einheit · 1 Test · 9,8 h“, Legende im Lexikon. Layout-Test hell/dunkel, Schrift 16 und 28 px, 320/390/430 px.
+
+## 7. Trainingswissen (ergänzt, steht in docs/TRAININGSREGELN.md)
+Persönliche Reaktion (HFV, Ruhepuls, RPE nach harten Wochen → Rhythmus, Erholungstiefe, Steigerung), Rhythmus 2+1/3+1 nach Person, Erholungswoche 60–70 %, Kraft je Phase und Alter, Schwimm-Intensität mit ⚡, Teamsport-Belastung (Turnier > Spiel > Training), Wettkampf-Bedingungen (Hitze, Freiwasser/Neopren, hügelig, Startzeit – neues Feld beim Ziel), „Anders gemacht“ wirkt auf die nächsten Tage.
+Dabei gefundene Fehler im Planer: Erholungswochen wurden nie aufgefüllt (mit festen Ruhetagen ~50 %) und erst ab 82 % gekürzt; Kraft fast immer nur 1×; Rumpf-Kraft galt als Beinkraft und fiel vor Spieltagen weg; beim Kürzen ging der Begründungstext „Ausnahme: …“ verloren; Tagesgrenze der Prüfungszeit nach dem Runden überschritten (41 statt 40 min).
+
+**Dein Plan (ab morgen, wie die App jetzt neu planen würde):**
+| | vorher (gespeichert) | nachher |
+|---|---|---|
+| Stunden je Woche (eigene, Grundlage/Aufbau) | 6,9–9,2 h | 6,3–9,1 h |
+| Erholungswochen | 49–53 % | **59–63 %** |
+| harte Einheiten je Woche | 1–2 | 1–2 |
+| schnelle Schwimm-Stücke (⚡) | meist 0 | **1 pro Woche** |
+| Kraft in der Grundlage | 1× | 1× – dein Raster erlaubt Kraft nur dienstags (siehe FUER-JONAH.md) |
+| Regel-Hinweise | 6 | 3 (lange Einheit, schon vorher) |
+Ich habe deinen Plan nicht umgeschrieben (er würde in der Grundlage ~0,5 h kürzer). Er stellt sich beim nächsten Neu-Planen mit Vorschau um, z. B. wenn du den 2. Krafttag freigibst.
+**Papa und Mama:** keine Verstöße; neu geplant Erholungswochen 67–71 % statt 78 %, Mama Kraft 2× in der Grundlage. Test-Personen (10) und 250+ erfundene Nutzer: Plan-Check ohne Verstöße.
+
+## 8. Tests
+- Neu: Langzeit-Simulation **30 Nutzer, 3–6 Monate** (alle Arten „anders gemacht“, App-Anpassungen, Neu-Planen, Coach gegen Bestwert, neue Regeln) – Pflicht vor jedem Release. Drehen + App-Wechsel mit Langzeit-Daten im Browser.
+- Funde aus den Simulationen, allgemein behoben: Erholungswoche direkt nach Neu-Planen wurde nicht leichter; Auffüllen verlängerte Tage über die Zeit im Raster bzw. nach einem Rennen; 2. Krafteinheit bei sehr wenig Zeit.
+- **Tests (ausgeführt):** Unit 3.176 grün (neu u. a. 36 „Anders gemacht“-Fälle, 22 Regel-Tests mit allen Test-Personen, Bestwert/Tageswert, 30-Nutzer-Simulation), Browser-Tests 668 grün (Chromium + WebKit, neu: alle „Anders“-Arten wie ein Mensch eingetippt + neu geladen, Startzeit-Feld, Überlauf aller „Anders“-Arten bei 320 px/28 px, Plan-Symbole hell/dunkel/16–28 px/320–430 px, Drehen, App-Wechsel). Gegenproben: Dreh-Test und Rückkehr-Test sind mit dem alten Code rot.
+
+---
+
 # Auftrag 29: Stabilisierung (7.11.)
 
 **Stand:** Alles behoben und mit Tests abgesichert, als **Version 3.17.0** veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert). Keine Daten von dir verändert.
