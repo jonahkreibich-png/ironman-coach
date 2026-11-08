@@ -250,6 +250,38 @@ test('flüssig: Rechenzeit je Frame klein, Gleiten läuft als Web-Animation (Com
   await expect(page.locator('[data-view="fortschritt"]')).toBeVisible();
 });
 
+/* Auftrag 30: nach dem Drehen (Querformat und zurück) war die Linse verschoben. Ursache: Position aus window.innerHeight, das iOS nach dem
+   Drehen kurz noch alt meldet. Hier: Drehen hin und zurück, auch mit „veralteter“ Fensterhöhe und Safe Area – Linse deckt den aktiven Tab genau. */
+const lensVsTab = (page: Page) => page.evaluate(() => {
+  const l = (document.querySelector('.tab-lens') as HTMLElement).getBoundingClientRect(); const t = (document.querySelector('#tabs .tab.on') as HTMLElement).getBoundingClientRect();
+  return { dx: Math.abs((l.left + l.width / 2) - (t.left + t.width / 2)), dy: Math.abs((l.top + l.height / 2) - (t.top + t.height / 2)), dw: Math.abs(l.width - t.width), dh: Math.abs(l.height - t.height) };
+});
+async function aligned(page: Page) {
+  await expect.poll(async () => { const d = await lensVsTab(page); return Math.max(d.dx, d.dy, d.dw, d.dh); }, { timeout: 3000 }).toBeLessThan(1.5);
+}
+for (const design of ['', 'glas']) test(`Drehen ins Querformat und zurück: Linse sitzt danach genau am aktiven Tab${design ? ' (Glas)' : ''}`, async ({ page }) => {
+  await seed(page);
+  if (design) await page.addInitScript(d => document.documentElement.setAttribute('data-design', d), design);
+  await open(page, '/?go=plan');
+  await aligned(page);
+  for (const [w, h] of [[844, 390], [390, 844], [844, 390], [390, 844]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await aligned(page);
+  }
+  // iOS-Fall: beim Größenereignis meldet innerHeight noch den alten Wert (Querformat), die Leiste steht aber schon unten im Hochformat
+  await page.evaluate(() => { Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => 390 }); window.dispatchEvent(new Event('orientationchange')); window.dispatchEvent(new Event('resize')); });
+  await page.waitForTimeout(900);
+  await aligned(page);
+  // Safe Area unten kommt nach dem Drehen erst etwas später an (ohne eigenes Ereignis): Leiste wandert, Linse wandert mit
+  await page.evaluate(() => window.dispatchEvent(new Event('orientationchange')));
+  await page.addStyleTag({ content: '.tabbar { bottom: 34px !important; }' });
+  await aligned(page);
+  // Tab wechseln nach dem Drehen: Linse gleitet zum richtigen Ort
+  await page.locator('#tabs .tab[data-tab="mehr"]').click();
+  await expect(page.locator('[data-view="mehr"]')).toBeVisible();
+  await aligned(page);
+});
+
 test('„Bewegung reduzieren“: keine Feder, keine Vergrößerung, Linse wechselt direkt', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await seed(page);

@@ -7,12 +7,19 @@ import * as W from './workouts';
 import * as K from './keysessions';
 import { rulesOf, evaluate, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
-import { actualMetrics, effectiveActivity, changedOf, actualSport, plannedLoadDropped } from './results';
+import { actualMetrics, effectiveActivity, changedOf, actualSport, plannedLoadDropped, effectiveSession, changeKeepsStage, changeZone } from './results';
 import { evaluateIntervals } from './intervals';
 import { LIB } from './workoutlib';
 import { runQualitySpec, bikeQualitySpec, runEasyForm, bikeEasyForm } from './workoutbuild';
 /* ---------- Datum ---------- */
-function addDays(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+/* Auftrag 30: gemerkt (reine Funktion, wird beim Neuzeichnen tausendfach mit denselben Werten gerufen – Ampel-Verlauf, Belastung) */
+const ADD_DAYS = new Map<string, string>();
+function addDays(s, n) {
+  const k = s + '|' + n; const hit = ADD_DAYS.get(k); if (hit !== undefined) return hit;
+  const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); const r = d.toISOString().slice(0, 10);
+  if (ADD_DAYS.size > 50000) ADD_DAYS.clear();
+  ADD_DAYS.set(k, r); return r;
+}
 function illnessAt(periods, date) { return (periods || []).find(p => p && p.start && date >= p.start && (!p.end || date <= p.end)) || null; }
 const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
 const fmt = (v, d?) => { const s = d != null ? Number(v).toFixed(d) : String(Math.round(v * 10) / 10); return s.replace('.', ','); };
@@ -280,7 +287,8 @@ function defaultMinutes(s) { if (s.plannedMinutes) return s.plannedMinutes; if (
 function sessionLoad(s, st, thr?) {
   st = st || {};
   // Auftrag 29: anders gemacht → Belastung des Gemachten (Sportart, ohne die geplante Härte)
-  if (changedOf(st)) s = Object.assign({}, s, { sport: actualSport(s, st) }, plannedLoadDropped(st) ? { zone: 'Zone 2', hard: false, spec: null, title: 'Locker' } : {}); const m = st.metrics || {};
+  // Auftrag 30: alle Arten über eine Stelle (Sportart, tatsächliche Zone, Härte des Gemachten)
+  if (changedOf(st)) s = effectiveSession(s, st); const m = st.metrics || {};
   const corrected = ['min', 'hr', 'power', 'normalizedPower'].some(k => st.metricsManual?.[k] || st.metricsSrc?.[k] === 'manual');
   if (toNum(st.icuLoad) != null && !corrected) return Math.max(0, Math.round(toNum(st.icuLoad)));
   const min = toNum(m.min) != null ? toNum(m.min) : defaultMinutes(s);
@@ -299,7 +307,8 @@ function sessionLoad(s, st, thr?) {
   return Math.round(h * IF * IF * 100);
 }
 function plannedIF(s) {
-  if (s.sport === 'football') return isGame(s) ? 7 / 9 : 6 / 9;
+  // Auftrag 30: Teamsport aus Dauer und Intensität (mit Puls oder RPE zählen diese, sonst Schätzung): Spiel > Training, Turnier/Doppelspiel noch höher
+  if (s.sport === 'football') return /turnier|doppel|zwei spiele|2 spiele/i.test(s.title || '') ? 7.5 / 9 : isGame(s) ? 7 / 9 : 6 / 9;
   if (s.sport === 'strength') return 5 / 9;
   if (isIntervals(s)) return 0.85;
   const z = Math.max(0, ...[...String(s.zone || '').matchAll(/\d/g)].map(x => +x[0]));
@@ -636,7 +645,7 @@ function libTarget(stage, result, prevResult) { return result === 'up' ? stage +
 function libStatus(state, weeks, date) {
   const thr = { ...thrOf(state), lthrBike: (thrOf(state).lthrBike) || LTHR_DEFAULT.bike };
   const libDone = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -28)).flatMap(d => d.sessions.filter(x => x && x.spec && x.spec.lib && LIB[x.spec.lib.key] && LIB[x.spec.lib.key].quality && ['run', 'bike'].includes(x.sport) && !x.cancelled).map(x => ({ s: x, st: (state.sessions || {})[x.id] || {}, date: d.date }))).sort((a, b) => a.date.localeCompare(b.date));
-  const verdictOf = (x) => x.st.completed && changedOf(x.st) ? { result: 'stay', why: 'anders trainiert als geplant' } : x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], thr) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
+  const verdictOf = (x) => x.st.completed && !changeKeepsStage(x.st) ? { result: 'stay', why: 'anders trainiert als geplant' } : x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], thr) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
   const out = {};
   for (const key of [...new Set(libDone.map(x => x.s.spec.lib.key))]) { const list = libDone.filter(x => x.s.spec.lib.key === key); const last = list[list.length - 1], prev = list[list.length - 2]; const v = verdictOf(last); if (!v) continue; const pv = prev ? verdictOf(prev) : null; out[key] = { stage: last.s.spec.lib.stage, target: libTarget(last.s.spec.lib.stage, v.result, pv && pv.result), why: v.why, date: last.date }; }
   return out;
@@ -738,7 +747,9 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   }
 
   // 3) Verpasste Schlüsseleinheit innerhalb von 48 h verschieben
-  const hardDay = (d, exceptId) => live(d).some(s => s.id !== exceptId && isHard(s));
+  // Auftrag 30: ein Tag, an dem eine lockere Einheit „härter als geplant“ (Zone 4–5) gemacht wurde, zählt als harter Tag
+  const doneHarder = s => { const st = (state.sessions || {})[s.id]; return !!(st && st.completed && (changedOf(st) || {}).kind === 'harder' && (changeZone(st, s) || 0) >= 4); };
+  const hardDay = (d, exceptId) => live(d).some(s => s.id !== exceptId && (isHard(s) || doneHarder(s)));
   const gameDay = d => live(d).some(isGame);
   for (const back of [1, 2]) {
     const from = addDays(date, -back);
@@ -776,9 +787,22 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
         if (!ruleOk(rules, s, to, live(to))) continue;
         const copy = Object.assign({}, s, { id: s.id + '-nach', title: s.title, nachVon: from }); delete copy._adj; delete copy._orig; delete copy.movedFrom; delete copy.date;
         push({ id: 'redo-' + s.id, type: 'add', to, session: copy, group: 'redo-' + s.id,
-          what: `${s.title}: am ${dowDe(to)} ${dm(to)} nachholen`, reason: `Am ${dowDe(from)} ${dm(from)} anders trainiert (locker statt hart) – Platz ohne harte Einheit daneben gefunden` });
+          what: `${s.title}: am ${dowDe(to)} ${dm(to)} nachholen`, reason: `Am ${dowDe(from)} ${dm(from)} ${(changedOf((state.sessions || {})[s.id]) || {} as any).kind === 'aborted' ? 'abgebrochen' : 'anders trainiert (locker statt hart)'} – Platz ohne harte Einheit daneben gefunden` });
         break;
       }
+    });
+  }
+  // 4) Auftrag 30: „härter als geplant“ (Zone 4–5) fließt in den nächsten Tag ein: eine harte Einheit dort wird locker (Zone 2, 20 % kürzer),
+  //    damit nie zwei harte Tage hintereinander liegen. Tests, Wettkämpfe, Spiele, fest gewünschte und erledigte Einheiten bleiben.
+  {
+    const from = addDays(date, -1);
+    live(from).filter(s => sessDone(state, s) && (changedOf((state.sessions || {})[s.id]) || {} as any).kind === 'harder' && (changeZone((state.sessions || {})[s.id], s) || 0) >= 4 && !isIntervals(s) && !isGame(s) && !isTestOrRace(s)).forEach(s => {
+      live(date).filter(x => isHard(x) && !isTestOrRace(x) && !isGame(x) && !x.race && !x.pinned && !sessDone(state, x) && !EASED_RE.test(x.title || '')).forEach(x => {
+        push({ id: `harder-${s.id}-${x.id}`, type: 'modify', sessionId: x.id, group: 'harder-' + s.id,
+          set: { title: 'Zone 2 statt: ' + x.title, zone: 'Zone 2', hard: false, plannedMinutes: x.plannedMinutes ? round5(x.plannedMinutes * 0.8) : null, plannedKm: x.plannedKm ? r1(x.plannedKm * 0.8) : null,
+            description: `Gestern (${dowDe(from)} ${dm(from)}) härter trainiert als geplant. Heute locker in Zone 2, damit sich der Körper erholt – die harte Einheit kommt in der nächsten Woche wieder.` },
+          what: `${x.title} → Zone 2, 20 % kürzer`, reason: `Am ${dowDe(from)} ${dm(from)} härter als geplant (Zone ${changeZone((state.sessions || {})[s.id], s)})` });
+      });
     });
   }
   return res;
@@ -789,7 +813,7 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
 function stageVerdict(s, st, act): { ok: boolean; why: string } {
   st = st || {}; const m = actualMetrics(st, act);
   // Auftrag 29: anders gemacht (locker, andere Sportart, andere Intervalle) ist kein Nachweis für die Stufe
-  if (changedOf(st) && changedOf(st).kind !== 'shorter') return { ok: false, why: 'anders trainiert als geplant' };
+  if (!changeKeepsStage(st)) return { ok: false, why: changedOf(st) && changedOf(st).kind === 'aborted' ? 'abgebrochen' : 'anders trainiert als geplant' };
   const rpe = toNum(st.rpe), min = toNum(m.min);
   if (/abgebrochen|nicht geschafft|zu schwer/i.test(st.notes || '')) return { ok: false, why: 'laut Notiz zu schwer' };
   if (rpe != null && rpe >= 9) return { ok: false, why: 'RPE ' + rpe + ' (sehr hart)' };

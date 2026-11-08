@@ -11,7 +11,8 @@ import * as W from '../workouts';
 import type { EngineCtx } from './engine';
 import { readinessFacts } from './engine';
 import { fieldsOf } from '../fields';
-import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea, changedOf, actualSport, actualTitle, plannedLoadDropped } from '../results';
+import { valueStory, storyText, STORY_METRICS } from '../valuestory';
+import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea, changedOf, actualSport, actualTitle, plannedLoadDropped, intervalsMode, changeZone, changeParts, placeLabel, omitLabel } from '../results';
 import { HR_ZONES } from '../sports';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
@@ -40,7 +41,7 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
     if (act) usedActs.add(act.id);
     // Auftrag 29: anders gemacht → bewertet wird das Gemachte (Sportart, Titel); die geplante Härte zählt dann nicht als Vorgabe
     const ch = changedOf(st);
-    if (ch) { const dropped = plannedLoadDropped(st); out.push({ key: s.id, date: d.date, sport: actualSport(s, st), title: actualTitle(s, st, act), planned: dropped ? null : ch.kind === 'otherIntervals' ? { ...s, spec: null } : s, st, act, custom: false, changedFrom: s, change: ch }); return; }
+    if (ch) { const dropped = plannedLoadDropped(st); out.push({ key: s.id, date: d.date, sport: actualSport(s, st), title: actualTitle(s, st, act), planned: dropped ? null : intervalsMode(st) !== 'planned' ? { ...s, spec: null, ...(ch.kind === 'harder' ? { zone: 'Zone ' + changeZone(st, s), hard: true } : {}) } : s, st, act, custom: false, changedFrom: s, change: ch }); return; }
     out.push({ key: s.id, date: d.date, sport: s.sport, title: s.sport === 'strength' ? actualStrength(st, act).title : s.title, planned: s, st, act, custom: false });
   }));
   Object.entries(effectiveCustomBuckets(ctx.state) || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => {
@@ -120,10 +121,17 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (d.change && d.changedFrom) {
     const was = String(d.changedFrom.title || 'die geplante Einheit'); const why = d.change.reason;
     const keyPlanned = C.isKey(d.changedFrom) || C.isIntervals(d.changedFrom);
-    if (d.change.kind === 'easy') good.push(`${keyPlanned ? stripTitle(was) + ' ausgefallen' : 'Lockerer als geplant'} – kein Problem, Zone 2 war ${why === 'tired' || why === 'ill' || why === 'pain' ? 'heute genau richtig' : 'sinnvoll'}.${keyPlanned ? ' Ob die Schlüsseleinheit nachgeholt wird, prüfe ich mit den Regeln (nie neben einer anderen harten Einheit).' : ''}`);
+    if (d.change.kind === 'easy') good.push(`${keyPlanned ? stripTitle(was) + ' ausgefallen' : 'Lockerer als geplant'} – kein Problem, Zone ${changeZone(d.st, d.changedFrom)} war ${why === 'tired' || why === 'ill' || why === 'pain' ? 'heute genau richtig' : 'sinnvoll'}.${keyPlanned ? ' Ob die Schlüsseleinheit nachgeholt wird, prüfe ich mit den Regeln (nie neben einer anderen harten Einheit).' : ''}`);
     else if (d.change.kind === 'otherSport') good.push(`Statt ${was} ${d.title.split(' · ')[0]} gemacht – zählt als ${d.title.split(' · ')[0]}-Einheit.${why === 'pain' ? ' Mit Schmerzen war das die richtige Wahl.' : ''}`);
     else if (d.change.kind === 'shorter') good.push(`Kürzer als geplant${why === 'time' ? ' (keine Zeit)' : why ? '' : ''} – besser kurz als gar nicht.`);
     else if (d.change.kind === 'otherIntervals') good.push('Andere Intervalle als geplant – bewertet werden die gemachten.');
+    // Auftrag 30: weitere Arten
+    else if (d.change.kind === 'longer') good.push(`Länger als geplant${v.min ? ` (${Math.round(v.min)} min)` : ''} – gezählt wird die tatsächliche Dauer.`);
+    else if (d.change.kind === 'harder') better.push(`Härter als geplant (Zone ${changeZone(d.st, d.changedFrom)})${why === 'motivation' ? ', weil es sich gut angefühlt hat' : ''}. Das kostet mehr Erholung: die nächste harte Einheit erst nach einem lockeren Tag.`);
+    else if (d.change.kind === 'aborted') better.push(`Nach ${v.min ? Math.round(v.min) + ' min' : 'kurzer Zeit'} abgebrochen${why === 'pain' ? ' wegen Schmerzen – richtig so. Bei anhaltenden Schmerzen bitte abklären lassen' : why === 'ill' ? ' – bei Krankheit richtig so' : why === 'tired' ? ' – bei Müdigkeit ist Aufhören klug' : ''}. Die Einheit zählt mit der tatsächlichen Dauer${keyPlanned ? '; ob die Schlüsseleinheit nachgeholt wird, prüfe ich mit den Regeln' : ''}.`);
+    else if (d.change.kind === 'place') good.push(`${placeLabel(d.changedFrom.sport, d.change.place)} statt wie geplant – zählt ganz normal${d.change.place === 'in' && d.changedFrom.sport === 'bike' ? ' (Tempo drinnen sagt wenig, Puls und Dauer zählen)' : ''}.`);
+    else if (d.change.kind === 'split') { const p = changeParts(d.st); good.push(`In ${p.length >= 2 ? p.length + ' Teilen' : 'Teilen'} gemacht${p.length >= 2 ? ` (${p.map(x => Math.round(x)).join(' + ')} min)` : ''} – zählt zusammen${p.length ? ` ${Math.round(p.reduce((a, b) => a + b, 0))} min` : ''}. Am Stück wäre der Reiz für die Ausdauer etwas größer.`); }
+    else if (d.change.kind === 'omit') good.push(d.change.omit === 'brick' ? 'Koppellauf weggelassen – die Radeinheit zählt normal, den Wechsel üben wir beim nächsten Mal.' : d.change.omit === 'breastOnly' ? 'Nur Brust geschwommen – zählt als Schwimmen, aber nicht für deine Kraul-Stufe.' : d.change.omit === 'aids' ? 'Ohne Hilfsmittel geschwommen – das ist sogar anspruchsvoller.' : `Einheit ${omitLabel(d.change.omit)} – zählt mit dem, was du gemacht hast.`);
   }
 
   // Dauer gegen Vorgabe
@@ -230,9 +238,10 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     if (v.spl) good.push(`${de(v.spl)} Züge pro Bahn${v.dps ? ` (${de(v.dps, 2)} m pro Zug)` : ''}.`);
     if (v.longest && !(target && v.longest >= target)) {
       // Bestmarke nur gegen frühere echte Werte (Einheiten davor), nicht gegen das Profil oder den Plan
-      const before = C.swimProofs(ctx.state, ctx.baseWeeks, C.addDays(d.date, -1), 84).filter((x: any) => x.key !== d.key).map((x: any) => x.crawl || 0);
-      const prev = Math.max(0, ...before);
-      if (v.longest >= 25) good.unshift(`${v.longest} m Kraul am Stück${prev && v.longest > prev ? `, neue Bestmarke (vorher ${prev} m)` : prev && v.longest === prev ? ' wie zuletzt' : ''}.`);
+      // Auftrag 30: Tageswert gegen Bestwert (mit Datum), nicht „wie zuletzt“; ein schwächerer Tag ist kein Rückschritt
+      const before = (C.swimProofs(ctx.state, ctx.baseWeeks, C.addDays(d.date, -1), 365) as any[]).filter(x => x.key !== d.key && x.crawl).map(x => ({ date: x.date, v: x.crawl }));
+      const sv = valueStory([...before, { date: d.date, v: v.longest }], true); sv.trend = null;
+      if (v.longest >= 25) good.unshift(storyText(sv, { ...STORY_METRICS.crawl, today: ctx.today }));
     }
     if (v.crawlShare != null && v.crawlShare < 70) better.push(`Kraul-Anteil ${Math.round(v.crawlShare)} %: Stück für Stück mehr Kraul, Brust nur zum Erholen.`);
     if (v.technique) better.push(`Technik-Thema „${v.technique}“: ${/bein|sinken|wasserlage|kopf/i.test(v.technique) ? 'Kopf ruhig und Blick nach unten, dann kommen die Beine hoch' : /atm/i.test(v.technique) ? 'unter Wasser lang ausatmen, beim Drehen nur einatmen' : 'eine Sache pro Bahn üben'}.`);
@@ -367,9 +376,12 @@ function nextDays(ctx: EngineCtx, _after: string, fatigue: number, sport?: strin
 
 /* ---------- Antwort bauen: 3 Teile, nie nur Lob ---------- */
 function compose(head: string, good: string[], better: string[], next: string, missing: string[], fallbackBetter: string): string {
-  const b = better.length ? better.slice(0, 2) : [fallbackBetter];
-  const g = good.length ? good.slice(0, 3) : ['Du hast die Einheit gemacht, das zählt am meisten.'];
-  return [head, `👍 Gut: ${g.join(' ')}`, `🔧 Besser: ${b.join(' ')}`, `➡️ Nächste Tage: ${next}`, missing.length ? `Es fehlen: ${joinDe([...new Set(missing)].slice(0, 4))}. Trag es nach, dann wird die Bewertung genauer.` : ''].filter(Boolean).join('\n').replace(/\.\.(?=\s|$)/g, '.').replace(/ %/g, '\u00a0%').replace(/\(-(\d)/g, '(−$1');
+  // Auftrag 30: übersichtlich – doppelte Sätze raus, mehrere Punkte je Zeile mit „•“ statt eines langen Absatzes
+  const uniq = (l: string[]) => { const seen = new Set<string>(); return l.filter(x => { const k = String(x || '').trim().toLowerCase(); if (!k || seen.has(k)) return false; seen.add(k); return true; }); };
+  const b = better.length ? uniq(better).slice(0, 2) : [fallbackBetter];
+  const g = good.length ? uniq(good).filter(x => !b.includes(x)).slice(0, 3) : ['Du hast die Einheit gemacht, das zählt am meisten.'];
+  const block = (label: string, l: string[]) => l.length > 1 ? `${label}:\n${l.map(x => '• ' + x).join('\n')}` : `${label}: ${l[0] || ''}`;
+  return [head, block('👍 Gut', g), block('🔧 Besser', b), `➡️ Nächste Tage: ${next}`, missing.length ? `Es fehlen: ${joinDe([...new Set(missing)].slice(0, 4))}. Trag es nach, dann wird die Bewertung genauer.` : ''].filter(Boolean).join('\n').replace(/\.\.(?=\s|$)/g, '.').replace(/ %/g, '\u00a0%').replace(/\(-(\d)/g, '(−$1');
 }
 function fallback(sport: string, hard: boolean, indoor = false): string {
   if (sport === 'bike' && indoor) return 'Kleiner Punkt: auf der Rolle schwitzt man viel, Ventilator an und genug trinken; trag die Anstrengung (RPE) ein, dann vergleiche ich besser.';

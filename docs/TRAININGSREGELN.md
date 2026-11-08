@@ -118,6 +118,30 @@ Jede harte Einheit mit mindestens 10-15 min Aufwärmen (mit Steigerungen) und 5-
 - Quelle: Trainingslehre
 - Umgesetzt: Einheiten-Bausteine (workouts.ts), Plan-Check (Prüfung „warmup“)
 
+### Persönliche Reaktion (neu)
+
+HFV, Ruhepuls und RPE nach harten Wochen steuern Rhythmus und Erholung. Harte Woche = Belastung mindestens 10 % über dem 4-Wochen-Schnitt. Wer sich langsam erholt (HFV deutlich unter der eigenen Basis, Ruhepuls +3 oder mehr, nach der lockeren Woche nicht wieder normal, lockere Einheiten mit hoher RPE), bekommt den Rhythmus 2+1, tiefere Erholungswochen (55–65 %), höchstens 6 % Steigerung und ein eher längeres Tapering. Wer sich schnell erholt, behält 3+1 mit 65–72 %. Ab 2 ausgewerteten harten Wochen; vorher gelten die Regeln nach Alter und Erfahrung.
+
+- Warum: Menschen reagieren sehr unterschiedlich auf dieselbe Belastung; HFV und Ruhepuls zeigen das früher als die Leistung.
+- Quelle: Plews u. a. (HFV-gesteuertes Training), Kiviniemi u. a.; Mann u. a. (individuelle Trainingsreaktion)
+- Umgesetzt: shared/response.ts → Neu-Planen (Rhythmus, Erholungstiefe, Steigerung) und Coach-Kontext
+
+### Rhythmus und Erholungswoche (verbessert)
+
+3+1; 2+1 für Jugendliche, ab 50, Einsteiger, bei Stress, langsamer Erholung. Stress = Prüfungs-/Stresszeit in den nächsten 6 Wochen. Die Erholungswoche hat etwa 60–70 % des eigenen Umfangs der letzten Aufbauwoche (vorher waren bis 82 % erlaubt, mit festen Ruhetagen im Wochenraster wurden es nur ~50 %). Zu viel wird gekürzt, zu wenig wird über lockere Einheiten aufgefüllt.
+
+- Warum: Zu flache Erholungswochen erholen nicht, zu tiefe kosten Form. 60–70 % ist die übliche Spanne.
+- Quelle: Bompa/Haff (Periodisierung), Friel (Triathlon-Bibel), ACSM
+- Umgesetzt: Generator (Rhythmus, enforceRecovery, Wochenraster) (Prüfung „recoveryDepth“)
+
+### Teamsport-Belastung (verbessert)
+
+Teamsport nach Dauer und Intensität. Mit Puls über die Puls-Belastung, mit RPE über die Anstrengung, sonst geschätzt – Spiel höher als Training, Turnier oder zwei Spiele noch höher.
+
+- Warum: Ein Turniertag belastet deutlich mehr als ein lockeres Training gleicher Länge.
+- Quelle: Foster (Session-RPE), Banister (TRIMP)
+- Umgesetzt: Belastung (core.sessionLoad/plannedIF)
+
 ## Wettkämpfe und Saison
 
 ### Nach dem Wettkampf (verbessert)
@@ -168,6 +192,14 @@ Vor jedem Wettkampf ein Rennplan: Tempo je Disziplin (Puls, Watt, Pace), Verpfle
 - Quelle: Trainingspraxis
 - Umgesetzt: Mehr → Wettkampf, Coach nach dem Wettkampf
 
+### Wettkampf-Bedingungen (neu)
+
+Hitze, Freiwasser, Höhenmeter und Startzeit fließen ein. Warmes Rennen → in den letzten gut 2 Wochen Hitze-Gewöhnung bei lockeren Einheiten; Freiwasser-Triathlon → in den 6 Wochen davor (Mai–September) eine Schwimmeinheit pro Woche im Freiwasser, mit Neopren wenn erlaubt, nie allein; hügelige Strecke → lange Ausfahrten bzw. ein Lauf pro Woche hügelig; Startzeit → Generalprobe und lange Einheiten am Wochenende zur Wettkampf-Uhrzeit.
+
+- Warum: Hitze, Freiwasser, Höhenmeter und Uhrzeit entscheiden am Renntag oft mehr als ein paar Prozent Fitness.
+- Quelle: Racinais u. a. (Hitze-Akklimatisation), Triathlon-Trainingspraxis
+- Umgesetzt: Generator (addRaceConditions)
+
 ## Pausen, Krankheit, verpasste Einheiten
 
 ### Wiedereinstieg nach Pausen (neu)
@@ -193,6 +225,14 @@ Nie durch Stapeln nachholen. Lockere Einheiten verfallen. Eine Schlüsseleinheit
 - Warum: Nachholen auf einen Schlag bringt mehr Ermüdung als Nutzen.
 - Quelle: Trainingspraxis
 - Umgesetzt: Tägliche und wöchentliche Anpassung (core.ts)
+
+### Anders gemacht: nächste Tage (neu)
+
+Fehlende Härte wird nur nachgeholt, wenn Platz ist (nie stapeln). Locker statt hart, andere Sportart oder abgebrochen: die Schlüsseleinheit wird nachgeholt, wenn innerhalb von 2 Tagen ein Tag ohne harte Einheit daneben frei ist (höchstens eine pro Woche, nie stapeln). Härter als geplant (Zone 4–5): eine harte Einheit am nächsten Tag wird locker. Aufgeteilt, nur Brust oder andere Intervalle zählen nicht als Nachweis für Stufen.
+
+- Warum: Verpasste Härte nachzuholen, wenn kein Platz ist, stapelt Ermüdung; zwei harte Tage hintereinander erhöhen das Verletzungsrisiko.
+- Quelle: Trainingslehre (Belastung–Erholung)
+- Umgesetzt: Tägliche Anpassung (core.dailyAdjustments), Stufen
 
 ## Schmerzen und Überlastung
 
@@ -300,6 +340,14 @@ Grundlage: Technik und mehr Kraft. Aufbau und spezifisch: Erhaltung (kurz, 2 × 
 - Quelle: Rønnestad & Mujika (Krafttraining für Ausdauersportler), NSCA (Jugendliche)
 - Umgesetzt: Generator (Kraft je Phase)
 
+### Kraft je Phase und Alter (verbessert)
+
+Grundlage 2×, Aufbau 1–2×, spezifisch 1× kurz, Rennwoche keine. In Erholungswochen 1×. Ab 50 mehr: Grundlage 3×, Aufbau und spezifisch 2×. Innerhalb der eigenen Häufigkeit; hat das Wochenraster nur eine Kraft-Einheit, kommt in der Grundlage eine kurze zweite dazu (Rumpf und Oberkörper, 25 min) an einem lockeren Tag – nur, wo das eigene Raster Kraft erlaubt. Rumpf zählt nicht als Beinkraft (darf vor einem Spiel liegen).
+
+- Warum: Kraft schützt vor Verletzungen und macht ökonomischer; ab 50 geht Muskelmasse schneller verloren.
+- Quelle: Rønnestad & Mujika, ACSM (ältere Sportler)
+- Umgesetzt: Generator (Kraft je Phase, Wochenraster)
+
 ## Alter und Geschlecht
 
 ### Ab 50 Jahren (war schon da)
@@ -343,6 +391,14 @@ Technik vor Umfang. Übungen mit kurzer Erklärung (Abschlag, Catch-up, Seitlage
 - Warum: Im Wasser entscheidet die Technik mehr als die Kraft.
 - Quelle: Schwimm-Trainingslehre
 - Umgesetzt: Schwimmeinheiten, Lexikon
+
+### Schwimm-Intensität sichtbar (verbessert)
+
+1× pro Woche schnelle Stücke (⚡). Passend zur Stufe: Lernende 25-m-Stücke zügig, ab 200 m Schwellen-Sets, ab 400 m CSS-Intervalle.
+
+- Warum: Auch im Wasser braucht es Tempo-Reize; markiert sieht man, wo die harte Einheit der Woche liegt.
+- Quelle: Swim Smooth (CSS), Trainingspraxis
+- Umgesetzt: Generator (Schwimm-Qualität), Übersicht (Symbole)
 
 ## Coach
 

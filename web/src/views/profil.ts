@@ -114,13 +114,19 @@ function courseFields(g: Goal): string {
     ${sp.has('bike') ? field('gc-ba', t('goal.bikeAscent'), c.bikeAscentM ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="bikeAscentM"' }) : ''}
     ${sp.has('run') ? field('gc-ra', t('goal.runAscent'), c.runAscentM ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="runAscentM"' }) : ''}
     ${sp.has('swim') ? select('gc-sv', t('goal.swimVenue'), c.swimVenue || '', [['', t('goal.unknown')], ['open', t('goal.open')], ['pool', t('goal.pool')]], 'data-ch="gc" data-k="swimVenue"') + select('gc-ws', t('goal.wetsuit'), yn(c.wetsuit), [['', t('goal.unknown')], ['yes', t('common.yes')], ['no', t('common.no')]], 'data-ch="gc" data-k="wetsuit"') : ''}
-    ${field('gc-t', t('goal.temp'), c.tempC ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="tempC"' })}</div><div class="hint">${esc(t('goal.courseHint'))}</div>`);
+    ${field('gc-t', t('goal.temp'), c.tempC ?? '', { inputmode: 'numeric', data: 'data-ch="gc" data-k="tempC"' })}
+    ${field('gc-st', 'Startzeit (Uhrzeit)', c.startTime ?? '', { inputmode: 'numeric', placeholder: 'z. B. 07:30', data: 'data-ch="gc" data-k="startTime"' })}</div><div class="hint">${esc(t('goal.courseHint'))}</div>`);
 }
 onChange('gc', el => {
   if (!G) return; const k = el.dataset.k!; const v = (el as HTMLInputElement).value.trim();
   const c: any = { ...(G.course || {}) };
   if (k === 'swimVenue') c.swimVenue = v || null;
   else if (k === 'wetsuit') c.wetsuit = v === 'yes' ? true : v === 'no' ? false : null;
+  // Auftrag 30: Startzeit „7:30“, „07.30“, „730“ → „07:30“; ungültig → Meldung, alter Wert bleibt
+  else if (k === 'startTime') {
+    if (!v) c.startTime = null;
+    else { const m = /^(\d{1,2})[:.]?(\d{2})$/.exec(v.replace(/\s*uhr$/i, '')); if (!m || +m[1] > 23 || +m[2] > 59) { toast('Bitte eine Uhrzeit wie 07:30 eintragen.'); (el as HTMLInputElement).value = c.startTime || ''; return; } c.startTime = `${m[1].padStart(2, '0')}:${m[2]}`; (el as HTMLInputElement).value = c.startTime; }
+  }
   else { const n = v === '' ? null : parseFloat(v.replace(',', '.')); if (n != null && (!isFinite(n) || n < (k === 'tempC' ? -10 : 0) || n > (k === 'tempC' ? 45 : 10000))) { toast(t('common.invalidNumber')); return; } c[k] = n == null ? null : Math.round(n); }
   G.course = c;
 });

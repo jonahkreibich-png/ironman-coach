@@ -10,7 +10,8 @@ import { sportIc, gearChips } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
 import { shortPlan } from '../../../shared/workouts';
 import { duration } from '../../../shared/i18n';
-import { isHardSession } from '../../../shared/intensity';
+import { isHardSession, isTestSession, sessionMarks, intensityBand, weekLine, MARKS, type Mark } from '../../../shared/intensity';
+import { changedOf, effectiveSession, actualSport } from '../../../shared/results';
 import { dayStats, sessState, effStatus } from '../domain';
 import { nav } from '../nav';
 import { toast } from '../toast';
@@ -31,25 +32,37 @@ export function adjustmentGroups() {
 
 /* Auftrag 18, Punkt 3: Wochenleiste bleibt bei der gewählten Woche (mittig), öffnet bei der aktuellen Woche, Knopf „Heute“.
    Darunter eine Zeile zur Woche (Phase, Ziel, Stunden) und die 7 Tage als kurze Liste; Details beim Antippen der Einheit. */
-const isTest = (s: any) => !!s && ((s.spec && s.spec.kind === 'test') || /(^|\s)(Lauftest|Radtest|Schwimmtest|Test)\b|Kraul-Check/.test(s.title || ''));
+const isTest = isTestSession;
 const liveS = (d: any) => daySummary(d, { ...STATE, customWorkouts: effectiveCustomWorkouts() }).active.map(s => s.session);
 function weekChip(x: any, i: number, sel: number, cw: number): string {
   const ss = x.days.flatMap(liveS);
   const test = ss.some(isTest), race = ss.some((s: any) => s.race);
-  const sym = (x.isRecoveryWeek ? `<span class="wkc-s">${ic('moon')}</span>` : '') + (test ? `<span class="wkc-s">${ic('pulse')}</span>` : '') + (race ? `<span class="wkc-s race">${ic('flag')}</span>` : '');
+  const sym = (x.isRecoveryWeek ? `<span class="wkc-s">${ic('moon')}</span>` : '') + (test ? `<span class="wkc-s">${ic('target')}</span>` : '') + (race ? `<span class="wkc-s race">${ic('flag')}</span>` : '');
   const lbl = [t('plan.weekShort', { n: x.weekNumber }), fmtDate(x.startDate), t('tl.' + (x.phase || 'base')), x.isRecoveryWeek ? t('plan.symRecovery') : '', test ? t('plan.symTest') : '', race ? t('plan.symRace') : ''].filter(Boolean).join(', ');
   return `<button class="wkc ${i === sel ? 'on' : ''} ${i === cw ? 'now' : ''}" data-act="plan-week" data-i="${i}" role="tab" aria-selected="${i === sel}" aria-label="${esc(lbl)}" title="${esc(lbl)}"><span class="wkc-t"><i class="wkc-dot tl-${esc(x.phase || 'base')}"></i>${esc(t('plan.weekShort', { n: x.weekNumber }))}</span><span class="wkc-d">${esc(shortDate(x.startDate))}</span><span class="wkc-sym">${sym}</span></button>`;
 }
 const shortDate = (d: string) => `${+d.slice(8)}.${+d.slice(5, 7)}.`;
+/* Auftrag 30: kleine Symbole (einheitliche Icons) und Farbstreifen je Intensität – eine Stelle: shared/intensity.ts */
+export function marksHtml(marks: Mark[], s: any = null): string {
+  return marks.map(k => { const m = MARKS.find(x => x.key === k)!; const label = k === 'adjusted' && s && s.movedFrom ? t('st.moved') : m.label;
+    return `<span class="pr-mark mk-${k}" role="img" aria-label="${esc(label)}" title="${esc(label)}" data-mark="${k}">${ic(m.icon)}</span>`; }).join('');
+}
 function planRow(s: any): string {
   const st = sessState(s.id);
   const status = effStatus(s);
-  const hard = isHardSession(s) && !s.race && s.sport !== 'football';
+  // erledigt und anders gemacht: Symbole und Intensität des Gemachten
+  const eff = st.completed && changedOf(st) ? effectiveSession(s, st) : s;
+  const marks = sessionMarks(eff); const band = intensityBand(eff);
   const dur = s.plannedMinutes && !new RegExp('\\b' + s.plannedMinutes + ' min').test(s.title || '') ? duration(s.plannedMinutes) : '';
   const check = status === 'done' || status === 'open' || status === 'missed'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
-  const badge = s._adj && s._adj.length ? ' ' + pill(s.movedFrom ? t('st.moved') : t('st.adjusted'), 'warn') : '';
-  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${plannedHtml(s, st)}${gearChips(s)}${hard ? ` <span class="pr-hard" role="img" aria-label="${esc(t('plan.hard'))}" title="${esc(t('plan.hard'))}">${ic('bolt')}</span>` : ''}${badge}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
+  const test = marks.includes('test') && !st.completed && status !== 'cancelled';
+  return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''} ${band ? 'int-' + band : ''} ${test ? 'pr-test' : ''}" style="--c:${SPORT_COLOR[actualSport(s, st)] || 'var(--rest)'}" data-band="${band || ''}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${plannedHtml(s, st)}${gearChips(s)}${marks.length ? ` <span class="pr-marks">${marksHtml(marks, s)}</span>` : ''}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
+}
+/* Auftrag 30: Tests deutlich hervorgehoben – eigene Karte mit Ablauf und „frisch sein“ */
+function testCard(s: any): string {
+  const how = s.spec ? shortPlan(s.spec) : '';
+  return `<div class="pr-testcard" data-test-card><div class="pr-testhead">${ic('target')}<b>${esc(s.sport === 'swim' ? 'Schwimmtest' : s.sport === 'bike' ? 'Radtest' : s.sport === 'run' ? 'Lauftest' : 'Test')}</b></div>${how ? `<div class="xs"><b>Ablauf:</b> ${esc(how)}</div>` : ''}<div class="xs muted">Frisch sein: am Tag davor locker oder frei, gut schlafen, 2–3 h vorher essen. Danach passt die App deine Zonen an.</div></div>`;
 }
 
 export function renderPlan(): string {
@@ -77,7 +90,8 @@ export function renderPlan(): string {
   // Wochenleiste: bleibt bei der gewählten Woche (centerWeekBar), „Heute“ springt zur aktuellen Woche
   h += `<div class="wkbar"><div class="wkbar-s" id="wkbar" role="tablist" aria-label="${esc(t('plan.weekBar'))}">${PLAN.weeks.map((x: any, i: number) => weekChip(x, i, UI.planWeek!, cw)).join('')}</div><button class="btn ghost sm wkbar-today" data-act="plan-today">${esc(t('plan.todayBtn'))}</button></div>`;
   const head = w.headline || [t('plan.weekShort', { n: w.weekNumber }), t('tl.' + (w.phase || 'base'))].join(' · ');
-  h += `<div class="card wk-sum"><div class="spread wk-head"><div class="wk-l"><div class="lbl"><i class="wkc-dot tl-${esc(w.phase || 'base')}"></i>${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div><div class="week-head" data-week-head>${esc(head)}</div>${volTxt ? `<div class="xs muted" data-week-volume>${esc(volTxt)}</div>` : ''}</div>
+  h += `<div class="card wk-sum"><div class="spread wk-head"><div class="wk-l"><div class="lbl"><i class="wkc-dot tl-${esc(w.phase || 'base')}"></i>${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div><div class="week-head" data-week-head>${esc(head)}</div>${volTxt ? `<div class="xs muted" data-week-volume>${esc(volTxt)}</div>` : ''}
+    <div class="xs wk-line" data-week-line>${esc(weekLine(w.days.flatMap(liveS), currentSummary.plannedMinutes))}</div></div>
     <div class="wk-r" data-week-count><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(currentSummary.plannedMinutes / 60))}${currentSummary.unknownPlannedMinutes ? ' + ?' : ''}</div></div></div>
     ${w.important ? `<div class="hint" style="margin-top:6px"><b>${esc(t('plan.thisWeek'))}:</b> ${esc(w.important)}</div>` : ''}
     ${w.focus ? more(t('plan.weekMore'), `<p class="small">${esc(w.focus)}</p>`) : ''}</div>`;
@@ -85,12 +99,18 @@ export function renderPlan(): string {
   h += editBar(w);
   // Auftrag 19, Punkt 3 (Jonahs Wahl: C): Balken je Tag oben, darunter jeder Tag als Zeile, heute aufgeklappt
   h += weekMix(w, today);
-  h += `<button class="btn ghost block" data-act="custom-add" data-date="${UI.planDate && w.days.some((d: any) => d.date === UI.planDate) ? UI.planDate : (w.days.some((d: any) => d.date === today) ? today : w.startDate)}" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('plan.addExtra'))}</button>`;
+  // Auftrag 30: Knopf „Extra-Einheit“ unten entfernt – das „+“ an jedem Tag macht dasselbe (dort auch „Aus Vorlage“)
   h += `<section class="sec" data-plan-adjustments><button class="btn ghost block spread" data-act="plan-adjustments" aria-expanded="${!!UI.planAdjustmentsOpen}" aria-controls="plan-adjustments-body" style="flex-wrap:wrap;row-gap:2px"><span>${esc(t("plan.adjustments"))}</span><span class="xs muted">${esc(t("plan.last30"))} ${ic("down")}</span></button><div id="plan-adjustments-body" ${UI.planAdjustmentsOpen ? "" : "hidden"}>${adjustmentsList()}</div></section>`;
   return '<div class="plan-c" data-plan-design="C">' + h + '</div>';
 }
 /* ---------- Auftrag 19, Punkt 3: Woche als Balken und aufklappbare Tage ---------- */
-interface DayInfo { d: any; list: any[]; customs: any[]; summary: ReturnType<typeof daySummary>; rest: boolean; before: boolean; min: number; hard: boolean; race: boolean }
+interface DayInfo { d: any; list: any[]; customs: any[]; summary: ReturnType<typeof daySummary>; rest: boolean; before: boolean; min: number; hard: boolean; race: boolean; marks: Mark[] }
+/* Auftrag 30: Symbole eines Tages (wichtigste zuerst, höchstens 3) */
+const DAY_ORDER: Mark[] = ['race', 'test', 'hard', 'brick', 'long', 'technique', 'recovery'];
+function dayMarks(live: any[]): Mark[] {
+  const all = new Set(live.flatMap((s: any) => { const st = sessState(s.id); return sessionMarks(st.completed && changedOf(st) ? effectiveSession(s, st) : s); }));
+  return DAY_ORDER.filter(k => all.has(k)).slice(0, 3);
+}
 function dayInfo(d: any): DayInfo {
   const summary = daySummary(d, { ...STATE, customWorkouts: effectiveCustomWorkouts() });
   const list = summary.planned.map(s => s.session);
@@ -98,17 +118,17 @@ function dayInfo(d: any): DayInfo {
   const before = d.sessions.some((s: any) => s.sport === 'rest' && s.title === 'Vor dem Planstart');
   const live = summary.active.map(s => s.session);
   return { d, list, customs, summary, rest: !list.length && !customs.length, before, min: summary.plannedMinutes,
-    hard: live.some((s: any) => isHardSession(s) && !s.race && s.sport !== 'football'), race: live.some((s: any) => s.race) };
+    hard: live.some((s: any) => isHardSession(s) && !s.race && s.sport !== 'football'), race: live.some((s: any) => s.race), marks: dayMarks(live) };
 }
 function dayRows(x: DayInfo, _today: string): string {
   const { d, list } = x;
-  return list.map((s: any) => editing() && !sessState(s.id).completed && !s.race ? editRow(s) : planRow(s) + whatLine(s)).join('')
+  return list.map((s: any) => editing() && !sessState(s.id).completed && !s.race ? editRow(s) : planRow(s) + (isTestSession(s) && !sessState(s.id).completed && !s.cancelled ? testCard(s) : whatLine(s))).join('')
     + x.summary.extras.map(row => {
       const c = row.session;
       if (editing() && !row.completed && !row.cancelled) return editRow(c);
       const amount = row.completed ? row.actualMinutes : row.plannedMinutes;
       return `<div class="pr"><button class="pr-b" data-act="custom-open" data-cid="${esc(c.id)}" data-date="${d.date}">${sportIc(c.sport || 'multi')}<span class="pr-t"><span class="t">${esc(c.title)}</span> ${pill(t('plan.extra'), 'accent')} ${pill(row.completed ? t('sess.isDone') : 'Geplant', row.completed ? 'good' : '')}</span><span class="pr-m">${amount == null ? '?' : esc(duration(amount))}</span></button></div>`;
-    }).join('') + `<button class="btn ghost sm" data-act="template-add" data-date="${d.date}">${ic('plus')} Trainingsvorlage einf\u00fcgen</button>`;
+    }).join('');  // Auftrag 30: Knopf \u201eTrainingsvorlage einf\u00fcgen\u201c je Tag entfernt \u2013 das \u201e+\u201c am Tag bietet \u201eAus Vorlage\u201c
 }
 /* kurz, was man tun soll (aus dem Aufbau der Einheit; Teamsport und Wettkampf ohne) */
 function whatLine(s: any): string {
@@ -130,7 +150,7 @@ function weekMix(w: any, today: string): string {
   const max = Math.max(60, ...infos.map((x: DayInfo) => x.min));
   const bars = infos.map((x: DayInfo) => {
     const segs = x.summary.active.map(({ session: s, plannedMinutes }: any) => `<i style="height:${((plannedMinutes || 0) / max * 100).toFixed(1)}%;background:${SPORT_COLOR[s.sport] || 'var(--rest)'}"></i>`).join('');
-    return `<button class="pm-c ${x.d.date === today ? 'today' : ''} ${x.d.date === sel ? 'on' : ''}" data-act="plan-pick" data-date="${x.d.date}" aria-label="${esc(dowLong(x.d.date) + ' ' + fmtDate(x.d.date))}"><span class="pm-b">${x.rest ? `<span class="pm-rest">${ic('moon')}</span>` : segs}</span>${x.hard ? `<span class="pm-hard">${ic('bolt')}</span>` : ''}<span class="pm-l">${esc(dowShort(x.d.date).slice(0, 2))}</span></button>`;
+    return `<button class="pm-c ${x.d.date === today ? 'today' : ''} ${x.d.date === sel ? 'on' : ''}" data-act="plan-pick" data-date="${x.d.date}" aria-label="${esc(dowLong(x.d.date) + ' ' + fmtDate(x.d.date))}"><span class="pm-b">${x.rest ? `<span class="pm-rest">${ic('moon')}</span>` : segs}</span>${x.marks.length && x.marks[0] !== 'recovery' ? `<span class="pm-hard mk-${x.marks[0]}" data-mark="${x.marks[0]}">${ic(MARKS.find(m => m.key === x.marks[0])!.icon)}</span>` : ''}<span class="pm-l">${esc(dowShort(x.d.date).slice(0, 2))}</span></button>`;
   }).join('');
   const days = infos.map((x: DayInfo) => {
     // beim Bearbeiten sind alle Tage offen (man will die ganze Woche sehen)
@@ -138,7 +158,7 @@ function weekMix(w: any, today: string): string {
     const sum = x.rest ? `<span class="muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span>`
       : !x.summary.active.length ? `<span class="muted">${esc(t('st.cancelled'))}</span>` : x.summary.active.map(({ session: s, completed }: any) => `<span title="${esc(completed ? t('sess.isDone') : s.title)}" class="pm-si" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">${sportIcon(s.sport)}</span>`).join('') + `<span class="pm-st">${esc(shortTitles(x))}</span>`;
     return `<div class="cday ${x.d.date === today ? 'today' : ''} ${open ? 'open' : ''} ${x.rest ? 'rest' : ''}" id="day-${x.d.date}" data-day="${x.d.date}">
-      <div class="cday-hr"><button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m" data-planned-minutes="${x.min}" aria-label="Soll ${x.min}${x.summary.unknownPlannedMinutes ? ' + ?' : ''} min; Ist ${x.summary.actualMinutes} min${x.summary.unknownActualMinutes ? '; Dauer offen bei weiteren Einheiten' : ''}">${x.min ? esc(mins(x.min)) : ''}${x.summary.unknownPlannedMinutes ? ' + ?' : ''}${x.hard ? `<i class="pg-hard">${ic('bolt')}</i>` : ''}</span><span class="chev">${ic('down')}</span></button><button class="cday-add" data-act="custom-add" data-date="${x.d.date}" aria-label="${esc('Extra-Einheit am ' + dowShort(x.d.date) + ' ' + shortDate(x.d.date) + ' hinzufügen')}" title="Extra-Einheit hinzufügen">${ic('plus')}</button></div>
+      <div class="cday-hr"><button class="cday-h" data-act="plan-pick" data-date="${x.d.date}" aria-expanded="${open}"><span class="cday-d"><b>${esc(dowShort(x.d.date))}</b> ${esc(shortDate(x.d.date))}</span><span class="cday-s">${sum}</span><span class="cday-m" data-planned-minutes="${x.min}" aria-label="Soll ${x.min}${x.summary.unknownPlannedMinutes ? ' + ?' : ''} min; Ist ${x.summary.actualMinutes} min${x.summary.unknownActualMinutes ? '; Dauer offen bei weiteren Einheiten' : ''}">${x.min ? esc(mins(x.min)) : ''}${x.summary.unknownPlannedMinutes ? ' + ?' : ''}${x.marks.length && !x.rest ? `<i class="pg-hard pg-marks">${marksHtml(x.marks)}</i>` : ''}</span><span class="chev">${ic('down')}</span></button><button class="cday-add" data-act="custom-add" data-date="${x.d.date}" aria-label="${esc('Extra-Einheit am ' + dowShort(x.d.date) + ' ' + shortDate(x.d.date) + ' hinzufügen')}" title="Extra-Einheit hinzufügen">${ic('plus')}</button></div>
       ${open ? `<div class="cday-b">${x.rest ? restRow(x) : ''}${dayRows(x, today)}</div>` : ''}</div>`;
   }).join('');
   return `<div class="card pmix" data-plan-mix><div class="pm-bars">${bars}</div></div><div class="list cdays">${days}</div>`;

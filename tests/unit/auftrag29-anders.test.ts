@@ -122,3 +122,74 @@ describe('Anpassung durch die App (Krankheit, Temperatur): neuer Titel, keine ve
     }
   });
 });
+
+/* ---------- Auftrag 30: alle Arten von „Anders gemacht“ mit passenden Feldern ---------- */
+import { changeZone, effectiveSession, changeKeepsStage, intervalsMode, changeText, omitOptions, changeParts, plannedLoadDropped as dropped30 } from '../../shared/results';
+describe('Auftrag 30: alle Arten – Titel, Zone, Belastung, Stufe, Intervall-Liste, Coach-Kurzform', () => {
+  const ss = { id: 'y', sport: 'bike', title: 'Rad-Intervalle 2×12 min Sweet Spot', plannedMinutes: 75, hard: true, zone: 'Zone 3' };
+  const easyRun = { id: 'z', sport: 'run', title: 'Lockerer Lauf 45 min', plannedMinutes: 45, zone: 'Zone 2' };
+  const swim = { id: 's', sport: 'swim', title: 'Schwimmen 1.200 m Technik', plannedMinutes: 45 };
+  const brick = { id: 'b', sport: 'bike', title: 'Lange Ausfahrt 2 h + Koppellauf 15 min', plannedMinutes: 135 };
+  const ch = (min: number, changed: any) => done(min, { asPlanned: false, changed });
+  test('lockerer mit tatsächlicher Zone (Standard Zone 2)', () => {
+    expect(actualTitle(ss, ch(60, { kind: 'easy', zone: 1 }))).toBe('Rad Zone 1 · 60 min');
+    expect(changeZone(ch(60, { kind: 'easy' }), ss)).toBe(2);
+    expect(effectiveSession(ss, ch(60, { kind: 'easy', zone: 1 }))).toMatchObject({ zone: 'Zone 1', hard: false, spec: null });
+  });
+  test('härter: Zone, Belastung höher als geplant locker, eigene Intervall-Liste', () => {
+    const st = ch(45, { kind: 'harder', zone: 4 });
+    expect(actualTitle(easyRun, st)).toBe('Laufen härter (Zone 4) · 45 min');
+    // ohne Puls/RPE zählt die tatsächliche Zone (mit Puls zählt der gemessene Puls)
+    expect(C.sessionLoad(easyRun, { completed: true, metrics: { min: '45' }, asPlanned: false, changed: { kind: 'harder', zone: 4 } })).toBeGreaterThan(C.sessionLoad(easyRun, { completed: true, metrics: { min: '45' } }));
+    expect(intervalsMode(st)).toBe('free'); expect(changeKeepsStage(st)).toBe(false);
+    expect(changeZone(ch(45, { kind: 'harder' }), easyRun)).toBe(4);
+  });
+  test('kürzer / länger: Dauer aus dem Feld (eine Quelle), Belastung folgt der tatsächlichen Dauer', () => {
+    expect(actualTitle(easyRun, ch(70, { kind: 'longer' }))).toBe('Lockerer Lauf · 70 min');
+    expect(C.sessionLoad(easyRun, ch(70, { kind: 'longer' }))).toBeGreaterThan(C.sessionLoad(easyRun, ch(30, { kind: 'shorter' })));
+    expect(changeKeepsStage(ch(70, { kind: 'longer' }))).toBe(true);
+  });
+  test('abgebrochen nach X min: Titel, Härte fällt weg (Nachholen nach Regeln), keine Stufe', () => {
+    const st = ch(25, { kind: 'aborted', reason: 'pain' });
+    expect(actualTitle(ss, st)).toBe('Rad-Intervalle Sweet Spot · abgebrochen nach 25 min');
+    expect(dropped30(st)).toBe(true); expect(changeKeepsStage(st)).toBe(false);
+    expect(changeText(ss, st)).toBe('abgebrochen nach 25 min, Grund: Schmerzen');
+  });
+  test('drinnen / draußen je Sportart', () => {
+    expect(actualTitle(easyRun, ch(45, { kind: 'place', place: 'in' }))).toBe('Lockerer Lauf 45 min · Laufband');
+    expect(actualTitle(swim, ch(45, { kind: 'place', place: 'out' }))).toBe('Schwimmen 1.200 m Technik · Freiwasser');
+    expect(changeKeepsStage(ch(45, { kind: 'place', place: 'in' }))).toBe(true);
+  });
+  test('aufgeteilt: Teile mit je Dauer, Summe, keine Intervall-Liste, kein langer Lauf', () => {
+    const st = ch(55, { kind: 'split', parts: [30, 25] });
+    expect(changeParts(st)).toEqual([30, 25]);
+    expect(actualTitle(easyRun, st)).toBe('Lockerer Lauf · 2 Teile (30 + 25 min)');
+    expect(intervalsMode(st)).toBe('none'); expect(effectiveSession({ ...easyRun, long: true }, st).long).toBe(false);
+  });
+  test('ohne Teil: Koppel, Hilfsmittel, nur Brust – Auswahl passt zur Einheit', () => {
+    expect(omitOptions(brick).map(x => x[0])).toContain('brick');
+    expect(omitOptions(swim).map(x => x[0])).toEqual(expect.arrayContaining(['aids', 'breastOnly']));
+    expect(omitOptions(easyRun).map(x => x[0])).not.toContain('breastOnly');
+    expect(actualTitle(brick, ch(120, { kind: 'omit', omit: 'brick' }))).toBe('Lange Ausfahrt 2 h · ohne Koppellauf');
+    expect(actualTitle(swim, ch(45, { kind: 'omit', omit: 'breastOnly' }))).toBe('Schwimmen 1.200 m Technik · nur Brust');
+    expect(changeKeepsStage(ch(45, { kind: 'omit', omit: 'breastOnly' }))).toBe(false);
+    expect(changeKeepsStage(ch(45, { kind: 'omit', omit: 'aids' }))).toBe(true);
+  });
+  test('Grund Motivation; unbekannte Art zählt nicht als Änderung', () => {
+    expect(plannedLine(ss, ch(60, { kind: 'easy', reason: 'motivation' }))).toBe('geplant: Rad-Intervalle 2×12 min Sweet Spot · Grund: Motivation');
+    expect(changedOf(ch(60, { kind: 'quatsch' }))).toBeNull();
+  });
+  for (const kind of ['harder', 'longer', 'aborted', 'place', 'split', 'omit', 'otherIntervals'] as const) test(`Coach bewertet das Gemachte: ${kind}`, () => {
+    const { s, date } = scenario('bike'); if (!s) return;
+    const W2 = world('jugend-langdistanz', date);
+    const extra: any = { place: { place: 'in' }, split: { parts: [40, 20] }, omit: { omit: 'warmup' }, harder: { zone: 5 } };
+    W2.state.sessions[s.id] = ch(kind === 'aborted' ? 20 : 60, { kind, ...(extra[kind] || {}) });
+    const ctx: any = W2.ctx();
+    const d = doneItems(ctx, date, date).find(x => x.key === s.id)!;
+    expect(d.title).toBe(actualTitle(s, W2.state.sessions[s.id]));
+    const r = reviewItem(ctx, d);
+    expect(r.text).toMatch({ harder: /Härter als geplant \(Zone 5\)/, longer: /Länger als geplant/, aborted: /Nach 20 min abgebrochen/, place: /Rolle statt wie geplant/, split: /In 2 Teilen gemacht \(40 \+ 20 min\)/, omit: /ohne Ein-\/Auslaufen/, otherIntervals: /Andere Intervalle/ }[kind]);
+    const loads = C.dailyLoadEntries(W2.state, C.applyAdjustments(W2.plan.weeks, {})).filter((x: any) => x.key === 'session:' + s.id);
+    expect(loads.length).toBe(1);
+  });
+});

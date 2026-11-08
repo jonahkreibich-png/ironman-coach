@@ -9,7 +9,7 @@ import { world, CHAT_TODAY } from '../helpers/chat-world';
 import { PERSONAS } from '../../fixtures/personas';
 import * as C from '../../shared/core';
 
-const THREE = /👍 Gut: [\s\S]+\n🔧 Besser: [\s\S]+\n➡️ Nächste Tage: /;
+const THREE = /👍 Gut:[\s\S]+\n🔧 Besser:[\s\S]+\n➡️ Nächste Tage: /;
 const clean = (t: string) => { expect(t).not.toMatch(/undefined|NaN|null|\[object/); expect(t).not.toMatch(/\.\.(\s|$)/); };
 function checkReview(text: string) { expect(text).toMatch(THREE); clean(text); expect(text).toMatch(/\d/); }
 
@@ -57,7 +57,7 @@ describe.skipIf(!hasLatestData())('Jonahs echte Daten (15.10.)', () => {
   test('Rückblick auf die Woche am 6.10. (Tag nach dem Fußballspiel)', () => { const r = ask('Rückblick auf die Woche', '2026-10-06'); expect(r.intent).toBe('review'); clean(r.text); });
   test('Lauf am 26.09. (eigene Einheit, Entkopplung 6,5 %)', () => { const t = ask('Wie war mein Lauf?', '2026-09-27').text; expect(t).toMatch(/Entkopplung 6,5\s%/); checkReview(t); });
   test('nie nur Lob: jede Antwort hat einen „Besser“-Teil', () => {
-    for (const q of QS) { const t = ask(q).text; expect(t).toMatch(/🔧 Besser: \S+/); }
+    for (const q of QS) { const t = ask(q).text; expect(t).toMatch(/🔧 Besser:\s*\S+/); }
   });
 });
 

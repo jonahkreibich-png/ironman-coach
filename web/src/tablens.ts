@@ -51,7 +51,7 @@ let placed = false;               // Linse hat schon eine Position
 let copied = '';                  // zuletzt kopierte Tab-Leiste (für die vergrößerte Ansicht)
 
 /* Geometrie wird nur bei Bedarf gelesen (Start, Größenänderung), nie im Animations-Frame */
-interface Geo { w: number; h: number; top: number; vh: number; trLeft: number; trTop: number; trW: number; trH: number; left: number; right: number; centers: { tab: string; c: number }[] }
+interface Geo { w: number; h: number; top: number; bottom: number; trLeft: number; trTop: number; trW: number; trH: number; left: number; right: number; centers: { tab: string; c: number }[] }
 let G: Geo | null = null;
 /* nur für Aufnahmen in docs/: Zeitlupe (window.__lensSlow = 4) */
 const slow = () => (typeof window !== 'undefined' && (window as any).__lensSlow) || 1;
@@ -62,14 +62,19 @@ function measure(): Geo | null {
   const list = tabButtons(); if (!list.length) return null;
   const r = tabs.getBoundingClientRect(), b0 = list[0].getBoundingClientRect();
   if (!r.width || !b0.height) return null;
-  return { w: r.width / list.length, h: b0.height, top: b0.top, vh: window.innerHeight, trLeft: r.left, trTop: r.top, trW: r.width, trH: r.height, left: r.left, right: r.right,
+  /* Auftrag 30: Abstand nach unten wie die Leiste selbst (ihr CSS-„bottom“ inkl. Safe Area + Abstand Tab → Leistenrand), nicht aus
+     window.innerHeight: das meldet iOS nach dem Drehen kurz noch den alten Wert – danach stand die Linse versetzt. */
+  const barEl = tabs.closest('.tabbar') as HTMLElement | null;
+  const br = barEl ? barEl.getBoundingClientRect() : r;
+  const cssBottom = barEl ? parseFloat(getComputedStyle(barEl).bottom) || 0 : 0;
+  return { w: r.width / list.length, h: b0.height, top: b0.top, bottom: cssBottom + (br.bottom - b0.bottom), trLeft: r.left, trTop: r.top, trW: r.width, trH: r.height, left: r.left, right: r.right,
     centers: list.map(b => { const q = b.getBoundingClientRect(); return { tab: b.dataset.tab || '', c: q.left + q.width / 2 }; }) };
 }
 const geo = () => G || (G = measure());
 function place(g: Geo): void {
   if (!lens || !inner) return;
   // unten verankert wie die Leiste selbst (Safari-Leiste ein-/ausgeblendet: beide wandern gleich)
-  lens.style.width = g.w + 'px'; lens.style.height = g.h + 'px'; lens.style.bottom = (g.vh - g.top - g.h).toFixed(2) + 'px';
+  lens.style.width = g.w + 'px'; lens.style.height = g.h + 'px'; lens.style.bottom = g.bottom.toFixed(2) + 'px';
   inner.style.width = g.trW + 'px'; inner.style.height = g.trH + 'px';
 }
 function nearest(x: number): string {
@@ -274,8 +279,12 @@ export function syncTabLens(): void {
 /* Größe geändert (Drehen, Schriftgröße, Safari-Leiste): neu messen und ohne Animation an den aktiven Tab setzen */
 function relayout(): void {
   if (!lens || dragging) return;
-  G = measure(); const g = geo(); if (!g) return;
-  place(g); stopGlide();
+  const old = G; G = measure(); const g = geo(); if (!g) return;
+  place(g);
+  // Auftrag 30: unveränderte Maße (Nachmessen nach dem Drehen, ResizeObserver beim Start) unterbrechen kein laufendes Gleiten
+  const same = !!old && placed && Math.abs(old.trLeft - g.trLeft) < 0.5 && Math.abs(old.trW - g.trW) < 0.5 && Math.abs(old.top - g.top) < 0.5 && Math.abs(old.h - g.h) < 0.5 && Math.abs(old.bottom - g.bottom) < 0.5;
+  if (same) { if (!glideAnim && !rafGlide) { const on = pendingTab || activeTab() || lensTab; if (on && Math.abs(st.x - centerOf(on)) > 0.5) { Object.assign(st, { x: centerOf(on), v: 0, s: 1, vs: 0 }); lensTab = on; paint(); settle(on); } } return; }
+  stopGlide();
   const on = pendingTab || activeTab() || lensTab; if (!on) return;
   Object.assign(st, { x: centerOf(on), v: 0, s: 1, vs: 0 }); lensTab = on; placed = true; paint(); settle(on);
 }
@@ -286,9 +295,19 @@ export function initTabLens(): void {
   if ((bar as any)._lens) { syncTabLens(); return; }
   (bar as any)._lens = true;
   ensureLens(); syncTabLens();
-  let rt = 0; const onResize = () => { cancelAnimationFrame(rt); rt = requestAnimationFrame(relayout); };
+  // Auftrag 30: bei jeder Größenänderung, Drehung, Safari-Leiste und Rückkehr in die App neu messen – sofort und noch einmal, wenn iOS
+  // das Layout nach dem Drehen fertig hat (Safe Area und Breite kommen dort erst etwas später an)
+  let rt = 0; const late: number[] = [];
+  const onResize = () => {
+    cancelAnimationFrame(rt); rt = requestAnimationFrame(relayout);
+    late.splice(0).forEach(clearTimeout); for (const ms of [120, 350, 800]) late.push(window.setTimeout(relayout, ms));
+  };
   window.addEventListener('resize', onResize);
-  if (typeof ResizeObserver === 'function') new ResizeObserver(onResize).observe(tabs);
+  window.addEventListener('orientationchange', onResize);
+  window.addEventListener('pageshow', onResize);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onResize(); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
+  if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(onResize); ro.observe(tabs); ro.observe(bar); }
   const capture = (id: number) => { try { tabs!.setPointerCapture(id); } catch (er) { /* ältere Browser */ } };
   tabs.addEventListener('pointerdown', e => {
     if (pid != null || (e.pointerType === 'mouse' && e.button !== 0)) return;

@@ -134,3 +134,25 @@ test('Auftrag 29: „Dein Trainingsdashboard“ passt bei jeder Schriftgröße',
   }
   expect([...new Set(problems)]).toEqual([]);
 });
+
+/* Auftrag 30: „Anders gemacht“ – jede Art mit ihren Feldern passt bei 320 px und sehr großer Schrift (hell und dunkel) */
+for (const dark of [false, true]) test(`Auftrag 30: Anders gemacht, alle Arten, 320 px, 28 px Schrift, ${dark ? 'dunkel' : 'hell'}`, async ({ page }) => {
+  test.setTimeout(180000);
+  await page.setViewportSize({ width: 320, height: 760 });
+  await prepare(page, dark, 28);
+  await page.goto('/?go=plan'); await expect(page.locator('#app')).not.toBeEmpty();
+  const sid = await page.evaluate(() => { const b = document.querySelector('[data-act="sess-open"]') as HTMLElement | null; return b ? b.dataset.sid : null; });
+  expect(sid).toBeTruthy();
+  await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).first().click();
+  const sh = page.locator('#sheetPanel');
+  await sh.locator('[data-act="fd-asplanned"][data-v="0"]').click();
+  const problems: string[] = [];
+  const kinds = await sh.locator('[data-act="fd-chg-kind"]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.v!));
+  expect(kinds.length).toBeGreaterThanOrEqual(7);
+  for (const k of kinds) {
+    await sh.locator(`[data-act="fd-chg-kind"][data-v="${k}"]`).click(); await page.waitForTimeout(60);
+    if (k === 'split') { await sh.locator('[data-act="fd-chg-part-add"]').click(); await page.waitForTimeout(40); }
+    (await overflow(page)).forEach(p => problems.push(`${k}: ${p}`));
+  }
+  expect(problems).toEqual([]);
+});

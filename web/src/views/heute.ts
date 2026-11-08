@@ -80,7 +80,7 @@ function answerCard(): string {
     ${noValues && !d.ill ? `<button class="btn soft block" data-act="checkin-open" style="margin-top:var(--s3)">${ic('plus')} ${esc(t('heute.enterValues'))}</button>` : ''}
     <details class="more" style="margin-top:var(--s3)"><summary>${esc(t('heute.why'))}<span class="chev">${ic('down')}</span></summary><div class="body">${critTiles()}${historyBars()}
       ${d.readiness.point && !d.readiness.personal ? `<div class="hint">${esc(t('heute.fixedLimits', { n: C.MIN_DAYS }))}</div>` : ''}
-      <div class="row wrap"><button class="btn ghost sm" data-act="checkin-open">${ic('edit')} ${esc(t('heute.editValues'))}</button></div></div></details>
+      ${/* Auftrag 30: „Werte ändern“ entfernt – die Kacheln darüber und das Herz oben öffnen dasselbe */ ''}</div></details>
   </div>`;
 }
 

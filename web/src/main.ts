@@ -144,6 +144,8 @@ function renderTabs() {
 
 let softInserted: Element[] | null = null;
 function render() {
+  // Auftrag 30: Zähler für die Messung „ruhig nach App-Wechsel“ (Tests lesen ihn; kostet nichts)
+  (window as any).__renders = ((window as any).__renders || 0) + 1;
   // Auftrag 18: automatische Plan-Änderungen erst nach dem ersten Abgleich (sonst überschreibt ein alter Stand auf dem Gerät den neueren Plan vom Server)
   safeRun('swim-skill', () => { if (HAS_PLAN && autoReady && checkSwimSkill()) saveState(); });
   invalidate();
@@ -190,10 +192,22 @@ function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y);
 /* Auftrag 26: Aktualisierung aus dem Hintergrund – gebündelt (ein Neuzeichnen je Bild), nie mitten in einer Eingabe */
 let refreshFrame = 0, refreshLater = false;
 const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+/* Auftrag 30: Angleichen aus dem Hintergrund in einer Leerlaufzeit (nicht während der Finger scrollt oder gleich nach der Rückkehr in die
+   App), danach im nächsten Bild. Nur Geändertes wird angeglichen (morph), kein Neuaufbau. */
+let lastTouch = 0, refreshIdle = false;
+document.addEventListener('pointerdown', () => { lastTouch = performance.now(); }, { capture: true, passive: true });
+document.addEventListener('scroll', () => { lastTouch = performance.now(); }, { capture: true, passive: true });
 function refresh() {
   if (typing()) { refreshLater = true; return; }
-  if (refreshFrame) return;
-  refreshFrame = requestAnimationFrame(() => { refreshFrame = 0; if (typing()) { refreshLater = true; return; } softRerender(); });
+  if (refreshFrame || refreshIdle) return;
+  refreshIdle = true;
+  const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: any) => number) | undefined;
+  const go = () => {
+    if (performance.now() - lastTouch < 250) { setTimeout(go, 250); return; }   // Finger/Scrollen noch aktiv: kurz warten
+    refreshIdle = false;
+    refreshFrame = requestAnimationFrame(() => { refreshFrame = 0; if (typing()) { refreshLater = true; return; } softRerender(); });
+  };
+  if (ric) ric(go, { timeout: 1200 }); else setTimeout(go, 50);
 }
 /* Neue Daten aus dem Hintergrund gleiten an ihren Platz (240 ms) statt zu springen: Bausteine, die sich verschieben, starten an ihrer
    alten Position (FLIP), neu eingefügte blenden ein. Mit „Bewegung reduzieren“ ohne Animation. */

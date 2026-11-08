@@ -1,4 +1,5 @@
 import {effectiveCustomBuckets} from './custom-state26';
+import { personalResponse } from './response';
 /* Kommende Wochen neu planen (Kern, ohne Browser): gleicher Ablauf für App, Fragebogen, Coach-Chat, Server und Tests.
    Regel für alle (Auftrag 7): Gibt es schon einen Plan, wird FORTGESETZT, nicht neu begonnen. Vergangene Wochen bleiben,
    Wochen- und Blockzählung laufen weiter, der Umfang knüpft an die Belastung (CTL/ATL) an, Score-Kalibrierung und Verlauf
@@ -59,7 +60,7 @@ export function replanPlan(old: any, profile: Profile, goals: Goal[], today: str
   const pauseDays = st0 ? C.trainingGap(st0, old.weeks || [], from) : null;
   // Auftrag 20: Lauf-Geh-Einheiten pro Woche bisher (letzte 2 normale Wochen vor dem Neuplanen): nicht sprunghaft mehr (eine mehr = +50-100 % Laufumfang)
   const rwN = (() => { const ws = eff.filter((w: any) => w.endDate < from && !w.isRecoveryWeek && !w.partial).slice(-2); const n = ws.map((w: any) => (w.days || []).reduce((a: number, d: any) => a + (d.sessions || []).filter((s: any) => s && !s.cancelled && s.stage && s.stage.ladder === 'runwalk').length, 0)); return n.length && n.every(x => x > 0) ? Math.max(...n) : null; })();
-  const gen = generatePlan({ recentRunWalkN: rwN, profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, from, frozen: frozenDays(old, o.adjustments, o.state, from), measuredStartMin: o.measuredStartMin ?? null, recentOwnMin, recentLong, pauseDays,
+  const gen = generatePlan({ recentRunWalkN: rwN, profile, goals: gl, today, currentWeeklyHours: o.recentHours ?? null, load, from, frozen: frozenDays(old, o.adjustments, o.state, from), measuredStartMin: o.measuredStartMin ?? null, recentOwnMin, recentLong, pauseDays, response: st0 ? personalResponse(st0, old.weeks || [], today) : null,
     continueFrom: continuationOf(old, today, o.state ? { ...o.state, adjustments: o.adjustments || o.state.adjustments } : undefined, from), needTests: o.needTests,
     stages: { swim: stages.swim === undefined ? undefined as any : stages.swim, runwalk: stages.runwalk === undefined ? undefined as any : stages.runwalk } });
   const next = transitionPlan(old, gen.plan, today, from);

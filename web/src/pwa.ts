@@ -56,7 +56,8 @@ export function startPwa(): void {
         location.reload();
       });
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') reg!.update().catch(() => {});
+        // Auftrag 30: Update-Suche nach der Rückkehr erst etwas später (nicht im ersten Bild)
+        if (document.visibilityState === 'visible') setTimeout(() => { if (document.visibilityState === 'visible') reg!.update().catch(() => {}); }, 2500);
       });
     } catch (e) { /* offline oder nicht unterstützt: App läuft trotzdem */ }
   };

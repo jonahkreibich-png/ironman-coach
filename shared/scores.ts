@@ -1,5 +1,5 @@
 import {effectiveCustomBuckets} from './custom-state26';
-import { actualMetrics, crawlOf, actualTitle, actualSport, plannedLoadDropped } from './results';
+import { actualMetrics, crawlOf, actualTitle, actualSport, effectiveSession } from './results';
 /* Leistungs-Scores je Sportart (Auftrag 12): feste Leistungsskala 0-100 statt „Anteil am Ziel“.
    20 = Einsteiger, 50 = solider Hobbysportler, 70 = stark, 85 = Spitzenamateur, 100 = Elite; alters- und geschlechtsbereinigt, wenn bekannt.
    Kein Abschneiden bei 100 mehr: wer besser wird, steigt weiter.
@@ -1051,7 +1051,7 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {})
     } as Activity);
   };
-  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, actualTitle(s, st), { ...st, zone: plannedLoadDropped(st) ? 'Zone 2' : s.zone, race: !!s.race }, s.plannedMinutes); }));
+  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, actualTitle(s, st), { ...st, zone: effectiveSession(s, st).zone, race: !!s.race }, s.plannedMinutes); }));
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
   return out;
 }

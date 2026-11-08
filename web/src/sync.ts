@@ -289,9 +289,11 @@ async function drainSync(): Promise<boolean> {
       // fetch entstanden sind. Ein alter Ack darf sie nicht aus der Warteschlange loeschen.
       detect();
       uncommittedHashes = {...META.hashes};
-      (res.records || []).forEach(r => { if (applyRecord(r)) appliedAny = true; });
+      let appliedNow = false;
+      (res.records || []).forEach(r => { if (applyRecord(r)) { appliedAny = true; appliedNow = true; } });
       // Zustand vor Cursor/Ausgang bestaetigen. Bei Fehler bleibt der Ausgang wiederholbar.
-      if (typeof saveState === 'function') saveState(true);
+      // Auftrag 30: nur, wenn sich wirklich etwas geändert hat (vorher bei jedem Abgleich ganzer Speicher neu geschrieben)
+      if (appliedNow && typeof saveState === 'function') saveState(true);
       if (!await localStorage.settled()) throw new Error('Daten noch nicht lokal gespeichert. App offen lassen und Backup exportieren.');
       uncommittedHashes = null;
       sent.forEach(c => { const k = c.kind + '|' + c.key; if (META.pending[k] && META.pending[k].updatedAt === c.updatedAt) { delete META.pending[k]; if (!(res.records || []).some(r => r.kind === c.kind && r.key === c.key)) setBase(k, c.kind, c.data, c.deleted); } });
@@ -351,7 +353,17 @@ export function syncNotify() {
   clearTimeout(notifyTimer);
   notifyTimer = setTimeout(() => syncNow({ onlyIfPending: true }), 1500);
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow(); });
+/* Auftrag 30: Rückkehr in die App – erst zeigt der Browser den gespeicherten Stand ruhig an, der Abgleich (Speicher lesen, vergleichen,
+   Server) läuft danach in einer Leerlaufzeit. Vorher lief er sofort im ersten Bild nach der Rückkehr (Ruckeln). */
+let returnTimer: any = null;
+export function whenIdle(fn: () => void, wait = 600): void {
+  const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: any) => number) | undefined;
+  setTimeout(() => { if (ric) ric(fn, { timeout: 1500 }); else fn(); }, wait);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') { clearTimeout(returnTimer); return; }
+  clearTimeout(returnTimer); returnTimer = setTimeout(() => whenIdle(() => { if (document.visibilityState === 'visible') syncNow(); }, 0), 600);
+});
 window.addEventListener('online', () => syncNow());
 setInterval(() => { if (document.visibilityState === 'visible') syncNow(); }, 3 * 60 * 1000);
 setInterval(updateStatusEls, 30 * 1000);

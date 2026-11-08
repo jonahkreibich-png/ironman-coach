@@ -13,7 +13,7 @@ import { invalidate } from '../data';
 import { replanFuture } from '../replan';
 import { nav } from '../nav';
 import { toast } from '../toast';
-import { gridHtml, listHtml, addHtml, registerTarget, weekHtml } from './rules';
+import { gridHtml, listHtml, registerTarget, weekHtml } from './rules';
 import { weekSummary } from '../../../shared/weekgrid';
 import { dayCap } from '../../../shared/plangen';
 import { todayStr } from '../util';
@@ -46,7 +46,11 @@ export function renderBeruecksichtigungen(): string {
   if (LAST) h += `<div class="banner good" data-replanned style="margin-bottom:var(--s3)">${esc(LAST)}</div>`;
   h += sec(t('rules.gridTitle'), `<div class="card stack"><div class="hint">${esc(t('week.hint'))}</div>${weekHtml('cons')}</div>`);
   h += sec(t('cons.team'), teamCard(p));
-  h += sec(t('rules.notesTitle'), `<div class="hint" style="margin:0 2px var(--s2)">${esc(t('rules.notesHint'))}</div>${listHtml('cons')}<div style="margin-top:var(--s2)">${addHtml('cons')}</div>`);
+  // Auftrag 30: „In eigenen Worten“ entfernt (Raster reicht, Sonderwünsche über den Coach). Bisherige Sätze und Regeln aus dem Chat bleiben
+  // sichtbar und wirken weiter; nur wer welche hat, sieht den Abschnitt.
+  { const cur = draftProfile(SCREEN);
+    if ((cur.notes || []).length || (cur.rules || []).some((r: any) => r && r.source !== 'grid')) h += sec('Deine weiteren Regeln', `<div class="hint" style="margin:0 2px var(--s2)" data-rules-coach-hint>Neue Sonderwünsche (z. B. „mittwochs kein Laufen“) sagst du einfach dem Coach.</div>${listHtml('cons', { clarify: false })}`);
+    else h += `<div class="hint" style="margin:var(--s3) 2px" data-rules-coach-hint>Sonderwünsche (z. B. „mittwochs kein Laufen“) sagst du einfach dem Coach.</div>`; }
   h += sec(t('cons.skills'), `<div class="card stack"><div class="fgrid">
     ${p.sports.includes('swim') ? select('cs-crawl', t('cons.crawl'), sk.swimCrawl || '', [['', '–'], ['yes', t('common.yes')], ['some', t('cons.some')], ['no', t('common.no')]], 'data-ch="cs" data-k="swimCrawl"') + field('cs-crawlm', t('cons.crawlM'), sk.swimCrawlM ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="swimCrawlM" data-num="1"' }) : ''}
     ${p.sports.includes('run') ? field('cs-run', t('cons.runMin'), sk.runContinuousMin ?? '', { inputmode: 'numeric', data: 'data-ch="cs" data-k="runContinuousMin" data-num="1"' }) : ''}

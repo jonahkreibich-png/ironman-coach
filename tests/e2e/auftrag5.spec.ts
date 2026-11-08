@@ -13,31 +13,24 @@ async function effectiveSessions(page: any) {
   });
 }
 
-test('A: Papas Satz → App zeigt, was sie verstanden hat → Läufe nur noch Sa/So, auch diese Woche', async ({ page }) => {
-  await seed(page);
+/* Auftrag 30: „In eigenen Worten“ gibt es nicht mehr (Raster reicht, Sonderwünsche über den Coach). Papas früherer Satz bleibt aber
+   sichtbar und wirkt weiter: die App zeigt, was sie verstanden hat, und das Raster zeigt die Regel. Nichts wird still gelöscht. */
+test('A: Papas früherer Satz bleibt sichtbar und wirkt (Raster), kein Eingabefeld mehr', async ({ page }) => {
+  await seed(page, { extra: (d: any) => { d.profile = { ...(d.profile || {}), notes: ['kann mittwochs nicht laufen, nur Samstag oder Sonntag', 'Mondphase beachten'] }; } });
   await open(page, '/?go=beruecksichtigungen');
-  await page.fill('#rule-new-cons', 'kann mittwochs nicht laufen, nur Samstag oder Sonntag');
-  await page.locator('[data-act="rule-check"]').click();
-  const card = page.locator('[data-rule-confirm]');
-  await expect(card).toContainText('Laufen: nie Mi');
-  await expect(card).toContainText('Laufen: nur Sa und So');
-  await page.locator('[data-act="rule-ok"]').click();
-  // die Regel landet direkt im Wochenraster
+  await expect(page.locator('#rule-new-cons')).toHaveCount(0);
+  const list = page.locator('[data-cons-list]');
+  await expect(list).toContainText('kann mittwochs nicht laufen');
+  await expect(list).toContainText('Laufen: nie Mi');
+  await expect(list).toContainText('Laufen: nur Sa und So');
+  // nicht verstandener alter Satz: bleibt mit Hinweis auf den Coach
+  await expect(list.locator('[data-note-coach]')).toHaveCount(1);
+  await expect(list).toContainText('Mondphase beachten');
+  await expect(page.locator('[data-rules-coach-hint]')).toContainText('dem Coach');
+  // die Regel steht im Wochenraster
   await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bno\b/);
   await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="6"]')).toHaveClass(/\byes\b/);
-  // Auftrag 6: erst vorgemerkt, Vorschau zeigt die Folgen, dann übernehmen
-  await expect(page.locator('[data-act="rule-cell"][data-s="run"][data-d="3"]')).toHaveClass(/\bchg\b/);
-  await page.locator('[data-act="stage-apply"]').click();
-  await expect(page.locator('[data-stage-preview]')).toContainText(/Laufen von \S+ auf (Sa|So)(?![a-z])/);
-  await page.locator('[data-act="stage-confirm"]').click();
-  await expect(page.locator('[data-replanned]')).toBeVisible({ timeout: 5000 });
-  // ab heute (Mi 14.10.) kein Lauf mehr außer Sa/So
-  const all = await effectiveSessions(page);
-  const runs = all.filter((s: any) => s.sport === 'run' && s.date >= '2026-10-14');
-  expect(runs.length).toBeGreaterThan(0);
-  runs.forEach((s: any) => expect([0, 6], `${s.title} ${s.date}`).toContain(dow(s.date)));
-  const msgs = Object.values((await stored(page)).coachMsgs) as any[];
-  expect(msgs.some(m => /Plan angepasst/.test(m.title || ''))).toBe(true);
+  void effectiveSessions; void dow; void stored;
 });
 
 test('A2: Wochenraster antippen ändert die Regel (geht → lieber nicht → geht nicht)', async ({ page }) => {

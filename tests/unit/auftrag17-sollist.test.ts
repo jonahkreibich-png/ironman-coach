@@ -65,7 +65,7 @@ describe('geplant 100 m, gemacht 50 m: nie 100 m als Leistung', () => {
     const all = [...r.good, ...r.better, ...r.next].join(' ');
     expect(all).not.toMatch(NO_100);
     expect(all).toMatch(/Geplant: 100 m Kraul am Stück. Geschafft: 50 m/);
-    expect(all).toMatch(/50 m Kraul am Stück wie zuletzt/);
+    expect(all).toMatch(/50 m Kraul am Stück – so gut wie dein Bestwert/);
     expect(autoReview(ctx, d, 'full')).not.toMatch(NO_100);
   });
   test('Coach-Engine nach der Aufzeichnung: keine 100-m-Behauptung, keine 100-m-Stufe', () => {

@@ -36,7 +36,7 @@ export const GOALS: Record<GoalType, GoalDef> = {
   fitness: { type: 'fitness', group: 'other', legs: [], hours: [0, 0], prepWeeks: [4, 12] }
 };
 
-export interface Course { bikeAscentM?: number | null; runAscentM?: number | null; swimVenue?: 'open' | 'pool' | null; wetsuit?: boolean | null; tempC?: number | null }
+export interface Course { bikeAscentM?: number | null; runAscentM?: number | null; swimVenue?: 'open' | 'pool' | null; wetsuit?: boolean | null; tempC?: number | null; /** Auftrag 30: Startzeit „HH:MM“ (Generalproben zur gleichen Uhrzeit) */ startTime?: string | null }
 export interface Goal {
   id: string;
   type: GoalType;

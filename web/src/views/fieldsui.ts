@@ -17,7 +17,7 @@ import { strengthNumber } from '../../../shared/strength';
 import { editStrengthTemplate } from './strength';
 import { intervalsBlock, registerIntervalHost, registerPlannedLookup } from './intervalsui';
 import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay } from '../../../shared/validate';
-import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, plannedLoadDropped } from '../../../shared/results';
+import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, CHANGE_ZONES, changedOf, changeZone, changeParts, intervalsMode, omitOptions, placeLabel } from '../../../shared/results';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
 /* Datensatz der Einheit (Zustand einer geplanten Einheit oder die Extra-Einheit selbst) */
@@ -79,7 +79,9 @@ export function fieldsBlock(tg: Target): string {
   // Testfelder nur bei Tests (Lauftest, Radtest, Schwimmtest)
   const isTest = /test/i.test(String((tg.planned && tg.planned.title) || ''));
   const defs = (SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }]).filter(f => (!f.test || isTest) && (f.key !== 'np' || realWatts(st)));
-  const main = defs.filter(f => !f.more), extra = defs.filter(f => f.more);
+  // Auftrag 30: Dauer/Distanz stehen bei „kürzer/länger/abgebrochen“ oben im Änderungs-Block (dieselben Felder, keine doppelten)
+  const moved = tg.kind === 'session' && tg.planned ? movedKeys(st) : [];
+  const main = defs.filter(f => !f.more && !moved.includes(f.key)), extra = defs.filter(f => f.more && !moved.includes(f.key));
   const prof = profile();
   const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds);
   const ld = loadOn(STATE, C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), tg.date);
@@ -89,34 +91,87 @@ export function fieldsBlock(tg: Target): string {
   return `<div class="card flat tight stack" data-fields="${tg.sport}">
     <div class="spread"><div class="lbl">${esc(t('fd.values'))} ${srcs.map(s => srcBadge(s)).join(' ')}</div>${hasOrig ? `<button class="link" data-act="fd-reset" ${attrs(tg)}>${esc(t('common.resetOriginal'))}</button>` : ''}</div>
     ${auto ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-auto>${auto}</div>` : ''}
-    ${tg.kind === 'session' && tg.planned ? changeHtml(tg, st) : ''}
+    ${tg.kind === 'session' && tg.planned ? changeHtml(tg, st, defs.filter(f => moved.includes(f.key))) : ''}
     ${doubtsHtml(tg, st)}
     <div class="fgrid">${main.map(f => oneField(tg, f, st)).join('')}</div>
-    ${plannedLoadDropped(st) ? '' : intervalsBlock(tg, st, attrs(tg))}
+    ${ivHtml(tg, st)}
     ${extra.length ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}
     <div class="fld wide"><span class="lab">${esc(t('fd.rpe'))}</span><div class="rpe-row" role="group" aria-label="${esc(t('fd.rpe'))}">${Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button class="chip ${String(st.rpe ?? '') === String(n) ? 'on' : ''}" aria-pressed="${String(st.rpe ?? '') === String(n)}" data-act="fd-rpe" data-v="${n}" ${attrs(tg)}>${n}</button>`).join('')}</div><div class="xs muted">${esc(t('fd.rpeHint'))}</div></div>
     <div class="fld wide"><span class="lab">${esc(t('fd.feel'))}</span><div class="chips" style="flex-wrap:wrap">${FEEL.map(([v, l]) => `<button class="chip ${String(st.feel ?? '') === v ? 'on' : ''}" aria-pressed="${String(st.feel ?? '') === v}" data-act="fd-feel" data-v="${v}" ${attrs(tg)}>${esc(l)}</button>`).join('')}</div></div>
-    <div class="fld wide"><label for="fd-dev">${esc(t('fd.deviation'))}</label><input class="inp" id="fd-dev" data-ch="fd-top" data-k="deviation" ${attrs(tg)} value="${esc(st.deviation || '')}" placeholder="${esc(t('fd.deviationPh'))}"></div>
+    ${/* Auftrag 30: altes Freitextfeld „Abweichung“ ist doppelt zu „Anders gemacht“ – nur noch sichtbar, wenn dort schon etwas steht */ (st.deviation || '').trim() ? `<div class="fld wide"><label for="fd-dev">${esc(t('fd.deviation'))}</label><input class="inp" id="fd-dev" data-ch="fd-top" data-k="deviation" ${attrs(tg)} value="${esc(st.deviation || '')}" placeholder="${esc(t('fd.deviationPh'))}"></div>` : ''}
     ${more(t('fd.note'), `<textarea class="inp" id="fd-notes" rows="3" data-ch="fd-top" data-k="${tg.kind === 'custom' ? 'description' : 'notes'}" ${attrs(tg)} placeholder="${esc(t('sess.notesPh'))}">${esc((tg.kind === 'custom' ? st.description : st.notes) || '')}</textarea>`, !!((tg.kind === 'custom' ? st.description : st.notes) || '').trim())}
   </div>`;
 }
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
-/* Auftrag 29: „So wie geplant / Anders gemacht“ mit Art und optionalem Grund (Intervall-Liste dann nicht nötig) */
-function changeHtml(tg: Target, st: any): string {
-  const c = st.changed || {}; const other = st.asPlanned === false;
+/* Auftrag 29/30: „So wie geplant / Anders gemacht“ – je Art die passenden Felder, optional der Grund */
+const DUR_KINDS = ['shorter', 'longer', 'aborted'];
+function movedKeys(st: any): string[] { const c = changedOf(st); return c && DUR_KINDS.includes(c.kind) ? ['min', 'km', 'meters'] : []; }
+function ivHtml(tg: Target, st: any): string {
+  const mode = tg.kind === 'session' ? intervalsMode(st) : 'planned';
+  if (mode === 'none') return '';
+  if (mode === 'free') return intervalsBlock({ ...tg, planned: tg.planned ? { ...tg.planned, spec: null } : null }, st, attrs(tg), true);
+  return intervalsBlock(tg, st, attrs(tg));
+}
+function changeHtml(tg: Target, st: any, durDefs: FieldDef[]): string {
+  const c = st.changed || {}; const other = st.asPlanned === false; const s = tg.planned;
   const chip = (act: string, v: string, label: string, on: boolean) => `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="${act}" data-v="${esc(v)}" ${attrs(tg)}>${esc(label)}</button>`;
   const sports: [string, string][] = [['run', 'Laufen'], ['bike', 'Rad'], ['swim', 'Schwimmen'], ['strength', 'Kraft'], ['football', 'Teamsport']];
+  const endurance = ['run', 'bike', 'swim'].includes(s.sport);
+  const kinds = CHANGE_KINDS.filter(([k]) => endurance || !['otherIntervals', 'place', 'split'].includes(k));
+  let detail = '';
+  if ((c.kind === 'easy' || c.kind === 'harder') && !endurance) detail = '<div class="xs muted">Wie anstrengend es war, trägst du unten als RPE ein.</div>';
+  else if (c.kind === 'easy' || c.kind === 'harder') { const z = changeZone(st, s); detail = `<span class="lab">Tatsächliche Intensität</span><div class="chips" style="flex-wrap:wrap" data-change-zone>${CHANGE_ZONES.filter(([n]) => c.kind === 'easy' ? n <= 3 : n >= 3).map(([n, l]) => chip('fd-chg-zone', String(n), l, z === n)).join('')}</div><div class="xs muted">Dein Gefühl (RPE) trägst du unten ein.</div>`; }
+  else if (DUR_KINDS.includes(c.kind)) detail = `<div class="fgrid" data-change-dur>${durDefs.map(f => oneField(tg, f.key === 'min' && c.kind === 'aborted' ? { ...f, label: 'Abgebrochen nach' } : f, st)).join('')}</div>`;
+  else if (c.kind === 'otherSport') detail = `<label class="fld"><span class="lab">Sportart</span><select class="inp" data-ch="fd-chg-sport" ${attrs(tg)}><option value="">–</option>${sports.filter(([k]) => k !== s.sport).map(([k, l]) => `<option value="${k}" ${c.sport === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>${c.sport ? '<div class="xs muted">Unten stehen jetzt die Felder dieser Sportart.</div>' : ''}`;
+  else if (c.kind === 'place') detail = `<span class="lab">Wo?</span><div class="chips" data-change-place>${chip('fd-chg-place', 'in', placeLabel(s.sport, 'in'), c.place === 'in')}${chip('fd-chg-place', 'out', placeLabel(s.sport, 'out'), c.place === 'out')}</div>`;
+  else if (c.kind === 'split') {
+    const parts: any[] = Array.isArray(c.parts) && c.parts.length ? c.parts : [null, null]; const sum = changeParts(st).reduce((x, y) => x + y, 0);
+    detail = `<span class="lab">Teile</span><div class="stack" data-change-parts>${parts.map((v, i) => `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:flex-end"><label class="fld grow" for="fd-part-${i}"><span class="lab">Teil ${i + 1} <span class="muted">(min)</span></span><input class="inp" id="fd-part-${i}" inputmode="text" data-ch="fd-chg-part" data-i="${i}" ${attrs(tg)} value="${esc(v ?? '')}" placeholder="z. B. 30 oder 1:05"></label>${parts.length > 2 ? `<button class="btn ghost sm" data-act="fd-chg-part-del" data-i="${i}" ${attrs(tg)} aria-label="Teil ${i + 1} entfernen">×</button>` : ''}</div>`).join('')}
+      <button class="btn ghost sm" data-act="fd-chg-part-add" ${attrs(tg)}>+ Teil</button>${sum ? `<div class="xs muted" data-parts-sum>Zusammen ${Math.round(sum)} min</div>` : ''}</div>`;
+  }
+  else if (c.kind === 'omit') detail = `<span class="lab">Was hast du weggelassen?</span><div class="chips" style="flex-wrap:wrap" data-change-omit>${omitOptions(s).map(([k, l]) => chip('fd-chg-omit', k, l, c.omit === k)).join('')}</div>`;
+  else if (c.kind === 'otherIntervals') detail = '<div class="xs muted">Trag unten in der Intervall-Liste ein, was du gemacht hast.</div>';
   return `<div class="fld wide" data-as-planned><span class="lab">Wie lief es?</span><div class="chips" role="group" aria-label="Wie lief es?" style="flex-wrap:wrap">${chip('fd-asplanned', '1', 'So wie geplant', st.asPlanned === true)}${chip('fd-asplanned', '0', 'Anders gemacht', other)}</div>
-    ${other ? `<span class="lab">Was hast du gemacht?</span><div class="chips" style="flex-wrap:wrap" data-change-kind>${CHANGE_KINDS.filter(([k]) => k !== 'otherSport' || true).map(([k, l]) => chip('fd-chg-kind', k, k === 'easy' && tg.planned && !/intervall|sweet|schwelle|tempo|test|vo2|hart/i.test(String(tg.planned.title || '') + ' ' + (tg.planned.hard ? 'hart' : '')) ? 'Locker (Zone 2)' : l, c.kind === k)).join('')}</div>
-      ${c.kind === 'otherSport' ? `<label class="fld"><span class="lab">Sportart</span><select class="inp" data-ch="fd-chg-sport" ${attrs(tg)}><option value="">–</option>${sports.filter(([k]) => k !== tg.planned.sport).map(([k, l]) => `<option value="${k}" ${c.sport === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+    ${other ? `<span class="lab">Was hast du gemacht?</span><div class="chips" style="flex-wrap:wrap" data-change-kind>${kinds.map(([k, l]) => chip('fd-chg-kind', k, l, c.kind === k)).join('')}</div>
+      ${detail ? `<div class="stack" data-change-detail="${esc(c.kind)}">${detail}</div>` : ''}
       <span class="lab">Grund (optional)</span><div class="chips" style="flex-wrap:wrap" data-change-reason>${CHANGE_REASONS.map(([k, l]) => chip('fd-chg-reason', k, l, c.reason === k)).join('')}</div>` : ''}</div>`;
 }
 function setChange(tg: Target, f: (st: any) => void) { const st = rec(tg); if (!st) return; f(st); if (st.asPlanned === false && !st.changed) st.changed = {}; redraw(); rev(tg); }
+const indoorPlanned = (s: any) => !!s && (s.indoor === true || /rolle|indoor|drinnen|laufband|halle/i.test(String(s.title || '')));
 on('fd-asplanned', el => setChange(tg0(el), st => { st.asPlanned = el.dataset.v === '1'; if (st.asPlanned) delete st.changed; }));
-on('fd-chg-kind', el => setChange(tg0(el), st => { st.asPlanned = false; st.changed = { ...(st.changed || {}), kind: el.dataset.v }; if (el.dataset.v !== 'otherSport') delete st.changed.sport; }));
+on('fd-chg-kind', el => {
+  const tg = tg0(el); const planned = plannedFor(tg);
+  setChange(tg, st => {
+    const k = el.dataset.v!; const prev = st.changed || {};
+    // nur passende Angaben behalten; beim Wechsel der Art fallen die der alten weg (der Grund bleibt)
+    st.asPlanned = false; st.changed = k === prev.kind ? { ...prev } : { kind: k, ...(prev.reason ? { reason: prev.reason } : {}) };
+    if (k === 'place' && !st.changed.place) st.changed.place = indoorPlanned(planned) ? 'out' : 'in';
+  });
+});
 on('fd-chg-reason', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}) }; st.changed.reason = st.changed.reason === el.dataset.v ? undefined : el.dataset.v; }));
+on('fd-chg-zone', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), zone: +el.dataset.v! }; }));
+on('fd-chg-place', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), place: el.dataset.v }; }));
+on('fd-chg-omit', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}) }; st.changed.omit = st.changed.omit === el.dataset.v ? undefined : el.dataset.v; }));
 onChange('fd-chg-sport', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), kind: 'otherSport', sport: (el as HTMLSelectElement).value || undefined }; }));
+/* Aufgeteilt: Teile mit je Dauer; die Summe ist die Dauer der Einheit (dasselbe Feld wie überall) */
+function setParts(tg: Target, parts: any[]) {
+  const st = rec(tg); if (!st) return;
+  const nums = parts.map(v => (v == null || v === '' ? null : +v)).filter((v): v is number => v != null && v > 0);
+  let next: any = { ...st, changed: { ...(st.changed || {}), kind: 'split', parts } };
+  if (nums.length) next = setSessionMetricManual(next, 'min', String(Math.round(nums.reduce((a, b) => a + b, 0))));
+  put(tg, next); redraw(); rev(tg);
+}
+const partsOf = (st: any): any[] => Array.isArray(st.changed?.parts) && st.changed.parts.length ? [...st.changed.parts] : [null, null];
+onChange('fd-chg-part', el => {
+  const tg = tg0(el); const st = rec(tg); if (!st) return; const i = +el.dataset.i!;
+  const raw = (el as HTMLInputElement).value.trim(); const parts = partsOf(st);
+  if (raw) { const chk = checkField(tg.sport, 'min', raw); if (!chk.ok) { el.setAttribute('aria-invalid', 'true'); toast(chk.msg!); (el as HTMLInputElement).value = parts[i] ?? ''; return; } parts[i] = +chk.value; } else parts[i] = null;
+  el.removeAttribute('aria-invalid'); setParts(tg, parts);
+});
+on('fd-chg-part-add', el => { const tg = tg0(el); const st = rec(tg); if (!st) return; const parts = partsOf(st); parts.push(null); setParts(tg, parts); });
+on('fd-chg-part-del', el => { const tg = tg0(el); const st = rec(tg); if (!st) return; const parts = partsOf(st); parts.splice(+el.dataset.i!, 1); setParts(tg, parts); });
+function plannedFor(tg: Target): any { const d = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((x: any) => x.date === tg.date); return (d && d.sessions.find((x: any) => x.id === tg.id)) || null; }
 function tg0(el: HTMLElement): Target { return tgOf(el); }
 /* Auftrag 22: Rückfrage bei widersprüchlichen Werten (z. B. 200 km in 30 min, Puls über max. Puls) mit Vorschlag */
 function doubtsHtml(tg: Target, st: any): string {
@@ -134,7 +189,7 @@ on('fd-doubt', el => {
 // Auftrag 22: Intervall-Liste nutzt denselben Datensatz, dieselbe Speicherung und dieselbe Neubewertung wie die übrigen Werte
 registerIntervalHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {},
   thresholds: () => { const p = profile(); const th: any = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; } });
-registerPlannedLookup((id, date) => { const d = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((x: any) => x.date === date); return (d && d.sessions.find((x: any) => x.id === id)) || null; });
+registerPlannedLookup((id, date) => { const s = plannedFor({ kind: 'session', id, date, sport: '' }); return s && intervalsMode(STATE.sessions[id]) === 'free' ? { ...s, spec: null } : s; });
 /* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
 const rev = (tg: Target) => { if(customDraft(tg.id))return; const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
 // Beim Tippen sichern, ohne Formular/Fokus neu aufzubauen. Fachliche

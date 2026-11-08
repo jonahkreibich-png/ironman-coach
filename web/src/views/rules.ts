@@ -119,13 +119,15 @@ on('week-freq', el => {
 
 /* ---------- Liste: Sätze und was daraus wurde ---------- */
 const strengthPill = (r: Rule) => r.kind === 'info' ? pill(t('rules.info'), '') : r.strength === 'hard' ? pill(t('rules.hard'), 'bad') : pill(t('rules.soft'), 'warn');
-export function listHtml(tid: string): string {
+/* opts.clarify = false (Auftrag 30, Berücksichtigungen ohne „In eigenen Worten“): nicht verstandene alte Sätze bleiben sichtbar mit dem
+   Hinweis, sie dem Coach zu sagen – nichts wird still gelöscht */
+export function listHtml(tid: string, opts: { clarify?: boolean } = {}): string {
   const d = TARGETS[tid].get();
   const all = rulesOf({ notes: d.notes, rules: d.rules } as any, parseFor(todayStr())).filter(visible);
   const byText = (n: string) => all.filter(r => (r.text || '').trim().toLowerCase() === n.trim().toLowerCase());
   const items = d.notes.map((n, i) => {
     const rs = byText(n);
-    const sub = rs.length ? rs.map(r => `<span class="rl-r">${strengthPill(r)} ${esc(describe(r))}</span>`).join('') : `<span class="s">${esc(t('rules.notUnderstood'))}</span> <button class="link" data-act="rule-clarify" data-t="${tid}" data-i="${i}">${esc(t('rules.clarify'))}</button>`;
+    const sub = rs.length ? rs.map(r => `<span class="rl-r">${strengthPill(r)} ${esc(describe(r))}</span>`).join('') : opts.clarify === false ? `<span class="s" data-note-coach>Konnte nicht als Regel übernommen werden – sag es dem Coach, dann plant er es ein.</span>` : `<span class="s">${esc(t('rules.notUnderstood'))}</span> <button class="link" data-act="rule-clarify" data-t="${tid}" data-i="${i}">${esc(t('rules.clarify'))}</button>`;
     return `<div class="li" data-cons="${i}"><span class="grow"><span class="t">${esc(n)}</span><br>${sub}</span>${rs.length ? pill(t('cons.used'), 'good') : pill(t('cons.notUsed'), 'warn')}<button class="icon-btn" data-act="rule-del-note" data-t="${tid}" data-i="${i}" aria-label="${esc(t('common.remove'))}">${ic('close')}</button></div>`;
   });
   // Regeln ohne Satz (aus dem Chat oder später der KI), ohne die Raster-Felder

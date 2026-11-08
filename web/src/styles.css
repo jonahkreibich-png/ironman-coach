@@ -540,6 +540,26 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pr-m { flex: 0 0 auto; font-size: var(--t-xs); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pr-hard { display: inline-flex; vertical-align: -2px; color: var(--warn); }
 .pr-hard svg { width: 14px; height: 14px; }
+/* Auftrag 30: Symbole (einheitliche Icons) und Farbstreifen je Intensität (locker / mittel / hart) */
+.pr-marks { display: inline-flex; gap: 3px; vertical-align: -2px; flex-wrap: wrap; }
+.pr-mark { display: inline-flex; color: var(--ink-2); }
+.pr-mark svg { width: 14px; height: 14px; }
+.mk-hard { color: var(--warn); } .mk-test { color: var(--accent); } .mk-race { color: var(--hl, var(--accent)); } .mk-recovery { color: var(--info, var(--ink-2)); }
+.pr.wo { position: relative; padding-left: 9px; }
+.pr.wo::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: var(--int, transparent); }
+.pr.wo.int-easy { --int: var(--good); } .pr.wo.int-moderate { --int: var(--warn); } .pr.wo.int-hard { --int: var(--bad); }
+.pr.wo.cancelled::before { opacity: .35; }
+.pr-testcard { margin: 0 0 8px 38px; padding: 8px 10px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, transparent); display: grid; gap: 4px; overflow-wrap: anywhere; }
+.pr-testhead { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: var(--t-sm); }
+.pr-testhead svg { width: 16px; height: 16px; flex-shrink: 0; }
+.wk-line { margin-top: 2px; color: var(--ink-2); overflow-wrap: anywhere; }
+.pg-marks { display: inline-flex; gap: 2px; margin-left: 4px; }
+.pg-marks .pr-mark svg { width: 11px; height: 11px; }
+.mk-legend { display: grid; gap: 8px; }
+.mk-legend .li { align-items: flex-start; }
+.mk-legend .ic-mk { display: inline-flex; width: 26px; height: 26px; border-radius: 8px; place-items: center; justify-content: center; align-items: center; background: color-mix(in srgb, currentColor 12%, transparent); flex-shrink: 0; }
+.mk-legend .ic-mk svg { width: 16px; height: 16px; }
+.int-dot { display: inline-block; width: 4px; height: 16px; border-radius: 3px; vertical-align: -3px; margin-right: 6px; }
 .pr-rest { min-height: 44px; }
 .pr-x { font-size: var(--t-xs); color: var(--ink-2); padding: 0 0 6px 38px; overflow-wrap: anywhere; }
 .pr .wo-status { flex: 0 0 auto; }

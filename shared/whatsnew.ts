@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.18.0', items: [
+    '„Anders gemacht“ vollständig: lockerer/härter mit Zone, kürzer/länger/abgebrochen mit Dauer und Distanz, eigene Intervalle, andere Sportart mit ihren Feldern, drinnen/draußen, aufgeteilt in Teile, ohne Teil (z. B. ohne Koppel, nur Brust). Titel, Belastung und Coach nutzen das Gemachte.',
+    'Plan-Übersicht: kleine Symbole (⚡ hart, 🎯 Test, 🏁 Wettkampf, 🔗 Koppel, 🌙 Erholung, 🛠 Technik, ↔ lang, ✎ angepasst), Farbstreifen je Intensität, Tests als eigene Karte und oben eine Zeile je Woche. Legende im Lexikon.',
+    'Coach unterscheidet Bestwert, Tageswert und Trend („Heute 75 m am Stück, dein Bestwert sind 100 m“). Ruhiger nach dem App-Wechsel, Tab-Leiste sitzt nach dem Drehen richtig.'
+  ] },
   { version: '3.17.0', items: [
     '„Anders gemacht“: Beim Abhaken wählst du „So wie geplant“ oder „Anders gemacht“ (z. B. locker statt Intervalle, kürzer, andere Sportart, mit Grund). Der Titel zeigt dann, was du wirklich gemacht hast, der Coach bewertet genau das.',
     'Plan: Mit dem „+“ an jedem Tag legst du dort sofort eine Extra-Einheit an. Titel, Dauer und Beschreibung stimmen jetzt immer überein.',

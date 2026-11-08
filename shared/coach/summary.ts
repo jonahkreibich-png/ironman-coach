@@ -4,6 +4,10 @@
 import * as C from '../core';
 import { readinessContextLine } from '../readiness';
 import { doneItems, valsOf } from './review';
+import { changeText } from '../results';
+import { valueStories } from './analysis';
+import { STORY_METRICS, dm } from '../valuestory';
+import { personalResponse } from '../response';
 import { readinessFallback, readinessOf, type EngineCtx } from './engine';
 import { ageOf, sleepNeed } from '../profile';
 import { mainGoal, GOALS } from '../goals';
@@ -56,8 +60,19 @@ export function buildContext(ctx: EngineCtx, opts: { days?: number; question?: s
   }));
   doneItems(ctx, from, today).forEach(d => {
     const v = valsOf(d);
-    L.push(json({ date: d.date, id: d.key, sport: d.sport, IST: { ...(d.sport === 'strength' ? { title: d.title, area: v.area, areaSource: v.areaSource, exercises: v.exercises } : {}), min: v.min, km: v.km, meters: v.meters, longestCrawlM: v.longest, longestPullM: v.longestPull, pace100Sec: v.pace100, hr: v.hr, paceSecKm: v.pace, power: v.power, rpe: v.rpe, feel: v.feel, technique: v.technique || null, deviation: v.deviation || null }, notes: v.notes ? v.notes.slice(0, 120) : null, missing: 'unbekannt = nicht nachgewiesen; niemals durch SOLL ersetzen' }));
+    L.push(json({ date: d.date, id: d.key, sport: d.sport, ...(d.change && d.changedFrom ? { gemacht: d.title, andersAlsGeplant: changeText(d.changedFrom, d.st, d.act), geplantWar: d.changedFrom.title } : {}), IST: { ...(d.sport === 'strength' ? { title: d.title, area: v.area, areaSource: v.areaSource, exercises: v.exercises } : {}), min: v.min, km: v.km, meters: v.meters, longestCrawlM: v.longest, longestPullM: v.longestPull, pace100Sec: v.pace100, hr: v.hr, paceSecKm: v.pace, power: v.power, rpe: v.rpe, feel: v.feel, technique: v.technique || null, deviation: v.deviation || null }, notes: v.notes ? v.notes.slice(0, 120) : null, missing: 'unbekannt = nicht nachgewiesen; niemals durch SOLL ersetzen' }));
   });
+  // Auftrag 30: Bestwert (bester Einzelwert), Tageswert (letzte Einheit) und Trend (mehrere Einheiten) getrennt – nie erster gegen letzter Wert
+  try {
+    const sv = valueStories(ctx, today); const rows: string[] = [];
+    for (const [k, x] of Object.entries(sv)) {
+      if (!x.day || !x.best) continue; const m = STORY_METRICS[k];
+      rows.push(`${m.label}: Tageswert ${m.fmt(x.day.v)} (${dm(x.day.date)}), Bestwert ${m.fmt(x.best.v)} (${dm(x.best.date)})${m.stage && x.confirmed ? `, bestätigt (2×) ${m.fmt(x.confirmed)}` : ''}, Trend: ${x.trend === 'up' ? 'steigend' : x.trend === 'down' ? 'etwas schwächer' : x.trend === 'flat' ? 'stabil' : 'noch keiner (zu wenige Einheiten)'}`);
+    }
+    if (rows.length) { L.push('## Bestwert / Tageswert / Trend'); L.push('Regel: Bestwert = bester Einzelwert, Tageswert = letzte Einheit, Trend erst ab mehreren Einheiten. Ein schwächerer Tag ist kein Rückschritt, ein einzelner Spitzenwert noch kein neues Niveau.'); rows.forEach(r => L.push(r)); }
+  } catch (e) { /* Kontext bleibt ohne diesen Teil */ }
+  // Auftrag 30: persönliche Reaktion auf harte Wochen und Erholung (bestimmt Rhythmus 2+1/3+1 und Tiefe der Erholungswochen)
+  try { const r = personalResponse(ctx.state, C.applyAdjustments(ctx.baseWeeks || [], ctx.state.adjustments || {}), today); L.push('PERSÖNLICHE REAKTION: ' + r.text); } catch (e) { /* ohne */ }
   L.push('## Werte (Schlaf h / HFV / Ruhepuls / Temp-Abw. / Ampel)');
   L.push('AMPEL HEUTE: ' + readinessContextLine(readinessOf(ctx)));
   const hist = ctx.readinessWithheld ? (ctx.state.trend || []).filter((p: any) => p && p.date <= today && p.date >= C.addDays(today, -Math.min(days, 21))).map((p: any) => ({ date: p.date, ill: false, level: null, score: null })) : C.readinessHistory(ctx.state.trend, ctx.state.illnessPeriods, today, Math.min(days, 21), readinessFallback(ctx));

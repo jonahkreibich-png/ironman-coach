@@ -9,6 +9,8 @@ import type { EngineCtx } from './engine';
 import { doneItems, valsOf } from './review';
 import { sleepNeed } from '../profile';
 import { actualMetrics } from '../results';
+import { storyText, STORY_METRICS, type Story } from '../valuestory';
+import { valueStories } from './analysis';
 
 export interface ClaimFacts {
   /** längste Strecke Kraul am Stück (Einzelwert), bestätigt (in 2 Einheiten) und eigene Angabe im Profil */
@@ -356,11 +358,42 @@ export function checkValueClaims(text: string, f: ValueFacts, refDate: string): 
   const res = out.join('').replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   return { text: res, corrected, dropped };
 }
+/* ---------- Auftrag 30: Verlaufs-Aussagen gegen Bestwert / Tageswert / Trend ----------
+   „Kraul am Stück: von 50 m (Di 13.10.) auf 75 m (Fr 6.11.)“, obwohl der Bestwert 100 m (27.10.) war: ein Fortschritt auf einen Wert unter dem
+   Bestwert ist ein Tageswert, kein neues Niveau. „Rückschritt“ ohne schwächeren Trend über mehrere Einheiten ist ein normaler schwächerer Tag.
+   Solche Sätze werden durch die richtige Einordnung ersetzt („Heute 75 m am Stück, dein Bestwert sind 100 m (27.10.).“). */
+const PROG_METRIC: [string, RegExp][] = [['pull', /pull|buoy/i], ['crawl', /kraul|am stück/i], ['bike20', /\bwatt\b|\d\s*w\b|leistung/i], ['run5k', /\bpace\b|\/\s*km|pro km/i]];
+const PROGRESS = /\bvon\s+\d[\d.,:]*\s*(?:m|w|watt|min)?\b[^.!?]*?\bauf\s+\d|\b(gesteigert|verbessert|wird länger|werden länger|steigt|gestiegen|neues niveau|fortschritt)\b/i;
+const REGRESS = /\b(rückschritt|verschlechtert|schlechter geworden|nachgelassen|abgebaut|eingebrochen)\b/i;
+function numsFor(k: string, s: string): number[] {
+  if (k === 'run5k') return [...s.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => +m[1] * 60 + +m[2]);
+  if (k === 'bike20') return [...s.matchAll(/(\d{2,4})\s*(?:w|watt)\b/gi)].map(m => +m[1]);
+  return [...s.matchAll(/(\d{1,2}(?:\.\d{3})+|\d{2,5})\s*m\b/gi)].map(m => +m[1].replace(/\./g, ''));
+}
+export function checkProgressClaims(text: string, stories: Record<string, Story>, today: string): { text: string; fixed: string[] } {
+  const fixed: string[] = [];
+  const parts = String(text || '').split(/((?<=[.!?])(?<!\b\d{1,2}\.\d{1,2}\.)(?<!\b\d{1,2}\.)\s+|\n)/);
+  const out = parts.map(part => {
+    if (!part || !part.trim() || CONDITIONAL.test(part)) return part;
+    const hit = PROG_METRIC.find(([, re]) => re.test(part)); if (!hit) return part;
+    const k = hit[0]; const sv = stories[k]; if (!sv || !sv.day || !sv.best) return part;
+    const m = STORY_METRICS[k]; const better = (a: number, b: number) => m.higher ? a > b : a < b;
+    let wrong = false;
+    if (PROGRESS.test(part)) { const ns = numsFor(k, part); const to = ns[ns.length - 1]; if (to != null && better(sv.best.v, to)) wrong = true; }
+    if (REGRESS.test(part) && sv.trend !== 'down') wrong = true;
+    if (!wrong) return part;
+    const repl = storyText(sv, { ...m, today }); fixed.push(part.trim());
+    return repl || '';
+  });
+  const res = out.join('').replace(/[ \t]{2,}/g, ' ').trim();
+  return { text: res, fixed };
+}
 /* Ein Prüfer für jede Coach-Nachricht (Regel-Coach, Server, KI, Etappenziele) vor dem Anzeigen */
-export function verifyCoachText(text: string, ctx: EngineCtx, refDate?: string, facts?: { claims?: ClaimFacts; values?: ValueFacts }): string {
+export function verifyCoachText(text: string, ctx: EngineCtx, refDate?: string, facts?: { claims?: ClaimFacts; values?: ValueFacts; stories?: Record<string, Story> }): string {
   if (!text) return text;
   let t = fixCoachText(text, ctx);
   try { t = stripUnsupported(t, (facts && facts.claims) || claimFacts(ctx, refDate)); } catch (e) { /* Prüfung darf die Anzeige nie verhindern */ }
   try { t = checkValueClaims(t, (facts && facts.values) || valueFacts(ctx), refDate || ctx.today).text; } catch (e) { /* dito */ }
+  try { t = checkProgressClaims(t, (facts && facts.stories) || valueStories(ctx, ctx.today), ctx.today).text; } catch (e) { /* dito */ }
   return t || String(text).split(/(?<=[.!?])\s/)[0];
 }

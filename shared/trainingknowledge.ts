@@ -145,7 +145,29 @@ export const KNOWLEDGE: Knowledge[] = [
     why: 'Erfundene Zusammenhänge führen zu falschen Entscheidungen.', source: 'Auftrag 18, Punkt 1', where: 'Prüfer vor jeder Coach-Antwort (claims.ts)' },
   { id: 'coach-rules', topic: 'Coach', title: 'Der Coach kennt die Regeln', status: 'neu',
     rule: 'Der KI-Coach bekommt diese Regeln als kurzen Kontext; der Regel-Coach erklärt sie (z. B. „Warum habe ich heute frei?“).',
-    why: 'Erklärte Regeln werden besser eingehalten.', source: 'Auftrag 18, Punkt 6', where: 'KI-Anweisung, Regel-Coach (dialog.ts), Lexikon „Training verstehen“' }
+    why: 'Erklärte Regeln werden besser eingehalten.', source: 'Auftrag 18, Punkt 6', where: 'KI-Anweisung, Regel-Coach (dialog.ts), Lexikon „Training verstehen“' },
+  // ---------- Auftrag 30: ergänzt ----------
+  { id: 'response', topic: 'Belastung und Erholung', title: 'Persönliche Reaktion', status: 'neu',
+    rule: 'HFV, Ruhepuls und RPE nach harten Wochen steuern Rhythmus und Erholung. Harte Woche = Belastung mindestens 10 % über dem 4-Wochen-Schnitt. Wer sich langsam erholt (HFV deutlich unter der eigenen Basis, Ruhepuls +3 oder mehr, nach der lockeren Woche nicht wieder normal, lockere Einheiten mit hoher RPE), bekommt den Rhythmus 2+1, tiefere Erholungswochen (55–65 %), höchstens 6 % Steigerung und ein eher längeres Tapering. Wer sich schnell erholt, behält 3+1 mit 65–72 %. Ab 2 ausgewerteten harten Wochen; vorher gelten die Regeln nach Alter und Erfahrung.',
+    why: 'Menschen reagieren sehr unterschiedlich auf dieselbe Belastung; HFV und Ruhepuls zeigen das früher als die Leistung.', source: 'Plews u. a. (HFV-gesteuertes Training), Kiviniemi u. a.; Mann u. a. (individuelle Trainingsreaktion)', where: 'shared/response.ts → Neu-Planen (Rhythmus, Erholungstiefe, Steigerung) und Coach-Kontext' },
+  { id: 'rhythm', topic: 'Belastung und Erholung', title: 'Rhythmus und Erholungswoche', status: 'verbessert',
+    rule: '3+1; 2+1 für Jugendliche, ab 50, Einsteiger, bei Stress, langsamer Erholung. Stress = Prüfungs-/Stresszeit in den nächsten 6 Wochen. Die Erholungswoche hat etwa 60–70 % des eigenen Umfangs der letzten Aufbauwoche (vorher waren bis 82 % erlaubt, mit festen Ruhetagen im Wochenraster wurden es nur ~50 %). Zu viel wird gekürzt, zu wenig wird über lockere Einheiten aufgefüllt.',
+    why: 'Zu flache Erholungswochen erholen nicht, zu tiefe kosten Form. 60–70 % ist die übliche Spanne.', source: 'Bompa/Haff (Periodisierung), Friel (Triathlon-Bibel), ACSM', where: 'Generator (Rhythmus, enforceRecovery, Wochenraster)', check: 'recoveryDepth' },
+  { id: 'team-load', topic: 'Belastung und Erholung', title: 'Teamsport-Belastung', status: 'verbessert',
+    rule: 'Teamsport nach Dauer und Intensität. Mit Puls über die Puls-Belastung, mit RPE über die Anstrengung, sonst geschätzt – Spiel höher als Training, Turnier oder zwei Spiele noch höher.',
+    why: 'Ein Turniertag belastet deutlich mehr als ein lockeres Training gleicher Länge.', source: 'Foster (Session-RPE), Banister (TRIMP)', where: 'Belastung (core.sessionLoad/plannedIF)' },
+  { id: 'strength-phase', topic: 'Kraft', title: 'Kraft je Phase und Alter', status: 'verbessert',
+    rule: 'Grundlage 2×, Aufbau 1–2×, spezifisch 1× kurz, Rennwoche keine. In Erholungswochen 1×. Ab 50 mehr: Grundlage 3×, Aufbau und spezifisch 2×. Innerhalb der eigenen Häufigkeit; hat das Wochenraster nur eine Kraft-Einheit, kommt in der Grundlage eine kurze zweite dazu (Rumpf und Oberkörper, 25 min) an einem lockeren Tag – nur, wo das eigene Raster Kraft erlaubt. Rumpf zählt nicht als Beinkraft (darf vor einem Spiel liegen).',
+    why: 'Kraft schützt vor Verletzungen und macht ökonomischer; ab 50 geht Muskelmasse schneller verloren.', source: 'Rønnestad & Mujika, ACSM (ältere Sportler)', where: 'Generator (Kraft je Phase, Wochenraster)' },
+  { id: 'swim-intensity', topic: 'Technik', title: 'Schwimm-Intensität sichtbar', status: 'verbessert',
+    rule: '1× pro Woche schnelle Stücke (⚡). Passend zur Stufe: Lernende 25-m-Stücke zügig, ab 200 m Schwellen-Sets, ab 400 m CSS-Intervalle.',
+    why: 'Auch im Wasser braucht es Tempo-Reize; markiert sieht man, wo die harte Einheit der Woche liegt.', source: 'Swim Smooth (CSS), Trainingspraxis', where: 'Generator (Schwimm-Qualität), Übersicht (Symbole)' },
+  { id: 'race-conditions', topic: 'Wettkämpfe und Saison', title: 'Wettkampf-Bedingungen', status: 'neu',
+    rule: 'Hitze, Freiwasser, Höhenmeter und Startzeit fließen ein. Warmes Rennen → in den letzten gut 2 Wochen Hitze-Gewöhnung bei lockeren Einheiten; Freiwasser-Triathlon → in den 6 Wochen davor (Mai–September) eine Schwimmeinheit pro Woche im Freiwasser, mit Neopren wenn erlaubt, nie allein; hügelige Strecke → lange Ausfahrten bzw. ein Lauf pro Woche hügelig; Startzeit → Generalprobe und lange Einheiten am Wochenende zur Wettkampf-Uhrzeit.',
+    why: 'Hitze, Freiwasser, Höhenmeter und Uhrzeit entscheiden am Renntag oft mehr als ein paar Prozent Fitness.', source: 'Racinais u. a. (Hitze-Akklimatisation), Triathlon-Trainingspraxis', where: 'Generator (addRaceConditions)' },
+  { id: 'changed-carry', topic: 'Pausen, Krankheit, verpasste Einheiten', title: 'Anders gemacht: nächste Tage', status: 'neu',
+    rule: 'Fehlende Härte wird nur nachgeholt, wenn Platz ist (nie stapeln). Locker statt hart, andere Sportart oder abgebrochen: die Schlüsseleinheit wird nachgeholt, wenn innerhalb von 2 Tagen ein Tag ohne harte Einheit daneben frei ist (höchstens eine pro Woche, nie stapeln). Härter als geplant (Zone 4–5): eine harte Einheit am nächsten Tag wird locker. Aufgeteilt, nur Brust oder andere Intervalle zählen nicht als Nachweis für Stufen.',
+    why: 'Verpasste Härte nachzuholen, wenn kein Platz ist, stapelt Ermüdung; zwei harte Tage hintereinander erhöhen das Verletzungsrisiko.', source: 'Trainingslehre (Belastung–Erholung)', where: 'Tägliche Anpassung (core.dailyAdjustments), Stufen' }
 ];
 
 /* kurzer Kontext für den KI-Coach (eine Zeile je Regel) */

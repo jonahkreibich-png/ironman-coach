@@ -145,8 +145,9 @@ test('Auftrag 29 Felder: „+“ am Tag legt eine Extra-Einheit an genau diesem 
   await page.locator('[data-act="custom-save"]').click();
   const c = (await stored(page)).customWorkouts[date!];
   expect(c && c[0].title).toBe('Rolle extra'); expect(c[0].metrics.min).toBe('45'); expect(c[0].plannedMinutes).toBe(45);
-  // der Knopf unten bleibt
-  await expect(page.locator('[data-act="custom-add"]:not(.cday-add)').first()).toBeAttached();
+  // Auftrag 30: der doppelte Knopf unten ist weg, das „+“ am Tag bleibt
+  await expect(page.locator('[data-act="custom-add"]:not(.cday-add)')).toHaveCount(0);
+  await expect(page.locator('.cday-add[data-act="custom-add"]').first()).toBeAttached();
 });
 
 test('Auftrag 29 Felder: Morgenwerte mit Einheiten, neu laden, ungültig', async ({ page }) => {
@@ -226,4 +227,142 @@ test('Auftrag 29: Normalized Power nur mit echten Wattdaten (nicht bei einfacher
   await sheet(page).locator('#fd-indoor').selectOption('basic');
   await page.evaluate(() => document.querySelectorAll('#sheetPanel [data-fields] details').forEach(d => { (d as HTMLDetailsElement).open = true; }));
   await expect(sheet(page).locator('#fd-np')).toHaveCount(0);
+});
+
+/* Auftrag 30: „Anders gemacht“ vollständig – je Auswahl die passenden Felder, eintippen wie ein Mensch, neu laden, gleiche Zahl in Liste und Coach-Kontext */
+async function seedAnders(page: Page) {
+  await seed(page, { extra: (d: any) => {
+    const day = d.plan.weeks.flatMap((w: any) => w.days).find((x: any) => x.date === TODAY);
+    day.sessions.push({ id: 'a30-bike', sport: 'bike', title: 'Rad-Intervalle 2×12 min Sweet Spot', plannedMinutes: 75, hard: true, zone: 'Zone 3' });
+    day.sessions.push({ id: 'a30-swim', sport: 'swim', title: 'Schwimmen 1.200 m Technik', plannedMinutes: 45 });
+  } });
+  await open(page, '/?go=plan');
+}
+async function andersStart(page: Page, sid: string, kind: string) {
+  await openPlanSession(page, sid); await page.keyboard.press('Escape');
+  const t = page.locator(`[data-act="sess-toggle"][data-sid="${sid}"]`).first();
+  if ((await t.getAttribute('aria-pressed')) !== 'true') await t.click();
+  await openPlanSession(page, sid);
+  await sheet(page).locator('[data-act="fd-asplanned"][data-v="0"]').click();
+  await sheet(page).locator(`[data-act="fd-chg-kind"][data-v="${kind}"]`).click();
+  await expect(sheet(page).locator(`[data-change-detail="${kind}"]`)).toHaveCount(1);
+}
+async function rowText(page: Page, sid: string) {
+  await stored(page); // erst gesichert, dann neu laden
+  await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
+  if (!(await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).count())) await page.locator(`.cday-h[data-date="${TODAY}"]`).click();
+  return (await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).first().textContent()) || '';
+}
+const ctxMin = async (page: Page, sid: string) => { const st = await stored(page); const plan = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_plan') || '{}')); const d = doneItems(ctxOf(st, plan), TODAY, TODAY).find(x => x.key === sid); return d ? { title: d.title, min: valsOf(d).min } : null; };
+
+test('Auftrag 30: kürzer, länger, abgebrochen – Dauer und Distanz oben (einmal), neu laden, Liste und Coach-Kontext gleich', async ({ page }) => {
+  test.setTimeout(90000);
+  await seedAnders(page);
+  await andersStart(page, 'a30-bike', 'shorter');
+  // Dauer/Distanz stehen im Änderungs-Block und nicht doppelt
+  await expect(sheet(page).locator('#fd-min')).toHaveCount(1); await expect(sheet(page).locator('#fd-km')).toHaveCount(1);
+  await expect(sheet(page).locator('[data-change-dur] #fd-min')).toHaveCount(1);
+  await typeField(page, 'min', '0:40'); await typeField(page, 'km', '18,5 km');
+  await expect(sheet(page).locator('#fd-min')).toHaveValue('40');
+  let st = (await stored(page)).sessions['a30-bike'];
+  expect(st.changed.kind).toBe('shorter'); expect(String(st.metrics.min)).toBe('40'); expect(String(st.metrics.km)).toBe('18.5');
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-bike')).toContain('Rad-Intervalle Sweet Spot · 40 min');
+  expect(await ctxMin(page, 'a30-bike')).toEqual({ title: 'Rad-Intervalle Sweet Spot · 40 min', min: 40 });
+  // länger
+  await openPlanSession(page, 'a30-bike');
+  await sheet(page).locator('[data-act="fd-chg-kind"][data-v="longer"]').click();
+  await typeField(page, 'min', '1:35');
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-bike')).toContain('· 95 min');
+  // abgebrochen nach 25 min, Grund Schmerzen; ungültige Eingabe → Meldung, Wert bleibt
+  await openPlanSession(page, 'a30-bike');
+  await sheet(page).locator('[data-act="fd-chg-kind"][data-v="aborted"]').click();
+  await expect(sheet(page).locator('label[for="fd-min"]')).toContainText('Abgebrochen nach');
+  await typeField(page, 'min', '25'); await sheet(page).locator('[data-act="fd-chg-reason"][data-v="pain"]').click();
+  await typeField(page, 'min', '99999');
+  await expect(page.locator('.toast')).toBeVisible();
+  await expect.poll(async () => String((await stored(page)).sessions['a30-bike'].metrics.min)).toBe('25');
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-bike')).toContain('abgebrochen nach 25 min');
+  st = (await stored(page)).sessions['a30-bike']; expect(st.changed).toMatchObject({ kind: 'aborted', reason: 'pain' });
+  expect((await ctxMin(page, 'a30-bike'))!.min).toBe(25);
+});
+
+test('Auftrag 30: aufgeteilt – Teile mit je Dauer, Summe ist die Dauer, ungültig wird abgelehnt, neu laden', async ({ page }) => {
+  test.setTimeout(90000);
+  await seedAnders(page);
+  await andersStart(page, 'a30-bike', 'split');
+  const part = async (i: number, v: string) => { const el = sheet(page).locator(`#fd-part-${i}`); await el.click(); await el.fill(''); await el.pressSequentially(v, { delay: 5 }); await el.blur(); };
+  await part(0, '30'); await part(1, '0:25');
+  await expect(sheet(page).locator('[data-parts-sum]')).toContainText('Zusammen 55 min');
+  await sheet(page).locator('[data-act="fd-chg-part-add"]').click(); await part(2, '15 min');
+  await part(1, '9999');
+  await expect(page.locator('.toast')).toBeVisible();
+  const st = (await stored(page)).sessions['a30-bike'];
+  expect(st.changed.parts).toEqual([30, 25, 15]); expect(String(st.metrics.min)).toBe('70');
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-bike')).toContain('3 Teile (30 + 25 + 15 min)');
+  expect((await ctxMin(page, 'a30-bike'))!.min).toBe(70);
+  await openPlanSession(page, 'a30-bike');
+  await expect(sheet(page).locator('#fd-part-1')).toHaveValue('25');
+  await expect(sheet(page).locator('[data-intervals]')).toHaveCount(0);
+});
+
+test('Auftrag 30: härter mit Zone, eigene Intervall-Liste, drinnen/draußen, ohne Teil, andere Sportart', async ({ page }) => {
+  test.setTimeout(90000);
+  await seedAnders(page);
+  await andersStart(page, 'a30-bike', 'harder');
+  await sheet(page).locator('[data-act="fd-chg-zone"][data-v="5"]').click();
+  await expect(sheet(page).locator('[data-act="fd-chg-zone"][data-v="5"]')).toHaveAttribute('aria-pressed', 'true');
+  // eigene Intervall-Liste ohne Soll, gleich offen
+  await expect(sheet(page).locator('[data-intervals]')).toHaveCount(1);
+  await expect(sheet(page).locator('[data-iv-row="0"]')).toBeVisible();
+  await expect(sheet(page).locator('[data-iv-row="0"]')).toContainText('zusätzlich');
+  await typeField(page, 'min', '60');
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-bike')).toContain('Rad härter (Zone 5) · 60 min');
+  // drinnen/draußen
+  await openPlanSession(page, 'a30-bike');
+  await sheet(page).locator('[data-act="fd-chg-kind"][data-v="place"]').click();
+  await sheet(page).locator('[data-act="fd-chg-place"][data-v="in"]').click();
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-bike')).toContain('· Rolle');
+  // Schwimmen: nur Brust
+  await andersStart(page, 'a30-swim', 'omit');
+  await expect(sheet(page).locator('[data-act="fd-chg-omit"][data-v="breastOnly"]')).toBeVisible();
+  await expect(sheet(page).locator('[data-act="fd-chg-omit"][data-v="brick"]')).toHaveCount(0);
+  await sheet(page).locator('[data-act="fd-chg-omit"][data-v="breastOnly"]').click();
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-swim')).toContain('· nur Brust');
+  // andere Sportart: Felder dieser Sportart
+  await openPlanSession(page, 'a30-swim');
+  await sheet(page).locator('[data-act="fd-chg-kind"][data-v="otherSport"]').click();
+  await sheet(page).locator('[data-ch="fd-chg-sport"]').selectOption('run');
+  await expect(sheet(page).locator('[data-fields="run"]')).toBeVisible();
+  await typeField(page, 'km', '8,2');
+  await page.keyboard.press('Escape');
+  expect(await rowText(page, 'a30-swim')).toContain('Laufen');
+  expect(String((await stored(page)).sessions['a30-swim'].metrics.km)).toBe('8.2');
+});
+
+/* Auftrag 30: neues Feld „Startzeit“ beim Ziel (Strecke): eintippen wie ein Mensch, neu laden, ungültig → Meldung, alter Wert bleibt */
+test('Auftrag 30 Feld: Startzeit des Wettkampfs', async ({ page }) => {
+  test.setTimeout(60000);
+  await seed(page, { extra: (d: any) => { d.goals = { 'g-tri': { id: 'g-tri', type: 'tri_olympic', name: 'Olympische Distanz', date: '2027-07-04', priority: 'A', outcome: 'finish' } }; } });
+  await open(page, '/?go=profil');
+  const openCourse = async () => { await page.locator('[data-act="goal-open"][data-id="g-tri"]').click(); await page.evaluate(() => document.querySelectorAll('#sheetPanel details').forEach(d => { (d as HTMLDetailsElement).open = true; })); };
+  await openCourse();
+  const f = sheet(page).locator('#gc-st');
+  await f.click(); await f.pressSequentially('7.30', { delay: 5 }); await f.blur();
+  await expect(f).toHaveValue('07:30');
+  await f.click(); await f.fill(''); await f.pressSequentially('25:99', { delay: 5 }); await f.blur();
+  await expect(page.locator('.toast')).toContainText('Uhrzeit');
+  await expect(f).toHaveValue('07:30');
+  await sheet(page).locator('[data-act="goal-save"]').click();
+  if (await page.locator('[data-act="stage-apply"]').count()) { await page.locator('[data-act="stage-apply"]').click(); const c = page.locator('[data-act="stage-confirm"]'); if (await c.count()) await c.click(); }
+  await expect.poll(async () => ((await stored(page)).goals['g-tri'].course || {}).startTime).toBe('07:30');
+  await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
+  await openCourse();
+  await expect(sheet(page).locator('#gc-st')).toHaveValue('07:30');
 });

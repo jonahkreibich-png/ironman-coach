@@ -71,15 +71,16 @@ export function editableRows(tg: any, st: any): IvRow[] {
   return [...matched, ...e.lines.filter(l => l.extra).map(l => ({ ...l.row! }))];
 }
 
-export function intervalsBlock(tg: any, st: any, attrs: string): string {
+/* free (Auftrag 30, „andere Intervalle“/„härter“): eigene Liste ohne Soll, gleich offen mit einer leeren Zeile */
+export function intervalsBlock(tg: any, st: any, attrs: string, free = false): string {
   const { e, targets } = ivContext(tg, st);
-  if (!e && !targets.length) return '';
+  if (!e && !targets.length && !free) return '';
   const sport = tg.sport; const fields = IV_FIELDS[sport];
   const manual = e && e.source === 'manual';
   const act = st && st.activityId && HOST ? HOST.activities()[st.activityId] : null;
   const autoAvail = !!act && manual && actualRows({}, act).rows.length > 0;
   const rows = editableRows(tg, st);
-  const n = Math.max(rows.length, targets.length);
+  const n = Math.max(rows.length, targets.length, free ? 1 : 0);
   const srcName = e && e.source !== 'none' ? SRC[e.source] : null;
   const lines = e ? e.lines : [];
   const verdictOfRow = (i: number) => (manual ? lines[i] : lines.filter(l => !l.extra)[i] || lines.filter(l => l.extra)[i - targets.length]);
@@ -117,9 +118,9 @@ export function intervalsBlock(tg: any, st: any, attrs: string): string {
       <div class="row" style="flex-wrap:wrap;gap:6px">${i > 0 ? `<button class="btn ghost sm" data-act="iv-copy" data-i="${i}" ${attrs}>wie vorheriges</button>` : ''}<button class="btn ghost sm" data-act="iv-abort" data-i="${i}" ${attrs} aria-pressed="${!!(r && r.aborted)}">${r && r.aborted ? 'abgebrochen ✓' : 'abgebrochen'}</button><button class="btn ghost sm" data-act="iv-move" data-i="${i}" data-dir="-1" ${attrs} ${i === 0 ? 'disabled' : ''} aria-label="Intervall ${i + 1} nach oben">↑</button><button class="btn ghost sm" data-act="iv-move" data-i="${i}" data-dir="1" ${attrs} ${i >= n - 1 ? 'disabled' : ''} aria-label="Intervall ${i + 1} nach unten">↓</button><button class="btn ghost sm danger" data-act="iv-del" data-i="${i}" ${attrs} aria-label="Intervall ${i + 1} löschen">löschen</button></div></div>`;
   }).join('');
   return `<div class="fld wide stack" data-intervals="${esc(sport)}"><div class="spread"><span class="lab">Intervalle ${srcName ? srcBadge(srcName) : ''}</span>${autoAvail ? `<button class="link" data-act="iv-reset" ${attrs}>Uhrwerte verwenden</button>` : ''}</div>
-    ${sum.length ? `<div class="xs" data-iv-sum>${sum.map(x => `<div>${esc(x)}</div>`).join('')}</div>` : `<div class="xs muted">Geplante Werte stehen grau im Feld. Sie zählen erst, wenn du etwas einträgst oder die Uhr es misst.</div>`}
+    ${sum.length ? `<div class="xs" data-iv-sum>${sum.map(x => `<div>${esc(x)}</div>`).join('')}</div>` : `<div class="xs muted">${free ? 'Trag ein, was du gemacht hast (Dauer oder Strecke, dazu Puls, Tempo oder Leistung).' : 'Geplante Werte stehen grau im Feld. Sie zählen erst, wenn du etwas einträgst oder die Uhr es misst.'}</div>`}
     ${bars ? `<ol class="iv-bars" aria-label="Intervalle Soll gegen Ist">${bars}</ol>` : ''}
-    ${more(manual ? 'Intervalle bearbeiten' : 'Intervalle eintragen oder korrigieren', `<div class="stack">${cards}<button class="btn ghost sm" data-act="iv-add" ${attrs}>+ Intervall hinzufügen</button></div>`, !!manual)}</div>`;
+    ${more(manual ? 'Intervalle bearbeiten' : 'Intervalle eintragen oder korrigieren', `<div class="stack">${cards}<button class="btn ghost sm" data-act="iv-add" ${attrs}>+ Intervall hinzufügen</button></div>`, !!manual || free)}</div>`;
 }
 
 /* ---------- Ändern ---------- */

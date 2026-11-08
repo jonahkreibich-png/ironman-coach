@@ -16,14 +16,14 @@ import { legsOf } from './goals';
 import { markExcuse } from './planrules';
 
 export type TRuleId = 'restDay' | 'teenHours' | 'bigDayNext' | 'maxSports' | 'hardCount' | 'hardAdjacent' | 'hardBeforeEvent' | 'goalQuality' | 'afterRace' | 'raceWeek'
-  | 'longCap' | 'longStep' | 'legsStrength' | 'strengthGameDay' | 'recoveryIntervals' | 'testLoad' | 'warmup' | 'raceSim' | 'minFreq' | 'longRunTempo';
+  | 'longCap' | 'longStep' | 'legsStrength' | 'strengthGameDay' | 'recoveryIntervals' | 'testLoad' | 'warmup' | 'raceSim' | 'minFreq' | 'longRunTempo' | 'recoveryDepth';
 export const TRULE_LABEL: Record<TRuleId, string> = {
   restDay: 'Ruhetage (mind. 1, unter 18/Einsteiger 2)', teenHours: 'Jugendliche: Wochenstunden ≤ Alter', bigDayNext: 'Nach langem Tag kein langer/harter Lauf',
   maxSports: 'Höchstens 2 Sportarten pro Tag', hardCount: 'Harte Einheiten pro Woche', hardAdjacent: 'Keine harten Tage hintereinander', hardBeforeEvent: 'Nichts Hartes vor Spiel/Wettkampf',
   goalQuality: 'Lauf-Qualität vor dem Laufziel', afterRace: 'Locker nach dem Wettkampf', raceWeek: 'Wettkampfwoche (keine Kraft, nichts Hartes)', longCap: 'Lange Einheit passend zum Ziel',
   longStep: 'Lange Einheit höchstens +10 min/Woche', legsStrength: 'Kraft Beine nicht vor/an Spiel, Wettkampf, langem Lauf', strengthGameDay: 'Kraft am Spieltag kurz (≤ 30 min)',
   recoveryIntervals: 'Erholungswoche ohne Intervalle (Tests erlaubt)', testLoad: 'Tests nicht neben Spiel/Wettkampf', warmup: 'Harte Einheit mit Ein- und Auslaufen', raceSim: 'Dreifach-Tag nur als Wettkampf-Simulation',
-  minFreq: 'Mindest-Häufigkeit je Sportart (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×)', longRunTempo: 'Tempo im langen Lauf nur jede 2. Woche, nie mit hartem Lauf'
+  minFreq: 'Mindest-Häufigkeit je Sportart (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×)', longRunTempo: 'Tempo im langen Lauf nur jede 2. Woche, nie mit hartem Lauf', recoveryDepth: 'Erholungswoche etwa 60–70 % der Aufbauwoche'
 };
 export interface TIssue { rule: TRuleId; week?: number; date?: string; msg: string }
 export interface TOpts {
@@ -330,6 +330,21 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
       if (runs.some((s: any) => s.stage)) continue;
       if (!runs.some((s: any) => hardS(s) && RUN_Q.has((s.spec && s.spec.kind) || (isTestS(s) ? 'test' : '')))) add('goalQuality', w, undefined, `Woche ${w.weekNumber}: kein Schwellen- oder Wettkampftempo-Lauf, ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}.`);
     }
+  }
+  // Auftrag 30: Tiefe der Erholungswoche – etwa 60–70 % des eigenen Umfangs der letzten Aufbauwoche (geprüft mit Spielraum 50–78 %, damit
+  // feste Termine, Tests und Lernstufen nicht zu Fehlalarmen führen)
+  // Lernstufen (Lauf-Geh, Kraul lernen) bleiben jede Woche gleich und werden nicht gekürzt – sie zählen hier nicht mit
+  const ownMin = (w: any) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.sport !== 'football' && !s.stage).reduce((b: number, s: any) => b + minOf(s), 0), 0);
+  for (let i = 1; i < weeks.length; i++) {
+    // Woche mit Rennen oder direkt danach: dort gelten „Wettkampfwoche“ und „Locker nach dem Wettkampf“
+    const w = weeks[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe || (o.from && w.startDate < o.from) || (races.some(r => r.date >= addD(w.startDate, -7) && r.date <= w.endDate))) continue;
+    let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || weeks[j].partial || weeks[j].entry || weeks[j].reduced || weeks[j].phase === 'taper' || weeks[j].phase === 'race')) j--;
+    if (j < 0) continue;
+    const ref = ownMin(weeks[j]), cur = ownMin(w); if (ref < 120) continue;
+    const pct = cur / ref;
+    // unter 30 %: Urlaub/Sperrzeit (eigene Regel), kein Fehler; über 78 % mit Test in der Woche: der Test (erlaubt) bringt die Minuten
+    const hasTest = (w.days || []).some((d: any) => live(d).some((s: any) => isTestS(s)));
+    if ((pct < 0.5 && pct >= 0.3) || (pct > 0.78 && !hasTest)) add('recoveryDepth', w, undefined, `Woche ${w.weekNumber}: Erholungswoche ${Math.round(pct * 100)} % der Aufbauwoche (Ziel etwa 60–70 %).`);
   }
   return out;
 }
@@ -991,6 +1006,46 @@ export function capLongSessions(weeks: any[], p: Profile, o: TOpts = {}): string
 }
 /* Auftrag 18, Punkt 6: Generalprobe vor einem Triathlon (A/B, ab 16): einmal in der spezifischen Phase, etwa 3-5 Wochen vorher, am Tag der
    langen Ausfahrt Schwimmen + Rad + Koppellauf im Wettkampf-Ablauf (Wechsel und Verpflegung üben). Zählt als erlaubter Dreifach-Tag. */
+/* ---------- Auftrag 30: Wettkampf-Bedingungen (bisher nutzte der Planer die Angaben zur Strecke gar nicht) ----------
+   - Hitze: warmes Rennen (Temperatur ≥ 24 °C angegeben, ohne Angabe ein Rennen Juni–August) → in den letzten gut 2 Wochen bis zu 5 lockere
+     Einheiten als Hitze-Gewöhnung (wärmer anziehen bzw. in der Wärme, viel trinken)
+   - Freiwasser/Neopren: Triathlon im Freiwasser (oder ohne Angabe) → in den 6 Wochen davor, nur Mai–September, eine Schwimmeinheit pro Woche
+     „wenn möglich im Freiwasser“ (mit Neopren, wenn erlaubt; nie allein)
+   - Streckenprofil: hügelige Radstrecke (≥ 8 Hm/km) → lange Ausfahrten der letzten 8 Wochen hügelig; hügelige Laufstrecke (≥ 10 Hm/km) →
+     ein lockerer Lauf pro Woche mit Hügeln
+   - Uhrzeit: Startzeit angegeben → Generalprobe und lange Einheiten am Wochenende der letzten 8 Wochen zur Wettkampf-Uhrzeit
+   Nur Hinweise an lockeren Einheiten (kein Einfluss auf Umfang, Härte oder Tage); Feste Termine, Erledigtes, Tests und Lernstufen bleiben. */
+export function addRaceConditions(weeks: any[], o: TOpts = {}): string[] {
+  const fixes: string[] = [];
+  const keep = (s: any) => !!(o.keep && o.keep(s));
+  const D = daysOf(weeks);
+  const note = (s: any, flag: string, text: string) => { if (s[flag]) return false; s[flag] = true; s.description = [s.description, text].filter(Boolean).join('\n'); return true; };
+  for (const g of (o.goals || []).filter((x: any) => x && x.date && !x.result && x.priority !== 'C' && x.type !== 'fitness' && GOALS[x.type])) {
+    const c: any = g.course || {}; const month = +g.date!.slice(5, 7);
+    const win = (x: DayRef, a: number, b: number) => { const k = diffD(x.d.date, g.date!); return k >= a && k <= b && (!o.from || x.d.date >= o.from); };
+    const easy = (s: any) => !fixedS(s) && !keep(s) && !s.race && !isTestS(s) && !hardS(s) && !s.stage;
+    const legs = legsOf(g); const km = (sp: string) => legs.filter(l => l.sport === sp).reduce((a, l) => a + (l.km || 0), 0);
+    // Hitze
+    const hot = c.tempC != null ? c.tempC >= 24 : month >= 6 && month <= 8;
+    if (hot) { let n = 0; for (const x of D.filter(y => win(y, 3, 16))) for (const s of live(x.d).filter((y: any) => easy(y) && (y.sport === 'run' || y.sport === 'bike'))) if (n < 5 && note(s, 'heat', `Hitze-Gewöhnung für ${g.name}: locker in der Wärme oder etwas wärmer angezogen, viel trinken (mit Salz).`)) n++; if (n) fixes.push(`${g.name}: ${n} Einheiten zur Hitze-Gewöhnung`); }
+    // Freiwasser / Neopren
+    const tri = /^tri_/.test(g.type) || g.type === 'aquathlon';
+    if (tri && c.swimVenue !== 'pool') { const seen = new Set<string>(); let n = 0;
+      for (const x of D.filter(y => win(y, 4, 42))) { const m = +x.d.date.slice(5, 7); if (m < 5 || m > 9 || seen.has(x.w.startDate)) continue;
+        const s = live(x.d).find((y: any) => y.sport === 'swim' && easy(y)); if (s && note(s, 'openWater', `Wenn möglich im Freiwasser${c.wetsuit !== false ? ' mit Neopren' : ''} – Sichten, Start und Orientierung üben, nie allein.`)) { seen.add(x.w.startDate); n++; } }
+      if (n) fixes.push(`${g.name}: ${n} Schwimmeinheiten im Freiwasser`); }
+    // Streckenprofil
+    const bk = km('bike'), rk = km('run');
+    if (bk > 0 && (c.bikeAscentM || 0) / bk >= 8) { let n = 0; for (const x of D.filter(y => win(y, 7, 56))) for (const s of live(x.d).filter((y: any) => y.sport === 'bike' && isLongS(y) && easy(y))) if (note(s, 'hilly', `Hügelig fahren: ${g.name} hat ${c.bikeAscentM} Höhenmeter – Anstiege ruhig, im Sitzen, gleichmäßige Kraft.`)) n++; if (n) fixes.push(`${g.name}: ${n} lange Ausfahrten hügelig`); }
+    if (rk > 0 && (c.runAscentM || 0) / rk >= 10) { const seen = new Set<string>(); let n = 0; for (const x of D.filter(y => win(y, 7, 56))) { if (seen.has(x.w.startDate)) continue; const s = live(x.d).find((y: any) => y.sport === 'run' && easy(y) && !isLongS(y)); if (s && note(s, 'hillyRun', `Mit Hügeln laufen: ${g.name} hat ${c.runAscentM} Höhenmeter – bergauf kurze Schritte, bergab locker.`)) { seen.add(x.w.startDate); n++; } } if (n) fixes.push(`${g.name}: ${n} Läufe mit Hügeln`); }
+    // Wettkampf-Uhrzeit
+    const tm = /^(\d{1,2})[:.](\d{2})$/.exec(String(c.startTime || '').trim());
+    if (tm) { const time = `${tm[1].padStart(2, '0')}:${tm[2]}`; let n = 0;
+      for (const x of D.filter(y => win(y, 7, 56) && [0, 6].includes(dowOf(y.d.date)))) for (const s of live(x.d).filter((y: any) => !fixedS(y) && !keep(y) && !y.race && (raceSimDay(x.d) || isLongS(y)))) { if (s.raceTime) continue; s.raceTime = true; s.time = time; s.description = [s.description, `Zur Wettkampf-Uhrzeit (${time}): Frühstück, Ablauf und Verpflegung wie am Renntag testen.`].filter(Boolean).join('\n'); n++; }
+      if (n) fixes.push(`${g.name}: ${n} Einheiten zur Wettkampf-Uhrzeit`); }
+  }
+  return fixes;
+}
 export function addRaceRehearsals(weeks: any[], p: Profile, o: TOpts & { sports?: string[] } = {}): string[] {
   const fixes: string[] = [];
   const keep = (s: any) => !!(o.keep && o.keep(s));

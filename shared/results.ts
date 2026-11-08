@@ -134,31 +134,110 @@ export function evidenceSignature(state: any, weeks?: any[]): string {
   return 'results-v1-' + (hash >>> 0).toString(16);
 }
 
-/* ---------- Auftrag 29: „Anders trainiert als geplant“ ----------
-   Am Zustand der Einheit: asPlanned (true = so wie geplant, false = anders) und changed { kind, sport?, reason? }.
-   Eine Stelle für Titel und „geplant: …“ (Einheit, Liste, Plan, Heute, Coach) und für Sportart/Art, die Bewertung, Scores, Stufen und
-   Belastung nutzen: gezählt wird nur das Gemachte. Das alte Freitextfeld „deviation“ bleibt als optionale Notiz. */
-export type ChangeKind = 'easy' | 'shorter' | 'otherIntervals' | 'otherSport';
-export const CHANGE_KINDS: [ChangeKind, string][] = [['easy', 'Locker (Zone 2) statt geplant'], ['shorter', 'Kürzer'], ['otherIntervals', 'Andere Intervalle'], ['otherSport', 'Andere Sportart']];
-export const CHANGE_REASONS: [string, string][] = [['tired', 'müde'], ['ill', 'krank'], ['time', 'keine Zeit'], ['weather', 'Wetter'], ['pain', 'Schmerzen'], ['other', 'anderes']];
+/* ---------- Auftrag 29/30: „Anders trainiert als geplant“ ----------
+   Am Zustand der Einheit: asPlanned (true = so wie geplant, false = anders) und changed { kind, sport?, reason?, zone?, place?, parts?, omit? }.
+   Eine Stelle für Titel und „geplant: …“ (Einheit, Liste, Plan, Heute, Coach), für Sportart, Zone und Härte des Gemachten, die Bewertung,
+   Scores, Stufen und Belastung nutzen: gezählt wird nur das Gemachte. Das alte Freitextfeld „deviation“ bleibt als optionale Notiz.
+   Auftrag 30: je Art die passenden Felder – lockerer/härter: tatsächliche Zone; kürzer/länger/abgebrochen: Dauer und Distanz (dieselben
+   Werte metrics.min/km/meters, eine Quelle); andere Intervalle: eigene Liste ohne Soll; andere Sportart: Felder dieser Sportart;
+   drinnen/draußen; aufgeteilt: Teile mit je Dauer (Summe = Dauer der Einheit); ohne Teil: Koppel, Hilfsmittel, nur Brust, Ein-/Auslaufen. */
+export type ChangeKind = 'easy' | 'harder' | 'shorter' | 'longer' | 'aborted' | 'otherIntervals' | 'otherSport' | 'place' | 'split' | 'omit';
+export const CHANGE_KINDS: [ChangeKind, string][] = [['easy', 'Lockerer'], ['harder', 'Härter'], ['shorter', 'Kürzer'], ['longer', 'Länger'], ['aborted', 'Abgebrochen'],
+  ['otherIntervals', 'Andere Intervalle'], ['otherSport', 'Andere Sportart'], ['place', 'Drinnen / draußen'], ['split', 'Aufgeteilt'], ['omit', 'Ohne Teil']];
+export const CHANGE_REASONS: [string, string][] = [['tired', 'müde'], ['ill', 'krank'], ['time', 'keine Zeit'], ['weather', 'Wetter'], ['pain', 'Schmerzen'], ['motivation', 'Motivation'], ['other', 'anderes']];
+export const CHANGE_ZONES: [number, string][] = [[1, 'Zone 1 · sehr locker'], [2, 'Zone 2 · locker'], [3, 'Zone 3 · mittel'], [4, 'Zone 4 · Schwelle'], [5, 'Zone 5 · sehr hart']];
+export interface Change { kind: ChangeKind; sport?: string; reason?: string; zone?: number; place?: 'in' | 'out'; parts?: number[]; omit?: string }
 const SPORT_NAME: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', strength: 'Kraft', football: 'Teamsport' };
-export function changedOf(st: any): { kind: ChangeKind; sport?: string; reason?: string } | null {
-  if (!st || st.asPlanned !== false || !st.changed || !st.changed.kind) return null;
+const KINDS = new Set<string>(CHANGE_KINDS.map(([k]) => k));
+export function changedOf(st: any): Change | null {
+  if (!st || st.asPlanned !== false || !st.changed || !KINDS.has(st.changed.kind)) return null;
   return st.changed;
 }
 export function actualSport(s: any, st: any): string { const c = changedOf(st); return c && c.kind === 'otherSport' && c.sport ? c.sport : s.sport; }
-/** Ist die geplante Härte weggefallen (locker statt hart, andere Sportart)? Dann zählt die Einheit nicht als Schlüsseleinheit/Stufe. */
-export function plannedLoadDropped(st: any): boolean { const c = changedOf(st); return !!c && (c.kind === 'easy' || c.kind === 'otherSport'); }
+const planZone = (s: any) => Math.max(0, ...[...String((s && s.zone) || '').matchAll(/\d/g)].map(x => +x[0]));
+/** Zone des Gemachten (1-5) oder null, wenn sie aus der Änderung nicht hervorgeht */
+export function changeZone(st: any, s: any = null): number | null {
+  const c = changedOf(st); if (!c) return null;
+  const z = Number(c.zone); const ok = Number.isInteger(z) && z >= 1 && z <= 5 ? z : null;
+  if (c.kind === 'easy') return ok ?? 2;
+  if (c.kind === 'harder') return ok ?? Math.min(5, Math.max(4, planZone(s) + 1));
+  if (c.kind === 'otherSport') return ok ?? 2;
+  return ok;
+}
+/** Ist die geplante Härte weggefallen (locker statt hart, andere Sportart, abgebrochen)? Dann zählt die Einheit nicht als Schlüsseleinheit/Stufe
+    und darf nach den Regeln nachgeholt werden. */
+export function plannedLoadDropped(st: any): boolean { const c = changedOf(st); return !!c && (c.kind === 'easy' || c.kind === 'otherSport' || c.kind === 'aborted'); }
+/** Gilt das Gemachte noch als Nachweis für Lern-Stufen (z. B. Kraul am Stück)? Kürzer/länger, drinnen/draußen und ohne Hilfsmittel ja;
+    aufgeteilt, nur Brust, locker, härter, abgebrochen, andere Sportart, andere Intervalle nein. */
+export function changeKeepsStage(st: any): boolean {
+  const c = changedOf(st); if (!c) return true;
+  return c.kind === 'shorter' || c.kind === 'longer' || c.kind === 'place' || (c.kind === 'omit' && (c.omit === 'aids' || c.omit === 'warmup' || c.omit === 'brick'));
+}
+/** Intervall-Liste: keine (locker, andere Sportart, aufgeteilt), eigene ohne Soll (andere Intervalle, härter) oder die geplante */
+export function intervalsMode(st: any): 'none' | 'free' | 'planned' {
+  const c = changedOf(st); if (!c) return 'planned';
+  if (c.kind === 'easy' || c.kind === 'otherSport' || c.kind === 'split') return 'none';
+  if (c.kind === 'otherIntervals' || c.kind === 'harder') return 'free';
+  return 'planned';
+}
+/** Die Einheit, wie sie wirklich gemacht wurde (für Belastung, Scores, Bewertung): Sportart, Zone, Härte, Aufbau */
+export function effectiveSession(s: any, st: any): any {
+  const c = changedOf(st); if (!c) return s;
+  const z = changeZone(st, s); const out: any = { ...s, sport: actualSport(s, st) };
+  if (c.kind === 'easy') Object.assign(out, { zone: 'Zone ' + z, hard: false, spec: null, title: 'Locker' });
+  else if (c.kind === 'harder') Object.assign(out, { zone: 'Zone ' + z, hard: (z || 0) >= 4, spec: null, title: (z || 0) >= 4 ? 'Hart' : 'Mittel' });
+  else if (c.kind === 'otherSport') Object.assign(out, { zone: 'Zone ' + z, hard: false, spec: null, title: SPORT_NAME[out.sport] || 'Training' });
+  else if (c.kind === 'aborted') Object.assign(out, { hard: false, spec: null });
+  else if (c.kind === 'otherIntervals') Object.assign(out, { spec: null, title: 'Intervalle', ...(z ? { zone: 'Zone ' + z } : {}) });
+  else if (c.kind === 'split') Object.assign(out, { spec: null, long: false });
+  return out;
+}
+/** Teile einer aufgeteilten Einheit (Minuten) */
+export function changeParts(st: any): number[] {
+  const c = changedOf(st); if (!c || c.kind !== 'split' || !Array.isArray(c.parts)) return [];
+  return c.parts.map(v => resultNumber(v)).filter((v): v is number => v != null && v > 0);
+}
+const PLACE_WORD: Record<string, [string, string]> = { run: ['Laufband', 'draußen'], bike: ['Rolle', 'draußen'], swim: ['Halle', 'Freiwasser'] };
+export function placeLabel(sport: string, place: 'in' | 'out' | undefined): string { const w = PLACE_WORD[sport] || ['drinnen', 'draußen']; return place === 'out' ? w[1] : w[0]; }
+/** „ohne Teil“: passende Auswahl je geplanter Einheit */
+export function omitOptions(s: any): [string, string][] {
+  const out: [string, string][] = [];
+  const brick = /koppel/i.test(String((s && s.title) || '') + ' ' + JSON.stringify((s && s.spec) || {}));
+  if (brick) out.push(['brick', 'Koppellauf weggelassen']);
+  if (s && s.sport === 'swim') out.push(['aids', 'ohne Hilfsmittel'], ['breastOnly', 'nur Brust']);
+  if (s && (s.sport === 'run' || s.sport === 'bike' || s.sport === 'swim')) out.push(['warmup', 'ohne Ein-/Auslaufen']);
+  if (s && s.sport === 'strength') out.push(['exercises', 'nicht alle Übungen']);
+  out.push(['other', 'anderer Teil']);
+  return out;
+}
+const OMIT_WORD: Record<string, string> = { brick: 'ohne Koppellauf', aids: 'ohne Hilfsmittel', breastOnly: 'nur Brust', warmup: 'ohne Ein-/Auslaufen', exercises: 'nicht alle Übungen', other: 'ohne einen Teil' };
+export const omitLabel = (k: string | undefined) => OMIT_WORD[k || ''] || 'ohne einen Teil';
 const stripNums = (t: string) => String(t || '').replace(/\s*\d+(?:[.,]\d+)?\s*×\s*\d+(?:[.,]\d+)?\s*(?:min|s|m)\b|\s*\(\s*\d{1,3}(?:\.\d{3})*\s*m\s*\)|\s*\d+(?:[.,]\d+)?\s*(?:min|km|m)\b/g, '').replace(/\s+mit\s*$/, '').replace(/\s{2,}/g, ' ').trim();
+const fmtMin = (m: number) => m >= 60 && m % 60 ? `${Math.floor(m / 60)} h ${Math.round(m % 60)} min` : m >= 60 ? `${m / 60} h` : `${Math.round(m)} min`;
 /** Titel dessen, was wirklich gemacht wurde („Rad Zone 2 · 60 min“); ohne Änderung der geplante Titel */
 export function actualTitle(s: any, st: any, act: any = null): string {
   const c = changedOf(st); if (!c) return s.title;
   const min = resultNumber(actualMetrics(st || {}, act).min); const dur = min ? ` · ${Math.round(min)} min` : '';
-  const sp = SPORT_NAME[actualSport(s, st)] || 'Training';
-  if (c.kind === 'easy') return `${sp} Zone 2${dur}`;
-  if (c.kind === 'shorter') return `${stripNums(s.title) || sp}${dur || ' (kürzer)'}`;
+  const sp = SPORT_NAME[actualSport(s, st)] || 'Training'; const z = changeZone(st, s);
+  if (c.kind === 'easy') return `${sp} Zone ${z}${dur}`;
+  if (c.kind === 'harder') return `${sp} härter (Zone ${z})${dur}`;
+  if (c.kind === 'shorter' || c.kind === 'longer') return `${stripNums(s.title) || sp}${dur || (c.kind === 'shorter' ? ' (kürzer)' : ' (länger)')}`;
+  if (c.kind === 'aborted') return `${stripNums(s.title) || sp} · abgebrochen${min ? ` nach ${Math.round(min)} min` : ''}`;
   if (c.kind === 'otherIntervals') return `${sp}: andere Intervalle${dur}`;
+  if (c.kind === 'place') return `${s.title} · ${placeLabel(s.sport, c.place)}`;
+  if (c.kind === 'split') { const p = changeParts(st); return `${stripNums(s.title) || sp} · ${p.length >= 2 ? `${p.length} Teile (${p.map(x => Math.round(x)).join(' + ')} min)` : 'aufgeteilt'}`; }
+  if (c.kind === 'omit') return `${c.omit === 'brick' ? String(s.title || sp).replace(/\s*(?:\+|mit|und)\s*Koppel\w*.*$/i, '') || sp : s.title} · ${omitLabel(c.omit)}`;
   return `${sp}${dur}`;
+}
+/** Kurzform der Änderung für Coach-Kontext und Anzeige („härter (Zone 4)“, „abgebrochen nach 25 min“) */
+export function changeText(s: any, st: any, act: any = null): string {
+  const c = changedOf(st); if (!c) return '';
+  const min = resultNumber(actualMetrics(st || {}, act).min);
+  const t: Record<ChangeKind, string> = { easy: `lockerer (Zone ${changeZone(st, s)})`, harder: `härter (Zone ${changeZone(st, s)})`, shorter: `kürzer${min ? ` (${fmtMin(min)})` : ''}`, longer: `länger${min ? ` (${fmtMin(min)})` : ''}`,
+    aborted: `abgebrochen${min ? ` nach ${Math.round(min)} min` : ''}`, otherIntervals: 'andere Intervalle', otherSport: `andere Sportart (${SPORT_NAME[actualSport(s, st)] || '?'})`,
+    place: placeLabel(s.sport, c.place), split: `aufgeteilt${changeParts(st).length ? ` (${changeParts(st).map(x => Math.round(x)).join(' + ')} min)` : ''}`, omit: omitLabel(c.omit) };
+  const why = (CHANGE_REASONS.find(([k]) => k === c.reason) || [])[1];
+  return t[c.kind] + (why ? `, Grund: ${why}` : '');
 }
 /** kleine Zeile darunter: „geplant: Sweet Spot 2×12“ (leer ohne Änderung) */
 export function plannedLine(s: any, st: any): string {

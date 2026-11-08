@@ -26,8 +26,9 @@ import * as K from './keysessions';
 import { placeholders, macroPhases, timelineOf, capsFor, easyAfterDays, PHASE_NAME, type Anchor, type WeekPhase } from './periodize';
 import { levelOf, maxHard, ownHardBudget, repairIntensity, qualityFor, varyRepeats } from './intensity';
 import { repairSports, repairSpacing } from './planrules';
-import { repairTrainingRules, hardBlocked, capLongSessions, addRaceRehearsals, minFreqOf, freqByVolume } from './trainingrules';
+import { repairTrainingRules, hardBlocked, capLongSessions, addRaceRehearsals, addRaceConditions, minFreqOf, freqByVolume } from './trainingrules';
 import { addSessionNotes } from './sessionnotes';
+import type { Response } from './response';
 import { seasonHint } from './goalcheck';
 
 export type Phase = 'base' | 'build' | 'specific' | 'taper' | 'race';
@@ -64,6 +65,8 @@ export interface GenInput {
   frozen?: { date: string; sessions: any[] }[] | null;
   /** gemessener Wochenumfang (Minuten eigenes Training) aus den ersten Wochen: Start dort statt bei der Schätzung */
   measuredStartMin?: number | null;
+  /** Auftrag 30: persönliche Reaktion auf harte Wochen und Erholung (shared/response.ts) */
+  response?: Response | null;
   /** „Stunden bisher: weiß ich nicht“: vorsichtig starten, nach 2 Wochen an die echten Daten anpassen */
   hoursUnknown?: boolean;
   /** Auftrag 17: wirklich erledigtes eigenes Training (Minuten, meiste der letzten 3 Wochen ohne Krankheit): Start höchstens +Steigerung darauf */
@@ -317,7 +320,13 @@ function generatePlanIn(inp: GenInput): GenResult {
   const eff = effectsOf(rules);
   const conflicts: Conflict[] = [];
   const cautious = profile.medicalCaution || eff.caution || (age != null && age >= 50);
-  const prog = progressionOf(profile, today, cautious);
+  // Auftrag 30: Rhythmus nach Person – 2+1 für Jugendliche, ab 50, Einsteiger, viel Stress (Prüfungs-/Stresszeit in den nächsten 6 Wochen)
+  // und wer sich laut eigenen Daten langsam erholt; sonst 3+1. Eigene Einstellung im Profil hat Vorrang (progressionOf).
+  const stressNow = rules.some((r: any) => r && r.kind === 'period' && r.from && r.to && r.to >= today && r.from <= addDays(today, 42));
+  const resp = inp.response || null;
+  const twoOne = levelOf(profile) === 'beginner' || stressNow || (!!resp && resp.recovery === 'slow');
+  const prog0 = progressionOf(profile, today, cautious || twoOne);
+  const prog = resp && resp.incMax && !profile.progression ? { ...prog0, incPct: Math.min(prog0.incPct, resp.incMax) } : prog0;
   const recoveryEvery = prog.buildWeeks + 1;
   const cont = inp.continueFrom || null;
   // Makrozyklen: auf jedes A-, B- (und mit genug Abstand C-) Ziel hin Grundlage → Aufbau → spezifisch → Tapering → Wettkampf, nach B-Zielen 1 Woche Erholung
@@ -476,7 +485,8 @@ function generatePlanIn(inp: GenInput): GenResult {
     keyWeeks: ks - Math.floor(ks / 4), strideWeeks: weeksSince(strideSlot && strideSlot.stridesFrom), brickWeeks: weeksSince(brickSlot && brickSlot.from),
     lastTestMon: pat ? ((pat.targets || []).filter(t => (t.tests || []).length && t.start < start).map(t => t.start).sort().pop() || (pat.lastTest && pat.lastTest < start ? mondayOf(pat.lastTest) : null)) : null,
     runRef: cont && cont.lastNormalWeek ? weekMinutes(cont.lastNormalWeek, 'run') || null : null };
-  const legsStrength = (x: Cand) => !!x.strength && x.s.area !== 'upper';
+  // Auftrag 30: Rumpf (core) belastet die Beine nicht – vorher galt alles außer Oberkörper als Beinkraft und fiel vor Spieltagen weg
+  const legsStrength = (x: Cand) => !!x.strength && x.s.area !== 'upper' && x.s.area !== 'core' && !(x.s.spec && (x.s.spec.area === 'upper' || x.s.spec.area === 'core'));
   let blockNo = cont ? cont.blockNo + (cont.builtSinceRecovery ? 0 : 1) : 1, blockWeek = cont && cont.builtSinceRecovery ? cont.builtSinceRecovery : 0;
   phases.forEach((ph, wi) => {
     const mon = addDays(start, wi * 7);
@@ -563,7 +573,7 @@ function generatePlanIn(inp: GenInput): GenResult {
       // lockere Tage nach einem Wettkampf (Sprint 3, Olympisch 5, Mittel 10, Lang/Marathon 14 Tage)
       const easyDates = dates.filter(d => goals.some(g => g.date && g.type !== 'fitness' && d > g.date && daysBetween(g.date, d) <= easyAfterDays(g.type)));
       const items = WP.patternWeek(pat, { mon, dates, recovery: ph.recovery, entry: entryWeek[wi], ownMin: ownVols[wi], target: tg, tests, phase: ph.phase,
-        goalType: sgP.goalType, minor: (ageOf(profile, mon) ?? 30) < 18, easyDates,
+        goalType: sgP.goalType, minor: (ageOf(profile, mon) ?? 30) < 18, age: ageOf(profile, mon), strengthOn: (profile.sports || []).includes('strength'), easyDates,
         hardDows: slots.filter(x => x.game || x.race).map(x => x.dow),
         caps: { run: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), runEasySecKm: profile.thresholds.thresholdPaceRunSec ? profile.thresholds.thresholdPaceRunSec * 1.2 : null, swimLearning: !!swimStage }).run,
           bikeOut: capsFor(sgP.goalType, mon, { aGoal: A.type, age: ageOf(profile, mon), indoor: cOut0.indoor }).bike, swim: capsFor(sgP.goalType, mon, { swimLearning: !!swimStage, phase: ph.phase as any }).swim },
@@ -758,7 +768,13 @@ function generatePlanIn(inp: GenInput): GenResult {
       }
     } else if (sports.includes('strength')) {
       const [smin, smax] = freqOf(profile, 'strength');
-      const n = limitByRules('strength', ph.phase === 'race' ? Math.min(1, smax) : Math.max(smin, Math.min(smax, smin || 1)), smin);
+      // Auftrag 30: Kraft je Phase und Alter (Grundlage 2×, Aufbau 1–2×, spezifisch/Tapering 1× kurz, Rennwoche über die Regel keine; ab 50 mehr),
+      // innerhalb der eigenen Häufigkeit (vorher fast immer 1×, weil der Mindestwert genommen wurde)
+      const a50 = (ageOf(profile, mon) || 0) >= 50;
+      // unter 3 h pro Woche bleibt es bei 1× (sonst nimmt die Kraft der Ausdauer die Zeit bzw. die Woche wächst zu schnell)
+      const wantS0 = ph.phase === 'race' ? 1 : ph.phase === 'base' ? (a50 ? 3 : 2) : ph.phase === 'build' ? (a50 ? 2 : (ph.recovery ? 1 : 2)) : ph.phase === 'specific' ? (a50 ? 2 : 1) : 1;
+      const wantS = (profile.weeklyHours || 5) < 3 || (ownVols[wi] || 0) < 150 ? Math.min(wantS0, 1) : wantS0;
+      const n = limitByRules('strength', Math.max(smin, Math.min(smax, ph.recovery ? Math.min(wantS, 1 + (a50 ? 1 : 0)) : wantS)), smin);
       // Auftrag 17: im Aufbau und in der spezifischen Phase Kraft als Erhaltung (höchstens 2 × 25-30 min)
       const keep = ph.phase === 'build' || ph.phase === 'specific';
       for (let k = 0; k < (keep ? Math.min(2, n) : n); k++) cands.push({ s: W.build({ ...W.strengthSession([...profile.sports, ...sports], { light: ph.recovery || ph.phase === 'taper' || ph.phase === 'race', ...(keep ? { minutes: 30 } : {}), back: eff.strengthBack, knee: eff.strengthKnee, shoulder: eff.strengthShoulder, variant: k, why: keep ? 'Kraft als Erhaltung: hält Muskeln und Sehnen stabil, ohne müde zu machen.' : 'stabile Muskeln und Sehnen schützen vor Verletzungen und machen dich ökonomischer.' }), tip: tipFor('strength', rules) || undefined }), strength: true, prio: 4 });
@@ -989,10 +1005,12 @@ function generatePlanIn(inp: GenInput): GenResult {
   enforceLongRun(weeks, lastLongRun0, keepIds);
   enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds);
   // Auftrag 15: Erholungswochen spürbar leichter als die letzte normale Woche (vorher oft gleich viel, weil das Ziel über dem lag, was die Einheiten hergeben)
-  enforceRecovery(weeks, prevRef[0] || null, keepIds);
+  if (resp && resp.depth) weeks.forEach((w: any) => { if (w.isRecoveryWeek) w.recoveryDepth = resp.depth; });
+  const recCap = (date: string) => Math.min(dayCap(profile, dowOf(date)), dayLimit(rules, date).cap);
+  enforceRecovery(weeks, prevRef[0] || null, keepIds, recCap);
   // Auftrag 17: Kürzungen oben können einen langen Lauf verkürzt haben; danach wieder höchstens +10 min pro Woche und der Umfang
   // wieder höchstens +10 % (beides kürzt nur, deshalb endet es)
-  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds); }
+  for (let k = 0; k < 2; k++) { enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds, recCap); }
   // was bleibt, bleibt genau so (auch nach den Kürzungen oben)
   if (midWeek && weeks[0]) { const orig: Record<string, any> = {}; (inp.frozen || []).forEach(f => f.sessions.forEach((s: any) => { if (s && s.id) { const { _done, _doneMin, ...o } = s; orig[s.id] = JSON.parse(JSON.stringify(o)); } }));
     const strip = (s: any) => { const { _done, _doneMin, ...o } = s; return JSON.parse(JSON.stringify(o)); };
@@ -1009,20 +1027,34 @@ function generatePlanIn(inp: GenInput): GenResult {
   const intensityFixes = repairIntensity(weeks, profile, today, intOpts);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Ruhetage und Kürzungen können eine Woche kleiner gemacht haben: die Steigerung danach wieder höchstens +10 % (kürzt nur)
-  enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds);
+  enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds, recCap);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Auftrag 18: Generalprobe vor Triathlons (Schwimmen, Rad, Koppellauf an einem Tag)
   trainingFixes.push(...addRaceRehearsals(weeks, profile, { ...trOpts, sports }));
+  // Auftrag 30: Hitze, Freiwasser/Neopren, Streckenprofil und Wettkampf-Uhrzeit (nur Hinweise an lockeren Einheiten)
+  trainingFixes.push(...addRaceConditions(weeks, { ...trOpts, goals: [...goals, ...(trOpts.goals || [])].filter((g: any, i: number, a: any[]) => a.findIndex(x => x.id === g.id) === i) }));
   // noch einmal Intensität (fehlende Qualität, Abwechslung) auf den nun gültigen Plan – nur an Tagen, die die Regeln erlauben – und Regeln
   intensityFixes.push(...repairIntensity(weeks, profile, today, intOpts));
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));
   // Umfangsbremse und Grenzen der langen Einheiten abwechselnd, bis beides passt (beides kürzt nur)
-  for (let k = 0; k < 6; k++) { enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds); if (!capLongSessions(weeks, profile, trOpts).length) break; }
+  for (let k = 0; k < 6; k++) { enforceLongRun(weeks, lastLongRun0, keepIds); enforceVolume(weeks, 1 + prog.incPct / 100, ownBudget, prevRef[0] || null, keepN, keepIds); enforceRecovery(weeks, prevRef[0] || null, keepIds, recCap); if (!capLongSessions(weeks, profile, trOpts).length) break; }
   // Auftrag 19: zum Schluss noch einmal Abwechslung (spätere Schritte können dieselbe Schlüsseleinheit zwei Wochen hintereinander erzeugt haben)
   intensityFixes.push(...varyRepeats(weeks, from || start));
   // Auftrag 20: Ruhetage und Kürzungen können neue Paare derselben Sportart an Folgetagen erzeugt haben (z. B. So/Mo): ohne Verschieben
   // eine Einheit locker und kurz, mit Grund
   ruleFixes.push(...repairSpacing(weeks, profile, { from: from || start, keep: (s: any) => keepIds.has(s.id) || !!s.pinned, noMove: true, dayCap: trOpts.dayCap, allowed: trOpts.allowed }));
+  // Auftrag 30: zum Schluss die Tagesgrenzen der eigenen Regeln (Prüfungszeit 40 min, Tageslimit) noch einmal genau – Schwimmzeiten aus
+  // Metern lagen nach dem Runden knapp darüber (41 statt 40 min)
+  for (const w of weeks) for (const d of w.days) {
+    const cap = dayLimit(rules, d.date).cap; if (!(cap > 0) || !isFinite(cap) || d.date < (from || start)) continue;
+    for (let g = 0; g < 4; g++) {
+      const flex = d.sessions.filter((s: any) => s && s.spec && !s.fixed && !s.race && !s.cancelled && s.sport !== 'rest' && s.sport !== 'football' && !keepIds.has(s.id));
+      const tot = d.sessions.filter((s: any) => s && !s.cancelled && s.sport !== 'rest' && !s.race).reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0);
+      if (tot <= cap || !flex.length) break;
+      const f = Math.max(0.5, 1 - (tot - cap + 1) / flex.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0) - g * 0.05);
+      d.sessions = d.sessions.map((s: any) => { if (!flex.includes(s)) return s; const r = W.rebuildScaled(s, f); return r && r.plannedMinutes < s.plannedMinutes ? keepExcuse(s, { ...s, ...r, plannedKm: r.plannedKm ?? undefined }) : s; });
+    }
+  }
   const violations = validateWeeks(weeks, { minor, maxIncPct: prog.incPct }, prevRef);
   const age2 = goalAllowed(A.type, ageAtRace);
   if (!age2.ok) violations.push({ rule: 'age', msg: age2.msg! });
@@ -1132,7 +1164,7 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
     if (keepIds.has(s.id) || s.fixed || s.race || !s.plannedMinutes || (sport && s.sport !== sport) || s.sport === 'rest' || (s.spec && s.spec.title)) return s;
     // Auftrag 19: Kraft aus dem festen Wochenaufbau bleibt so lang wie gewünscht (z. B. Ganzkörper 30 min)
     if (s.sport === 'strength' && s.pattern) return s;
-    if (!keepIds.has(s.id) && s.spec && (!s.stage || (s.sport === 'swim' && f < 1))) { const r = W.rebuildScaled(s, f); return r ? { ...s, ...r, plannedKm: r.plannedKm ?? undefined } : s; }
+    if (!keepIds.has(s.id) && s.spec && (!s.stage || (s.sport === 'swim' && f < 1))) { const r = W.rebuildScaled(s, f); return r ? keepExcuse(s, { ...s, ...r, plannedKm: r.plannedKm ?? undefined }) : s; }
     return s;
   }); });
   // Zeitbudget pro Woche (ohne feste Termine wie Teamsport und Wettkampf)
@@ -1187,26 +1219,57 @@ export function enforceVolume(weeks: any[], maxInc: number, budgetMin = Infinity
   }
 }
 /* Erholungswoche: höchstens 80 % der letzten normalen Woche (eigenes Training; feste Termine, Tests und Lernstufen bleiben) */
-function enforceRecovery(weeks: any[], prev: any = null, keepIds = new Set<string>()) {
+/* Auftrag 30: beim Kürzen/Verlängern baut rebuildScaled die Beschreibung neu – Begründungen („Ausnahme: …“) und Hinweise
+   (Hitze, Freiwasser, Uhrzeit) gingen dabei verloren. Sie bleiben jetzt erhalten. */
+function keepExcuse(old: any, next: any): any {
+  const keep = String(old.description || '').split('\n').filter((l: string) => /^(Ausnahme:|Hitze-Gewöhnung|Wenn möglich im Freiwasser|Hügelig fahren|Mit Hügeln laufen|Zur Wettkampf-Uhrzeit)/.test(l) && !String(next.description || '').includes(l));
+  return keep.length ? { ...next, description: [next.description, ...keep].filter(Boolean).join('\n') } : next;
+}
+function enforceRecovery(weeks: any[], prev: any = null, keepIds = new Set<string>(), capOf: ((date: string) => number) | null = null) {
   const all = prev ? [prev, ...weeks] : weeks;
-  for (let i = 1; i < all.length; i++) {
+  for (let i = prev ? 1 : 0; i < all.length; i++) {
     const w = all[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe) continue;
-    let j = i - 1; while (j > 0 && (all[j].isRecoveryWeek || all[j].reduced || all[j].entry || all[j].partial || all[j].phase === 'taper' || all[j].phase === 'race')) j--;
-    const ref = ownWeekMinutes(all[j]); if (ref < 90 || all[j].isRecoveryWeek || all[j].partial) continue;
-    for (let guard = 0; guard < 5 && ownWeekMinutes(w) > ref * 0.82; guard++) {
+    const normalW = (x: any) => x && !x.isRecoveryWeek && !x.reduced && !x.entry && !x.partial && x.phase !== 'taper' && x.phase !== 'race';
+    let j = i - 1; while (j > 0 && !normalW(all[j])) j--;
+    // Auftrag 30: kein gültiger Bezug davor (z. B. direkt nach dem Neu-Planen ist die Woche davor angebrochen): die nächste normale Woche danach
+    let refW = normalW(all[j]) ? all[j] : null;
+    if (!refW) { let k = i + 1; while (k < all.length && !normalW(all[k])) k++; refW = k < all.length ? all[k] : null; }
+    if (!refW) continue;
+    const ref = ownWeekMinutes(refW); if (ref < 90) continue;
+    // Auftrag 30: Erholungswoche etwa 60–70 % der letzten Aufbauwoche (vorher bis 82 % erlaubt; nach unten keine Grenze – bei festen Ruhetagen
+    // landete sie bei ~50 %). Zu viel: kürzen auf ~66 %; zu wenig: lockere Einheiten verlängern auf ~62 % (höchstens +35 % je Einheit).
+    const lo = ref * (w.recoveryDepth ? w.recoveryDepth[0] : 0.58), hi = ref * (w.recoveryDepth ? w.recoveryDepth[1] : 0.72), mid = (lo + hi) / 2;
+    // auffüllen nie in Wochen mit Wettkampf oder kurz danach (lockere Tage nach dem Rennen), nie lange Einheiten oder Einheiten mit Begründung
+    const nearRace = all.slice(Math.max(0, i - 1), i + 1).some((x: any) => (x.races || []).length || x.days.some((d: any) => d.sessions.some((s: any) => s && s.race)));
+    // nie über 80 % der kleinsten der letzten 3 normalen Wochen auffüllen (nach Änderungen der verfügbaren Zeit sind frühere Wochen kleiner)
+    const normals = all.slice(Math.max(0, i - 6), i).filter((x: any) => !x.isRecoveryWeek && !x.partial && !x.reduced && !x.entry && x.phase !== 'taper' && x.phase !== 'race').slice(-3).map(ownWeekMinutes).filter((m: number) => m > 0);
+    const fillMax = normals.length ? Math.min(...normals) * 0.8 : Infinity;
+    for (let guard = 0; guard < 4 && !nearRace && ownWeekMinutes(w) < Math.min(lo, fillMax); guard++) {
+      const cur = ownWeekMinutes(w);
+      const flex = w.days.flatMap((d: any) => d.sessions).filter((s: any) => s.spec && !s.stage && !keepIds.has(s.id) && !s.fixed && !s.race && !s.cancelled && !s.hard && !(s.sport === 'run' && (s.long || /^Lang/.test(s.title || ''))) && !s.ruleNote && !s.pinned && (s.sport === 'run' || s.sport === 'bike' || s.sport === 'swim') && !/test|Kraul-Check/i.test(s.title || ''));
+      const flexMin = flex.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0); if (!flexMin) break;
+      const f = Math.min(1.35, 1 + (Math.min(mid, ref * 0.62, fillMax) - cur) / flexMin);
+      let changed = false;
+      for (const s of flex) { const rb = W.rebuildScaled(s, f); if (!rb || rb.plannedMinutes <= s.plannedMinutes) continue; const day = w.days.find((d: any) => d.sessions.includes(s)); const dayMin = day ? day.sessions.filter((x: any) => x && !x.cancelled && x.sport !== 'rest' && !x.race).reduce((a: number, x: any) => a + (x.plannedMinutes || 0), 0) : 0; if (capOf && day && dayMin - (s.plannedMinutes || 0) + rb.plannedMinutes > capOf(day.date)) continue; Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); changed = true; }
+      if (!changed) break;
+    }
+    for (let guard = 0; guard < 5 && ownWeekMinutes(w) > hi; guard++) {
       const cur = ownWeekMinutes(w);
       const flex = w.days.flatMap((d: any) => d.sessions).filter((s: any) => s.spec && (!s.stage || s.sport === 'swim') && !s.fixed && !s.race && !s.cancelled && s.sport !== 'football' && !/test|Kraul-Check/i.test(s.title || ''));
       const flexMin = flex.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0); if (!flexMin) break;
-      const f = Math.max(0.4, 1 - (cur - ref * 0.78) / flexMin);
+      const f = Math.max(0.4, 1 - (cur - ref * 0.66) / flexMin);
       let changed = false;
-      for (const s of flex) { const rb = W.rebuildScaled(s, f); if (rb && rb.plannedMinutes < s.plannedMinutes) { Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); changed = true; } }
+      // Begründungen („Ausnahme: …“) bleiben beim Neuaufbau der Beschreibung erhalten
+      for (const s of flex) { const rb = W.rebuildScaled(s, f); if (rb && rb.plannedMinutes < s.plannedMinutes) { const keepNote = String(s.description || '').split('\n').filter((l: string) => /^Ausnahme:/.test(l)); Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); if (keepNote.length && !String(s.description || '').includes(keepNote[0])) s.description = [s.description, ...keepNote].filter(Boolean).join('\n'); changed = true; } }
       if (!changed) break;
     }
-    // reicht Kürzen nicht (kurze Einheiten, Lernstufen): eine Einheit einer Sportart weniger, die in der Woche mehrfach vorkommt
-    if (ownWeekMinutes(w) > ref * 0.9) {
+    // reicht Kürzen nicht (kurze Einheiten, Lernstufen): eine Einheit einer Sportart weniger, die in der Woche mehrfach vorkommt –
+    // nur, wenn die Woche danach nicht unter die untere Grenze fällt
+    if (ownWeekMinutes(w) > ref * 0.76) {
       const own = w.days.flatMap((d: any) => d.sessions.map((s: any) => ({ d, s }))).filter(({ s }: any) => s && !keepIds.has(s.id) && !s.fixed && !s.race && !s.cancelled && s.sport !== 'rest' && s.sport !== 'football' && !/test|Kraul-Check/i.test(s.title || ''));
       const many = (sp: string) => own.filter(({ s }: any) => s.sport === sp).length >= 2;
-      const x = own.filter(({ s }: any) => many(s.sport) && !s.long).sort((a: any, b: any) => (a.s.plannedMinutes || 0) - (b.s.plannedMinutes || 0))[0];
+      const curMin = ownWeekMinutes(w);
+      const x = own.filter(({ s }: any) => many(s.sport) && !s.long && curMin - (s.plannedMinutes || 0) >= lo).sort((a: any, b: any) => (a.s.plannedMinutes || 0) - (b.s.plannedMinutes || 0))[0];
       if (x) { x.d.sessions = x.d.sessions.filter((s: any) => s !== x.s); if (!x.d.sessions.length) x.d.sessions = [{ id: x.s.id + '-rest', sport: 'rest', title: 'Ruhetag' }]; }
     }
   }

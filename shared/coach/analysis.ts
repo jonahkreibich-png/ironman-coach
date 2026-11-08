@@ -12,7 +12,9 @@ import { sleepNeed } from '../profile';
 import { rulesOf } from '../constraints';
 import { parseFor } from '../ruleparse';
 import { doneItems } from './review';
-import { actualMetrics, evidenceSignature } from '../results';
+import { actualMetrics, evidenceSignature, changeText } from '../results';
+import { valueStory, storyText, STORY_METRICS, type Pt, type Story } from '../valuestory';
+import { valsOf } from './review';
 
 export type Trigger = 'morning' | 'activity' | 'weekly' | 'view';
 export interface Insight { id: string; kind: 'load' | 'recovery' | 'trend' | 'technique' | 'consistency' | 'illness'; tone: 'good' | 'info' | 'warn' | 'bad'; score: number; title: string; why: string; tip: string }
@@ -33,10 +35,27 @@ const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const fmtD = (d: string) => `${DOW[new Date(d + 'T12:00:00Z').getUTCDay()]} ${d.slice(8)}.${d.slice(5, 7)}.`;
 
 /* Alle erledigten Einheiten mit ihren Feldern (geplante, Extra-Einheiten, Aufzeichnungen ohne Zuordnung) */
-export interface Done { id: string; date: string; sport: string; title: string; planned: any | null; f: ReturnType<typeof fieldsOf> }
+export interface Done { id: string; date: string; sport: string; title: string; planned: any | null; f: ReturnType<typeof fieldsOf>; /** Auftrag 30: anders als geplant (Kurzform) */ change?: string | null }
 export function doneSessions(ctx: EngineCtx, from: string, to: string): Done[] {
-  return doneItems(ctx, from, to).map(d => ({ id: d.key, date: d.date, sport: d.sport, title: d.title, planned: d.planned, f: fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport) }));
+  return doneItems(ctx, from, to).map(d => ({ id: d.key, date: d.date, sport: d.sport, title: d.title, planned: d.planned, f: fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport), change: d.change && d.changedFrom ? changeText(d.changedFrom, d.st, d.act) : null }));
 }
+/* Auftrag 30, Punkt 5: Serien je Wert für Bestwert / Tageswert / Trend (ein Jahr zurück, nur eingetragene oder gemessene Werte) */
+export function storySeries(ctx: EngineCtx, today = ctx.today): Record<string, Pt[]> {
+  const out: Record<string, Pt[]> = { crawl: [], pull: [], run5k: [], runLong: [], bike20: [], swim400: [] };
+  for (const p of C.swimProofs(ctx.state, ctx.baseWeeks || [], today, 365) as any[]) { if (p.crawl) out.crawl.push({ date: p.date, v: p.crawl }); if (p.pull) out.pull.push({ date: p.date, v: p.pull }); }
+  for (const d of doneItems(ctx, C.addDays(today, -365), today)) {
+    const v: any = valsOf(d);
+    if (d.sport === 'run' && v.km) { out.runLong.push({ date: d.date, v: v.km }); if (v.km >= 4.9 && v.min) out.run5k.push({ date: d.date, v: v.min * 60 / v.km }); }
+    if (d.sport === 'bike' && v.power && (v.min || 0) >= 20) out.bike20.push({ date: d.date, v: v.power });
+    if (d.sport === 'swim' && v.pace100 && ((v.meters || 0) >= 400)) out.swim400.push({ date: d.date, v: v.pace100 });
+  }
+  return out;
+}
+export function valueStories(ctx: EngineCtx, today = ctx.today): Record<string, Story> {
+  const s = storySeries(ctx, today);
+  return Object.fromEntries(Object.entries(s).map(([k, pts]) => [k, valueStory(pts, STORY_METRICS[k].higher)]));
+}
+export const storyLine = (k: string, st: Story, today: string) => storyText(st, { ...STORY_METRICS[k], today });
 /* Laufökonomie: Meter pro Herzschlag bei lockeren Läufen (je höher, desto effizienter) */
 const runEff = (x: Done) => x.f.paceSec && x.f.hr ? (60000 / x.f.paceSec) / x.f.hr : null;
 function slope(pts: { x: number; y: number }[]): number | null {
@@ -137,8 +156,18 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
     if (ills >= 2 && tiredSigns) add({ id: 'reds', kind: 'recovery', tone: 'warn', score: 72, title: 'Mehrere Warnzeichen zusammen', why: `${ills} Infekte in 3 Monaten und Müdigkeit im Training.`, tip: 'Manchmal steckt zu wenig Energie dahinter: rund ums Training genug essen (Kohlenhydrate und Eiweiß). Bei Frauen auch auf Zyklus-Veränderungen achten. Lass das bitte ärztlich abklären, das ist keine Diagnose.' }); }
   // Schwimmen: Kraul am Stück und Züge pro Bahn
   const swims = done.filter(x => x.sport === 'swim');
-  const crawl = swims.filter(x => x.f.longestCrawl).map(x => ({ d: x.date, m: x.f.longestCrawl! }));
-  if (crawl.length >= 2 && crawl[crawl.length - 1].m > crawl[0].m) add({ id: 'swim-crawl', kind: 'technique', tone: 'good', score: 45, title: 'Kraul am Stück wird länger', why: `Von ${de(crawl[0].m, 1)} m (${fmtD(crawl[0].d)}) auf ${de(crawl[crawl.length - 1].m, 1)} m (${fmtD(crawl[crawl.length - 1].d)}).`, tip: 'Weiter kurze Strecken sauber schwimmen, die Länge kommt mit der Atmung.' });
+  // Auftrag 30: Bestwert, Tageswert und Trend unterscheiden (vorher erster gegen letzter Wert: „von 50 m auf 75 m“ trotz Bestwert 100 m)
+  let stories: Record<string, Story> = {};
+  try { stories = valueStories(ctx, today); } catch (e) { stories = {}; }
+  for (const [k, title] of [['crawl', 'Kraul am Stück'], ['pull', 'Mit Pull Buoy am Stück']] as const) {
+    const sv = stories[k]; if (!sv || !sv.day || sv.n < 2 || sv.day.date < C.addDays(today, -21)) continue;
+    const up = sv.isNewBest || sv.trend === 'up';
+    add({ id: k === 'crawl' ? 'swim-crawl' : 'swim-pull', kind: 'technique', tone: up ? 'good' : 'info', score: up ? 45 : 30, title: sv.isNewBest ? `Neuer Bestwert: ${title}` : sv.trend === 'up' ? `${title} wird länger` : title, why: storyLine(k, sv, today), tip: 'Weiter kurze Strecken sauber schwimmen, die Länge kommt mit der Atmung.' });
+  }
+  for (const [k, sport] of [['run5k', 'Laufen'], ['bike20', 'Rad'], ['swim400', 'Schwimmen']] as const) {
+    const sv = stories[k]; if (!sv || !sv.isNewBest || !sv.day || sv.day.date < C.addDays(today, -14)) continue;
+    add({ id: 'best-' + k, kind: 'trend', tone: 'good', score: 42, title: `Neuer Bestwert ${sport}`, why: storyLine(k, sv, today), tip: 'Stark. Ein einzelner Spitzenwert ist noch kein neues Niveau – die Zonen passe ich erst nach einem Test oder wiederholten Werten an.' });
+  }
   const tech = swims.filter(x => x.f.technique).slice(-1)[0];
   if (tech && tech.date > C.addDays(today, -21)) add({ id: 'swim-tech', kind: 'technique', tone: 'info', score: 35, title: 'Technik-Schwerpunkt Schwimmen', why: `Zuletzt notiert: „${tech.f.technique}“ (${fmtD(tech.date)}).`, tip: /atm/i.test(tech.f.technique) ? 'Ins Wasser ausatmen (blubbern), nur kurz seitlich einatmen, Brett-Übungen mit Atmung.' : /bein|sink|wasserlage|kopf/i.test(tech.f.technique) ? 'Kopf ruhig, Blick zum Boden, Beinschlag aus der Hüfte: so liegen die Beine höher.' : 'Technikübungen am Anfang jeder Einheit, kurze Kraul-Strecken.' });
   if (prof.focus && prof.focus.some(t => /schwimm/i.test(t)) && !swims.length && !ill) add({ id: 'swim-none', kind: 'consistency', tone: 'warn', score: 40, title: 'Länger nicht geschwommen', why: 'In den letzten 6 Wochen keine Schwimm-Einheit erledigt, dabei ist Schwimmen deine Schwäche.', tip: 'Die zwei Schwimmtermine pro Woche haben Vorrang vor Zusatzeinheiten.' });

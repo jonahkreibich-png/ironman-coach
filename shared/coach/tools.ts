@@ -109,7 +109,7 @@ export function runTool(ctx: EngineCtx, name: string, input: any, opts: { propos
     if (input.what === 'sessions') {
       // alle erledigten Einheiten mit ihren Feldern (Uhr, intervals.icu, von Hand, aus Notizen)
       const rows = doneSessions(ctx, C.addDays(from, 1), date).map(x => { const f = x.f; const zv = x.planned ? zoneVerdict(x.planned, (ctx.state.sessions || {})[x.id], ctx.profile.thresholds) : null;
-        return Object.fromEntries(Object.entries({ date: x.date, sport: x.sport, title: x.title, min: f.min, km: f.km, meters: f.meters, pace: f.paceSec, pace100: f.pace100, hr: f.hr, maxHr: f.maxHr, zone: zv ? zv.text : null, decoupling: f.decoupling, efficiency: f.efficiency, cadence: f.cadence, power: f.power, spl: f.spl, longestCrawl: f.longestCrawl, technique: f.technique || null, rpe: f.rpe, feel: f.feel, deviation: f.deviation || null }).filter(([, v]) => v != null && v !== '')); });
+        return Object.fromEntries(Object.entries({ date: x.date, sport: x.sport, title: x.title, min: f.min, km: f.km, meters: f.meters, pace: f.paceSec, pace100: f.pace100, hr: f.hr, maxHr: f.maxHr, zone: zv ? zv.text : null, decoupling: f.decoupling, efficiency: f.efficiency, cadence: f.cadence, power: f.power, spl: f.spl, longestCrawl: f.longestCrawl, technique: f.technique || null, rpe: f.rpe, feel: f.feel, deviation: f.deviation || null, anders: x.change ? x.change : null }).filter(([, v]) => v != null && v !== '')); });
       return { result: JSON.stringify(rows), isError: false, changes: [] };
     }
     return err('Unbekannte Abfrage.');

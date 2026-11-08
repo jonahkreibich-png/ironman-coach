@@ -74,7 +74,7 @@ describe.skipIf(!hasRealData())('Analyse mit echten Daten (30 Fälle)', () => {
   test('Schwimm-Fortschritt aus den Feldern: Kraul am Stück von 12,5 m auf 25 m', () => {
     const ctx = realCtx('2026-10-21'); const s = own(ctx, '2026-10-20', '2026-10-20')[0].sessions.find((x: any) => x.sport === 'swim');
     ctx.state.sessions[s.id] = { completed: true, metrics: { meters: '900', min: '35', longestCrawl: '25' } };
-    const i = analyze(ctx).insights.find(x => x.id === 'swim-crawl')!; expect(i.why).toMatch(/12,5 m .* auf 25 m/);
+    const i = analyze(ctx).insights.find(x => x.id === 'swim-crawl')!; expect(i.why).toMatch(/25 m Kraul am Stück – neuer Bestwert \(vorher 12,5 m am /); expect(i.title).toBe("Neuer Bestwert: Kraul am Stück");
   });
   test('Wochen-Auslöser schreibt „Was der Coach gerade sieht“ als Nachricht', () => { expect(analyze(realCtx('2026-10-11'), 'weekly').messages.some(m => m.title === 'Was der Coach gerade sieht')).toBe(true); });
   test('Ansicht in der App: keine Lob-Nachrichten, nur Warnungen', () => { expect(analyze(realCtx('2026-10-06'), 'view').messages.every(m => m.kind !== 'info')).toBe(true); });

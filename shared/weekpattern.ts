@@ -50,6 +50,7 @@ export interface PatternWeekIn {
   phase?: 'base' | 'build' | 'specific' | 'taper' | 'race'; caps?: { run: number; bikeOut: number; swim: number };
   /** Ziel des Zyklus (Art der Schlüsseleinheiten), harte feste Tage (Spiel, Wettkampf), lockere Tage nach einem Wettkampf, unter 18 */
   goalType?: GoalType; hardDows?: number[]; easyDates?: string[]; minor?: boolean;
+  /** Auftrag 30: Alter (über 50 mehr Kraft) und ob Kraft gewählt ist */ age?: number | null; strengthOn?: boolean;
   /** 400 m Kraul am Stück geschafft: CSS-Test statt Kraul-Check */
   crawl400: boolean;
   /** längstes Kraul-Stück im normalen Training (Strecke am Stück, Auftrag 11) */ repMax?: number;
@@ -96,7 +97,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
   const longRun = t && t.longRun ? r5(mid(t.longRun)) : ph === 'race' ? r5(Math.min(40, st.longRun * 0.4)) : ph === 'taper' ? r5(st.longRun * 0.6) : rec ? r5(st.longRun * 0.65) : Math.min(capRun, st.longRun + lrStep);
   // lange Ausfahrt ohne Vorgabe: höchstens +15 min pro Woche, vorerst nicht über 4 h
   const lb = (f: number): [number, number] => [r5(Math.min(capBike, st.longBike) * f), r5(Math.min(capBike, st.longBike) * f)];
-  const longBikeR: [number, number] = t && t.longBike ? [...t.longBike] as [number, number] : ph === 'race' ? lb(0.4) : ph === 'taper' ? lb(0.6) : rec ? lb(0.6) : [Math.min(capBike, st.longBike), Math.min(capBike, st.longBike + 15)];
+  const longBikeR: [number, number] = t && t.longBike ? [...t.longBike] as [number, number] : ph === 'race' ? lb(0.4) : ph === 'taper' ? lb(0.6) : rec ? [lb(0.6)[0], lb(0.85)[0]] : [Math.min(capBike, st.longBike), Math.min(capBike, st.longBike + 15)];
   // Schwimmen wird mit dem Können und dem Ziel länger (bis zur Obergrenze), in Erholung und Tapering kürzer
   const swimMin = t && t.swim ? r5(mid(t.swim)) : rec || ph === 'taper' || ph === 'race' ? 40 : Math.min(inp.caps ? inp.caps.swim : 60, st.swim + 5);
   const swimDays = slots.filter(sl => sl.role === 'swim').map(sl => sl.dow);
@@ -165,7 +166,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       const sq = first && !rec && !inp.entry && ph !== 'race' && !easyDay(date) ? pickQuality('swim', (st.swimQN || {})[ph] || 0, { ...K.libEnv(), phase: ph, goal, level: inp.level || 'advanced', noZ5: inp.noZ5, swimCont: inp.swimStage ? (W.SWIM_STAGE_M[inp.swimStage.n] || 25) : inp.repMax ?? 400, gear: inp.swim.gear || [] }) : null;
       const anyQ = !rec && !inp.entry && ph !== 'race';
       const make = (min: number) => { let v = K.fitSwim(K.swimVariant(base(min), (st.weekN || 0) + (first ? 0 : 1), st.blockWeek || 0, ph), min); if (!first && anyQ) v = K.fitSwim(noFast(v), min); return sq && sq.key !== 'swim.drills' ? swimQuality(sq.key, sq.stage, v, { repMax: inp.swimStage ? (W.SWIM_STAGE_M[inp.swimStage.n] || 25) : inp.repMax ?? 400, learner: !!inp.swimStage, minutes: min }) : v; };
-      out.push({ dow: sl.dow, slot: sl, s: null, make, min: swimMin, adj: t && t.swim ? undefined : rec || ph === 'taper' || ph === 'race' ? [30, 40] : [40, inp.caps ? inp.caps.swim : 60] });
+      out.push({ dow: sl.dow, slot: sl, s: null, make, min: swimMin, adj: t && t.swim ? undefined : rec ? [30, 45] : ph === 'taper' || ph === 'race' ? [30, 40] : [40, inp.caps ? inp.caps.swim : 60] });
     } else if (sl.role === 'full') {
       // Auftrag 19: Kraft Ganzkörper (z. B. Di 30 min); vor der Rad-Qualität leichter
       const easy = (!!keySlot && !rec && !inp.entry && ((sl.dow + 1) % 7) === keySlot.dow) || (bikeTestDow >= 0 && ((sl.dow + 1) % 7) === bikeTestDow);
@@ -198,7 +199,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
     } else if (sl.sport === 'bike' && sl.am) {
       // Auftrag 19: lockeres Rad am Morgen (z. B. vor der Schule auf der Rolle, auch am Spieltag): Zone 1-2, zählt nicht als hart
       const range = sl.min || [30, 40];
-      out.push({ dow: sl.dow, slot: sl, s: null, am: true, make: (min) => bikeEasyForm('bike.morning', 0, inp.bikeIn, min)!, min: rec ? range[0] : r5(mid(range)), adj: rec ? [range[0], range[0]] : [range[0], range[1]] } as any);
+      out.push({ dow: sl.dow, slot: sl, s: null, am: true, make: (min) => bikeEasyForm('bike.morning', 0, inp.bikeIn, min)!, min: rec ? range[0] : r5(mid(range)), adj: [range[0], range[1]] } as any);
     } else if (sl.sport === 'bike') {
       if (sl.dow === bikeTestDow) { out.push({ dow: sl.dow, slot: sl, s: null, test: true, hard: true, make: () => W.bikeTest({ ...inp.bikeOut, indoor: false, bikeName: null }) }); continue; }
       const range = sl.min || [50, 75];
@@ -230,10 +231,29 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
       // gewünschter Qualitätslauf am Tag vor einem Spiel: nur kontrolliert (Zone 3, Wettkampftempo wie Halbmarathon), nie Schwelle oder härter
       const beforeHard = (inp.hardDows || []).includes((sl.dow + 1) % 7);
       const rq = q && sl.pin && beforeHard && runQ!.zone > 3 ? K.calmQuality(goal, (st.runQN || {})[ph] || 0, { noZ5: inp.noZ5 }) : runQ;
-      out.push({ dow: sl.dow, slot: sl, s: null, hard: q || undefined, pin: q && !!sl.pin, make: (min) => q ? K.runQuality(inp.run, rq!) : variant ? K.runBaseVariant(inp.run, min, st.weekN || 0) : ph === 'base' && strides && !easyDay(date) ? K.runStridesHills(inp.run, min, st.weekN || 0, strides) : W.runEasy(inp.run, min, { strides: easyDay(date) ? 0 : strides }), min: q ? W.totals(K.runQuality(inp.run, rq!)).min : rec ? Math.max(30, range[0] - 10) : r5(mid(range)), adj: q ? undefined : rec ? [Math.max(30, range[0] - 10), range[0]] : [range[0], range[1]] } as any);
+      out.push({ dow: sl.dow, slot: sl, s: null, hard: q || undefined, pin: q && !!sl.pin, make: (min) => q ? K.runQuality(inp.run, rq!) : variant ? K.runBaseVariant(inp.run, min, st.weekN || 0) : ph === 'base' && strides && !easyDay(date) ? K.runStridesHills(inp.run, min, st.weekN || 0, strides) : W.runEasy(inp.run, min, { strides: easyDay(date) ? 0 : strides }), min: q ? W.totals(K.runQuality(inp.run, rq!)).min : rec ? Math.max(30, range[0] - 10) : r5(mid(range)), adj: q ? undefined : rec ? [Math.max(30, range[0] - 10), range[1]] : [range[0], range[1]] } as any);
     }
   }
   void why;
+  // Auftrag 30: Kraft je Phase und Alter – Grundlage 2×, Aufbau 1–2× (ab 50: 2×), spezifisch 1× kurz, Rennwoche keine. Hat das Wochenraster nur
+  // eine Kraft-Einheit, kommt in diesen Wochen eine kurze zweite dazu (Rumpf und Oberkörper, 25 min – belastet die Beine nicht vor Spiel oder
+  // langem Lauf) an einem lockeren Tag ohne harte Einheit und ohne Kraft am Vortag.
+  const strengthItems = out.filter(x => x.strength);
+  const want2 = inp.strengthOn !== false && !rec && !inp.entry && (ph === 'base' || (ph === 'build' && (inp.age || 0) >= 50));
+  if (want2 && strengthItems.length === 1) {
+    const sDow = strengthItems[0].dow;
+    const busy = (dow: number) => out.filter(x => x.dow === dow).length;
+    const cand = slots.filter(x => (x.sport === 'run' || x.sport === 'bike') && x.role !== 'long' && x.role !== 'key' && x.role !== 'brick' && !hardDays.has(x.dow) && x.dow !== qDay
+      && x.dow !== sDow && (sDow + 1) % 7 !== x.dow && (x.dow + 1) % 7 !== sDow && !(inp.hardDows || []).includes(x.dow))
+      .map(x => x.dow).filter((d, i, a) => a.indexOf(d) === i).sort((a, b) => busy(a) - busy(b));
+    if (cand.length) {
+      const dow = cand[0];
+      const spec = W.strengthArea('core', { minutes: 25, back: inp.strength.back, shoulder: inp.strength.shoulder, why: 'Zweite Kraft-Einheit in der Grundlage: Rumpf und Oberkörper stabil, ohne die Beine vor Spiel oder langem Lauf zu belasten.' });
+      spec.lib = { key: 'strength.core2', stage: 0 };
+      { const mainS = spec.steps.find(x => x.part === 'main'); if (mainS) mainS.min = 20; }
+      out.push({ dow, slot: { dow, sport: 'strength', role: 'core' } as any, s: null, strength: true, make: () => spec } as any);
+    }
+  }
   // Auf die Wochenvorgabe ausgleichen: zuerst Rad unter der Woche, dann lockerer Lauf, dann lange Ausfahrt (innerhalb der Spanne)
   const total = () => out.reduce((a, x) => a + (x.min != null ? x.min : W.totals(x.make!(0)).min), 0);
   const order = [...out.filter(x => x.slot.sport === 'bike' && !x.long && x.adj), ...out.filter(x => x.slot.sport === 'run' && !x.long && x.adj), ...out.filter(x => x.long && x.slot.sport === 'bike'), ...out.filter(x => x.slot.role === 'swim' && x.adj)];

@@ -475,3 +475,52 @@ export function repairIntensity(weeks: any[], p: Profile, today: string, o0: Rep
   fixLongQ();
   return fixes;
 }
+
+
+/* ---------- Auftrag 30, Punkt 6: Symbole und Intensität für die Übersicht (eine Stelle für Plan, Heute und Lexikon) ----------
+   hard ⚡ (Intervalle bzw. hart, auch schnelle Schwimm-Stücke), test 🎯, race 🏁, brick 🔗 (Koppel), recovery 🌙 (Erholung), technique 🛠,
+   long ↔ (lange Einheit), adjusted ✎ (von der App oder dir angepasst). Intensität für den Farbstreifen: locker / mittel / hart. */
+export type Mark = 'hard' | 'test' | 'race' | 'brick' | 'recovery' | 'technique' | 'long' | 'adjusted';
+export const MARKS: { key: Mark; icon: string; label: string; text: string }[] = [
+  { key: 'hard', icon: 'bolt', label: 'Intervalle / hart', text: 'Schlüsseleinheit mit harten Abschnitten (Intervalle, Schwelle, schnelle Schwimm-Stücke). Davor und danach locker.' },
+  { key: 'test', icon: 'target', label: 'Test', text: 'Test (Lauf, Rad oder Schwimmen): misst deine Zonen neu. Frisch hingehen – Tag davor locker, gut schlafen.' },
+  { key: 'race', icon: 'flag', label: 'Wettkampf', text: 'Wettkampf oder Rennen.' },
+  { key: 'brick', icon: 'link', label: 'Koppel', text: 'Koppeleinheit: direkt nach dem Rad ein kurzer Lauf, übt den Wechsel.' },
+  { key: 'recovery', icon: 'moon', label: 'Erholung / Ruhetag', text: 'Ruhetag oder sehr lockere Erholungseinheit; in der Wochenleiste: Erholungswoche.' },
+  { key: 'technique', icon: 'tool', label: 'Technik', text: 'Technik im Mittelpunkt (z. B. Schwimm-Übungen, Lauf-ABC).' },
+  { key: 'long', icon: 'span', label: 'Lange Einheit', text: 'Lange, lockere Einheit für die Ausdauer (langer Lauf, lange Ausfahrt).' },
+  { key: 'adjusted', icon: 'edit', label: 'Angepasst', text: 'Von der App oder von dir angepasst (antippen zeigt vorher → nachher).' }
+];
+export function isTestSession(s: any): boolean { return !!s && ((s.spec && s.spec.kind === 'test') || /(^|\s)(Lauftest|Radtest|Schwimmtest|Test)\b|Kraul-Check/.test(s.title || '')); }
+const longOf = (s: any) => { const m = s.plannedMinutes || 0; return !!s.long || (s.sport === 'run' && (m >= 75 || /\blang/i.test(s.title || ''))) || (s.sport === 'bike' && (m >= 120 || /\blang/i.test(s.title || ''))); };
+/* schnelle Stücke beim Schwimmen (Zone 4-5 oder Sprints) zählen als hart und werden mit ⚡ markiert */
+const SWIM_Q = new Set(['swim.fast', 'swim.threshold', 'swim.css', 'swim.pyramid', 'swim.descend', 'swim.broken', 'swim.racestart']);
+export const swimFast = (s: any) => !!s && s.sport === 'swim' && !s.cancelled && (SWIM_Q.has((s.spec && s.spec.lib && s.spec.lib.key) || '') || s.spec?.kind === 'css'
+  || ((s.spec && s.spec.steps) || []).some((x: any) => (x.zone || 0) >= 3 && x.part === 'main' && x.mode !== 'drill' && (x.reps || 1) >= 4));
+export function sessionMarks(s: any): Mark[] {
+  if (!s || s.cancelled) return [];
+  if (s.sport === 'rest') return ['recovery'];
+  const out: Mark[] = [];
+  const test = isTestSession(s);
+  if (s.race) out.push('race'); else if (test) out.push('test'); else if (isHardSession(s) || swimFast(s)) out.push('hard');
+  if (/koppel/i.test(String(s.title || '') + ' ' + JSON.stringify((s.spec && s.spec.steps) || []))) out.push('brick');
+  if (!s.race && !test && (kindOf(s) === 'technique' || /technik|lauf-abc|drill/i.test(s.title || ''))) out.push('technique');
+  if (!s.race && !out.includes('hard') && longOf(s)) out.push('long');
+  if (!out.length && /erholung|regeneration|ausrollen|ganz locker|sehr locker|mobility/i.test(s.title || '')) out.push('recovery');
+  if ((s._adj && s._adj.length) || s.movedFrom) out.push('adjusted');
+  return [...new Set(out)];
+}
+export type Band = 'easy' | 'moderate' | 'hard';
+export function intensityBand(s: any): Band | null {
+  if (!s || s.sport === 'rest' || s.cancelled) return null;
+  if (s.race || isTestSession(s) || isHardSession(s) || swimFast(s)) return 'hard';
+  if (isLightQuality(s) || /zone\s*3/i.test(s.zone || '') || longOf(s) || s.sport === 'strength') return 'moderate';
+  return 'easy';
+}
+/* Zeile oben in jeder Woche: „2 harte Einheiten · 1 Test · 7,8 h“ */
+export function weekLine(sessions: any[], minutes: number): string {
+  const live = sessions.filter(s => s && s.sport !== 'rest' && !s.cancelled);
+  const hard = live.filter(s => sessionMarks(s).includes('hard')).length, tests = live.filter(s => isTestSession(s) && !s.race).length, races = live.filter(s => s.race).length;
+  const h = (Math.round(minutes / 6) / 10).toString().replace('.', ',');
+  return [hard ? `${hard} harte Einheit${hard === 1 ? '' : 'en'}` : 'keine harte Einheit', tests ? `${tests} Test${tests === 1 ? '' : 's'}` : '', races ? `${races} Wettkampf${races === 1 ? '' : 'e'}` : '', `${h} h`].filter(Boolean).join(' · ');
+}

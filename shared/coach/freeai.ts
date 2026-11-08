@@ -38,6 +38,8 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
     '- SOLL ist der Plan, IST ist, was der Athlet eingetragen hat oder was gemessen wurde. Erreicht ist nur, was als IST in den Daten oder in einem Werkzeug-Ergebnis steht. Ein Plan-Wert ist nie ein Ergebnis. Fehlt der IST-Wert, frag nach (z. B. „Wie weit bist du am Stück gekrault?“), statt den Plan-Wert zu nennen.',
     '- Frühere Coach-Nachrichten sind keine Daten. Widerspricht etwas den aktuellen Werten, gelten die aktuellen Werte. Wurde ein Wert korrigiert, nenne den neuen.',
     '- Bewerte vorsichtig: eine einzelne Einheit oder ein einzelner Wert ist noch kein Trend. Wenn Daten fehlen oder du unsicher bist, sag das offen.',
+    '- Unterscheide immer Bestwert (bester Einzelwert mit Datum), Tageswert (heute bzw. die letzte Einheit) und Trend (mehrere Einheiten), siehe „Bestwert / Tageswert / Trend“. Vergleiche nie den ersten mit dem letzten Wert. Ein schwächerer Tag ist kein Rückschritt, ein einzelner Spitzenwert noch kein neues Niveau. Beispiel: „Heute 75 m am Stück, dein Bestwert sind 100 m (27.10.).“',
+    '- Übersichtlich schreiben: ein Gedanke pro Satz, kurze Sätze, die wichtigste Aussage zuerst, höchstens drei Zahlen pro Antwort.',
     `- ${CAUSE_RULE}`,
     '- Hilfsmittel (Kickbrett, Pull Buoy, Flossen …) nur, wenn sie unter AUSRÜSTUNG stehen. Setze nichts voraus, was fehlt.',
     '- Keine medizinischen Diagnosen und keine Medikamente. Bei Schmerzen, Verletzung, Krankheit, Fieber, Brustschmerz oder Schwindel: Training pausieren oder nur ganz locker und zum Arzt bzw. zur Ärztin raten.',
