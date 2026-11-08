@@ -1,5 +1,17 @@
 # Für Jonah
 
+**3.19.0 freigeben (nur du kannst das):** Das Veröffentlichen der echten App hat der automatische Sicherheitscheck von Claude Code gestoppt. Sag mir „Freigeben“ (oder erlaube den Befehl `node scripts/veroeffentlichen.mjs`), dann veröffentliche ich und schicke dir danach eine Test-Mitteilung.
+
+**Nach dem Update auf 3.19.0:**
+1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
+2. Mehr → Mitteilungen: Steht dort „Auf diesem Gerät nicht aktiv“, einmal auf „Erneut erlauben“ tippen. Dann „Test senden“.
+3. Optional: „Auch in der Schule ruhig“ einschalten und deine Schulzeiten eintragen.
+4. Kommt der Test nicht: iPhone-Einstellungen → Fokus → prüfen, ob Stamio bei deinen Fokus-Modi erlaubt ist.
+
+---
+
+## Frühere Hinweise
+
 **Update auf 3.18.0:** App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
 
 **2. Krafteinheit (nur du kannst das):** Dein Wochenraster erlaubt Kraft nur am Dienstag. Mehr → Berücksichtigungen → im Raster in der Zeile „Kraft“ einen zweiten Tag antippen (z. B. Do), bis er „geht“ zeigt → unten „Änderungen übernehmen“. Dann plant die App in der Grundlage die 2. Einheit (kurz, Rumpf und Oberkörper) selbst ein.

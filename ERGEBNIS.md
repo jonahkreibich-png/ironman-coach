@@ -1,3 +1,42 @@
+# Auftrag 31: Coach-Tab ruckelt, Mitteilungen kommen nicht an (8.11.)
+
+**Stand:** Umgesetzt und getestet, Version **3.19.0**. Test-App veröffentlicht (vorher gesichert). **Echte App noch nicht:** Das Veröffentlichen wurde vom automatischen Sicherheitscheck gestoppt und braucht Jonahs Freigabe. Danach folgt die Test-Mitteilung an Jonah. Keine Nutzerdaten verändert.
+
+## 1. Coach-Tab
+**Ursache** (Messung mit Kopie deiner Daten, WebKit): Vor dem Anzeigen wird jede Coach-Nachricht auf richtige Zahlen geprüft. Diese Prüfung hat für jede Nachricht den ganzen Plan mit allen 182 Anpassungen neu aufgebaut. Außerdem hat jeder Tab-Wechsel alles neu berechnet. Das waren 86 % der Zeit.
+**Lösung:** Berechnungen bleiben erhalten, bis sich Daten ändern. Die Grundlagen der Prüfung werden einmal je Datenstand berechnet. Gezeichnet werden nur die letzten 30 Nachrichten, ältere beim Hochscrollen. „Was der Coach gerade sieht“ kommt aus dem Zwischenspeicher und wird im Hintergrund erneuert. In Ruhepausen rechnet die App Coach und Trends vor.
+
+Antippen bis zum ersten Bild, Median (Spitze), mit deinen Daten:
+| Tab | vorher WebKit | nachher WebKit | vorher iPhone-ähnlich* | nachher iPhone-ähnlich* |
+|---|---|---|---|---|
+| Coach | 498 ms (5.632) | **15 ms** (46) | 1.644 ms (17.964) | **41 ms** (200) |
+| Coach mit 1.000 Nachrichten | 3.326 ms (25.276) | **30 ms** (31) | – | – |
+| Heute | 77 ms | **15 ms** | 221 ms | **39 ms** |
+| Plan | 76 ms | **55–76 ms** (Rechnen 42 → 14 ms, Rest ist Layout) | 207 ms | **52 ms** |
+| Fortschritt | 78 ms | **46 ms** | 206 ms | **97 ms** |
+| Mehr | 46 ms | **14 ms** | 101 ms | **25 ms** |
+\* Chromium mit 4-fach gebremster CPU. Ältere Nachrichten nachladen: 30 ms. Messwerkzeug: `scripts/tabmessung.mjs`.
+Dauertest: `tests/e2e/auftrag31-coach.spec.ts` (1.000 Nachrichten; mit der alten Version rot: 1.001 Nachrichten gezeichnet, 470 ms).
+
+## 2. Mitteilungen – die Kette
+| Schritt | Ergebnis |
+|---|---|
+| Server-Schlüssel (VAPID) in der echten App | ✅ gesetzt (auch Test-App) |
+| Anmeldung gespeichert und deinem Konto zugeordnet | ✅ Konto 1. **Aber:** Dein iPhone bekam am 31.10. um 18:43 eine neue Geräte-Kennung. Die Anmeldung hing an der alten (zuletzt gesehen 18:42). Vom 31.10. bis heute 18:51 hatte dein aktives Gerät **keine** Anmeldung. Die App hat das nicht bemerkt. **Das ist die Ursache.** |
+| Bleibt die Anmeldung nach Update, neuem Verbinden, Neuinstallation? | Vorher ❌. Jetzt ✅: Die App prüft bei jedem Start, nach jeder Rückkehr (höchstens alle 6 h) und nach jedem Update, ob der Server ihre Anmeldung hat, und meldet sich sonst still neu an. Eine Anmeldung zu einem alten Schlüssel wird ersetzt statt weiterbenutzt. |
+| Zeitpläne (Cron) | ✅ alle 5 min. Täglich: Morgen-Briefing 06:45 (Schultag) / 09:00 (Wochenende), 1 h vor Nachmittags-Einheit, Vorabend 21:00, „Wie war's?“ 20:30, Essen 18:00, Adduktoren 19:00 (Mo/Mi/Fr, Teamsport). Sonntag 18:00 Wochenrückblick. Dazu Warnungen (Temperatur, Ampel rot, Plan angepasst) und Bestwerte. Höchstens 4 pro Tag. |
+| Antwort von Apple | Vorher ❌ nie gespeichert; jede Mitteilung galt als „gesendet“. Jetzt ✅ je Gerät: Status, Grund, letzte Zustellung, Fehler in Folge. 404/410 und „falscher Schlüssel“ = abgelaufen → Anmeldung entfernt, Gerät zeigt „nicht aktiv – erneut erlauben“. |
+| Service Worker zeigt die Mitteilung (auch bei geschlossener App) | ✅ geprüft (Unit-Test). Neu: reagiert, wenn der Browser die Anmeldung erneuert. |
+| App → Mitteilungen | ✅ „Auf diesem Gerät aktiv / nicht aktiv – erneut erlauben“, „Letzte Mitteilung zugestellt vor …“, „Test senden“ mit ehrlichem Ergebnis, Auswahl und Uhrzeiten, Ruhezeit nachts und **neu in der Schule** (Mo–Fr, Standard 07:45–13:15, aus), iPhone-Hinweis (nur Home-Bildschirm-App, Fokus kann ausblenden) |
+| Betreiber | ✅ Mehr → Betreiber → Mitteilungen: Nutzer mit aktiven Mitteilungen, Geräte, Fehler, abgelaufene, Zustellungen der letzten 7 Tage, Test je Nutzer. Dazu `scripts/push-test.mjs`. |
+| Tests | ✅ Erlauben → Test kommt an; neue Geräte-Kennung → App meldet sich selbst neu an; nach Update bleibt sie aktiv; 410 wird erkannt und ersetzt; 403-Ablehnung mit Grund gespeichert; Briefing zur richtigen Uhrzeit vor/nach beiden Zeitumstellungen und in anderer Zeitzone; Schul-Ruhezeit |
+| Test-Mitteilung an dich | ⏳ nach dem Veröffentlichen der echten App |
+
+## Tests (ausgeführt)
+Typen ✅ · 3.185 Unit-/Server-Tests ✅ · Build ✅ · 676 Browser-Tests (Chromium + WebKit) ✅. Ein älterer Abgleich-Test wackelte auch mit der Vorversion (lud neu, bevor gespeichert war) – er wartet jetzt aufs Speichern, 24/24 grün.
+
+---
+
 # Auftrag 30: Anders gemacht, Übersicht, Wissen, Ruckeln, Coach (8.11.)
 
 **Stand:** Alles umgesetzt und getestet, Version **3.18.0**. Veröffentlicht (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei). Keine Daten von euch verändert.
