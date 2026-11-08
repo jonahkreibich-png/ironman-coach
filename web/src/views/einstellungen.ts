@@ -176,7 +176,7 @@ function pushHead(perm: string): string {
 }
 function notifyCard(): string {
   if (!isSyncOn()) return `<div class="card"><div class="hint">${esc(t('set.notifyNeedSync'))}</div></div>`;
-  if (PUSH === undefined) { PUSH = null; ensurePush().then(() => pushStatus()).then(s => { PUSH = s || { configured: false }; nav.rerender(); }); }
+  if (PUSH === undefined) { PUSH = null; ensurePush().then(() => pushStatus()).then(s => { PUSH = s || { configured: false }; nav.refresh(); }); /* Auftrag 31: wartet, falls gerade eine Uhrzeit eingetippt wird */ }
   const P = notifyPrefs();
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
   const head = pushHead(perm);

@@ -56,3 +56,21 @@ test('unchanged retry after multiple failures keeps new workout and clears retry
  // A later legitimate deletion from another tab must not resurrect the workout.
  f.disk.set('state',initial);s.setMergedItem('state',value,value);expect(await s.settled()).toBe(true);expect(JSON.parse(f.disk.get('state')!).sessions).toEqual({});
 });
+
+/* Auftrag 31: refresh() vor jedem Abgleich liest IndexedDB. Wurde WÄHREND des Lesens gespeichert, überschrieb der gelesene (ältere) Stand
+   den eben gespeicherten Wert; der Abgleich hielt ihn dann für die neueste Änderung (zweite Uhrzeit in „Ruhezeit Schule“ ging verloren). */
+test('Speichern während refresh() liest: der neue Wert bleibt (kein älterer Stand aus dem Lesen)', async () => {
+ const f = fixture(); const v0 = JSON.stringify({ end: '13:15' }); f.disk.set('state', v0);
+ f.journal.update = async (k, change) => { const v = change(f.disk.get(k) ?? null); f.disk.set(k, v); return v; };
+ let release: () => void = () => {}; const gate = new Promise<void>(r => { release = r; });
+ const read = f.journal.read; f.journal.read = async () => { const snap = await read(); await gate; return snap; };
+ const s = new DurableStorage(() => f.native, { ...f.journal, read: async () => [...f.disk] }); await s.initialize();
+ (s as any).journal = f.journal;
+ const r = s.refresh();
+ await new Promise(res => setTimeout(res, 0));
+ s.setMergedItem('state', JSON.stringify({ end: '13:40' }), v0);
+ release(); await r;
+ expect(JSON.parse(s.getItem('state')!).end).toBe('13:40');
+ expect(await s.settled()).toBe(true);
+ expect(JSON.parse(s.getItem('state')!).end).toBe('13:40');
+});

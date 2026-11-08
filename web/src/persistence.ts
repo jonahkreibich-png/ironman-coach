@@ -40,6 +40,7 @@ export class DurableStorage {
     // Der Zustands-Snapshot hat in allen Tabs denselben atomaren Schreibpfad.
     if (!this.journal?.update) return this.setItem(key, value);
     if (this.unreadable.has(key)) return false;
+    this.touched(key);
     this.fallback.set(key, value); this.pending++; this.onChange();
     this.flight = this.flight.then(async () => {
       const mergeBaseline=this.failedMergeBaseline.get(key) ?? baseline;
@@ -60,15 +61,21 @@ export class DurableStorage {
     });
     return false;
   }
+  /* Auftrag 31: Schlüssel, die während des Lesens neu gespeichert wurden, behalten ihren neuen Wert. Vorher überschrieb der gelesene
+     (ältere) Stand eine Eingabe, die genau in diesem Moment gespeichert wurde – der Abgleich schickte dann den alten Wert. */
+  private writes = new Map<string, number>();
+  private touched(key: string) { this.writes.set(key, (this.writes.get(key) || 0) + 1); }
   async refresh(): Promise<void> {
     await this.flight;
     if (this.journal) {
+      const before = new Map(this.writes);
       const entries = await this.journal.read();
-      for (const [k,v] of entries) if (!this.failed.has(k)) this.fallback.set(k,v);
+      for (const [k,v] of entries) if (!this.failed.has(k) && (this.writes.get(k) || 0) === (before.get(k) || 0)) this.fallback.set(k,v);
     }
   }
   private write(key: string, value: string | null): boolean {
     if (this.unreadable.has(key)) return false;
+    this.touched(key);
     if (!this.fallback.has(key)) {
       try {
         if (value == null) this.native().removeItem(key); else this.native().setItem(key, value);
