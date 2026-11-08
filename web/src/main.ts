@@ -3,7 +3,7 @@ import { storage as localStorage } from "./persistence";
 /* Einstieg: Tabs (Heute, Plan, Coach, Fortschritt, Mehr), Unterseiten unter „Mehr“, Aktionen, Deep Links. */
 import { guardLeave } from './staged';
 import { morph } from './morph';
-import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace } from './store';
+import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace, dataVersion } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
 import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, safeBlock, safeRun } from './kit';
@@ -13,7 +13,8 @@ import { D, invalidate } from './data';
 import './sync';
 import { renderHeute } from './views/heute';
 import { renderPlan, scrollToPlanDay, centerWeekBar } from './views/plan';
-import { renderCoach, scrollCoachBottom, healthAction } from './views/coach';
+import { renderCoach, scrollCoachBottom, healthAction, warmCoach } from './views/coach';
+import { currentTrends } from './views/trends';
 import { renderFortschritt } from './views/fortschritt';
 import { renderMehr, resetMehrSearch } from './views/mehr';
 import { renderLexikon, setLexiconQuery } from './views/lexikon';
@@ -41,7 +42,7 @@ import { initTabLens } from './tablens';
 import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
-import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState, retrySync } from './sync';
+import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState, retrySync, ensurePush } from './sync';
 /* Auftrag 29: „Erneut versuchen“ in der Abgleich-Meldung */
 on('sync-retry', () => { void retrySync().then(ok => toast(ok ? 'Alles gesichert.' : 'Noch nicht gesichert – ich versuche es automatisch weiter. Deine Einträge bleiben auf dem Gerät.')); });
 import { checkSwimSkill } from './testupdate';
@@ -148,7 +149,8 @@ function render() {
   (window as any).__renders = ((window as any).__renders || 0) + 1;
   // Auftrag 18: automatische Plan-Änderungen erst nach dem ersten Abgleich (sonst überschreibt ein alter Stand auf dem Gerät den neueren Plan vom Server)
   safeRun('swim-skill', () => { if (HAS_PLAN && autoReady && checkSwimSkill()) saveState(); });
-  invalidate();
+  // Auftrag 31: kein invalidate() mehr bei jedem Zeichnen – D() rechnet von selbst neu, wenn sich die Daten geändert haben
+  // (Datenstand in store.ts). Neuzeichnen nach Aktionen (rerender) leert den Zwischenspeicher weiterhin.
   for (const k in CHARTS) delete (CHARTS as any)[k];
   document.body.classList.toggle('no-plan', !HAS_PLAN);
   // Auftrag 26: gleiche Ansicht nur angleichen (kein Flackern, Bilder und offene Bereiche bleiben), neue Ansicht neu aufbauen
@@ -170,6 +172,24 @@ function render() {
   if (HAS_PLAN && UI.tab === 'plan' && !UI.sub) safeRun('week-bar', centerWeekBar);
   safeRun('top', renderTop); safeRun('tabs', renderTabs); safeRun('badge', updateBadge);
   if (HAS_PLAN) safeRun('tab-lens', initTabLens);
+  if (HAS_PLAN) warmSoon();
+}
+/* Auftrag 31: Nach dem Zeichnen in einer Leerlaufzeit die anderen Tabs vorrechnen (Coach, Trends), damit auch das erste Öffnen nach einer
+   Datenänderung schnell ist. Läuft nur, wenn sich der Datenstand seitdem geändert hat. */
+let warmedVer = -1, warmPending = false;
+function warmSoon() {
+  if (warmPending || warmedVer === dataVersion()) return;
+  warmPending = true;
+  const run = () => {
+    // Safari kennt kein requestIdleCallback: nach einer Pause, und nur wenn gerade nicht getippt/gescrollt wird
+    if (performance.now() - lastTouch < 800 || typing()) { setTimeout(run, 800); return; }
+    warmPending = false; if (warmedVer === dataVersion()) return;
+    warmedVer = dataVersion();
+    if (UI.tab !== 'coach') safeRun('warm-coach', warmCoach);
+    if (UI.tab !== 'fortschritt') safeRun('warm-trends', () => { currentTrends(); });
+  };
+  const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: any) => number) | undefined;
+  if (ric) ric(run, { timeout: 3000 }); else setTimeout(run, 1200);
 }
 on('view-retry', () => { invalidate(); rerender(); });
 function go(target: string, scroll?: string | null) {
@@ -188,7 +208,7 @@ function go(target: string, scroll?: string | null) {
   if (UI.tab === 'coach' && !UI.sub) { scrollCoachBottom(); return; }
   window.scrollTo(0, 0);
 }
-function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+function rerender() { const y = window.scrollY; invalidate(); render(); window.scrollTo(0, y); }
 /* Auftrag 26: Aktualisierung aus dem Hintergrund – gebündelt (ein Neuzeichnen je Bild), nie mitten in einer Eingabe */
 let refreshFrame = 0, refreshLater = false;
 const typing = () => /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
@@ -343,6 +363,13 @@ if (isSyncOn()) {
   loadMe().then(() => { if (UI.tab === 'mehr' && JSON.stringify(me()) !== meBefore) nav.refresh(); });
   loadAiState().then(() => { if ((UI.tab === 'coach' || UI.sub === 'coachset') && JSON.stringify(aiState()) !== aiBefore) nav.refresh(); });
   loadConnections();
+  // Auftrag 31: Mitteilungs-Anmeldung dieses Geräts prüfen und bei Bedarf erneuern (neue Geräte-Kennung, Update, neuer Schlüssel)
+  setTimeout(() => { void ensurePush().then(st => { if (st === 'renewed' && UI.sub === 'mitteilungen') nav.refresh(); }); }, 2500);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => { setTimeout(() => void ensurePush(true), 1500); });
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'push-renew') void ensurePush(true); });
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void ensurePush(); });
   void loadRecoveryStatus(); // Auftrag 28: Karte „Wiederherstellungscode sichern“
 }
 let renderedDay = todayStr();

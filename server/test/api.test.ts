@@ -53,11 +53,11 @@ beforeAll(async () => {
 }, 30000);
 afterAll(() => { procs.forEach(p => p.kill()); });
 
-for (const file of ['run.mjs', 'intervals.mjs', 'coach-server.mjs', 'push.mjs']) {
+for (const file of ['run.mjs', 'intervals.mjs', 'coach-server.mjs', 'push.mjs', 'push31.mjs']) {
   test(file, async () => {
     const api = await serverFor();
     const r = await run('test/' + file, { API: api });
-    if (r.code !== 0) console.log(r.out);
+    if (r.code !== 0 || process.env.SHOW_OUT) console.log(r.out);
     expect(r.code, r.out.split('\n').filter(l => l.includes('✗')).join('\n')).toBe(0);
   }, 60000);
 }

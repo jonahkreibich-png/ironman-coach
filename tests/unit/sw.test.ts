@@ -15,7 +15,7 @@ function load() {
 }
 test('sw.js ist gültiges JavaScript und hat alle Ereignisse', () => {
   expect(() => new Function('self', build())).not.toThrow();
-  expect(Object.keys(load()).sort()).toEqual(['activate', 'fetch', 'install', 'message', 'notificationclick', 'push']);
+  expect(Object.keys(load()).sort()).toEqual(['activate', 'fetch', 'install', 'message', 'notificationclick', 'push', 'pushsubscriptionchange']);
 });
 test('Server-Anfragen und OAuth-Rückkehr gehen nie über den Speicher, App-Seiten schon', () => {
   const h = load();
@@ -25,4 +25,17 @@ test('Server-Anfragen und OAuth-Rückkehr gehen nie über den Speicher, App-Seit
   expect(ask('https://app.example/assets/index.js')).toBe(true);
   expect(ask('https://app.example/?go=heute', 'navigate')).toBe(true);
   expect(ask('https://andere.example/x.js')).toBe(false);
+});
+
+/* Auftrag 31: Anmeldung vom Browser erneuert → mit demselben Schlüssel neu anmelden und offene Fenster bitten, sie dem Server zu melden */
+test('pushsubscriptionchange: neu anmelden, Fenster benachrichtigen', async () => {
+  const handlers: Record<string, (e: any) => void> = {}; const posted: any[] = []; const subs: any[] = [];
+  const self: any = { addEventListener: (k: string, fn: any) => { handlers[k] = fn; }, location: { origin: 'https://app.example' },
+    registration: { scope: 'https://app.example/', pushManager: { subscribe: async (o: any) => { subs.push(o); return {}; } } },
+    clients: { matchAll: async () => [{ postMessage: (m: any) => posted.push(m) }] } };
+  new Function('self', 'caches', 'fetch', build())(self, {}, () => Promise.reject(new Error('offline')));
+  let wait: any; handlers.pushsubscriptionchange({ oldSubscription: { options: { applicationServerKey: new Uint8Array([4, 1]) } }, waitUntil: (p: any) => { wait = p; } });
+  await wait;
+  expect(subs[0].userVisibleOnly).toBe(true);
+  expect(posted).toEqual([{ type: 'push-renew' }]);
 });

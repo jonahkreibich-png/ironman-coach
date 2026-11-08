@@ -73,7 +73,7 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const lthrRun = prof.thresholds.lthrRun || 0;
   const aet = prof.thresholds.aetHr && prof.thresholds.aetHr.length === 2 ? prof.thresholds.aetHr : null;
   const easyMax = aet ? aet[1] : lthrRun ? Math.round(lthrRun * 0.89) : null;
-  const weeks = C.applyAdjustments(ctx.baseWeeks, st.adjustments || {});
+  const weeks = (ctx as any).__weeks || C.applyAdjustments(ctx.baseWeeks, st.adjustments || {});
 
   /* ---------- Krankheit ---------- */
   const ill = C.illnessAt(st.illnessPeriods, today);

@@ -109,12 +109,18 @@ try { const tz = appTz(); if (STATE.settings && STATE.settings.tz !== tz) STATE.
    Zwischenspeicher nach jedem Hintergrund-Abgleich auf die alten Objekte: „Wieder gesund“ setzte das Ende an einer veralteten Kopie. */
 const replaced: (() => void)[] = [];
 export function onStateReplaced(fn: () => void): void { replaced.push(fn); }
+/* Auftrag 31: Datenstand. Jede Änderung (Speichern, Austausch, Plan-Index) zählt hoch; data.ts rechnet nur dann neu.
+   Vorher wurde bei jedem Zeichnen – auch beim reinen Tab-Wechsel – alles neu berechnet. */
+let dataVer = 0;
+export const dataVersion = (): number => dataVer;
+export function bumpData(): void { dataVer++; }
 /** Teile von STATE wurden ersetzt (z. B. Datensätze vom Server übernommen): Zwischenspeicher leeren */
-export function notifyStateChanged(): void { replaced.forEach(fn => { try { fn(); } catch (e) { /* nie scheitern */ } }); }
+export function notifyStateChanged(): void { dataVer++; replaced.forEach(fn => { try { fn(); } catch (e) { /* nie scheitern */ } }); }
 export function replaceState(next: any): void {
   if (next === STATE) return;
   Object.keys(STATE).forEach(k => { delete STATE[k]; });
   Object.assign(STATE, next);
+  dataVer++;
   replaced.forEach(fn => { try { fn(); } catch (e) { /* Zwischenspeicher leeren darf nie scheitern */ } });
 }
 
@@ -140,6 +146,7 @@ export function refreshStoredState(): boolean {
   } catch (_) { readFailure(LS_KEY); return false; }
 }
 export function saveState(remote = false): boolean {
+  dataVer++;
   if (localStorage.changing || !refreshStoredState()) return false;
   if (saveListener && !remote) STATE._storageRevision = Math.max(Date.now(), STATE._storageRevision || 0, baseline._storageRevision || 0) + 1;
   const ok = localStorage.setMergedItem(LS_KEY, JSON.stringify(STATE), JSON.stringify(baseline));
@@ -172,6 +179,7 @@ export const DAY_BY_DATE: Record<string, any> = {};
 export const SESS: any[] = [];
 export const SESS_BY_ID: Record<string, any> = {};
 export function rebuildPlanIndex(): void {
+  dataVer++;
   PLAN.weeks = CoachCore.applyAdjustments(BASE_WEEKS, STATE.adjustments || {});
   DAYS.length = 0; SESS.length = 0;
   Object.keys(DAY_BY_DATE).forEach(k => delete DAY_BY_DATE[k]); Object.keys(SESS_BY_ID).forEach(k => delete SESS_BY_ID[k]);
@@ -288,5 +296,11 @@ export function repairOnStart(): boolean {
 { try { if (migrateNotes(STATE, BASE_WEEKS)) saveState(); } catch (e) { /* nie den Start verhindern */ } }
 
 /* Anzeige arbeitet mit abgeleiteten Orten; Istwerte werden am unveraenderten Original bearbeitet. */
-export function effectiveCustomWorkouts(): Record<string,any[]> { return applyCustomPlanAdjustments(STATE.customWorkouts||{},STATE.adjustments||{}); }
+/* Auftrag 31: je Datenstand einmal (der Plan-Tab rief das für jede Wochen-Kachel und jeden Tag neu auf). Ergebnis nur lesen. */
+let customMemo: { ver: number; cw: any; adj: any; out: Record<string, any[]> } | null = null;
+export function effectiveCustomWorkouts(): Record<string,any[]> {
+  const cw = STATE.customWorkouts || {}, adj = STATE.adjustments || {};
+  if (customMemo && customMemo.ver === dataVer && customMemo.cw === cw && customMemo.adj === adj) return customMemo.out;
+  const out = applyCustomPlanAdjustments(cw, adj); customMemo = { ver: dataVer, cw, adj, out }; return out;
+}
 export function findCustomRecord(id:string):any { return Object.values(STATE.customWorkouts||{}).flat().find((w:any)=>w.id===id)||null; }

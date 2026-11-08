@@ -10,7 +10,7 @@ import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refres
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
 import { bikeSpeedsOf, kindsOf, speedRange, mainKind, BIKE_KIND_LABEL, SPEED_HINT, type BikeKind } from '../../../shared/bikespeed';
 import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
-import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall } from '../sync';
+import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall, ensurePush, pushLocal, ago } from '../sync';
 import { freeSettingsHtml } from './freeai';
 import { invalidate, D } from '../data';
 import { needsParentConsent } from '../../../shared/features';
@@ -26,7 +26,9 @@ import { isTestS } from '../../../shared/trainingrules';
 const NOTIFY_DEFAULTS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
   times: { morningSchool: '06:45', morningWeekend: '09:00', eveEarly: '21:00', evening: '20:30', adductors: '19:00', food: '18:00', weekly: '18:00' },
-  quietStart: '22:30', quietEnd: '06:00', holidays: false
+  quietStart: '22:30', quietEnd: '06:00', holidays: false,
+  // Auftrag 31: Ruhezeit in der Schule (Mo–Fr, nicht in den Ferien) – gleiche Standardwerte wie server/src/notify.ts
+  schoolQuiet: false, schoolStart: '07:45', schoolEnd: '13:15'
 };
 const NOTIFY_ROWS: [string, string[]][] = [
   ['morning', ['morningSchool', 'morningWeekend']], ['preSession', []], ['eveEarly', ['eveEarly']], ['evening', ['evening']],
@@ -54,6 +56,7 @@ export function notifySummary(): string {
   if (!isSyncOn()) return t('mehr.notifyNoAccount');
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
   if (perm === 'denied') return t('mehr.notifyBlocked');
+  if (perm === 'granted' && PUSH && (!PUSH.thisDevice || PUSH.expired)) return t('mehr.notifyInactive');
   return PUSH && PUSH.thisDevice && perm === 'granted' ? t('mehr.notifyOn') : t('mehr.notifyOff');
 }
 export function renderDarstellung(): string {
@@ -152,35 +155,73 @@ onChange('thr', el => {
 });
 
 /* ---------- Mitteilungen ---------- */
+/* Auftrag 31: Stand ehrlich zeigen – nicht nur „erlaubt“ im Browser, sondern ob der Server eine gültige Anmeldung DIESES Geräts hat und
+   ob die letzte Mitteilung beim Push-Dienst angekommen ist. Sonst „nicht aktiv – erneut erlauben“. */
+function pushHead(perm: string): string {
+  if (!pushSupported() || (isIOS() && !isStandalone())) return `<div class="banner info small" data-push-state="install">${esc(t('set.notifyInstall'))}</div>`;
+  if (PUSH && PUSH.configured === false) return `<div class="hint" data-push-state="server">${esc(t('set.notifyServer'))}</div>`;
+  if (perm === 'denied') return `<div class="hint" data-push-state="blocked">${esc(t('set.notifyBlocked', { app: APP.shortName }))}</div>`;
+  if (perm !== 'granted') return `<div class="hint" data-push-state="ask">${esc(t('set.notifyAsk'))}</div><button class="btn" data-act="push-on">${ic('bell')} ${esc(t('set.notifyAllow'))}</button>`;
+  if (!PUSH) return `<div class="hint" data-push-state="loading">${esc(t('set.notifyChecking'))}</div>`;
+  const inactive = !PUSH.thisDevice || PUSH.expired || pushLocal === 'needs-tap';
+  if (inactive) {
+    const why = PUSH.expired ? t('set.notifyExpired') : t('set.notifyNotHere');
+    return `<div class="spread"><span class="sync-st warn" data-push-state="inactive">${esc(t('set.notifyInactive'))}</span></div><div class="hint">${esc(why)}</div><button class="btn" data-act="push-on">${ic('bell')} ${esc(t('set.notifyAgain'))}</button>`;
+  }
+  const failing = (PUSH.fails || 0) > 0;
+  const last = PUSH.lastOkAt ? t('set.notifyLastOk', { when: ago(PUSH.lastOkAt) }) : t('set.notifyNoneYet');
+  return `<div class="spread" style="flex-wrap:wrap;gap:6px"><span class="sync-st ${failing ? 'warn' : 'ok'}" data-push-state="${failing ? 'failing' : 'on'}">${esc(t(failing ? 'set.notifyFailing' : 'set.notifyActive'))}</span><button class="btn ghost sm" data-act="push-test">${esc(t('set.notifyTest'))}</button></div>
+    <div class="xs muted" data-push-last>${esc(last)}${failing && PUSH.lastError ? ' · ' + esc(t('set.notifyLastErr', { err: String(PUSH.lastError) })) : ''}</div>
+    ${failing ? `<button class="btn ghost sm" data-act="push-on">${esc(t('set.notifyAgain'))}</button>` : ''}`;
+}
 function notifyCard(): string {
   if (!isSyncOn()) return `<div class="card"><div class="hint">${esc(t('set.notifyNeedSync'))}</div></div>`;
-  if (PUSH === undefined) { PUSH = null; pushStatus().then(s => { PUSH = s || { configured: false }; nav.rerender(); }); }
+  if (PUSH === undefined) { PUSH = null; ensurePush().then(() => pushStatus()).then(s => { PUSH = s || { configured: false }; nav.rerender(); }); }
   const P = notifyPrefs();
-  let head: string;
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-  if (!pushSupported() || (isIOS() && !isStandalone())) head = `<div class="hint">${esc(t('set.notifyInstall'))}</div>`;
-  else if (PUSH && PUSH.configured === false) head = `<div class="hint">${esc(t('set.notifyServer'))}</div>`;
-  else if (perm === 'denied') head = `<div class="hint">${esc(t('set.notifyBlocked', { app: APP.shortName }))}</div>`;
-  else if (PUSH && PUSH.thisDevice && perm === 'granted') head = `<div class="spread"><span class="sync-st ok">${esc(t('set.notifyOn'))}</span><button class="btn ghost sm" data-act="push-test">${esc(t('set.notifyTest'))}</button></div>`;
-  else head = `<div class="hint">${esc(t('set.notifyAsk'))}</div><button class="btn" data-act="push-on">${ic('bell')} ${esc(t('set.notifyAllow'))}</button>`;
+  const head = pushHead(perm);
   const team = !!(profile().teamSport || profile().sports.includes('football'));
-  const rows = NOTIFY_ROWS.filter(([k]) => k !== 'adductors' || team).map(([k, times]) => `<div>${toggle('np-' + k, t('notify.' + k), !!(P.types as any)[k], `data-ch="np" data-p="types.${k}"`)}${times.length ? `<div class="row" style="margin:4px 0 6px 44px;gap:8px">${times.map(tk => `<label class="small muted">${esc(t('notify.t.' + tk))} <input class="inp sm" type="time" data-ch="np" data-p="times.${tk}" value="${esc((P.times as any)[tk])}"></label>`).join('')}</div>` : ''}</div>`).join('');
-  return `<div class="card stack">${head}${more(t('set.notifyWhich'), `<div class="stack">${rows}
+  const rows = NOTIFY_ROWS.filter(([k]) => k !== 'adductors' || team).map(([k, times]) => `<div>${toggle('np-' + k, t('notify.' + k), !!(P.types as any)[k], `data-ch="np" data-p="types.${k}"`)}${times.length ? `<div class="row" style="margin:4px 0 6px 44px;gap:8px;flex-wrap:wrap">${times.map(tk => `<label class="small muted">${esc(t('notify.t.' + tk))} <input class="inp sm" type="time" data-ch="np" data-p="times.${tk}" value="${esc((P.times as any)[tk])}"></label>`).join('')}</div>` : ''}</div>`).join('');
+  const ios = isIOS() ? `<div class="hint" data-push-ios>${esc(t('set.notifyIosHint'))}</div>` : '';
+  return `<div class="card stack" data-notify>${head}${ios}
+    <div class="lbl" style="margin-top:var(--s2)">${esc(t('set.notifyQuiet'))}</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><label class="small muted">${esc(t('set.quietFrom'))} <input class="inp sm" type="time" data-ch="np" data-p="quietStart" value="${esc(P.quietStart)}"></label><label class="small muted">${esc(t('set.quietTo'))} <input class="inp sm" type="time" data-ch="np" data-p="quietEnd" value="${esc(P.quietEnd)}"></label></div>
+    ${toggle('np-school', t('set.schoolQuiet'), !!P.schoolQuiet, 'data-ch="np" data-p="schoolQuiet"')}
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-left:44px" data-school-times><label class="small muted">${esc(t('set.quietFrom'))} <input class="inp sm" type="time" data-ch="np" data-p="schoolStart" value="${esc(P.schoolStart)}"></label><label class="small muted">${esc(t('set.quietTo'))} <input class="inp sm" type="time" data-ch="np" data-p="schoolEnd" value="${esc(P.schoolEnd)}"></label></div>
     ${toggle('np-hol', t('set.holidays'), !!P.holidays, 'data-ch="np" data-p="holidays"')}
-    <div class="row" style="gap:8px"><label class="small muted">${esc(t('set.quietFrom'))} <input class="inp sm" type="time" data-ch="np" data-p="quietStart" value="${esc(P.quietStart)}"></label><label class="small muted">${esc(t('set.quietTo'))} <input class="inp sm" type="time" data-ch="np" data-p="quietEnd" value="${esc(P.quietEnd)}"></label></div>
-    <div class="hint">${esc(t('set.notifyHint'))}</div></div>`)}
+    ${more(t('set.notifyWhich'), `<div class="stack">${rows}<div class="hint">${esc(t('set.notifyHint'))}</div></div>`)}
     ${PUSH && PUSH.thisDevice ? `<button class="link" data-act="push-off">${esc(t('set.notifyOff'))}</button>` : ''}</div>`;
 }
 onChange('np', el => {
   STATE.settings.notify = notifyPrefs();
-  const inp = el as HTMLInputElement; const val = inp.type === 'checkbox' ? inp.checked : inp.value;
+  const inp = el as HTMLInputElement; let val: any = inp.type === 'checkbox' ? inp.checked : inp.value;
+  // Uhrzeiten nur vollständig übernehmen (leer oder halb eingetippt würde die Zeit auf dem Server ausschalten). Nach dem Attribut prüfen:
+  // ältere Browser zeigen ein Textfeld (type meldet dann „text“); „7:45“ und „7.45“ werden zu „07:45“.
+  if (inp.getAttribute('type') === 'time') {
+    const m = /^\s*(\d{1,2})[:.](\d{2})\s*$/.exec(String(val));
+    if (!m || +m[1] > 23 || +m[2] > 59) { toast(t('set.timeInvalid')); nav.rerender(); return; }
+    val = m[1].padStart(2, '0') + ':' + m[2];
+  }
   const parts = el.dataset.p!.split('.');
   if (parts.length === 2) STATE.settings.notify[parts[0]][parts[1]] = val; else STATE.settings.notify[parts[0]] = val;
   saveState(); toast(t('common.saved'));
 });
-on('push-on', async el => { (el as HTMLButtonElement).disabled = true; try { await enablePush(); PUSH = await pushStatus(); toast(t('set.notifyOn')); } catch (e: any) { toast(e.message); } nav.rerender(); });
+on('push-on', async el => { (el as HTMLButtonElement).disabled = true; try { await enablePush(); await ensurePush(true); PUSH = await pushStatus(); toast(t('set.notifyOn')); } catch (e: any) { toast(e.message); } nav.rerender(); });
 on('push-off', async () => { try { await disablePush(); PUSH = await pushStatus(); } catch (e: any) { toast(e.message); } nav.rerender(); });
-on('push-test', async () => { try { const r = await apiCall('POST', '/api/push/test'); toast(r.delivered ? t('set.testSent') : t('set.testNone')); } catch (e: any) { toast(e.message); } });
+/* Test: Ergebnis des Push-Dienstes für dieses Gerät ehrlich melden (angenommen, abgelaufen, abgelehnt mit Grund) */
+on('push-test', async el => {
+  (el as HTMLButtonElement).disabled = true;
+  try {
+    const r = await apiCall('POST', '/api/push/test');
+    const mine = (r.results || []).find((x: any) => x.thisDevice);
+    if (mine && mine.ok) toast(t('set.testSent'));
+    else if (mine && mine.gone) toast(t('set.testGone'));
+    else if (mine) toast(t('set.testRejected', { err: [mine.status, mine.reason].filter(Boolean).join(' ') }));
+    else toast(r.delivered ? t('set.testOther', { n: r.delivered }) : t('set.testNone'));
+    PUSH = await pushStatus();
+  } catch (e: any) { toast(e.message); }
+  nav.rerender();
+});
 
 /* ---------- KI-Coach ---------- */
 function aiCard(): string {

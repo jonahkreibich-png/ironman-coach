@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { generateKeyPairSync } from 'node:crypto';
+
+/* Auftrag 31: Server-Schlüssel für Mitteilungen nur für die Tests (bei jedem Lauf neu, kein Geheimnis) */
+const TEST_VAPID = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ format: 'jwk' }));
 
 /* E2E auf iPhone-Breite (390 px). Die App wird vorher gebaut (npm run build). */
 export default defineConfig({
@@ -24,5 +28,5 @@ export default defineConfig({
     { name: 'webkit-iphone', use: { ...devices['Desktop Safari'], viewport: { width: 390, height: 844 }, hasTouch: true } }
   ],
   // Simulierte App-Schlüssel für Oura, damit „Verbinden“ im Test bis zum Erlaubnis-Bildschirm führt (der Anbieter selbst wird abgefangen)
-  webServer: { command: 'node scripts/test-server.mjs 4180', port: 4180, reuseExistingServer: false, timeout: 30000, env: { DB_FILE: ':memory:', WORKER_ENV: JSON.stringify({ OURA_CLIENT_ID: 'test-id', OURA_CLIENT_SECRET: 'test-secret', DROPBOX_APP_KEY: 'test-dk', DROPBOX_APP_SECRET: 'test-ds', SIGNUP_PER_IP: '100000', SIGNUP_PER_HOUR: '100000' }) } }
+  webServer: { command: 'node scripts/test-server.mjs 4180', port: 4180, reuseExistingServer: false, timeout: 30000, env: { DB_FILE: ':memory:', WORKER_ENV: JSON.stringify({ OURA_CLIENT_ID: 'test-id', OURA_CLIENT_SECRET: 'test-secret', DROPBOX_APP_KEY: 'test-dk', DROPBOX_APP_SECRET: 'test-ds', SIGNUP_PER_IP: '100000', SIGNUP_PER_HOUR: '100000', VAPID_PRIVATE_JWK: TEST_VAPID }) } }
 });

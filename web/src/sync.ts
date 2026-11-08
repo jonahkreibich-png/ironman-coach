@@ -534,18 +534,62 @@ function resetSyncMeta() { META.cursor = 0; META.hashes = {}; META.pending = {};
 export function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 function b64ToBytes(s) { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); }
 export async function pushStatus() { try { return await api('GET', '/api/push/status'); } catch (e) { return null; } }
+/* Auftrag 31: Anmeldung dieses Browsers holen – passend zum aktuellen Server-Schlüssel. Eine Anmeldung zu einem früheren Schlüssel
+   (bisher einfach weiterverwendet) lehnt der Push-Dienst für immer ab; sie wird ersetzt. */
+const sameKey = (a: ArrayBuffer | null | undefined, b: Uint8Array) => { if (!a) return true; const x = new Uint8Array(a); return x.length === b.length && x.every((v, i) => v === b[i]); };
+async function currentSubscription(reg: ServiceWorkerRegistration, create: boolean): Promise<PushSubscription | null> {
+  const { key } = await api('GET', '/api/push/key', null, true);
+  const want = b64ToBytes(key);
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && !sameKey((sub.options as any) && (sub.options as any).applicationServerKey, want)) { try { await sub.unsubscribe(); } catch (e) { /* egal */ } sub = null; }
+  if (!sub && create) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: want });
+  return sub;
+}
+const workerReady = () => Promise.race([navigator.serviceWorker.ready, new Promise<null>(r => setTimeout(() => r(null), 10000))]);
 export async function enablePush(prefs?: any) {
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') throw new Error(t('push.denied'));
   // Auftrag 25: ohne Service Worker nicht ewig warten (der war bis 3.13.0 defekt), sondern klar sagen, was zu tun ist
-  const reg = await Promise.race([navigator.serviceWorker.ready, new Promise<null>(r => setTimeout(() => r(null), 10000))]);
+  const reg = await workerReady();
   if (!reg) throw new Error(t('push.noWorker'));
-  const { key } = await api('GET', '/api/push/key', null, true);
-  let sub = await reg.pushManager.getSubscription();
-  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
-  await api('POST', '/api/push/subscribe', { subscription: sub.toJSON(), ...(prefs ? { prefs } : {}) });
+  // Auftrag 31: abgelaufene Anmeldung (Push-Dienst meldete 404/410) wirklich ersetzen, nicht erneut melden
+  const st = await pushStatus();
+  if (st && st.expired && !st.thisDevice) { try { const old = await reg.pushManager.getSubscription(); if (old) await old.unsubscribe(); } catch (e) { /* egal */ } }
+  const sub = await currentSubscription(reg, true);
+  await api('POST', '/api/push/subscribe', { subscription: sub!.toJSON(), ...(prefs ? { prefs } : {}) });
+  try { localStorage.setItem(PUSH_CHECK_KEY, JSON.stringify({ at: Date.now(), end: sub!.endpoint.slice(-24), dev: AUTH.deviceId })); } catch (e) { /* egal */ }
+}
+/* Auftrag 31: Bei jedem Start (höchstens alle 6 h, nach Updates und neuem Verbinden sofort) prüfen, ob der Server noch die aktuelle
+   Anmeldung DIESES Geräts hat, und sie sonst ohne Zutun erneuern. Ursache des Ausfalls bei Nutzer 1: Das iPhone bekam am 31.10. eine
+   neue Geräte-Kennung, die Anmeldung hing an der alten – die App zeigte „erlaubt“, auf dem Server war für das Gerät nichts mehr.
+   Liefert den Stand für die Anzeige: 'on' | 'off' (nicht erlaubt) | 'renewed' | 'needs-tap' (erneut erlauben nötig) | 'unsupported'. */
+const PUSH_CHECK_KEY = 'ec_push_check';
+/** letzter Stand der Prüfung auf diesem Gerät (für die Anzeige unter Mitteilungen) */
+export let pushLocal = '';
+export async function ensurePush(force = false): Promise<string> { pushLocal = await checkPush(force); return pushLocal; }
+async function checkPush(force: boolean): Promise<string> {
+  try {
+    if (!isSyncOn() || !pushSupported()) return 'unsupported';
+    if (Notification.permission !== 'granted') return 'off';
+    let last: any = null; try { last = JSON.parse(localStorage.getItem(PUSH_CHECK_KEY) || 'null'); } catch (e) { last = null; }
+    const reg = await workerReady(); if (!reg) return 'needs-tap';
+    let sub: PushSubscription | null = null;
+    try { sub = await currentSubscription(reg, true); } catch (e) { sub = null; }
+    if (!sub) return 'needs-tap';   // iOS: neue Anmeldung ohne Antippen nicht möglich → „erneut erlauben“
+    const end = sub.endpoint.slice(-24);
+    const fresh = last && last.end === end && last.dev === AUTH.deviceId && Date.now() - last.at < 6 * 3600000;
+    if (fresh && !force) return 'on';
+    const st = await pushStatus();
+    // Push-Dienst hat die Anmeldung als abgelaufen gemeldet: nicht dieselbe tote Anmeldung erneut melden, sondern „erneut erlauben“ zeigen
+    if (st && st.expired && !st.thisDevice) return 'needs-tap';
+    let state = 'on';
+    if (!st || !st.thisDevice || st.endTail !== end) { await api('POST', '/api/push/subscribe', { subscription: sub.toJSON() }); state = 'renewed'; }
+    try { localStorage.setItem(PUSH_CHECK_KEY, JSON.stringify({ at: Date.now(), end, dev: AUTH.deviceId })); } catch (e) { /* egal */ }
+    return state;
+  } catch (e) { return 'needs-tap'; }
 }
 export async function disablePush() {
+  try { localStorage.removeItem(PUSH_CHECK_KEY); } catch (e) { /* egal */ }
   try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
   await api('POST', '/api/push/unsubscribe');
 }

@@ -1,7 +1,7 @@
 import {swimReviewMessages} from '../../shared/coach/analysis';
 /* Nach dem Schwellentest die Zonen automatisch übernehmen (Auftrag 7), sobald der Test erledigt ist und Werte hat.
    Derselbe Schritt läuft auf dem Server (Werte von der Uhr ohne App). */
-import { STATE, PLAN, BASE_WEEKS, profile, saveProfile, rebuildPlanIndex, replacePlanInPlace } from './store';
+import { STATE, PLAN, BASE_WEEKS, profile, saveProfile, rebuildPlanIndex, replacePlanInPlace, dataVersion } from './store';
 import { refreshFuture, refreshAdjustments } from '../../shared/refresh';
 import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate, swimPaceUpdate, swimStrokeUpdate, swimRateText } from '../../shared/swimskill';
 import { todayStr } from './util';
@@ -12,8 +12,11 @@ import { evidenceSignature } from '../../shared/results';
 
 /* Neue Bestwerte im Schwimmen (Feld „längste Strecke Kraul am Stück“ oder mit Pull Buoy): Können eintragen, alle kommenden Schwimmeinheiten neu stufen */
 let lastSwimInputs = '';
+let lastSwimCheck = '';   // Auftrag 31: Datenstand und Tag der letzten Prüfung – ohne Änderung keine neue Signatur bei jedem Zeichnen
 export function checkSwimSkill(): boolean {
   const today = todayStr();
+  const quick = dataVersion() + '|' + today; if (quick === lastSwimCheck) return false;
+  lastSwimCheck = quick;
   const signature = () => today + evidenceSignature(STATE, BASE_WEEKS) + JSON.stringify(profile().skills) + JSON.stringify(BASE_WEEKS.map(w => w.days?.map((d: any) => [d.date, d.sessions?.map((s: any) => [s.id, s.sport])])));
   const current = signature(); if (current === lastSwimInputs) return false;
   lastSwimInputs = current;

@@ -64,7 +64,9 @@ export async function encryptPayload(sub, payloadText) {
   return concat(salt, rs, new Uint8Array([asPublic.length]), asPublic, cipher);
 }
 
-/* Schickt eine Mitteilung. Liefert { ok, status, gone } – gone heißt: Abo ist abgelaufen und kann weg. */
+/* Schickt eine Mitteilung. Liefert { ok, status, gone, reason } – gone heißt: Abo ist abgelaufen und kann weg.
+   Auftrag 31: Grund der Ablehnung mitliefern (Apple antwortet z. B. {"reason":"BadJwtToken"} oder "VapidPkHashMismatch").
+   Ein Abo, das zu einem anderen Server-Schlüssel gehört (VapidPkHashMismatch), wird nie wieder funktionieren → wie abgelaufen behandeln. */
 export async function sendPush(env, sub, payload, opts) {
   opts = opts || {};
   const body = await encryptPayload(sub, JSON.stringify(payload));
@@ -78,5 +80,10 @@ export async function sendPush(env, sub, payload, opts) {
     },
     body
   });
-  return { ok: res.status >= 200 && res.status < 300, status: res.status, gone: res.status === 404 || res.status === 410 };
+  const ok = res.status >= 200 && res.status < 300;
+  let reason = '';
+  if (!ok) { try { const t = (await res.text()).slice(0, 300); try { reason = String(JSON.parse(t).reason || t); } catch (_) { reason = t; } } catch (_) { reason = ''; } }
+  reason = reason.replace(/\s+/g, ' ').trim().slice(0, 120);
+  const keyMismatch = /VapidPkHashMismatch/i.test(reason);
+  return { ok, status: res.status, gone: res.status === 404 || res.status === 410 || keyMismatch, reason };
 }

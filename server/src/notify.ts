@@ -9,7 +9,9 @@ import { sendPush } from './webpush';
 export const DEFAULT_PREFS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
   times: { morningSchool: '06:45', morningWeekend: '09:00', eveEarly: '21:00', evening: '20:30', adductors: '19:00', food: '18:00', weekly: '18:00' },
-  quietStart: '22:30', quietEnd: '06:00', preSessionMinutes: 60, holidays: false, maxPerDay: 4
+  quietStart: '22:30', quietEnd: '06:00', preSessionMinutes: 60, holidays: false, maxPerDay: 4,
+  // Auftrag 31: zweite Ruhezeit an Schultagen (Mo–Fr, nicht in den Ferien), wahlweise
+  schoolQuiet: false, schoolStart: '07:45', schoolEnd: '13:15'
 };
 export function prefsOf(settings) {
   const p = (settings && settings.notify) || {};
@@ -20,10 +22,12 @@ export function prefsOf(settings) {
   };
 }
 const toMin = hhmm => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ''); return m ? +m[1] * 60 + +m[2] : null; };
-export function inQuiet(prefs, min) {
-  const a = toMin(prefs.quietStart), b = toMin(prefs.quietEnd);
-  if (a == null || b == null) return false;
-  return a > b ? (min >= a || min < b) : (min >= a && min < b);
+const inWindow = (from, to, min) => { const a = toMin(from), b = toMin(to); if (a == null || b == null || a === b) return false; return a > b ? (min >= a || min < b) : (min >= a && min < b); };
+/* Ruhezeit: nachts (quietStart–quietEnd) und, wenn gewählt, in der Schule (Mo–Fr außer Ferien). dow: 0 = Sonntag */
+export function inQuiet(prefs, min, dow?: number) {
+  if (inWindow(prefs.quietStart, prefs.quietEnd, min)) return true;
+  if (prefs.schoolQuiet && dow != null && dow >= 1 && dow <= 5 && !prefs.holidays && inWindow(prefs.schoolStart, prefs.schoolEnd, min)) return true;
+  return false;
 }
 const WARNING_TYPES = new Set(['warnings']);
 const LEVEL = ['🟢', '🟡', '🔴'];
@@ -39,8 +43,8 @@ async function sentToday(env: Env, uid: number, day: string) {
   const rows = await env.DB.prepare('SELECT key, type FROM push_log WHERE user_id = ? AND day = ?').bind(uid, day).all();
   return rows.results || [];
 }
-async function logSent(env: Env, uid: number, day: string, key: string, type: string) {
-  await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at) VALUES (?, ?, ?, ?, ?)').bind(uid, key, day, type, Date.now()).run();
+async function logSent(env: Env, uid: number, day: string, key: string, type: string, delivered: number) {
+  await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at, delivered) VALUES (?, ?, ?, ?, ?, ?)').bind(uid, key, day, type, Date.now(), delivered).run();
 }
 export async function queueWarning(env: Env, uid: number, key: string, msg: any) {
   await env.DB.prepare('INSERT OR IGNORE INTO push_queue (user_id, key, type, payload, created_at) VALUES (?, ?, ?, ?, ?)').bind(uid, key, 'warnings', JSON.stringify(msg), Date.now()).run();
@@ -48,21 +52,36 @@ export async function queueWarning(env: Env, uid: number, key: string, msg: any)
 
 /* ---------- Verschicken an alle Geräte ---------- */
 /* Austauschbar für Tests (kein echter Versand) */
-type PushFn = (sub: any, msg: any) => Promise<{ ok?: boolean; gone?: boolean }>;
+type PushFn = (sub: any, msg: any) => Promise<{ ok?: boolean; gone?: boolean; status?: number; reason?: string }>;
 let pushOverride: PushFn | null = null;
 export function setPushOverride(fn: PushFn | null) { pushOverride = fn; }
-export async function deliver(env: Env, uid: number, msg: any): Promise<number> {
+export interface PushResult { deviceId: string; ok: boolean; status: number | null; reason: string; gone: boolean }
+/* Auftrag 31: an alle Geräte; je Gerät wird die Antwort des Push-Dienstes gespeichert (Status, Grund, letzte Zustellung, Fehler in Folge).
+   Abgelaufene Anmeldungen (404/410, falscher Schlüssel) werden entfernt und gemerkt – das Gerät zeigt dann „nicht aktiv – erneut erlauben“
+   und meldet sich beim nächsten Öffnen selbst neu an. */
+export async function deliverAll(env: Env, uid: number, msg: any): Promise<{ delivered: number; results: PushResult[] }> {
   const subs = await subscriptions(env, uid);
-  let ok = 0;
+  let ok = 0; const results: PushResult[] = [];
   for (const s of subs) {
-    try {
-      const r = pushOverride ? await pushOverride(s, msg) : await sendPush(env, s, msg, { urgency: msg.urgent ? 'high' : 'normal' });
-      if (r.ok) ok++;
-      else if (r.gone) await env.DB.prepare('DELETE FROM push_subs WHERE id = ?').bind(s.id).run();
-    } catch (e) { console.error('Push fehlgeschlagen:', e && e.message); }
+    let r: any;
+    try { r = pushOverride ? await pushOverride(s, msg) : await sendPush(env, s, msg, { urgency: msg.urgent ? 'high' : 'normal' }); }
+    catch (e) { r = { ok: false, status: null, reason: 'Netzwerk: ' + String((e && e.message) || e).slice(0, 80) }; }
+    const status = r.status == null ? (r.ok ? 201 : null) : r.status;
+    const reason = String(r.reason || '').slice(0, 120);
+    results.push({ deviceId: s.device_id, ok: !!r.ok, status, reason, gone: !!r.gone });
+    const now = Date.now();
+    if (r.ok) { ok++; await env.DB.prepare('UPDATE push_subs SET last_status = ?, last_at = ?, last_ok_at = ?, fails = 0, last_error = NULL WHERE id = ?').bind(status, now, now, s.id).run(); }
+    else if (r.gone) {
+      await env.DB.prepare('DELETE FROM push_subs WHERE id = ?').bind(s.id).run();
+      await env.DB.prepare('INSERT OR REPLACE INTO push_gone (user_id, device_id, at, status, reason) VALUES (?, ?, ?, ?, ?)').bind(uid, s.device_id, now, status, reason || null).run();
+    } else {
+      await env.DB.prepare('UPDATE push_subs SET last_status = ?, last_at = ?, fails = COALESCE(fails, 0) + 1, last_error = ? WHERE id = ?').bind(status, now, reason || ('HTTP ' + status), s.id).run();
+      console.error('Push fehlgeschlagen:', status, reason);
+    }
   }
-  return ok;
+  return { delivered: ok, results };
 }
+export async function deliver(env: Env, uid: number, msg: any): Promise<number> { return (await deliverAll(env, uid, msg)).delivered; }
 
 /* ---------- Inhalte ---------- */
 function todaySessions(L, date) {
@@ -184,14 +203,25 @@ export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any>
   const subs = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?').bind(uid).first();
   if (!subs || !subs.n) return { skipped: 'keine Geräte angemeldet' };
 
+  // Auftrag 31: Test-Mitteilungen (Betreiber: scripts/push-test.mjs bzw. Betreiber-Seite) sofort, ohne Ruhezeit und Tageslimit
+  const tests = await env.DB.prepare("SELECT key, payload FROM push_queue WHERE user_id = ? AND type = 'test' ORDER BY created_at").bind(uid).all();
+  const testSent: any[] = [];
+  for (const row of (tests.results || []) as any[]) {
+    await env.DB.prepare('DELETE FROM push_queue WHERE user_id = ? AND key = ?').bind(uid, row.key).run();
+    let job: any = {}; try { job = JSON.parse(row.payload); } catch (_) { job = {}; }
+    const r = await deliverAll(env, uid, { title: job.title || 'Test', body: job.body || 'Test-Mitteilung', url: job.url || './?go=heute', tag: row.key });
+    await logSent(env, uid, b.date, row.key, 'test', r.delivered);
+    testSent.push({ key: row.key, ...r });
+  }
+
   const L = ctx.state || await loadState(env, uid);
   if (!L.plan) return { skipped: 'kein Plan' };
   const settingsRec = L.state.settings || {};
   const prefs = prefsOf(settingsRec);
-  const quiet = inQuiet(prefs, min);
+  const quiet = inQuiet(prefs, min, b.dow);
   const sent = await sentToday(env, uid, b.date);
   const sentKeys = new Set(sent.map(r => r.key));
-  let count = sent.length;
+  let count = sent.filter(r => r.type !== 'test').length;   // Tests zählen nicht zum Tageslimit
   const warnSent = sent.some(r => WARNING_TYPES.has(r.type));
   const max = prefs.maxPerDay || 4;
   const out: any[] = [];
@@ -204,8 +234,8 @@ export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any>
     const limit = isWarning ? max : (warnSent ? max : max - 1);
     if (count >= limit) return false;
     const payload = { title: job.title, body: job.body, url: job.url || './', tag: job.key, badge: openCount(L, b.date), urgent: !!isWarning };
-    await deliver(env, uid, payload);
-    await logSent(env, uid, b.date, job.key, isWarning ? 'warnings' : job.type);
+    const n = await deliver(env, uid, payload);
+    await logSent(env, uid, b.date, job.key, isWarning ? 'warnings' : job.type, n);
     sentKeys.add(job.key); count++; out.push(job.key);
     return true;
   };
@@ -222,7 +252,7 @@ export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any>
   }
   // 2) Geplante Mitteilungen (in der Ruhezeit verfallen sie)
   if (!quiet) for (const job of buildJobs(L, b, prefs, prevMin)) await trySend(job, false);
-  return { sent: out, count, quiet };
+  return { sent: out, count, quiet, ...(testSent.length ? { tests: testSent } : {}) };
 }
 
 /* Warnungen nach dem Abruf bzw. nach Plan-Anpassungen in die Warteschlange legen */

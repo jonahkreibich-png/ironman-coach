@@ -22,16 +22,39 @@ let PAIR: { code: string; expiresAt: number } | null = null;
 let DEVICES: any[] | null = null, BACKUPS: any[] | null = null, ME: any = null, INVITES: any[] | null = null, NEW_INVITE: string | null = null, SERVER_ERR: any[] | null = null;
 let USERS: any[] | null = null;
 let WAI: any = null;
+let PUSHADM: any = null;
 let loading = false;
 async function loadLists() {
   if (!isSyncOn() || loading) return; loading = true;
   try {
     const [d, b, m] = await Promise.all([apiCall('GET', '/api/devices'), apiCall('GET', '/api/backups'), apiCall('GET', '/api/me')]);
     DEVICES = d.devices; BACKUPS = b.backups; ME = m;
-    if (ME && ME.role === 'admin') { INVITES = (await apiCall('GET', '/api/invites')).invites; USERS = (await apiCall('GET', '/api/admin/users')).users; WAI = await apiCall('GET', '/api/admin/ai-usage').catch(() => null); }
+    if (ME && ME.role === 'admin') { INVITES = (await apiCall('GET', '/api/invites')).invites; USERS = (await apiCall('GET', '/api/admin/users')).users; WAI = await apiCall('GET', '/api/admin/ai-usage').catch(() => null); PUSHADM = await apiCall('GET', '/api/admin/push').catch(() => null); }
   } catch (e) { DEVICES = DEVICES || []; BACKUPS = BACKUPS || []; }
   loading = false; nav.rerender();
 }
+/* Auftrag 31: Mitteilungen (nur Betreiber): wer hat aktive Anmeldungen, letzte Zustellung, Sendefehler, abgelaufene Anmeldungen */
+const when = (ts: number | null) => ts ? ago(ts) : '–';
+function pushAdminCard(): string {
+  const P = PUSHADM;
+  if (!P) return `<div class="card"><div class="hint">${esc(t('data.pushNone'))}</div></div>`;
+  const rows = (P.list || []).map((x: any) => `<div class="li" data-push-sub="${esc(String(x.userId))}"><span class="grow"><span class="t small">${esc(x.user)} · ${esc(x.device)}</span><br><span class="s">${esc(t('data.pushRow', { ok: when(x.lastOkAt), since: when(x.since) }))}${x.fails ? ' · ' + esc(t('data.pushFails', { n: x.fails, err: x.lastError || String(x.lastStatus || '') })) : ''}</span></span>${x.fails ? pill(t('data.pushErr'), 'bad') : pill('OK', 'good')}<button class="btn ghost sm" data-act="push-adm-test" data-uid="${esc(String(x.userId))}">${esc(t('data.pushTest'))}</button></div>`).join('');
+  const gone = (P.expired || []).map((x: any) => `<div class="li"><span class="grow small">${esc(x.user)} · ${esc(x.device)}<br><span class="s">${esc(t('data.pushGone', { when: when(x.at), status: [x.status, x.reason].filter(Boolean).join(' ') }))}</span></span></div>`).join('');
+  const week = (P.week || []).map((x: any) => { const u = (P.list || []).find((y: any) => y.userId === x.userId) || (P.expired || []).find((y: any) => y.userId === x.userId); return `<span class="chip">${esc((u && u.user) || ('Nutzer ' + x.userId))}: ${x.delivered}/${x.sent}</span>`; }).join('');
+  return `<div class="card stack" data-push-admin>
+    <div class="kv"><span class="muted">${esc(t('data.pushUsers'))}</span><b class="num" data-push-users>${P.usersWithPush} / ${P.users}</b></div>
+    <div class="kv"><span class="muted">${esc(t('data.pushSubs'))}</span><b class="num">${P.subs}${P.failing ? ' · ' + esc(t('data.pushFailing', { n: P.failing })) : ''}</b></div>
+    ${P.configured ? '' : `<div class="banner warn small">${esc(t('data.pushNoKey'))}</div>`}
+    ${rows ? `<div class="list">${rows}</div>` : `<div class="hint">${esc(t('data.pushEmpty'))}</div>`}
+    ${week ? `<div class="lbl">${esc(t('data.pushWeek'))}</div><div class="chips">${week}</div>` : ''}
+    ${gone ? `<div class="lbl">${esc(t('data.pushExpired'))}</div><div class="list">${gone}</div>` : ''}</div>`;
+}
+on('push-adm-test', async el => {
+  (el as HTMLButtonElement).disabled = true;
+  try { const r = await apiCall('POST', '/api/admin/push/test/' + el.dataset.uid); toast(r.delivered ? t('data.pushTestOk', { n: r.delivered }) : t('data.pushTestFail', { err: (r.results || []).map((x: any) => [x.status, x.reason].filter(Boolean).join(' ')).join(', ') || '–' })); PUSHADM = await apiCall('GET', '/api/admin/push').catch(() => PUSHADM); }
+  catch (e: any) { toast(e.message); }
+  nav.rerender();
+});
 /* Auftrag 16: Verbrauch der kostenlosen KI (nur Betreiber): heute, je Person, 7 Tage */
 function waiCard(): string {
   if (!WAI) return `<div class="card"><div class="hint">${esc(t('data.waiNone'))}</div></div>`;
@@ -116,7 +139,7 @@ export function renderBetreiber(): string {
   if (DEVICES == null) loadLists();
   if (!ME) return `<div class="card">${empty(t('common.loading'))}</div>`;
   if (ME.role !== 'admin') return `<div class="card"><div class="hint">${esc(t('data.operatorOnly'))}</div></div>`;
-  return sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside')) + sec(t('data.wai'), waiCard(), t('data.usersAside'))
+  return sec(t('data.invites'), invitesCard(), t('data.invitesAside')) + sec(t('data.users'), usersCard(), t('data.usersAside')) + sec(t('data.wai'), waiCard(), t('data.usersAside')) + sec(t('data.push'), pushAdminCard(), t('data.pushAside'))
     + sec(t('data.serverErrors'), `<div class="card stack"><button class="btn ghost sm" data-act="err-server">${esc(t('data.errorsServer'))}</button>${SERVER_ERR ? `<div class="list">${SERVER_ERR.slice(0, 15).map(e => `<div class="li"><span class="grow"><span class="t small">${esc(e.msg || e.message || '')}</span><br><span class="s">${esc(new Date(e.at || e.ts || 0).toLocaleString('de-DE'))} · ${esc(e.source || '')} ${esc(e.place || '')}</span></span></div>`).join('') || empty(t('data.noErrors'))}</div>` : ''}</div>`);
 }
 

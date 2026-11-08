@@ -42,6 +42,15 @@ self.addEventListener('push', event => {
   }
   event.waitUntil(Promise.all(tasks));
 });
+/* Auftrag 31: Der Browser hat die Anmeldung erneuert oder verworfen (Chrome/Firefox; Safari meldet das nicht): mit demselben Schlüssel neu
+   anmelden und offene Fenster bitten, sie dem Server zu melden. Ohne offenes Fenster erledigt das die App beim nächsten Start. */
+self.addEventListener('pushsubscriptionchange', event => {
+  const key = event.oldSubscription && event.oldSubscription.options && event.oldSubscription.options.applicationServerKey;
+  event.waitUntil((key ? self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }) : Promise.resolve(null))
+    .catch(() => null)
+    .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+    .then(list => list.forEach(c => c.postMessage({ type: 'push-renew' }))));
+});
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL((event.notification.data && event.notification.data.url) || './', self.registration.scope).href;

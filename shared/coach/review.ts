@@ -25,7 +25,10 @@ export interface Review { intent: 'review'; text: string; options: ReviewOpt[]; 
 
 const SPORT: Record<string, string> = { run: 'Lauf', bike: 'Radfahrt', swim: 'Schwimmen', strength: 'Kraft', football: 'Teamsport' };
 const fmtD = (d: string) => `${dowName(d).slice(0, 2)} ${d.slice(8)}.${d.slice(5, 7)}.`;
-const weeksOf = (ctx: EngineCtx) => C.applyAdjustments(ctx.baseWeeks, ctx.state.adjustments || {});
+/* Auftrag 31: withWeeks rechnet den Plan mit Anpassungen einmal vor (nur lesen!). doneItems wird je Prüfung oft aufgerufen
+   (je Einheit für den Puls-Vergleich) und hat ihn sonst jedes Mal neu aufgebaut und kopiert. */
+const weeksOf = (ctx: EngineCtx): any[] => (ctx as any).__weeks || C.applyAdjustments(ctx.baseWeeks, ctx.state.adjustments || {});
+export function withWeeks<T extends EngineCtx>(ctx: T): T { return (ctx as any).__weeks ? ctx : { ...ctx, __weeks: weeksOf(ctx) }; }
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 
 /* ---------- Erledigte Einheiten finden ---------- */

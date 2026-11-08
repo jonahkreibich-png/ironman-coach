@@ -15,8 +15,14 @@ let PERIOD: Period = (() => { try { const v = localStorage.getItem(KEY); return 
 let CARDS: TrendCard[] = [];
 let GROUP: TrendGroup | 'all' = 'all';
 
+/* Auftrag 31: je Datenstand und Zeitraum einmal (D() bleibt beim Tab-Wechsel gleich) */
+let MEMO: { d: any; p: Period; cards: TrendCard[] } | null = null;
 export function currentTrends(): TrendCard[] {
   const d = D();
+  if (MEMO && MEMO.d === d && MEMO.p === PERIOD) return MEMO.cards;
+  const cards = computeTrends(d); MEMO = { d, p: PERIOD, cards }; return cards;
+}
+function computeTrends(d: ReturnType<typeof D>): TrendCard[] {
   const state = { ...STATE, profile: d.profile, settings: { ...STATE.settings, readiness: d.fallback } };
   return trendCards({ today: d.today, period: PERIOD, activities: d.activities, trend: STATE.trend || [], illness: STATE.illnessPeriods || [], profile: d.profile, state, weeks: BASE_WEEKS.length ? PLAN.weeks : [] });
 }

@@ -16,8 +16,17 @@ const worker = (await import('file://' + out.replace(/\\/g, '/') + '?t=' + Date.
 
 function freshDb() {
   const db = new D1Shim(process.env.DB_FILE || ':memory:');
-  // vorhandene, schon umgestellte Datenbank-Datei (z. B. eine Kopie der echten Daten aus scripts/migrate-copy.mjs): nicht erneut migrieren
-  if (process.env.DB_FILE && db.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'd1_migrations'").get().n) return db;
+  // vorhandene, schon umgestellte Datenbank-Datei (z. B. eine Kopie der echten Daten aus scripts/migrate-copy.mjs): nicht erneut migrieren,
+  // Auftrag 31: aber neuere Migrationen nachholen (wie „wrangler d1 migrations apply“) – sonst fehlen in der Kopie z. B. neue Spalten
+  if (process.env.DB_FILE && db.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'd1_migrations'").get().n) {
+    const done = new Set(db.db.prepare('SELECT name FROM d1_migrations').all().map(r => r.name));
+    for (const f of fs.readdirSync('server/migrations').filter(f => f.endsWith('.sql')).sort()) {
+      if (done.has(f)) continue;
+      db.execFile('server/migrations/' + f);
+      db.db.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(f);
+    }
+    return db;
+  }
   for (const f of [...fs.readdirSync('server/migrations').filter(f => f.endsWith('.sql')).sort().map(f => 'server/migrations/' + f)]) {
     if (fs.existsSync(f)) db.execFile(f);
   }
@@ -53,10 +62,20 @@ function fakeAI(mode) {
 }
 
 let breakMain = false;
+/* Auftrag 31: nachgemachter Push-Dienst für Browser-Tests. Anmeldungen mit Adresse http://127.0.0.1:<port>/__push/<id>:
+   id beginnt mit „gone“ → 410 (abgelaufen), sonst 201. GET /__push-log zeigt, was angekommen ist. */
+let pushLog = [];
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${port}`);
-  if (u.pathname === '/__reset' && req.method === 'POST') { breakMain = false; root = ROOT0; env.DB = freshDb(); delete env.AI; res.writeHead(204); return res.end(); }
+  if (u.pathname.startsWith('/__push/') && req.method === 'POST') {
+    const chunks = []; for await (const c of req) chunks.push(c);
+    const id = u.pathname.slice(8);
+    pushLog.push({ id, at: Date.now(), bytes: Buffer.concat(chunks).length, vapid: /^vapid t=/.test(req.headers.authorization || ''), enc: req.headers['content-encoding'] || '' });
+    res.writeHead(id.startsWith('gone') ? 410 : 201); return res.end();
+  }
+  if (u.pathname === '/__push-log') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(pushLog)); }
+  if (u.pathname === '/__reset' && req.method === 'POST') { pushLog = []; breakMain = false; root = ROOT0; env.DB = freshDb(); delete env.AI; res.writeHead(204); return res.end(); }
   // Auftrag 28: anderen Build ausliefern (gleiche Adresse, gleicher Browser-Speicher) – „Update“ von der Vorversion auf die neue
   if (u.pathname === '/__dist' && req.method === 'POST') { const chunks = []; for await (const c of req) chunks.push(c); const d = JSON.parse(Buffer.concat(chunks).toString() || '{}').dir; if (d && fs.existsSync(path.join(path.resolve(d), 'index.html'))) { root = path.resolve(d); res.writeHead(204); } else res.writeHead(400); return res.end(); }
   // Auftrag 28: App-Code absichtlich kaputt ausliefern (Startfehler-Test: Fehlerseite, „Erneut versuchen“)

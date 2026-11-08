@@ -18,6 +18,9 @@ async function synced(page: Page) { await expect.poll(async () => { const m = aw
 async function addHrv(page: Page, v: string, nav = true) {
   if (nav) await page.goto('/?go=werte'); await page.locator(`[data-act="checkin-open"][data-date="${TODAY}"]`).last().click();
   await page.fill('#ck-hrv', v); await page.locator('#ck-hrv').blur(); await page.keyboard.press('Escape');
+  // Auftrag 31: erst weiter, wenn die App fertig gespeichert hat (sonst verwirft ein sofortiges Neuladen im Test den Wert – wackelte auch vorher)
+  await expect.poll(() => page.evaluate(v => { try { return (JSON.parse(localStorage.getItem('ec_state_v2') || '{}').trend || []).some((p: any) => String(p.hrv) === v); } catch (e) { return false; } }, v)).toBe(true);
+  if (nav) await expect(page.locator('#storage-status')).toHaveAttribute('data-status', 'saved');
 }
 
 test('Kurze Server-Aussetzer: keine Meldung, Einträge werden still nachgeholt', async ({ page, request }) => {

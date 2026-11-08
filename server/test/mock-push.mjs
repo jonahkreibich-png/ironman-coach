@@ -39,19 +39,24 @@ function decrypt(body) {
 
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://127.0.0.1:8798');
+  // Auftrag 31: ?id=… liefert weitere Anmeldungen (gleiche Schlüssel): gone → 410, bad → 403 BadJwtToken, oldkey → 400 VapidPkHashMismatch
   if (req.method === 'GET' && u.pathname === '/sub') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ endpoint: 'http://127.0.0.1:8798/push/abc', keys: { p256dh: b64u(uaPublic), auth: b64u(authSecret) } }));
+    return res.end(JSON.stringify({ endpoint: 'http://127.0.0.1:8798/push/' + (u.searchParams.get('id') || 'abc'), keys: { p256dh: b64u(uaPublic), auth: b64u(authSecret) } }));
   }
   if (req.method === 'GET' && u.pathname === '/messages') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(messages)); }
   if (req.method === 'POST' && u.pathname === '/reset') { messages.length = 0; res.writeHead(200); return res.end('{}'); }
   if (req.method === 'POST' && u.pathname.startsWith('/push/')) {
     const chunks = []; req.on('data', c => chunks.push(c)); req.on('end', () => {
+      const id = u.pathname.slice(6);
+      if (id === 'gone') { messages.push({ error: 'gone', id }); res.writeHead(410); return res.end(); }
+      if (id === 'bad') { messages.push({ error: 'bad', id }); res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ reason: 'BadJwtToken' })); }
+      if (id === 'oldkey') { messages.push({ error: 'oldkey', id }); res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ reason: 'VapidPkHashMismatch' })); }
       try {
         const err = verifyVapid(req.headers.authorization, 'http://127.0.0.1:8798');
         if (err) { messages.push({ error: err }); res.writeHead(403); return res.end(); }
         if (req.headers['content-encoding'] !== 'aes128gcm') throw new Error('falsches Content-Encoding');
-        messages.push(decrypt(Buffer.concat(chunks)));
+        messages.push({ ...decrypt(Buffer.concat(chunks)), id });
         res.writeHead(201); res.end();
       } catch (e) { messages.push({ error: e.message }); res.writeHead(400); res.end(); }
     });

@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.19.0', items: [
+    'Coach öffnet sofort, auch mit langem Verlauf: gezeigt werden die letzten 30 Nachrichten, ältere kommen beim Hochscrollen. Alle Tabs wechseln schneller.',
+    'Mitteilungen: Unter Mehr → Mitteilungen siehst du ehrlich, ob sie auf diesem Gerät aktiv sind und wann die letzte ankam. Mit „Test senden“ und neuer Ruhezeit für die Schule. Die App meldet das Gerät selbst neu an, wenn nötig.'
+  ] },
   { version: '3.18.0', items: [
     '„Anders gemacht“ vollständig: lockerer/härter mit Zone, kürzer/länger/abgebrochen mit Dauer und Distanz, eigene Intervalle, andere Sportart mit ihren Feldern, drinnen/draußen, aufgeteilt in Teile, ohne Teil (z. B. ohne Koppel, nur Brust). Titel, Belastung und Coach nutzen das Gemachte.',
     'Plan-Übersicht: kleine Symbole (⚡ hart, 🎯 Test, 🏁 Wettkampf, 🔗 Koppel, 🌙 Erholung, 🛠 Technik, ↔ lang, ✎ angepasst), Farbstreifen je Intensität, Tests als eigene Karte und oben eine Zeile je Woche. Legende im Lexikon.',

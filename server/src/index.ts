@@ -7,7 +7,7 @@ import { HttpError, json, corsHeaders, readJson } from './http';
 import { type Auth, authDevice, setup, createPairCode, redeemPairCode, createInvite, listInvites } from './auth';
 import { runImport, intervalsCreds } from './intervals';
 import { runDaily, runWeekly, loadState, runAnalysis, dataSignature } from './coach';
-import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliver } from './notify';
+import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliverAll } from './notify';
 import { vapidPublicKey } from './webpush';
 import { logError, recentErrors, scrub } from './errlog';
 import { extraRoutes, publicRoutes, scheduledExtras, onRecordsChanged } from './extensions';
@@ -63,7 +63,7 @@ export async function resetUser(env: Env, uid: number): Promise<number> {
   const t = Date.now();
   const changes: Change[] = (rows.results || []).map((r: any, i: number) => ({ kind: r.kind, key: r.key, deleted: true, updatedAt: t + i }));
   if (changes.length) await putRecords(env, uid, changes);
-  for (const tbl of ['connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'ai_usage', 'wai_usage', 'oauth_states']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
+  for (const tbl of ['connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_gone', 'ai_usage', 'wai_usage', 'oauth_states']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare("DELETE FROM user_meta WHERE user_id = ? AND k <> 'reset_at'").bind(uid).run();
   await setMeta(env, uid, 'reset_at', t);
   return changes.length;
@@ -99,6 +99,8 @@ export async function nightly(env: Env) {
   await env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(Date.now()).run();
   await env.DB.prepare('DELETE FROM pair_attempts WHERE ts < ?').bind(Date.now() - 86400000).run();
   await env.DB.prepare('DELETE FROM push_log WHERE day < ?').bind(berlinDate(Date.now() - 14 * 86400000)).run();
+  // Auftrag 31: Anmeldungen von Geräten, die es nicht mehr gibt (neu verbunden, abgemeldet), bekommen nichts mehr
+  await env.DB.prepare('DELETE FROM push_subs WHERE device_id NOT IN (SELECT id FROM devices)').run();
   await env.DB.prepare('DELETE FROM oauth_states WHERE created_at < ?').bind(Date.now() - 3600000).run();
   await purgeDeleted(env);
 }
@@ -179,6 +181,24 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
       const out: any[] = [];
       for (const u of await activeUsers(env)) await withTz(await userTz(env, u), async () => { try { const r = await runDataCheck(env, u); out.push({ user: u, groups: r.groups || [], fixed: r.fixed || 0, segments: r.segments || 0, skippedWrite: !!r.skippedWrite }); } catch (e) { out.push({ user: u, error: String((e as Error).message).slice(0, 160) }); } });
       return { users: out };
+    }
+    /* Auftrag 31: Mitteilungen im Überblick – wer hat aktive Anmeldungen, letzte Zustellung, Sendefehler (ohne Inhalte) */
+    if (p === '/api/admin/push' && M === 'GET') {
+      const subs: any = await env.DB.prepare('SELECT s.user_id, u.name AS user_name, d.name AS device, s.created_at, s.last_status, s.last_at, s.last_ok_at, s.fails, s.last_error FROM push_subs s LEFT JOIN users u ON u.id = s.user_id LEFT JOIN devices d ON d.id = s.device_id ORDER BY s.user_id').all();
+      const gone: any = await env.DB.prepare('SELECT g.user_id, u.name AS user_name, d.name AS device, g.at, g.status, g.reason FROM push_gone g LEFT JOIN users u ON u.id = g.user_id LEFT JOIN devices d ON d.id = g.device_id WHERE g.at > ? ORDER BY g.at DESC').bind(Date.now() - 30 * 86400000).all();
+      const week: any = await env.DB.prepare('SELECT user_id, COUNT(*) AS n, SUM(CASE WHEN delivered > 0 THEN 1 ELSE 0 END) AS ok, SUM(CASE WHEN delivered = 0 THEN 1 ELSE 0 END) AS failed FROM push_log WHERE day >= ? GROUP BY user_id').bind(berlinDate(Date.now() - 7 * 86400000)).all();
+      const users: any = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE COALESCE(test, 0) = 0').first();
+      const list = (subs.results || []) as any[];
+      return { configured: !!env.VAPID_PRIVATE_JWK, users: (users && users.n) || 0, usersWithPush: new Set(list.map(x => x.user_id)).size, subs: list.length, failing: list.filter(x => (x.fails || 0) > 0).length,
+        list: list.map(x => ({ userId: x.user_id, user: x.user_name || ('Nutzer ' + x.user_id), device: x.device || 'Gerät', since: x.created_at, lastStatus: x.last_status, lastAt: x.last_at, lastOkAt: x.last_ok_at, fails: x.fails || 0, lastError: x.last_error || null })),
+        expired: ((gone.results || []) as any[]).map(x => ({ userId: x.user_id, user: x.user_name || ('Nutzer ' + x.user_id), device: x.device || 'Gerät', at: x.at, status: x.status, reason: x.reason || null })),
+        week: ((week.results || []) as any[]).map(x => ({ userId: x.user_id, sent: x.n, delivered: x.ok || 0, failed: x.failed || 0 })) };
+    }
+    const apt = /^\/api\/admin\/push\/test\/(\d+)$/.exec(p);
+    if (apt && M === 'POST') {
+      if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
+      const r = await deliverAll(env, +apt[1], { title: BRAND.name, body: 'Test vom Betreiber: Mitteilungen kommen an. 💪', url: './?go=heute', tag: 'test-admin' });
+      return { delivered: r.delivered, results: r.results.map(x => ({ ok: x.ok, status: x.status, reason: x.reason, gone: x.gone })) };
     }
     // Test-Nutzer: Einladung erzeugen (der Tester richtet sich damit selbst ein)
     if (p === '/api/admin/testusers' && M === 'POST') return await createInvite(env, a, (await readJson(req)).note || 'Test-Nutzer', true);
@@ -288,24 +308,38 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     const keys = s.keys || {};
     const okEndpoint = /^https:\/\//.test(s.endpoint || '') || (env.ALLOW_TEST_ROUTES === '1' && /^http:\/\/127\.0\.0\.1:/.test(s.endpoint || ''));
     if (!okEndpoint || !keys.p256dh || !keys.auth) throw new HttpError(400, 'Ungültiges Abo');
-    await env.DB.prepare('DELETE FROM push_subs WHERE device_id = ? OR endpoint = ?').bind(a.deviceId, s.endpoint).run();
-    await env.DB.prepare('INSERT INTO push_subs (id, device_id, endpoint, p256dh, auth, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind('sub-' + crypto.randomUUID(), a.deviceId, s.endpoint, keys.p256dh, keys.auth, Date.now(), uid).run();
-    return { ok: true };
+    // Gleiche Anmeldung schon gespeichert: Stand (letzte Zustellung) behalten – die App bestätigt sie bei jedem Start
+    const same = await env.DB.prepare('SELECT id FROM push_subs WHERE device_id = ? AND endpoint = ? AND p256dh = ? AND auth = ? AND user_id = ?').bind(a.deviceId, s.endpoint, keys.p256dh, keys.auth, uid).first();
+    if (!same) {
+      await env.DB.prepare('DELETE FROM push_subs WHERE device_id = ? OR endpoint = ?').bind(a.deviceId, s.endpoint).run();
+      await env.DB.prepare('INSERT INTO push_subs (id, device_id, endpoint, p256dh, auth, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind('sub-' + crypto.randomUUID(), a.deviceId, s.endpoint, keys.p256dh, keys.auth, Date.now(), uid).run();
+    }
+    // Auftrag 31: alte Anmeldungen dieses Kontos von Geräten, die es nicht mehr gibt (z. B. iPhone neu verbunden), entfernen
+    await env.DB.prepare('DELETE FROM push_subs WHERE user_id = ? AND device_id NOT IN (SELECT id FROM devices WHERE user_id = ?)').bind(uid, uid).run();
+    await env.DB.prepare('DELETE FROM push_gone WHERE user_id = ? AND device_id = ?').bind(uid, a.deviceId).run();
+    return { ok: true, renewed: !same };
   }
   if (p === '/api/push/unsubscribe' && M === 'POST') {
     await env.DB.prepare('DELETE FROM push_subs WHERE device_id = ?').bind(a.deviceId).run();
     return { ok: true };
   }
+  /* Auftrag 31: ehrlicher Stand dieses Geräts – angemeldet? letzte Antwort des Push-Dienstes? abgelaufen? (endTail: Ende der Adresse,
+     damit die App erkennt, ob der Server noch ihre aktuelle Anmeldung hat) */
   if (p === '/api/push/status' && M === 'GET') {
-    const me = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE device_id = ?').bind(a.deviceId).first();
+    const me: any = await env.DB.prepare('SELECT endpoint, last_status, last_at, last_ok_at, fails, last_error, created_at FROM push_subs WHERE device_id = ? AND user_id = ?').bind(a.deviceId, uid).first();
     const all = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?').bind(uid).first();
-    return { configured: !!env.VAPID_PRIVATE_JWK, thisDevice: !!(me && me.n), devices: (all && all.n) || 0 };
+    const gone: any = me ? null : await env.DB.prepare('SELECT at, status, reason FROM push_gone WHERE user_id = ? AND device_id = ?').bind(uid, a.deviceId).first();
+    return { configured: !!env.VAPID_PRIVATE_JWK, thisDevice: !!me, devices: (all && all.n) || 0,
+      ...(me ? { endTail: String(me.endpoint).slice(-24), since: me.created_at, lastStatus: me.last_status, lastAt: me.last_at, lastOkAt: me.last_ok_at, fails: me.fails || 0, lastError: me.last_error || null } : {}),
+      ...(gone ? { expired: { at: gone.at, status: gone.status, reason: gone.reason || null } } : {}) };
   }
   if (p === '/api/push/test' && M === 'POST') {
     if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
-    const n = await deliver(env, uid, { title: BRAND.name, body: 'Mitteilungen funktionieren. 💪', url: './?go=heute', tag: 'test' });
-    return { delivered: n };
+    const r = await deliverAll(env, uid, { title: BRAND.name, body: 'Test: Mitteilungen kommen an. 💪', url: './?go=heute', tag: 'test' });
+    const names: any = await env.DB.prepare('SELECT id, name FROM devices WHERE user_id = ?').bind(uid).all();
+    const nm = new Map(((names.results || []) as any[]).map(x => [x.id, x.name]));
+    return { delivered: r.delivered, results: r.results.map(x => ({ device: nm.get(x.deviceId) || 'Gerät', thisDevice: x.deviceId === a.deviceId, ok: x.ok, status: x.status, reason: x.reason, gone: x.gone })) };
   }
 
   // Nur für lokale Tests: einen 5-Minuten-Lauf zu einer bestimmten Uhrzeit simulieren

@@ -2,7 +2,7 @@ import {effectiveCustomWorkouts} from './store';
 /* Abgeleitete Daten für die Bildschirme, pro Zeichnen einmal berechnet. */
 import * as C from '../../shared/core';
 import { readinessInputs, readinessSnapshot } from '../../shared/readiness';
-import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon, onStateReplaced } from './store';
+import { STATE, PLAN, BASE_WEEKS, DAYS, SESS, findDay, profile, goals, saveSoon, onStateReplaced, dataVersion } from './store';
 import { todayStr, ymd } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
 import { mainGoal, goalSports, type Goal } from '../../shared/goals';
@@ -12,7 +12,9 @@ import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
 import type { Activity } from '../../shared/activity/analyze';
 import { duplicateMsgIds, compactDecided } from '../../shared/coach/feed';
-import { verifyCoachText, valueFacts } from '../../shared/coach/claims';
+import { verifyCoachText, valueFacts, claimFacts, type ClaimFacts } from '../../shared/coach/claims';
+import { valueStories } from '../../shared/coach/analysis';
+import { withWeeks } from '../../shared/coach/review';
 
 export interface Derived {
   today: string; profile: Profile; goals: Goal[]; goal: Goal | null; minor: boolean; age: number | null;
@@ -25,6 +27,7 @@ export interface Derived {
   loadsBySport: Record<string, Record<string, number>>; engine: EngineCtx;
 }
 let cache: Derived | null = null;
+let cacheVer = -1;
 let lastInp: any = null;
 /* Prognose für ein Ziel am Renntag (beim Eintragen des Ergebnisses), ohne Korrektur aus diesem Rennen */
 export function prognosisFor(goal: Goal, date: string): Prognosis | null {
@@ -62,7 +65,9 @@ export function progMove(goal: Goal): Move | null {
    Zwischenspeicher (onStateReplaced). Vorher gab D() danach `cache` zurück – inzwischen null – und die App startete nicht mehr.
    Der nächste Aufruf rechnet dann mit dem neuen Zustand neu. */
 export function D(): Derived {
-  if (cache && cache.today === todayStr()) return cache;
+  // Auftrag 31: gültig, solange sich die Daten nicht geändert haben (Tab-Wechsel rechnet nichts neu)
+  if (cache && cache.today === todayStr() && cacheVer === dataVersion()) return cache;
+  cacheVer = dataVersion();
   const d = compute(); cache = d; afterCompute(d);
   return d;
 }
@@ -157,17 +162,24 @@ export { findDay, DAYS, SESS };
 
 /* Auftrag 29: Coach-Nachrichten werden vor dem Anzeigen gegen die aktuellen Daten geprüft (Zahlen, Datum/Wochentag, Leistungen).
    Gilt für alle Quellen (Regel-Coach, Server, KI, Etappenziele) und nach jeder Korrektur, weil hier mit dem jetzigen Stand geprüft wird. */
-let checked: { d: Derived | null; facts: any; out: Map<string, string> } = { d: null, facts: null, out: new Map() };
+/* Auftrag 31: Die Grundlagen der Prüfung (Plan mit Anpassungen, Werte, Verläufe, erreichte Leistungen je Datum) werden einmal je Datenstand
+   berechnet statt für jede Nachricht neu – das machte das Öffnen des Coachs langsam (500 ms bis mehrere Sekunden). */
+let checked: { d: Derived | null; ctx: any; values: any; stories: any; claims: Map<string, ClaimFacts>; out: Map<string, string> } = { d: null, ctx: null, values: null, stories: null, claims: new Map(), out: new Map() };
 export function coachText(m: any): string {
   const text = String((m && m.text) || '');
   if (!text || !m || m.from === 'user') return text;
   try {
     const d = D();
-    if (checked.d !== d) checked = { d, facts: { values: valueFacts(d.engine) }, out: new Map() };
+    if (checked.d !== d) { const ctx = withWeeks(d.engine); checked = { d, ctx, values: valueFacts(ctx), stories: null, claims: new Map(), out: new Map() }; }
     const ref = (m.date && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m.date : null) || (m.at ? ymd(new Date(m.at)) : d.today);
     const key = ref + '\u0000' + text;
     let v = checked.out.get(key);
-    if (v == null) { v = verifyCoachText(text, d.engine, ref, { values: checked.facts.values }); checked.out.set(key, v); }
+    if (v == null) {
+      const ctx = checked.ctx;
+      if (!checked.stories) checked.stories = valueStories(ctx, ctx.today);
+      let claims = checked.claims.get(ref); if (!claims) { claims = claimFacts(ctx, ref); checked.claims.set(ref, claims); }
+      v = verifyCoachText(text, ctx, ref, { values: checked.values, claims, stories: checked.stories }); checked.out.set(key, v);
+    }
     return v;
   } catch (e) { return text; }
 }

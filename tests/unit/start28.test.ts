@@ -32,14 +32,15 @@ describe('compactDecided ist idempotent', () => {
 });
 
 /* D() mit dem Zustand, der bei Nutzer 1 den Absturz auslöste: verkleinerte Vorschläge, Speichern ersetzt den Zustand */
-const H = vi.hoisted(() => ({ replaced: [] as (() => void)[], saves: 0, state: {} as any }));
+const H = vi.hoisted(() => ({ replaced: [] as (() => void)[], saves: 0, state: {} as any, ver: 0 }));
 vi.mock('../../web/src/store', () => ({
   STATE: H.state, PLAN: { meta: {}, weeks: [] }, BASE_WEEKS: [], DAYS: [], SESS: [], findDay: () => null,
   profile: () => ({ sports: ['run', 'bike', 'swim'], thresholds: {}, birthYear: 1990 }), goals: () => [],
   effectiveCustomWorkouts: () => ({}),
+  dataVersion: () => H.ver,
   onStateReplaced: (fn: () => void) => { H.replaced.push(fn); },
   // wie in der echten App: Speichern liest den Speicher neu ein und ersetzt den Zustand → Zwischenspeicher wird geleert
-  saveSoon: () => { H.saves++; H.replaced.forEach(f => f()); }
+  saveSoon: () => { H.saves++; H.ver++; H.replaced.forEach(f => f()); }
 }));
 vi.mock('../../web/src/util', () => ({ todayStr: () => '2026-11-07' }));
 

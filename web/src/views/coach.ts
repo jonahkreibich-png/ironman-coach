@@ -2,7 +2,7 @@
    Antwort; Rückfragen und Knöpfe statt Raten; Planänderungen mit Vorschau, Bestätigen und Rückgängig über dieselben Aktionen
    (shared/coach/ops.ts) und Regeln wie überall. Alte Briefings und Kommentare wandern nach 3/7/14 Tagen in den Verlauf,
    erledigte Gespräche werden nach 3 Tagen zu einer Zeile. Mit aktivem KI-Coach antwortet der Server, die Oberfläche bleibt gleich. */
-import { STATE, saveState, UI, profile, saveProfile, rebuildPlanIndex } from '../store';
+import { STATE, saveState, UI, profile, saveProfile, rebuildPlanIndex, findDay } from '../store';
 import { esc, fmtDate, dowShort, todayStr, addDays, ymd } from '../util';
 import { t } from '../../../shared/i18n';
 import { D, invalidate, coachText } from '../data';
@@ -110,8 +110,29 @@ function msgHtml(m: any, latest: boolean): string {
 
 /* Was der Coach gerade sieht (Auftrag 7): die 3 wichtigsten Erkenntnisse der Analyse mit Begründung und Tipp.
    Derselbe Code läuft auf dem Server (morgens, nach neuen Einheiten, sonntags); hier wird er frisch berechnet. */
+/* Auftrag 31: Ergebnis je Datenstand gemerkt. Nach einer Datenänderung erscheint sofort der letzte Stand; die neue Analyse läuft in einer
+   Leerlaufzeit und ersetzt nur diese Karte (kein Neuzeichnen des ganzen Coachs, kein Rechnen beim Tab-Wechsel). */
+let SEES: { d: any; html: string } | null = null;
+let seesPending = false;
 function seesCard(): string {
-  let a: any; try { a = analyze(D().engine, 'view'); } catch (e) { return ''; }
+  const d = D();
+  if (!SEES) SEES = { d, html: seesHtml(d) };            // allererstes Öffnen: einmal direkt (sonst springt die Seite)
+  else if (SEES.d !== d && !seesPending) {
+    seesPending = true;
+    const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: any) => number) | undefined;
+    const run = () => {
+      seesPending = false;
+      const cur = D(); if (SEES && SEES.d === cur) return;
+      const html = seesHtml(cur); const changed = !SEES || SEES.html !== html; SEES = { d: cur, html };
+      const el = document.querySelector('[data-sees-wrap]');
+      if (changed && el) { const follow = nearBottom(); el.innerHTML = html; if (follow) toBottom(); }
+    };
+    if (ric) ric(run, { timeout: 1500 }); else setTimeout(run, 120);
+  }
+  return `<div data-sees-wrap>${SEES.html}</div>`;
+}
+function seesHtml(d: any): string {
+  let a: any; try { a = analyze(d.engine, 'view'); } catch (e) { return ''; }
   if (!a || !a.top.length) return '';
   const L = a.load;
   return `<div class="card sees" data-sees style="margin-top:var(--s3)"><div class="lbl">${esc(t('ana.title'))}</div>
@@ -121,7 +142,7 @@ function seesCard(): string {
 /* Gerade aktuell: heutige Lage und offene Punkte */
 function nowCard(open: any[]): string {
   const d = D();
-  const today = C.planDays(C.applyAdjustments(d.engine.baseWeeks, STATE.adjustments || {})).find((x: any) => x.date === d.today);
+  const today = findDay(d.today); // Auftrag 31: vorhandener Plan-Index (gleicher Plan mit Anpassungen), nicht bei jedem Öffnen neu aufbauen
   const list = today ? today.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled) : [];
   const done = list.filter((s: any) => ((STATE.sessions || {})[s.id] || {}).completed).length;
   const R = d.readiness; const lvl = d.ill ? t('chat.now.sick') : R && R.level < 3 ? [t('chat.now.green'), t('chat.now.yellow'), t('chat.now.red')][R.level] : '';
@@ -130,10 +151,16 @@ function nowCard(open: any[]): string {
     <div class="small">${esc(line)}</div>${open.length ? `<div class="small" data-now-open>${esc(t('chat.now.open', { n: open.length }))}: ${open.map(m => `<button class="link" data-act="chat-jump" data-id="${esc(m.id)}">${esc((m.title || coachText(m) || '').slice(0, 50))}</button>`).join(' · ')}</div>` : ''}</div>`;
 }
 
+/* Auftrag 31: Gezeichnet werden nur die letzten 30 Einträge; ältere kommen beim Hochscrollen (oder Antippen) dazu, je 30. */
+export const FEED_PAGE = 30;
+let SHOW = FEED_PAGE;
 export function renderCoach(): string {
+  if (!UI.coachVisit) SHOW = FEED_PAGE;   // neu im Coach: wieder nur die letzten 30
   const all = Object.values(STATE.coachMsgs || {}).filter((m: any) => m && !m.deleted) as any[];
   const seen = UI.coachSeenPrev || UI.coachSeenAt || 0;
-  const { feed, archived } = arrangeFeed(all, Date.now(), seen, keepDays());
+  const { feed: fullFeed, archived } = arrangeFeed(all, Date.now(), seen, keepDays());
+  const hidden = Math.max(0, fullFeed.length - SHOW);
+  const feed = hidden ? fullFeed.slice(hidden) : fullFeed;
   const ai = aiState();
   const last = lastMsgId();
   const open = all.filter(m => isOpen(m)).sort((a, b) => b.at - a.at).slice(0, 3);
@@ -141,7 +168,7 @@ export function renderCoach(): string {
   if (!isSyncOn() && !freePublicKnown()) loadFreePublic().then(v => { if (v && freeOffer()) nav.rerender(); });
   let h = nowCard(open) + (freeOffer() ? freeConsentHtml('card') : '') + seesCard();
   h += `<div class="spread" style="margin:var(--s3) 0;flex-wrap:wrap;gap:6px"><span class="xs muted" style="flex:1 1 160px">${esc(ai.tier === 'claude' ? t('coach.aiMode') : ai.tier === 'free' ? t('coach.freeAiMode') : t('coach.freeMode2'))}</span><span class="row nowrap" style="gap:4px"><button class="btn ghost sm" data-act="chat-history" aria-label="${esc(t('chat.history'))}">${ic('doc')} ${esc(t('chat.history'))}${archived.length ? ` (${archived.length})` : ''}</button><button class="btn ghost sm" data-act="notes-open" aria-label="${esc(t('coach.notes'))}">${ic('user')} ${esc(t('coach.notesShort'))}</button></span></div>`;
-  h += `<div class="feed">${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : STREAM ? '' : empty(t('coach.empty'))}${streamHtml()}</div>`;
+  h += `<div class="feed">${hidden ? `<button class="btn ghost sm feed-more" data-act="feed-more" data-feed-more>${esc(t('chat.older', { n: hidden }))}</button>` : ''}${feed.length ? feed.map(f => f.type === 'line' ? `<div class="msg-line" data-line>${esc(f.line!)}</div>` : msgHtml(f.msg, f.msg.id === last)).join('') : STREAM ? '' : empty(t('coach.empty'))}${streamHtml()}</div>`;
   const dlg = STATE.chatDialog || {};
   const quick = quickOptions(D().engine, dlg).slice(0, 5);
   h += `<div class="chips quick" style="margin:var(--s3) 0 var(--s2)" data-quick>${quick.map(q => `<button class="chip" data-act="chat-say" data-text="${esc(q.say)}">${esc(q.label)}</button>`).join('')}</div>`;
@@ -150,6 +177,31 @@ export function renderCoach(): string {
   else if (ai.tier === 'free' && ai.free) h += `<div class="xs muted" style="text-align:center;margin-top:6px" data-free-count>${esc(t('coach.freeAiToday', { n: ai.free.todayQuestions || 0, max: ai.free.maxPerDay || 30 }))}</div>`;
   else h += `<div class="hint" style="text-align:center;margin-top:var(--s2)"><button class="link" data-act="go-sub" data-sub="coachset">${esc(t('coach.aiSettings'))}</button></div>`;
   return h;
+}
+/* Ältere Nachrichten dazunehmen, ohne dass die gerade sichtbare Stelle springt (nur zeichnen, nichts neu rechnen) */
+function showOlder(): void {
+  const h0 = document.documentElement.scrollHeight, y0 = window.scrollY;
+  SHOW += FEED_PAGE; nav.render();
+  window.scrollTo(0, y0 + (document.documentElement.scrollHeight - h0));
+}
+on('feed-more', () => showOlder());
+let userScrollAt = 0;
+if (typeof window !== 'undefined') {
+  const mark = () => { userScrollAt = performance.now(); };
+  window.addEventListener('touchmove', mark, { passive: true }); window.addEventListener('wheel', mark, { passive: true });
+  window.addEventListener('scroll', () => {
+    if (UI.tab !== 'coach' || UI.sub || window.scrollY > 300 || performance.now() - userScrollAt > 800) return;
+    if (document.querySelector('[data-feed-more]')) showOlder();
+  }, { passive: true });
+}
+/* Auftrag 31: in einer Leerlaufzeit vorrechnen, was der Coach beim Öffnen braucht (geprüfte Texte der sichtbaren Nachrichten,
+   „Was der Coach gerade sieht“). Ändert nichts, füllt nur die Zwischenspeicher. */
+export function warmCoach(): void {
+  const d = D();
+  if (!SEES || SEES.d !== d) SEES = { d, html: seesHtml(d) };
+  const all = Object.values(STATE.coachMsgs || {}).filter((m: any) => m && !m.deleted) as any[];
+  const { feed } = arrangeFeed(all, Date.now(), UI.coachSeenPrev || UI.coachSeenAt || 0, keepDays());
+  feed.slice(-FEED_PAGE).forEach(f => { if (f.msg) coachText(f.msg); });
 }
 export function scrollCoachBottom() { const f = document.querySelector('.feed'); if (f) window.scrollTo(0, document.body.scrollHeight); }
 

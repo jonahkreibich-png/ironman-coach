@@ -6,7 +6,7 @@
    Belegt sind nur eingetragene oder gemessene Werte (shared/results.ts), nie das Soll einer Einheit. */
 import * as C from '../core';
 import type { EngineCtx } from './engine';
-import { doneItems, valsOf } from './review';
+import { doneItems, valsOf, withWeeks } from './review';
 import { sleepNeed } from '../profile';
 import { actualMetrics } from '../results';
 import { storyText, STORY_METRICS, type Story } from '../valuestory';
@@ -22,6 +22,7 @@ export interface ClaimFacts {
   days?: DayFacts[];
 }
 export function claimFacts(ctx: EngineCtx, date?: string): ClaimFacts {
+  ctx = withWeeks(ctx);
   const pr = C.swimProofs(ctx.state, ctx.baseWeeks || [], ctx.today, 84);
   const crawls = pr.map((p: any) => p.crawl).filter(Boolean) as number[];
   const pulls = pr.map((p: any) => p.pull).filter(Boolean) as number[];
@@ -226,11 +227,13 @@ export function fixCoachText(text: string, ctx?: { today: string; baseWeeks?: an
   });
   // 2b. „<Einheit> vom/am <Wochentag>“ ohne Datum gegen den Plan
   if (ctx && ctx.baseWeeks) {
-    const days = C.planDays(C.applyAdjustments(ctx.baseWeeks, (ctx.state && ctx.state.adjustments) || {})).filter((d: any) => d.date >= C.addDays(ctx.today, -7) && d.date <= C.addDays(ctx.today, 7));
+    // Auftrag 31: Plan nur aufbauen, wenn der Text überhaupt „<Einheit> am <Wochentag>“ enthält
+    let daysCache: any[] | null = null;
+    const days = () => daysCache || (daysCache = C.planDays((ctx as any).__weeks || C.applyAdjustments(ctx.baseWeeks!, (ctx.state && ctx.state.adjustments) || {})).filter((d: any) => d.date >= C.addDays(ctx.today, -7) && d.date <= C.addDays(ctx.today, 7)));
     t = t.replace(/\b([A-ZÄÖÜ][\wäöüß-]*(?:test|lauf|training|schwimmen|einheit|fahrt|check))\s+(vom|am|von)\s+(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\b/g, (m, name, prep, w) => {
       const sport = (SPORT_KEY.find(([re]) => re.test(name)) || [null, null])[1]; const isTest = /test|check/i.test(name);
       const fit = (s: any) => s.sport !== 'rest' && (!sport || s.sport === sport) && (!isTest || /test|check/i.test(s.title || ''));
-      const hits = days.filter((d: any) => d.sessions.some(fit));
+      const hits = days().filter((d: any) => d.sessions.some(fit));
       if (!hits.length || hits.some((d: any) => dowOfDate(d.date) === dowIdx(w))) return m;
       const past = hits.filter((d: any) => prep === 'vom' ? d.date <= ctx.today : true);
       const one = (past.length ? past : hits);

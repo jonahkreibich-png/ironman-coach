@@ -39,7 +39,7 @@ export function prepareCopy(src, work) {
   return { db, users };
 }
 
-async function startServer(port, db, dist) {
+export async function startServer(port, db, dist) {
   const p = spawn(process.execPath, [path.join(ROOT, 'scripts', 'test-server.mjs'), String(port)], { cwd: ROOT, env: { ...process.env, DB_FILE: db, DIST_DIR: dist }, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; p.stdout.on('data', b => { log += b; }); p.stderr.on('data', b => { log += b; });
   for (let i = 0; i < 100; i++) { if (/Testserver auf/.test(log)) return p; if (p.exitCode != null) break; await new Promise(r => setTimeout(r, 200)); }
