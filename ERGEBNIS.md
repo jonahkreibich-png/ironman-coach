@@ -1,6 +1,6 @@
 # Auftrag 32: Coach eine Entscheidung je Frage + Tab-Leiste wie iOS 26 (9.11.)
 
-**Stand:** Umgesetzt und getestet, Version **3.20.0**. Veröffentlichung siehe unten.
+**Stand:** Umgesetzt, getestet und **veröffentlicht**: Version **3.20.0** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert.
 
 ## 1. Deine Coach-Nachrichten vom 9.11. (nur gelesen)
 | Uhrzeit | Nachricht | Woher | Warum so |
