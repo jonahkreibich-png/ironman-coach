@@ -613,3 +613,16 @@ export function intervalReview(ctx: EngineCtx, d: Done): { good: string[]; bette
   else if (e.zoneSlower >= 2 && e.zoneSlower >= e.judged / 2) out.next.push(`Bei passendem Puls warst du in ${e.zoneSlower} Intervallen langsamer als das Ziel: entweder müde oder die Zonen sind zu hoch – ein Test zeigt es.`);
   return out;
 }
+
+/* Auftrag 32: Eine Bewertung je Aufzeichnung. Kam die Aufzeichnung zuerst ohne Einheit an, bewertete der Server sie unter ihrer eigenen
+   Kennung (msg-review-<Aufzeichnung>). Wird sie danach in der App zur Extra-Einheit (z. B. Kraft-Bereich gewählt), hieß die Einheit
+   „act-…“ und es entstand eine zweite Bewertung. Jetzt gilt immer die Kennung der Einheit; die alte Bewertung derselben Aufzeichnung
+   wird ersetzt (gleiche Position im Chat, alte gelöscht). Liefert die Kennung und die zu ersetzende alte Nachricht. */
+export function reviewMsgId(state: any, d: { key: string; act?: any | null }): { id: string; old: any | null } {
+  const id = 'msg-review-' + d.key;
+  const msgs = (state && state.coachMsgs) || {};
+  const actId = d.act && d.act.id;
+  if (!actId || actId === d.key) return { id, old: null };
+  const old = Object.values(msgs).find((m: any) => m && !m.deleted && m.id !== id && (m.id === 'msg-review-' + actId || (m.refs && m.refs.activityId === actId && /^msg-review-/.test(m.id)))) as any;
+  return { id, old: old || null };
+}

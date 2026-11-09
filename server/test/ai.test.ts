@@ -136,7 +136,9 @@ describe('Werkzeuge und Regeln', () => {
     mock([tool('start_illness', { date: today, note: 'Fieber' }), text('Gute Besserung, ich habe dein Training pausiert.')]);
     const { env, T } = await user();
     const r = await chat(env, T, 'Ich habe Fieber, 38,5');
-    expect(r.data.messages.some((m: any) => m.kind === 'warning' && /kein Training/.test(m.text))).toBe(true);
+    // Auftrag 32: eine Antwort – der Sicherheitshinweis steht unter der KI-Antwort statt als eigene Nachricht
+    expect(r.data.messages.filter((m: any) => m.from !== 'user')).toHaveLength(1);
+    expect(r.data.messages.some((m: any) => m.kind === 'answer' && /kein Training/.test(m.text))).toBe(true);
     expect((await recs(env, T)).some((x: any) => x.kind === 'illness' && x.data.start === today)).toBe(true);
   });
   test('Zwei harte Tage hintereinander → abgelehnt, KI erklärt eine Alternative', async () => {
@@ -162,7 +164,7 @@ describe('Werkzeuge und Regeln', () => {
     const r = await chat(env, T, 'Ich will doppelt so viel trainieren!');
     const res = requests[1].messages[requests[1].messages.length - 1].content[0];
     expect(res.is_error).toBe(true); expect(res.content).toMatch(/Umfang/);
-    expect(r.data.messages.some((m: any) => m.kind === 'proposal')).toBe(false);
+    expect(r.data.messages.some((m: any) => m.proposal)).toBe(false);
   });
   // Auftrag 16: Planänderungen der KI gelten nie sofort, auch kleine nicht – immer als Vorschlag zum Bestätigen
   test('Prüfungswoche → Einheiten kürzen nur als Vorschlag; Übernehmen wendet an', async () => {
@@ -173,7 +175,7 @@ describe('Werkzeuge und Regeln', () => {
     const r = await chat(env, T, 'Nächste Woche habe ich Prüfungen.');
     expect(r.data.applied).toBe(0);
     expect((await recs(env, T)).find((x: any) => x.kind === 'adjust' && x.data.from_ai)).toBeUndefined();
-    const prop = r.data.messages.find((m: any) => m.kind === 'proposal');
+    const prop = r.data.messages.find((m: any) => m.proposal);   // Auftrag 32: Vorschlag hängt an der Antwort
     expect(prop).toBeTruthy();
     const ok = await call(env, 'POST', '/api/coach/proposal/' + prop.id, { accept: true }, T);
     expect(ok.data.applied).toBe(1);
@@ -186,7 +188,7 @@ describe('Werkzeuge und Regeln', () => {
     mock([tool('modify_session', { session_id: id, title: 'Tempodauerlauf 3×10 min', zone: 'Zone 4', reason: 'Tempo-Reiz' }), text('Ich schlage einen Tempolauf vor.')]);
     const { env, T } = await user();
     const r = await chat(env, T, 'Mach den Samstag härter');
-    const prop = r.data.messages.find((m: any) => m.kind === 'proposal');
+    const prop = r.data.messages.find((m: any) => m.proposal);   // Auftrag 32: Vorschlag hängt an der Antwort
     expect(prop.proposal.status).toBe('open'); expect(r.data.applied).toBe(0);
     const d = await call(env, 'POST', '/api/coach/proposal/' + prop.id, { accept: true }, T);
     expect(d.data.applied).toBe(1);
@@ -196,7 +198,7 @@ describe('Werkzeuge und Regeln', () => {
     mock([tool('change_goal', { name: 'Sprint-Triathlon', type: 'tri_sprint', date: add(today, 42), priority: 'A', reason: 'früherer Termin' }), text('Ich habe dir einen Vorschlag gemacht.')]);
     const { env, T } = await user();
     const r = await chat(env, T, 'Mein Wettkampf ist schon in 6 statt in 12 Wochen');
-    expect(r.data.messages.find((m: any) => m.kind === 'proposal').proposal.changes[0].kind).toBe('goal');
+    expect(r.data.messages.find((m: any) => m.proposal).proposal.changes[0].kind).toBe('goal');
     expect((await recs(env, T)).some((x: any) => x.kind === 'goal')).toBe(false);
   });
   test('Marathon mit 16 → Altersgrenze, Ziel abgelehnt', async () => {
@@ -293,7 +295,7 @@ describe('Kanonische App-Ampel vor Modelltext', () => {
     try {
       const { env, T } = await user({ oura: true });
       await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'trend', key: today, data: { date: today, sleepHours: 6.5, restingHR: 51, _src: { sleepHours: 'oura', restingHR: 'shortcut' }, _auto: { sleepHours: { oura: 6.5 }, restingHR: { shortcut: 51 } } }, updatedAt: Date.now() + 1000 }] }, T);
-      const res = await worker.fetch(new Request('http://x/api/coach/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T }, body: JSON.stringify({ text: 'Wie soll ich heute trainieren?' }) }), env, { waitUntil() {} } as any);
+      const res = await worker.fetch(new Request('http://x/api/coach/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + T }, body: JSON.stringify({ text: 'Wie ist meine Ampel heute?' }) }), env, { waitUntil() {} } as any);
       const lines = (await res.text()).trim().split('\n').map(l => JSON.parse(l));
       const answer = lines.find(l => l.t === 'done').messages.find((m: any) => m.kind === 'answer');
       expect(answer.text).toContain('Ampel der App: Gelb');

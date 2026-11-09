@@ -1,5 +1,11 @@
 # Für Jonah
 
+**Nach dem Update auf 3.20.0:** App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.** Sonst musst du nichts tun.
+
+---
+
+## Frühere Hinweise
+
 **Test-Mitteilung:** Um 22:55 habe ich dir eine geschickt („Test: Mitteilungen kommen wieder an.“). Apple hat sie angenommen. Ist sie nicht angekommen: Fokus prüfen (Punkt 4) und unter Mehr → Mitteilungen „Test senden“ drücken.
 
 **Nach dem Update auf 3.19.0:**

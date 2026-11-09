@@ -183,9 +183,9 @@ describe('Streaming, Werkzeuge, Wächter', () => {
     const r = await chat(env, T, 'ich hab morgen keine zeit, streich das training');
     if (id.endsWith('-mo')) { expect(r.status).toBeGreaterThanOrEqual(200); return; } // Montag: Ruhetag, nichts zu streichen
     expect(r.status).toBe(200); expect(r.data.applied).toBe(0);
-    const prop = r.data.messages.find((m: any) => m.kind === 'proposal'); expect(prop).toBeTruthy();
-    // Vorschlag steht nach der Antwort („unten bestätigen“)
-    expect(r.data.messages.indexOf(prop)).toBeGreaterThan(r.data.messages.findIndex((m: any) => m.kind === 'answer'));
+    // Auftrag 32: genau eine Antwort, der Vorschlag hängt an ihr („unten bestätigen“ = im selben Kasten)
+    const prop = r.data.messages.find((m: any) => m.proposal); expect(prop).toBeTruthy();
+    expect(prop.kind).toBe('answer'); expect(r.data.messages.filter((m: any) => m.from !== 'user')).toHaveLength(1);
     // (die Tages-Engine darf unabhängig davon z. B. eine verpasste Schlüsseleinheit verschieben; gestrichen wird erst nach Bestätigen)
     expect((await recs(env, T)).some((x: any) => x.kind === 'adjust' && x.data.type === 'cancel')).toBe(false);
     expect((await call(env, 'POST', '/api/coach/proposal/' + prop.id, { accept: true }, T)).data.applied).toBe(1);
@@ -274,7 +274,7 @@ test('kostenlose KI: roter Modelltext wird erst nach Prüfung als echte gelbe Ap
   const ai = fakeAI([{ text: 'Deine Ampel ist rot. Heute Ruhe.' }]);
   const { env, T } = await user({ ai, oura: true });
   await call(env, 'POST', '/api/sync', { since: 0, changes: [{ kind: 'trend', key: today, data: { date: today, sleepHours: 6, restingHR: 37, _src: { sleepHours: 'oura', restingHR: 'oura' }, _auto: { sleepHours: { oura: 6 }, restingHR: { oura: 37 } } }, updatedAt: Date.now() + 1000 }] }, T);
-  const r = await stream(env, T, 'Wie soll ich heute trainieren?');
+  const r = await stream(env, T, 'Wie ist meine Ampel heute?');
   expect(r.last.t).toBe('done');
   expect(r.last.messages.find((m: any) => m.kind === 'answer').text).toContain('Ampel der App: Gelb');
   const deltas = r.lines.filter(l => l.t === 'delta').map(l => l.text).join('');

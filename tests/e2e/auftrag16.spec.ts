@@ -73,7 +73,8 @@ test.describe('Kostenlose KI im Coach', () => {
     await expect(page.locator('#app')).toContainText('KI antwortet (kostenlos)', { timeout: 10000 });
     // Auftrag 26: ohne festen Tag – „morgen“ hing vom echten Datum des Servers ab (an Tagen vor einem Ruhetag verwarf die Prüfung den Vorschlag zu Recht)
     await send(page, 'Ich habe keine Zeit, streich das nächste Training');
-    const prop = page.locator('.feed .msg.proposal').last();
+    // Auftrag 32: der Vorschlag hängt an der KI-Antwort selbst (eine Nachricht, ein „Übernehmen“)
+    const prop = page.locator('.feed .msg:has([data-act="prop"])').last();
     await expect(prop).toBeVisible({ timeout: 10000 });
     await expect(prop.locator('[data-act="prop"][data-ok="1"]')).toBeVisible();
     await prop.locator('[data-act="prop"][data-ok="1"]').click();

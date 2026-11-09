@@ -1,5 +1,5 @@
 /* Aufnahme der Tab-Leiste für docs/ (nur auf Wunsch: RECORD=1, optional BASE=<Adresse einer anderen Fassung> und NAME=<Dateiname>).
-   Zeigt beide Abläufe: Antippen eines anderen Tabs und Halten + Ziehen über alle Tabs und zurück. SLOW=4 spielt die Feder in Zeitlupe. */
+   Zeigt: Antippen eines anderen Tabs, Halten + Ziehen über alle Tabs und zurück, schnelles Wischen, Halten (ganze Leiste reagiert) und Scrollen (Leiste schrumpft und wächst, Auftrag 32). SLOW=4 spielt die Feder in Zeitlupe. */
 import { test, type Page } from '@playwright/test';
 import { seed, open } from './helpers';
 
@@ -34,6 +34,13 @@ test('Aufnahme Tab-Leiste', async ({ page, browserName }) => {
   await page.mouse.move(p.heute.x, p.heute.y); await page.mouse.down();
   for (let k = 1; k <= 4; k++) await page.mouse.move(p.heute.x + (p.mehr.x - p.heute.x) * k / 4, p.heute.y);
   await page.mouse.up(); await wait(1400);
+  // 4) Auftrag 32: Halten (ganze Leiste wird größer, federt zurück), dann Runterscrollen (Leiste schrumpft) und Hochscrollen (wieder groß)
+  await page.mouse.move(p.coach.x, p.coach.y); await page.mouse.down(); await wait(700); await page.mouse.up(); await wait(1200);
+  await page.evaluate(() => { document.body.style.minHeight = '4000px'; });
+  for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, 90); await page.waitForTimeout(50 * slow); }
+  await wait(1200);
+  for (let i = 0; i < 4; i++) { await page.mouse.wheel(0, -90); await page.waitForTimeout(50 * slow); }
+  await wait(1200);
   const v = page.video()!;
   await page.close();
   await v.saveAs(`docs/tabbar-${process.env.NAME || 'neu'}-${browserName}${slow !== 1 ? '-zeitlupe' : ''}.webm`);

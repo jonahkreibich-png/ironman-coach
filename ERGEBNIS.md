@@ -1,3 +1,49 @@
+# Auftrag 32: Coach eine Entscheidung je Frage + Tab-Leiste wie iOS 26 (9.11.)
+
+**Stand:** Umgesetzt und getestet, Version **3.20.0**. Veröffentlichung siehe unten.
+
+## 1. Deine Coach-Nachrichten vom 9.11. (nur gelesen)
+| Uhrzeit | Nachricht | Woher | Warum so |
+|---|---|---|---|
+| 07:08 | „Ampel gelb … Heute: Fußball-Training (90 min)“ | Morgen-Briefing (Regel-Engine) | richtig für den Morgen |
+| 07:35 | 3 Hinweise (Warnzeichen, Effizienz, Kraul 75 m) | Analyse-Coach | eigene Karten, unabhängig von deiner Frage |
+| 15:25 | „Bewertung: Krafttraining … Mach heute lieber locker.“ | Server, nach der Aufzeichnung von HealthFit | Morgenwerte (6 h Schlaf) hängen an jeder Bewertung |
+| 18:45 | „Bewertung: Kraft Oberkörper …“ (gleicher Text) | App, nachdem du „Oberkörper“ gewählt hast | **doppelt**: Server und App benutzten verschiedene Kennungen für dieselbe Aufzeichnung |
+| 18:46 | „… laut deinen Regeln ohnehin kein Laufen, Radfahren, Schwimmen oder Krafttraining vorgesehen … Tag zur Erholung frei“ | kostenlose KI (Gemma) | Dein **Wochenraster** („Rad nie Mo“ usw.) stand bei der KI als „Regeln, nie brechen“. Dass Fußball ausfällt, verstand sie als „nichts mehr geplant“. Kraft von heute kannte sie bei dieser Frageart nicht. |
+| 18:47 | „… kein Krafttraining … alternativ eine lockere Einheit am Rad oder beim Laufen …“ | kostenlose KI | jede Frage einzeln, wieder mit dem Raster als Verbot; Angebot nur halbherzig |
+| 18:50 | „… laut deinen Regeln nicht Rad fahren … Krafttraining wäre eine Option … Dauer kann ich dir nicht nennen, da nicht in deinem Plan“ | kostenlose KI | nahm das eigene Angebot zurück (kannte es nicht), schlug Kraft vor, obwohl schon gemacht, und nannte „nicht im Plan“ als Grund |
+
+Der Regel-Coach (ohne KI) hätte auch schlecht geantwortet: Er bot an, Einheiten vom Dienstag zu streichen, und verstand „und wie lange?“ nicht.
+
+## 2. Coach neu: eine Frage → eine Entscheidung → eine Antwort
+- **Eine Tagesentscheidung** für Regel-Coach und KI-Weg: kennt heute Erledigtes (auch Extra-Einheiten und Aufzeichnungen), Offenes, Ausgefallenes, Ampel, Krankheit, Beschwerden, morgen, Woche, Teamsport, Regeln. Bei solchen Fragen antwortet die App selbst (eindeutig, kein KI-Kontingent).
+- **Ersatz statt Verbot:** Regeln und Wochenraster schützen vor Überlastung, sie verbieten keinen lockeren Ersatz. Abgeraten wird nur bei Krankheit, roter Ampel, Schmerzen oder schon viel Belastung – mit Grund und leichter Alternative. „Nicht im Plan“ ist nie ein Grund (wird auch aus KI-Antworten entfernt).
+- **Kein Widerspruch:** Ein Angebot bleibt, bis du Ja oder Nein sagst; Folgefragen nennen dieselbe Zahl. Ändert sich die Lage: „Korrektur, weil …“.
+- **Eine Nachricht:** Hinweis und Vorschlag stehen in derselben Antwort, höchstens ein „Übernehmen“. Gleiche Antwort zweimal → „Wie eben gesagt: …“.
+- **Eine Bewertung je Training** (Ursache der Doppelung behoben; deine doppelte vom 9.11. wird ausgeblendet, nichts gelöscht).
+
+**Dein Gespräch mit der neuen Version** (Kopie deiner Daten):
+| Frage | Antwort |
+|---|---|
+| soll ich heute noch was machen weil fußballtraining fällt aus | Ja: 40 min locker Rad fahren (Zone 2, Puls bis etwa 150). Das ersetzt Fußball-Training mit ruhigerer Belastung. Kraft Oberkörper (40 min) hast du heute schon erledigt. Deine Ampel ist gelb (du hast nur 6 h geschlafen), deshalb nur locker und nicht länger. Mit „Übernehmen“ steht es im Plan. |
+| aber ich will heute irgendwas machen | Bleibt dabei: 40 min locker Rad fahren (Zone 2). Mit „Übernehmen“ steht es im Plan. |
+| wie lange soll ich radfahren | 40 min, ganz locker (Zone 2, Puls bis etwa 150). Fühlst du dich nach der Hälfte schlapp, darfst du früher aufhören. |
+| kann ich auch laufen? | Ja: 40 min locker laufen (Zone 2) … |
+
+## 3. Coach-Testlabor (dauerhaft, vor jedem Release)
+21 Test-Nutzer × 36 Fragen = 756 Antworten, automatisch geprüft (eine Antwort, kein Widerspruch, kennt den Tag, sinnvoll und nicht zu streng, Länge, keine Wiederholung, Zahlen/Wochentage, Folgefragen) plus Bewertungsregeln für Sinn, Verständlichkeit, Hilfsbereitschaft.
+**Vorher 74,2 % → jetzt 100 %** (Bewertung Sinn 4,24 → 4,89 von 5). Gefundene und behobene Fälle bleiben als Test, z. B. „und wie lange?“ unverstanden, „Was soll ich vor dem Training essen?“ landete in der Tageserklärung, zweimal dieselbe Antwort, bei roter Ampel ohne leichte Alternative, Tageserklärung doppelt bei „nur 20 Minuten“. Details: `docs/coach-labor-32/bericht.md`.
+Eine zweite KI als Prüfer habe ich nicht genommen: Sie hätte das kostenlose Tageskontingent aller Nutzer verbraucht und wäre nicht wiederholbar – stattdessen feste Bewertungsregeln.
+
+## 5. Tab-Leiste wie iOS 26
+Halten oder Ziehen: ganze Leiste wird größer, gedehnt zur Druckstelle, federt elastisch zurück. Wechsel: die Linse gleitet als Tropfen (dehnt sich in Bewegungsrichtung, federt nach). Glas mit Unschärfe, angedeuteter Brechung und Glanzkante. Runterscrollen: Leiste schrumpft; Hochscrollen, Antippen oder Tab-Wechsel: wieder groß. Eine Linse, 60 fps gemessen (16,0 ms je Bild, WebKit und Chromium), sitzt nach Drehen richtig, „Bewegung reduzieren“ schaltet alles ab.
+Vergleich mit Video und Bildern: `docs/tabbar-ios26.md` (Video statt GIF, das mitgelieferte Werkzeug kann kein GIF). Unterschied: echte Lichtverzerrung geht in Safari im Web nicht; beim kurzen Antippen bewegt sich nur der Tropfen (sonst ruckelt es).
+
+## Tests (ausgeführt)
+Typen ✅ · 3.208 Unit-/Server-Tests ✅ (davon neu: Testlabor 756 Antworten, Jonahs Gespräch, KI-Prüfer mit den echten Antworten vom 9.11., Server-Weg ohne KI-Aufruf) · Build ✅ · 682 Browser-Tests (Chromium + WebKit) ✅, darunter 6 neue für die Tab-Leiste. Angepasst (Absicht): ältere Tests, die Vorschläge als eigene Karte bzw. Hinweise als eigene Nachricht erwarteten.
+
+---
+
 # Auftrag 31: Coach-Tab ruckelt, Mitteilungen kommen nicht an (8.11.)
 
 **Stand:** Umgesetzt, getestet und **veröffentlicht**: Version **3.19.0** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert.

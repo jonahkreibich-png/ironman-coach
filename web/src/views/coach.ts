@@ -90,9 +90,12 @@ function msgHtml(m: any, latest: boolean): string {
   const cls = m.from === 'user' ? 'user' : `coach ${m.kind === 'warning' ? 'warning' : m.kind === 'adjust' ? 'adjust' : m.kind === 'proposal' || m.kind === 'proposal-local' ? 'proposal' : ''}`;
   const head = m.from !== 'user' && m.title ? `<div class="h">${m.kind === 'warning' ? ic('info') : m.kind === 'adjust' ? ic('calendar') : m.from === 'ai' ? ic('wand') : ''}${esc(m.title)}</div>` : '';
   // Auftrag 21: jeder Vorschlag zeigt klar, was sich ändert (Einheit, von wann, nach wann)
-  const propLines = m.kind === 'proposal' && m.proposal ? [...new Set(((m.proposal.changes || []) as any[]).filter(c => c && c.kind === 'adjust' && c.data && c.data.what).map(c => String(c.data.what)))] : [];
+  // Auftrag 32: der Vorschlag hängt an der Antwort selbst (eine Nachricht, ein „Übernehmen“); alte Vorschlags-Karten bleiben lesbar
+  const hasProp = (m.kind === 'proposal' || m.kind === 'answer') && m.proposal && Array.isArray(m.proposal.changes);
+  const propLines = hasProp ? [...new Set(((m.proposal.changes || []) as any[]).filter(c => c && c.kind === 'adjust' && c.data && c.data.what).map(c => String(c.data.what)))] : [];
+  const propHead = hasProp && m.kind === 'answer' && m.propTitle && !propLines.length ? `<div class="xs" data-prop-title style="margin-top:6px"><b>${esc(m.propTitle)}</b></div>` : '';
   const propList = propLines.length && !(propLines.length === 1 && String(m.title || '').includes(propLines[0])) ? `<ul class="prop-list" data-prop-lines>${propLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : '';
-  const prop = m.kind === 'proposal' && m.proposal ? propList + (m.proposal.status === 'open'
+  const prop = hasProp ? propHead + propList + (m.proposal.status === 'open'
     ? `<div class="row" style="margin-top:8px"><button class="btn sm" data-act="prop" data-id="${esc(m.id)}" data-ok="1">${esc(t('coach.accept'))}</button><button class="btn ghost sm" data-act="prop" data-id="${esc(m.id)}" data-ok="0">${esc(t('coach.reject'))}</button></div>`
     : `<div class="xs muted" style="margin-top:6px">${esc(m.proposal.status === 'superseded' ? 'Durch aktuelle Daten ueberholt' : m.proposal.status === 'accepted' ? t('coach.accepted') : t('coach.rejected'))}</div>`) : '';
   const acts = (m.actions || []).length && !m.actionsDone ? `<div class="suggest">${m.actions.map((a: ChatAction, i: number) => `<button class="btn sm ${i ? 'ghost' : ''}" data-act="chat-action" data-id="${esc(m.id)}" data-i="${i}">${esc(a.label)}</button>`).join('')}</div>` : m.actionsDone ? `<div class="xs muted" style="margin-top:6px">${esc(m.actionsDone)}</div>` : '';
@@ -265,7 +268,9 @@ export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boo
     invalidate(); const d = D();
     const { reply, dialog } = converse(d.engine, STATE.chatDialog || {}, text, { scores: d.scores, prognosis: d.prognosis });
     STATE.chatDialog = dialog;
-    const msg: any = { id: `msg-a-${now}`, at: now + 1, date: todayStr(), kind: reply.intent === 'safety' ? 'warning' : 'answer', from: 'coach', chat: true, intent: reply.intent, text: reply.text, options: reply.options || [], suggestions: reply.suggestions || [], pendingOpen: !!reply.pending };
+    const msg: any = { id: `msg-a-${now}`, at: now + 1, date: todayStr(), kind: reply.intent === 'safety' ? 'warning' : 'answer', from: 'coach', chat: true, intent: reply.intent, text: reply.text, options: reply.options || [], suggestions: reply.suggestions || [], pendingOpen: !!reply.pending,
+      // Auftrag 32: Angebot der Tagesentscheidung bleibt an der Nachricht (gilt bis Ja/Nein; Folgefragen beziehen sich darauf)
+      ...(reply.offer ? { offer: reply.offer } : {}), ...(reply.decision ? { decision: reply.decision } : {}) };
     if ((reply as any).go) msg.options = [{ label: t('chat.open'), say: '', go: (reply as any).go }, ...msg.options];
     if (reply.apply && reply.apply.length) { const r = runOps(reply.apply); msg.undo = r.undo; }
     typeMsg(msg.id, coachText(msg));

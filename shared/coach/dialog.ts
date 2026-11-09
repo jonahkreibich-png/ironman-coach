@@ -23,11 +23,12 @@ import { activeInjury, type Op } from './ops';
 import { explainDay, explainWanted, limitIn } from './explain';
 import { parseSwimSkill, swimSkillUpdate } from '../swimskill';
 import { reviewAnswer } from './review';
+import { decide, type Decision, type Offer } from './decide';
 
 export interface Opt { label: string; say: string; go?: string }
 export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'pain-where' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
 export interface DialogState { pending?: Pending | null; focus?: { sid: string; date: string } | null }
-export interface Reply { intent: string; text: string; options?: Opt[]; apply?: Op[]; pending?: Pending | null; suggestions?: string[] }
+export interface Reply { intent: string; text: string; options?: Opt[]; apply?: Op[]; pending?: Pending | null; suggestions?: string[]; /** Auftrag 32: Angebot der Tagesentscheidung (gilt bis Ja/Nein) */ offer?: Offer | null; decision?: { kind: string; verdict: string } }
 type Extra = { scores?: any[]; prognosis?: any };
 type Sx = { s: any; date: string };
 type AdjOp = Extract<Op, { op: 'adjust' }>;
@@ -204,8 +205,27 @@ export function converse(ctx: EngineCtx, dialog: DialogState, input: string, ext
   let facts: ClaimFacts | null = null; try { facts = claimFacts(ctx); } catch (e) { facts = null; }
   // eigene Angabe im Chat („ich schaffe jetzt 100 m“) ist der Nachweis selbst und bleibt stehen
   reply = { ...reply, text: withTerms(fixCoachText(facts && reply.intent !== 'swim-skill' ? stripUnsupported(reply.text, facts) || reply.text : reply.text, ctx) || reply.text) };
+  reply = noRepeat(ctx, reply, input);
   next.pending = reply.pending === undefined ? null : reply.pending;
   return { reply, dialog: next };
+}
+/* Auftrag 32: Tageserklärung im Chat kurz und übersichtlich: Schritte, Summe, wie hart und die Tageswerte bleiben; Übungsbeschreibungen,
+   „Warum“ und Profilangaben stehen in der Einheit selbst (die KI bekommt über explain_day weiter alles). */
+export function compactExplain(t: string): string {
+  return String(t || '').split('\n').filter(l => !/^(Übungen:|Warum:|Profilangabe|Wie hart:|Achte auf:|Jede Kraul-Strecke)/.test(l.trim())).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+/* Auftrag 32: keine Wiederholung. Wäre die Antwort wortgleich mit der vorigen Coach-Antwort von heute (auf eine neue Frage), kommt nur
+   der Kern als „Wie eben gesagt: …“; bei „nicht verstanden“ eine andere, hilfreiche Formulierung statt desselben Textbausteins. */
+const normTxt = (s: any) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+function noRepeat(ctx: EngineCtx, reply: Reply, input: string): Reply {
+  // dieselbe Frage noch einmal (z. B. später am Tag) bekommt wieder die volle Antwort
+  const lastQ = (Object.values(ctx.state.coachMsgs || {}) as any[]).filter(m => m && !m.deleted && m.date === ctx.today && m.from === 'user').sort((a, b) => b.at - a.at)[0];
+  if (lastQ && normTxt(lastQ.text) === normTxt(input)) return reply;
+  const prev = (Object.values(ctx.state.coachMsgs || {}) as any[]).filter(m => m && !m.deleted && m.date === ctx.today && m.from !== 'user' && (m.kind === 'answer' || m.kind === 'warning') && (m.chat || m.intent || m.decision || m.from === 'ai')).sort((a, b) => b.at - a.at)[0];
+  if (!prev || normTxt(prev.text) !== normTxt(reply.text)) return reply;
+  if (['unknown', 'clarify', 'empty', 'help'].includes(reply.intent)) return { ...reply, text: 'Damit kann ich leider nichts anfangen. Ich bin für dein Training da – frag mich zum Beispiel, was heute ansteht, ob du heute noch trainieren sollst oder wie dein letztes Training war.' };
+  const first = (String(reply.text).match(/^[\s\S]*?[.!?](?=\s|$)/) || [reply.text])[0].trim();
+  return { ...reply, text: 'Wie eben gesagt: ' + first.charAt(0).toLowerCase() + first.slice(1) };
 }
 
 const SPORT_ASK: Record<string, [RegExp, string, string]> = {
@@ -237,15 +257,22 @@ function step(ctx: EngineCtx, d: DialogState, raw: string, extra: Extra): Reply 
   // 1) offene Rückfrage auflösen
   const p = d.pending;
   if (p && Date.now() - p.at < 60 * 60 * 1000) { const r = resolve(ctx, d, p, toks, raw); if (r) return r; }
+  // 1b) Auftrag 32: Tagesentscheidung (heute noch trainieren, Ersatz für Ausgefallenes, „wie lange?“, „lieber laufen?“) – eine Antwort,
+  //     höchstens ein Vorschlag; dieselbe Entscheidung nutzt der KI-Weg auf dem Server
+  const dec = decide(ctx, raw);
+  if (dec) return decisionReply(d, dec);
   // 2) Trainings-Bewertung (Auftrag 12): „Wie war mein Lauf?“, „Wie war meine Woche?“, „Vergleich mit letzter Woche“
   const rv = reviewAnswer(ctx, raw);
   if (rv) return { intent: 'review', text: rv.text, options: rv.options.length ? rv.options : undefined };
   const choice=trainingChoice(ctx,raw);if(choice)return choice;
   // 2b) Einheit tagesgenau erklären (Auftrag 7): „Was genau soll ich heute beim Schwimmen machen?“, „Ich hab nur 20 min“
   const j0 = toks.join(' ');
-  if (explainWanted(toks, raw) || (limitIn(j0) && /\b(hab|habe)\b/.test(j0) && !/\b(verschieb|streich|tausch)/.test(j0))) {
+  // Auftrag 32 (Testlabor): „Was soll ich vor dem Training essen?“ ist eine Ernährungsfrage, keine Tageserklärung
+  const foodQ = /\b(essen|esse|isst|trinken|trinke|ernaehr\w*|fruehstueck\w*|snack\w*|kohlenhydrat\w*|eiweiss|protein)\b/.test(j0);
+  if (!foodQ && (explainWanted(toks, raw) || (limitIn(j0) && /\b(hab|habe)\b/.test(j0) && !/\b(verschieb|streich|tausch)/.test(j0)))) {
     const date = dayIn(toks, ctx.today) || daysOf(ctx, toks).any[0] || ctx.today;
     const ex = explainDay(ctx, date, sportIn(toks), limitIn(j0));
+    ex.text = compactExplain(ex.text);
     const sx = (dayOf(ctx, date) ? live(dayOf(ctx, date)) : []).find((x: any) => !sportIn(toks) || x.sport === sportIn(toks));
     if (sx) d.focus = { sid: sx.id, date };
     if (ex.ops && ex.ops.length) return propose('explain', ex.text, ex.ops, [{ label: ex.yes || 'Ja, ändern', say: 'ja' }, { label: 'Nein, so lassen', say: 'nein' }]);
@@ -266,6 +293,15 @@ function step(ctx: EngineCtx, d: DialogState, raw: string, extra: Extra): Reply 
   return clarify(ctx, toks, '');
 }
 
+/* Auftrag 32: Entscheidung als eine Antwort; Vorschlag mit „Übernehmen“ bleibt offen, auch über Folgefragen („und wie lange?“) hinweg */
+const DECIDE_OPTS: Opt[] = [{ label: 'Übernehmen', say: 'ja' }, { label: 'Nein danke', say: 'nein' }];
+function decisionReply(d: DialogState, dec: Decision): Reply {
+  const base: Reply = { intent: 'decide-' + dec.kind, text: dec.text, offer: dec.offer || null, decision: { kind: dec.kind, verdict: dec.verdict } };
+  if (dec.ops && dec.ops.length) return { ...base, pending: { kind: 'confirm', at: Date.now(), ops: dec.ops, data: { intent: 'decide', done: `Steht im Plan: ${dec.offer ? dec.offer.title : 'Einheit'} heute. Viel Spaß – ganz locker!` } }, options: DECIDE_OPTS };
+  const keep = d.pending && d.pending.kind === 'confirm' && d.pending.data && d.pending.data.intent === 'decide' && dec.offer && dec.offer.status === 'open' ? d.pending : null;
+  return keep ? { ...base, pending: { ...keep, at: Date.now() }, options: DECIDE_OPTS } : { ...base, pending: null };
+}
+
 /* ---------- Rückfragen auflösen ---------- */
 function resolve(ctx: EngineCtx, d: DialogState, p: Pending, toks: string[], raw: string): Reply | null {
   // eine neue, vollständige Bitte geht vor der alten Rückfrage (Antworten auf Rückfragen sind kurz, außer Daten und Stärke)
@@ -279,6 +315,7 @@ function resolve(ctx: EngineCtx, d: DialogState, p: Pending, toks: string[], raw
   if (p.kind === 'confirm') {
     if (p.data && p.data.move && day && day !== p.data.move.date) return moveTo(ctx, d, p.data.move as Sx, day, true);
     if (isYes(toks) || has(toks, ['uebernehmen', 'ja bitte'])) return apply(p.data?.intent || 'apply', p.ops || [], doneText(p.ops || [], p.data?.done));
+    if (isNo(toks) && p.data && p.data.intent === 'decide') return { intent: 'decide-decline', text: 'Alles klar, dann heute ohne Extra-Einheit. Ein ruhiger Abend schadet nicht – morgen geht es normal weiter.', pending: null, decision: { kind: 'decline', verdict: 'info' } };
     if (isNo(toks)) return { intent: 'cancelled', text: 'Okay, ich lasse alles, wie es ist.', pending: null, options: quickOptions(ctx, d) };
     if (p.data && p.data.move && has(toks, ['anderer tag', 'anderen tag', 'anders'])) return askDay(ctx, d, p.data.move as Sx);
     return null;

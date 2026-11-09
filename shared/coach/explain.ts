@@ -195,6 +195,8 @@ Soll ich das so ändern?`, ops, yes: 'Ja, so machen' };
     if (limitMin && x.minutes && x.minutes > limitMin + 2 && !ops.length) {
       const short = fitToMinutes(spec, limitMin);
       const sx = structureOf({ ...s, spec: W.build(short).spec }, ctx.profile, ctx.today)!;
+      // Auftrag 32: bei wenig Zeit nur die gekürzte Fassung zeigen (vorher stand die volle Einheit davor – doppelt und zu lang)
+      blocks[blocks.length - 1] = `${s.title}${meta ? ` (${meta})` : ''}`;
       blocks.push(`Mit nur ${limitMin} min: ${W.totals(short).min} min so:\n${structureText({ ...sx, why: null, tip: null })}`);
       ops.push(modifyOp(ctx, s, date, short, null, `nur ${limitMin} min Zeit`)); yes = `Ja, auf ${W.totals(short).min} min kürzen`;
     } else if (ret && !ops.length && (C.isHard(s) || (x.minutes || 0) > 40)) {
@@ -206,6 +208,8 @@ Soll ich das so ändern?`, ops, yes: 'Ja, so machen' };
       const easy = s.sport === 'run' ? W.runEasy(spec.ctx, 25) : s.sport === 'bike' ? W.bikeEasy(spec.ctx, 30) : fitToMinutes(spec, 25);
       easy.steps = easy.steps.map(st => ({ ...st, zone: 1 }));
       ops.push(modifyOp(ctx, s, date, easy, `Locker statt: ${s.title}`, 'Ampel rot'));
+      // Auftrag 32: bei roter Ampel keine vollständige Bauanleitung der Einheit, die ohnehin nicht stattfinden soll
+      blocks[blocks.length - 1] = `${s.title}${meta ? ` (${meta})` : ''}`;
       blocks.push(`Deine Werte heute sind schlecht (${joinDe(readinessFacts(ctx, date)) || R.reasons.join(', ')}). Ich schlage vor: höchstens ${W.totals(easy).min} min ganz locker oder Ruhetag.`); yes = 'Ja, nur locker';
     } else if (R && R.level === 1 && C.isHard(s) && !ops.length && !/test/i.test(s.title || '') && (s.sport === 'run' || s.sport === 'bike')) {
       const easy = s.sport === 'run' ? W.runEasy(spec.ctx, Math.round((x.minutes || 40) * 0.8)) : W.bikeEasy(spec.ctx, Math.round((x.minutes || 50) * 0.8));

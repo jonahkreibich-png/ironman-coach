@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.20.0', items: [
+    'Coach: pro Frage eine klare Antwort. Fällt Training aus oder willst du heute noch etwas machen, schlägt er einen passenden Ersatz mit Dauer vor (z. B. 40 min locker Rad) – mit „Übernehmen“. Er weiß, was du heute schon gemacht hast, und bleibt bei seinem Angebot.',
+    'Tab-Leiste wie in iOS 26: Halten macht die ganze Leiste größer und sie federt zurück, die Auswahl gleitet wie ein Tropfen, beim Runterscrollen wird die Leiste kleiner, beim Hochscrollen wieder groß.'
+  ] },
   { version: '3.19.0', items: [
     'Coach öffnet sofort, auch mit langem Verlauf: gezeigt werden die letzten 30 Nachrichten, ältere kommen beim Hochscrollen. Alle Tabs wechseln schneller.',
     'Mitteilungen: Unter Mehr → Mitteilungen siehst du ehrlich, ob sie auf diesem Gerät aktiv sind und wann die letzte ankam. Mit „Test senden“ und neuer Ruhezeit für die Schule. Die App meldet das Gerät selbst neu an, wenn nötig.'

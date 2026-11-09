@@ -15,6 +15,8 @@ import { hasSource } from '../../shared/activity/merge';
 import type { EngineCtx, CoachMsg } from '../../shared/coach/engine';
 import { isMinor } from '../../shared/profile';
 import { BRAND } from '../../shared/brand';
+import { decide, decisionMessage, openOffer, stripPlanAsReason, contradictsOffer, suggestsDoneAgain } from '../../shared/coach/decide';
+import { oneAnswer } from '../../shared/coach/answer';
 
 /* Modelle (Auftrag 16 verglichen, siehe ERGEBNIS.md); WAI_MODEL überschreibt */
 export const WAI_MODELS = {
@@ -123,6 +125,17 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   const hits = checkMessage(text, { minor: isMinor(ctx.profile, ctx.today) });
   const hard = hits.find(h => h.flag === 'emergency' || h.flag === 'medication');
   if (hard) { out.messages.push({ id: `msg-safe-${now}`, at: now + 1, date: ctx.today, kind: 'warning', from: 'coach', text: hard.text, important: hard.flag === 'emergency' }); out.blocked = hard.flag; return out; }
+  // Auftrag 32: Tagesentscheidung (heute noch trainieren, Ersatz, „wie lange?“ …) trifft die App selbst – eine Antwort mit höchstens
+  // einem Vorschlag, dieselbe wie im Regel-Coach. Volle Daten (auch Oura-Ampel), denn hier formuliert keine KI.
+  const dec = decide(ctx0, userMsg.text);
+  if (dec) {
+    const soft = hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').map(h => h.text)[0] || '';
+    const m = decisionMessage({ ...dec, text: fixCoachText(dec.text, ctx0) || dec.text }, ctx.today, now + 2, soft);
+    if (live) { live.reset(); m.text.split(/(?<=\s)/).forEach(t => live.delta(t)); }
+    out.messages.push(m); out.topic = 'decide'; out.decided = dec.kind;
+    out.status = await freeStatus(env, uid, ctx.state.settings, !!o.parentNeeded);
+    return out;
+  }
   const st = await freeStatus(env, uid, ctx.state.settings, !!o.parentNeeded);
   if (!st.active) throw new FallbackError(st.reason || 'inactive');
   const msgs = Object.values(ctx.state.coachMsgs || {}) as CoachMsg[];
@@ -202,17 +215,22 @@ export async function waiChat(env: Env, uid: number, ctx0: EngineCtx, text: stri
   // Auftrag 17: behauptete Leistungen (z. B. „100 m geschafft“) müssen in den echten Daten stehen, sonst antwortet der Regel-Coach
   let fake: string[] = []; try { fake = unsupportedClaims(final, claimFacts(ctx)); } catch (e) { fake = []; }
   if (fake.length) bad.push(...fake);
-  if (!final || bad.length || claimed || leaksInternals(final)) {
+  // Auftrag 32: „nicht im Plan“/Regeln als Verbot fallen weg; heute schon Erledigtes nicht erneut vorschlagen; ein offenes Angebot nicht
+  // still zurücknehmen (sonst antwortet der Regel-Coach mit derselben Tagesentscheidung)
+  const sp = stripPlanAsReason(final); if (sp.removed.length) final = sp.text;
+  const again = suggestsDoneAgain(ctx0, final);
+  const contra = contradictsOffer(final, openOffer(ctx0));
+  if (!final || bad.length || claimed || leaksInternals(final) || again || contra) {
     await addWaiUsage(env, uid, { calls, neurons: out.neurons, tin, tout, fallbacks: 1 });
-    throw new FallbackError(!final ? 'empty' : bad.length ? 'invented: ' + bad.join(', ') : claimed ? 'claimed change without proposal' : 'internals');
+    throw new FallbackError(!final ? 'empty' : bad.length ? 'invented: ' + bad.join(', ') : claimed ? 'claimed change without proposal' : again ? 'suggests done again: ' + again : contra ? 'contradicts offer' : 'internals');
   }
   final = guardReadinessAnswer(final, text, ctx0);
   if (live) { live.reset(); final.split(/(?<=\s)/).forEach(t => live.delta(t)); }
   await addWaiUsage(env, uid, { questions: 1, calls, neurons: out.neurons, tin, tout });
-  hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
-  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: final, aiExcluded: final.startsWith('Ampel der App:'), by: 'free' } as any);
-  // Vorschläge nach der Antwort, damit „bestätige ihn unten“ stimmt
-  mergeSwapProposals(props).forEach((m, i) => out.messages.push({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx), at: Date.now() + 3 + i }));
+  // Auftrag 32: eine Antwort – Hinweis darunter, alle Vorschläge als ein Vorschlag an derselben Nachricht
+  out.messages.push(...oneAnswer({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: final, aiExcluded: final.startsWith('Ampel der App:'), by: 'free' } as any,
+    hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').map(h => h.text),
+    props.map(m => ({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx) }))));
   out.status = await freeStatus(env, uid, ctx.state.settings, !!o.parentNeeded);
   return out;
 }

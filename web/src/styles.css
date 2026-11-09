@@ -708,6 +708,28 @@ body.no-plan .tab-lens { display: none; }
   :root:not([data-theme="light"]) .tab-lens-shadow { box-shadow: 0 10px 28px rgba(0,0,0,.5); }
 }
 @media (prefers-reduced-motion: reduce) { .tab-lens-shadow, .tab-lens-shine { transition: none; } }
+/* Auftrag 32: Leiste wie iOS 26. Linsen-Ebene wird genauso verformt wie die Leiste (Drücken, Schrumpfen), damit beide deckungsgleich bleiben.
+   Schrumpfen beim Runterscrollen: nur scale/translate mit Feder-Kurve (leichtes Nachfedern), Compositor-freundlich. */
+.tab-lens-wrap { position: fixed; inset: 0; z-index: 31; pointer-events: none; }
+body.no-plan .tab-lens-wrap { display: none; }
+.tabbar, .tab-lens-wrap { transition: scale .5s cubic-bezier(.34,1.5,.5,1), translate .5s cubic-bezier(.34,1.5,.5,1); }
+.tabbar.mini, .tab-lens-wrap.mini { scale: .88; translate: 0 6px; }
+.tabbar.mini .tab span, .tab-lens-wrap.mini .ltab span { opacity: .55; }
+.tab span, .ltab span { transition: opacity .3s ease; }
+/* Glas: Unschärfe und leichte Lichtbrechung (Sättigung/Helligkeit des Inhalts dahinter), Glanzkante oben und weiche Kante unten */
+[data-design="glas"] .tabbar { -webkit-backdrop-filter: blur(18px) saturate(190%) brightness(1.06) contrast(1.04); backdrop-filter: blur(18px) saturate(190%) brightness(1.06) contrast(1.04);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.12), inset 0 0 0 .5px rgba(255,255,255,.25); }
+[data-design="glas"] .tabbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,0) 42%), radial-gradient(60% 120% at 50% 125%, rgba(255,255,255,.12), transparent 70%); }
+[data-design="glas"] .tab-lens-clip { -webkit-backdrop-filter: blur(3px) saturate(160%); backdrop-filter: blur(3px) saturate(160%); }
+:root[data-theme="dark"][data-design="glas"] .tabbar { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.1); }
+:root[data-theme="dark"][data-design="glas"] .tabbar::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-design="glas"] .tabbar { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.1); }
+  :root:not([data-theme="light"])[data-design="glas"] .tabbar::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%); }
+}
+@media (prefers-reduced-motion: reduce) { .tabbar, .tab-lens-wrap { transition: none; scale: none !important; translate: none !important; } }
+@media (prefers-reduced-transparency: reduce) { [data-design="glas"] .tabbar::before { display: none; } }
 .prog2 .big.approx { font-size: clamp(1.25rem, 6vw, 1.6rem); white-space: nowrap; }
 
 /* Auftrag 25: Mehr-Tab wie die iOS-Einstellungen: Suche, Profilkarte, gruppierte Listen */

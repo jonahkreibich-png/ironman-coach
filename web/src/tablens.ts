@@ -59,6 +59,11 @@ const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-r
 const tabButtons = () => tabs ? [...tabs.querySelectorAll<HTMLElement>('.tab')] : [];
 function measure(): Geo | null {
   if (!tabs) return null;
+  // Auftrag 32: Leiste (und Linsen-Ebene) können gerade gedrückt oder geschrumpft sein – gemessen wird immer die Ruhelage
+  return untransformed(measureRaw);
+}
+function measureRaw(): Geo | null {
+  if (!tabs) return null;
   const list = tabButtons(); if (!list.length) return null;
   const r = tabs.getBoundingClientRect(), b0 = list[0].getBoundingClientRect();
   if (!r.width || !b0.height) return null;
@@ -130,8 +135,92 @@ function ensureLens(): void {
   clip = document.createElement('div'); clip.className = 'tab-lens-clip';
   inner = document.createElement('div'); inner.className = 'tabbar-in tab-lens-in';
   const shine = document.createElement('div'); shine.className = 'tab-lens-shine';
-  clip.append(inner, shine); lens.append(shadow, clip); document.body.appendChild(lens);
+  // Auftrag 32: Linse in einer eigenen Ebene, die beim Drücken und Schrumpfen genauso verformt wird wie die Leiste (bleibt deckungsgleich)
+  wrap = document.createElement('div'); wrap.className = 'tab-lens-wrap'; wrap.setAttribute('aria-hidden', 'true');
+  clip.append(inner, shine); lens.append(shadow, clip); wrap.appendChild(lens); document.body.appendChild(wrap);
 }
+
+/* ---------- Auftrag 32: die ganze Leiste reagiert (wie iOS 26) ----------
+   Drücken: die Leiste wird leicht größer und dehnt sich zur Druckstelle (Gummiband, folgt dem Finger ein Stück), Loslassen: federt
+   elastisch mit kleinem Überschwingen zurück (vorausberechnete Feder als Web-Animation, läuft im Compositor).
+   Runterscrollen: Leiste schrumpft etwas (CSS „scale“/„translate“ mit Feder-Kurve), Hochscrollen, Antippen oder Tab-Wechsel: wieder groß.
+   Nur transform/scale (60 fps), Leiste und Linsen-Ebene immer gleich verformt. „Bewegung reduzieren“: nichts davon. */
+let wrap: HTMLElement | null = null;
+let mini = false;
+let squishX: number | null = null, squishX0 = 0, squishAnim: Animation[] = [];
+const SQ_S = 1.035, SQ_MAX = 7, SQ_K = 0.035;
+const SP_BOUNCE: Spring = { k: 360, z: 0.42 };
+const both = () => [bar, wrap].filter(Boolean) as HTMLElement[];
+function untransformed<T>(fn: () => T): T {
+  const els = both(); if (!els.length) return fn();
+  squishAnim.forEach(a => a.cancel()); squishAnim = [];
+  const prev = els.map(e => [e.style.transition, e.style.transform, e.style.scale, e.style.translate]);
+  els.forEach(e => { e.style.transition = 'none'; e.style.transform = 'none'; e.style.scale = 'none'; e.style.translate = 'none'; });
+  const out = fn();
+  els.forEach((e, i) => { e.style.transform = prev[i][1]; e.style.scale = prev[i][2]; e.style.translate = prev[i][3]; });
+  void (bar && bar.offsetWidth);                      // Ruhelage zurück, ohne Übergang
+  els.forEach((e, i) => { e.style.transition = prev[i][0]; });
+  return out;
+}
+/* Drehpunkt: beim Drücken die Druckstelle (Mitte der Leistenhöhe), sonst unten mittig */
+function origin(x: number | null): void {
+  if (!bar || !wrap) return;
+  const r = untransformed(() => bar!.getBoundingClientRect());
+  const ox = x == null ? r.left + r.width / 2 : Math.max(r.left, Math.min(r.right, x)), oy = x == null ? r.bottom : r.top + r.height / 2;
+  bar.style.transformOrigin = `${(ox - r.left).toFixed(1)}px ${(oy - r.top).toFixed(1)}px`;
+  wrap.style.transformOrigin = `${ox.toFixed(1)}px ${oy.toFixed(1)}px`;
+}
+const sqT = (dx: number, s: number) => `translate3d(${dx.toFixed(2)}px,0,0) scale(${s.toFixed(4)},${(1 + (s - 1) * 0.6).toFixed(4)})`;
+const sqDx = (x: number) => Math.max(-SQ_MAX, Math.min(SQ_MAX, (x - squishX0) * SQ_K));
+function squishIn(x: number): void {
+  if (reduced() || !bar || !wrap || mini) return;
+  squishAnim.forEach(a => a.cancel()); squishAnim = [];
+  origin(x); squishX0 = x; squishX = x;
+  for (const e of both()) { e.style.transition = 'transform .16s cubic-bezier(.2,.9,.3,1.25)'; e.style.transform = sqT(0, SQ_S); }
+}
+/* beim Ziehen bleibt die Leiste zur Druckstelle gedehnt stehen (sie dem Finger nachzuführen hieße, den Weichzeichner der Leiste in jedem
+   Bild neu zu rechnen – das kostete in WebKit spürbar Bilder); erst wenn der Finger weit wandert, rückt das Gummiband einmal nach */
+function squishMove(x: number): void {
+  if (squishX == null || !bar) return;
+  // Gummiband: rückt nur in groben Stufen nach (halbe Maximal-Auslenkung), nicht in jedem Bild
+  const cur = sqDx(squishX), next = sqDx(x);
+  if (Math.abs(next - cur) < SQ_MAX / 2) return;
+  squishX = x;
+  const t = sqT(next, SQ_S);
+  for (const e of both()) { e.style.transition = 'transform .22s cubic-bezier(.2,.9,.3,1.2)'; e.style.transform = t; }
+}
+function squishOut(): void {
+  if (squishX == null) return;
+  const dx = sqDx(squishX); squishX = null;
+  const els = both();
+  const path = trajectory({ x: dx, v: 0, s: SQ_S, vs: 0 }, 0, 1, SP_BOUNCE);
+  els.forEach(e => { e.style.transition = 'none'; e.style.transform = ''; });
+  if (typeof (bar as any).animate !== 'function' || path.length < 3) return;
+  const kf = path.map(o => ({ transform: sqT(o.x, o.s) }));
+  const dur = (path.length - 1) * 1000 / 60 * slow();
+  squishAnim = els.map(e => e.animate(kf, { duration: dur, easing: 'linear' }));
+  squishAnim[0].onfinish = () => { squishAnim = []; };
+}
+function setMini(on: boolean): void {
+  if (on === mini || !bar || !wrap) return;
+  if (on && (reduced() || dragging || squishX != null || pid != null)) return;
+  mini = on;
+  origin(null);
+  for (const e of both()) { e.style.transition = ''; e.classList.toggle('mini', on); }
+}
+let lastY = 0, acc = 0, userAt = -1e9;
+/* nur Scrollen durch Finger oder Mausrad zählt (inkl. Nachlaufen); automatisches Scrollen der App (z. B. Coach nach unten) nicht */
+function onScroll(): void {
+  const y = window.scrollY || 0, d = y - lastY; lastY = y;
+  if (!d || performance.now() - userAt > 1500) return;
+  if ((d > 0) !== (acc > 0)) acc = 0;
+  acc += d;
+  if (y < 40) setMini(false);
+  else if (acc > 24) setMini(true);
+  else if (acc < -16) setMini(false);
+}
+export const _barState = () => ({ mini, pressed: squishX != null, transform: bar ? bar.style.transform : '' });
+if (typeof window !== 'undefined') (window as any).__barState = _barState;
 
 /* ---------- Animation ---------- */
 /* Zeit- und Rechenmessung für die Tests „flüssig“: Rechenzeit je Frame (Summe, Anzahl, Maximum) */
@@ -234,13 +323,16 @@ function press(x: number): void {
   dragging = true;
   followX = reduced() ? centerOf(nearest(x)) : clampX(x);
   bar!.classList.add('lens-on'); lens.classList.add('pressed', 'moving');
+  // Auftrag 32: Halten/Ziehen – die ganze Leiste wird größer und dehnt sich zur Druckstelle (kurzes Antippen: nur die Linse gleitet,
+  // damit Leiste mit Weichzeichner und Linse nicht gleichzeitig animieren)
+  squishIn(x);
   peek(nearest(x)); kick();
 }
 const clampX = (x: number) => { const g = geo(); return g ? Math.max(g.left + g.w * 0.35, Math.min(g.right - g.w * 0.35, x)) : x; };
 function drag(x: number): void {
   const tab = nearest(x);
   followX = reduced() ? centerOf(tab) : clampX(x);
-  peek(tab); kick();
+  peek(tab); kick(); squishMove(x);
 }
 function release(x: number): void {
   const tab = nearest(x);
@@ -261,7 +353,7 @@ function tap(tab: string): void {
   navigate(tab);
 }
 function cancel(): void {
-  clearTimeout(timer); timer = 0; pid = null;
+  clearTimeout(timer); timer = 0; pid = null; squishOut();
   if (dragging) { dragging = false; if (lens) lens.classList.remove('pressed'); if (bar) bar.classList.remove('lens-on'); glideTo(activeTab() || lensTab); }
 }
 
@@ -274,7 +366,7 @@ export function syncTabLens(): void {
   const on = activeTab(); if (!on) return;
   if (!placed) { G = measure(); const g = geo(); if (!g) return; place(g); lens.classList.add('on'); glideTo(on); return; }
   const target = glideAnim ? glideAnim.toTab : rafGlide ? rafGlide.toTab : lensTab;
-  if (target !== on) { const g = geo(); if (g) place(g); glideTo(on); }
+  if (target !== on) { const g = geo(); if (g) place(g); glideTo(on); setMini(false); }
 }
 /* Größe geändert (Drehen, Schriftgröße, Safari-Leiste): neu messen und ohne Animation an den aktiven Tab setzen */
 function relayout(): void {
@@ -305,6 +397,10 @@ export function initTabLens(): void {
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
   window.addEventListener('pageshow', onResize);
+  // Auftrag 32: Runterscrollen schrumpft die Leiste, Hochscrollen macht sie wieder groß
+  lastY = window.scrollY || 0; window.addEventListener('scroll', onScroll, { passive: true });
+  const mark = () => { userAt = performance.now(); };
+  window.addEventListener('touchmove', mark, { passive: true }); window.addEventListener('wheel', mark, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onResize(); });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
   if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(onResize); ro.observe(tabs); ro.observe(bar); }
@@ -313,6 +409,8 @@ export function initTabLens(): void {
     if (pid != null || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const b = (e.target as HTMLElement).closest<HTMLElement>('.tab'); if (!b) return;
     pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; lx = e.clientX; downTab = b.dataset.tab || ''; downType = e.pointerType; swallowClick = false;
+    // Auftrag 32: geschrumpfte Leiste wird beim Antippen wieder groß (die ganze Leiste reagiert beim Drücken/Halten, siehe press)
+    if (mini) setMini(false);
     clearTimeout(timer);
     timer = window.setTimeout(() => { timer = 0; if (pid != null) { capture(pid); press(lx); } }, HOLD_MS);
   });
@@ -329,7 +427,7 @@ export function initTabLens(): void {
   });
   tabs.addEventListener('pointerup', e => {
     if (e.pointerId !== pid) return;
-    clearTimeout(timer); timer = 0; pid = null;
+    clearTimeout(timer); timer = 0; pid = null; squishOut();
     if (dragging) { e.preventDefault(); release(e.clientX); }
     else if (downTab) tap(downTab);
   });

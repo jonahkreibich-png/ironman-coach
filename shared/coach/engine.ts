@@ -13,7 +13,7 @@ import { mainGoal } from '../goals';
 import { T, pick, de, mmss, joinDe, dowName } from './texts';
 import { checkData, type SafetyHit } from './safety';
 import { underEatingCheck } from '../nutrition';
-import { doneItems, autoReview, type Done , reviewInputSig, reviewChange } from './review';
+import { doneItems, autoReview, type Done , reviewInputSig, reviewChange, reviewMsgId } from './review';
 import { extraChecks } from './extra';
 import { easyAfterDays } from '../periodize';
 
@@ -223,7 +223,11 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
       const key = a.sessionId || a.id; seen.add(key);
       const d: Done = doneItems(ctx, a.date, a.date).find(x => x.key === key || (x.act && x.act.id === a.id)) || { key, date: a.date, sport: a.sport, title: s ? s.title : (a.name || 'Einheit'), planned: s, st: (ctx.state.sessions || {})[key] || {}, act: a, custom: !s };
       let text: string; try { text = autoReview(ctx, d, mode); } catch (e) { text = sessionComment(ctx, a, s); }
-      push(msg(ctx, { id: 'msg-review-' + key, date: a.date, kind: 'session', title: 'Bewertung: ' + d.title, text, refs: { activityId: a.id, sessionId: a.sessionId || undefined } }));
+      // Auftrag 32: Kennung der Einheit (auch „act-…“ für Extra-Einheiten aus einer Aufzeichnung), alte Bewertung derselben Aufzeichnung ersetzen
+      seen.add(d.key);
+      const rid = reviewMsgId(ctx.state, d);
+      if (rid.old && !out.messages.some(x => x.id === rid.old.id)) out.messages.push({ ...rid.old, deleted: true } as any);
+      push(msg(ctx, { id: rid.id, date: a.date, kind: 'session', title: 'Bewertung: ' + d.title, text, refs: { activityId: a.id, sessionId: a.sessionId || undefined }, ...(rid.old ? { at: rid.old.at } : {}) } as any));
     }
     // von Hand abgehakte Einheiten ohne Aufzeichnung (heute und gestern)
     if (mode !== 'off') for (const d of doneItems(ctx, ev.sessionIds?.length ? '1900-01-01' : C.addDays(today, -1), today)) {

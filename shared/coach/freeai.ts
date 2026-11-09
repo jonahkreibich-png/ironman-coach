@@ -14,6 +14,7 @@ import { doneItems, valsOf, isReviewQuestion, norm2 } from './review';
 import { mmss } from './texts';
 import { TOOL_DEFS } from './tools';
 import { rulesForAi, KNOWLEDGE } from '../trainingknowledge';
+import { dayFactsLine, ruleLinesForAi } from './decide';
 /* Auftrag 18: Ursachen nur mit Daten (gilt für jede KI; zusätzlich prüft claims.ts jede Antwort deterministisch) */
 export const CAUSE_RULE = 'Ursachen und Zusammenhänge (z. B. Schlaf → Puls, Müdigkeit → Pace, Hitze → Puls) nennst du nur, wenn beide Werte für genau diese Einheit bzw. diesen Tag in den Daten stehen und die Abweichung zur eigenen Basis wirklich besteht (z. B. Puls bei gleicher Pace mindestens 5 Schläge über dem 6-Wochen-Schnitt, Temperatur über 25 °C gemessen). Sonst höchstens neutral, z. B. „Du hast nur 5,5 h geschlafen, mach heute lieber locker.“ Kein Puls eingetragen heißt: keine Aussage über den Puls.';
 
@@ -52,8 +53,8 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
   ];
   L.push(rulesForAi());
   if (minor) L.push(`- Der Athlet ist ${age} Jahre alt (minderjährig): keine Gewichtsziele, keine Diät, keine Kalorien zählen, kein Druck. Schule und Schlaf gehen vor. Bei Schmerzen immer Eltern und Arzt einbeziehen.`);
-  const rs = rulesOf(ctx.profile, parseFor(ctx.today)).filter(r => !r.hidden && r.kind !== 'info');
-  if (rs.length) L.push('Regeln des Athleten (nie brechen; „möglichst“ darf mit Begründung abweichen):', ...rs.map(r => '- ' + ruleText(r) + (r.strength === 'soft' ? ' (möglichst)' : '')));
+  // Auftrag 32: Wochenraster getrennt von eigenen Regeln (das Raster ist kein Verbot für Ersatz oder spontane lockere Einheiten)
+  L.push(...ruleLinesForAi(ctx, 40));
   return L.join('\n');
 }
 
@@ -115,6 +116,8 @@ export function contextParts(ctx: EngineCtx): ContextParts {
   const td = plan(today, 1); L.push('HEUTE (' + dd(today) + '): ' + (td[0] ? td[0].replace(/^\S+ \S+: /, '') : 'kein Plan'));
   const ill = C.illnessAt(ctx.state.illnessPeriods, today);
   if (ill) L.push(`KRANK EINGETRAGEN seit ${dd(ill.start)}: kein Training, auch nicht locker, bis 24 Stunden ohne Fieber und Symptome; dann „Wieder gesund“ tippen.`);
+  // Auftrag 32: was heute schon erledigt ist (auch Extra-Einheiten und Aufzeichnungen) und ein offenes Angebot von heute
+  try { L.push(dayFactsLine(ctx)); } catch (e) { /* ohne */ }
   cut('today');
   L.push('NÄCHSTE TAGE:', ...plan(C.addDays(today, 1), 8));
   cut('next');
@@ -281,7 +284,9 @@ const BASE_RULES = (today: string) => [
   '- Antworte auf Deutsch in der du-Form, natürlich und kurz: höchstens 4 Sätze, kein Markdown, keine Aufzählungen. Keine Floskeln, nichts doppelt sagen.',
   '- Beantworte zuerst genau die Frage. Nutze nur die DATEN unten und Ergebnisse der App; erfinde keine Zahlen, Termine, Messwerte oder Ergebnisse. SOLL ist der Plan, IST das Gemachte; ein Planwert ist kein Ergebnis.',
   '- Tage nennst du genau wie in den Daten (z. B. „Di 03.11.“), rechne Wochentage nie selbst aus. Nenne nie Werkzeug-Namen oder IDs.',
-  '- Keine Diagnosen, keine Medikamente. Bei Schmerzen, Krankheit, Fieber, Brustschmerz oder Schwindel: pausieren oder nur ganz locker, ärztlich abklären lassen.'
+  '- Keine Diagnosen, keine Medikamente. Bei Schmerzen, Krankheit, Fieber, Brustschmerz oder Schwindel: pausieren oder nur ganz locker, ärztlich abklären lassen.',
+  // Auftrag 32: gilt für jede Frage
+  '- „Steht nicht im Plan“ ist nie ein Grund. Schlage nie vor, was heute schon erledigt ist (HEUTE ERLEDIGT).'
 ];
 export interface FocusedPrompt { system: string; tools: any[]; topic: Topic; maxRounds: number }
 export function focusedPrompt(ctx: EngineCtx, text: string, appName: string, pre: { name: string; input: any } | null): FocusedPrompt {
@@ -300,10 +305,7 @@ export function focusedPrompt(ctx: EngineCtx, text: string, appName: string, pre
   const swimQ = sport === 'swim' || /\b(hilfsmittel|pull ?buoy|kickbrett|flossen)\b/.test(j);
   if (S.swim && swimQ) L.push('- Hilfsmittel nur, wenn sie unter AUSRÜSTUNG stehen.');
   if (minor) L.push(`- Der Athlet ist ${ageOf(ctx.profile, ctx.today)} Jahre alt (minderjährig): keine Gewichtsziele, keine Diät, kein Kalorienzählen, kein Druck. Schule und Schlaf gehen vor. Bei Schmerzen immer Eltern und Arzt einbeziehen.`);
-  if (topic === 'change' || topic === 'day' || topic === 'general') {
-    const rs = rulesOf(ctx.profile, parseFor(ctx.today)).filter(r => !r.hidden && r.kind !== 'info');
-    if (rs.length) L.push('Eigene Regeln des Athleten (nie brechen; „möglichst“ darf mit Begründung abweichen):', ...rs.slice(0, 8).map(r => '- ' + ruleText(r) + (r.strength === 'soft' ? ' (möglichst)' : '')));
-  }
+  if (topic === 'change' || topic === 'day' || topic === 'general') L.push(...ruleLinesForAi(ctx, 8));
   const rules = relevantRules(text); if (rules) L.push(rules);
   // Daten: immer Profil, Ziel und heute; der Rest nach Thema
   const D: string[] = [S.profile, S.goal, S.today];

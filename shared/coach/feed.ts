@@ -8,7 +8,7 @@ export interface FeedItem { type: 'msg' | 'line'; msg?: any; line?: string; date
 const DAY = 86400000;
 const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 /* offen: Vorschlag ohne Entscheidung, Rückfrage des Chats (höchstens einen Tag) oder Knöpfe einer Coach-Nachricht ohne Antwort */
-export const isOpen = (m: any, now = Date.now()) => !!m && ((m.kind === 'proposal' && m.proposal && m.proposal.status === 'open') || (!!m.pendingOpen && !m.actionsDone && now - (m.at || 0) < DAY) || (!!(m.actions && m.actions.length) && !m.actionsDone && !m.chat && m.kind !== 'answer'));
+export const isOpen = (m: any, now = Date.now()) => !!m && (((m.kind === 'proposal' || m.kind === 'answer') && m.proposal && m.proposal.status === 'open') || (!!m.pendingOpen && !m.actionsDone && now - (m.at || 0) < DAY) || (!!(m.actions && m.actions.length) && !m.actionsDone && !m.chat && m.kind !== 'answer'));
 const isChat = (m: any) => m.from === 'user' || !!m.chat || !!m.intent;
 export function summaryOf(thread: any[]): string {
   const done = [...thread].reverse().find(m => m.from !== 'user' && /^Erledigt: /.test(m.text || ''));
@@ -56,6 +56,8 @@ export function searchMsgs(all: any[], q: string): any[] {
 const norm = (s: any) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
 export function occasionKey(m: any): string | null {
   if (!m || m.deleted || m.from === 'user' || m.chat || m.intent || m.kind === 'answer') return null;
+  // Auftrag 32: eine Bewertung je Aufzeichnung (Server unter der Aufzeichnung, App unter der Extra-Einheit „act-…“)
+  if (/^msg-review-/.test(m.id || '') && m.kind === 'session') return 'review|' + ((m.refs && m.refs.activityId) || String(m.id).replace(/^msg-review-(act-)?/, ''));
   const text = norm(m.text);
   if (!text && !m.title) return null;
   const day = m.date || (m.at ? localDate(m.at) : '');
@@ -70,7 +72,9 @@ export function duplicateMsgIds(all: any[]): string[] {
     const k = occasionKey(m); if (!k) continue;
     const cur = best.get(k);
     if (!cur) { best.set(k, m); continue; }
-    if (better(m, cur) < 0) { out.push(cur.id); best.set(k, m); } else out.push(m.id);
+    // Bewertungen: die neueste gilt (enthält die nachgetragenen Angaben), sonst die entschiedene/älteste
+    const cmp = k.startsWith('review|') ? (cur.at || 0) - (m.at || 0) || String(cur.id).localeCompare(String(m.id)) : better(m, cur);
+    if (cmp < 0) { out.push(cur.id); best.set(k, m); } else out.push(m.id);
   }
   return out;
 }

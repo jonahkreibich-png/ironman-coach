@@ -32,6 +32,8 @@ async function stopAudit(page: Page) {
   return page.evaluate(() => { const w = window as any; w.__audit.stop = true; return w.__audit as { maxLenses: number; frames: { x: number; sx: number; s: number; t: number }[] }; });
 }
 const settledAt = async (page: Page, id: string) => {
+  // Auftrag 32: die ganze Leiste federt nach dem Drücken zurück – erst danach die Ruhelage der Tabs messen
+  await expect.poll(() => page.evaluate(() => (document.querySelector('.tabbar') as HTMLElement).getAnimations().length + ((window as any).__barState().pressed ? 1 : 0)), { timeout: 3000 }).toBe(0);
   const c = await tabCenter(page, id);
   await expect.poll(async () => Math.abs((await lensBox(page)).x - c.x), { timeout: 3000 }).toBeLessThan(1.5);
   await expect.poll(() => page.evaluate(() => (window as any).__lensState().gliding), { timeout: 3000 }).toBe(false);
@@ -308,4 +310,68 @@ test('„Bewegung reduzieren“: keine Feder, keine Vergrößerung, Linse wechse
   await page.mouse.up();
   await expect(page.locator('[data-view="plan"]')).toBeVisible();
   expect(Math.abs((await lensBox(page)).x - p.x)).toBeLessThan(1.5);
+});
+
+/* Auftrag 32: die ganze Leiste reagiert wie in iOS 26 – Drücken (größer, zur Druckstelle gedehnt, federt zurück), Runterscrollen schrumpft sie,
+   Hochscrollen/Antippen macht sie wieder groß. Leiste und Linse bleiben deckungsgleich, „Bewegung reduzieren“ schaltet alles ab. */
+const barScale = (page: Page) => page.evaluate(() => { const b = document.querySelector('.tabbar') as HTMLElement; const r = b.getBoundingClientRect(); return { w: r.width, h: r.height, x: r.left + r.width / 2, bottom: r.bottom }; });
+test('Drücken: ganze Leiste wird größer und dehnt sich zur Druckstelle, federt nach dem Loslassen zurück', async ({ page }) => {
+  await seed(page);
+  await open(page, '/');
+  await settledAt(page, 'heute');
+  const rest = await barScale(page);
+  const h = await tabCenter(page, 'heute'), c = await tabCenter(page, 'coach');
+  await page.mouse.move(c.x, c.y); await page.mouse.down();
+  await page.waitForTimeout(450);
+  const pressed = await barScale(page);
+  expect(pressed.w).toBeGreaterThan(rest.w * 1.02);                       // größer
+  await page.mouse.move(h.x, c.y, { steps: 6 });
+  await page.waitForTimeout(150);
+  const pulled = await barScale(page);
+  expect(pulled.x).toBeLessThan(pressed.x - 2);                           // zum Finger gezogen (Gummiband)
+  // Linse und Leiste bleiben deckungsgleich: Linse steht innerhalb der verformten Leiste
+  const lb = await lensBox(page); expect(lb.x).toBeGreaterThan(pulled.x - pulled.w / 2); expect(lb.x).toBeLessThan(pulled.x + pulled.w / 2);
+  await page.mouse.up();
+  // federt zurück: Web-Animation auf der Leiste, danach exakt Ruhelage
+  expect(await page.evaluate(() => (document.querySelector('.tabbar') as HTMLElement).getAnimations().length)).toBeGreaterThan(0);
+  await expect.poll(async () => Math.abs((await barScale(page)).w - rest.w), { timeout: 3000 }).toBeLessThan(0.5);
+  await settledAt(page, 'heute');
+  await expect(page.locator('.tab-lens')).toHaveCount(1);
+});
+test('Runterscrollen schrumpft die Leiste, Hochscrollen und Antippen machen sie wieder groß; Linse bleibt am aktiven Tab', async ({ page }) => {
+  await seed(page);
+  await open(page, '/?go=plan');
+  await settledAt(page, 'plan');
+  const rest = await barScale(page);
+  await page.evaluate(() => document.body.style.minHeight = '4000px');
+  for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(40); }
+  await expect.poll(() => page.evaluate(() => (window as any).__barState().mini), { timeout: 2000 }).toBe(true);
+  await expect.poll(async () => (await barScale(page)).w, { timeout: 2000 }).toBeLessThan(rest.w * 0.92);
+  // Linse sitzt auch geschrumpft am aktiven Tab
+  const p = await tabCenter(page, 'plan'); expect(Math.abs((await lensBox(page)).x - p.x)).toBeLessThan(2);
+  for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, -120); await page.waitForTimeout(40); }
+  await expect.poll(() => page.evaluate(() => (window as any).__barState().mini), { timeout: 2000 }).toBe(false);
+  await expect.poll(async () => Math.abs((await barScale(page)).w - rest.w), { timeout: 2000 }).toBeLessThan(0.5);
+  // wieder runter, dann Antippen: groß
+  for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(40); }
+  await expect.poll(() => page.evaluate(() => (window as any).__barState().mini), { timeout: 2000 }).toBe(true);
+  const pc = await tabCenter(page, 'plan');
+  await page.mouse.move(pc.x, pc.y); await page.mouse.down(); await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => (window as any).__barState().mini), { timeout: 2000 }).toBe(false);
+});
+test('„Bewegung reduzieren“: Leiste verformt sich nicht beim Drücken und schrumpft nicht beim Scrollen', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await seed(page);
+  await open(page, '/?go=plan');
+  await settledAt(page, 'plan');
+  const rest = await barScale(page);
+  const c = await tabCenter(page, 'coach');
+  await page.mouse.move(c.x, c.y); await page.mouse.down(); await page.waitForTimeout(450);
+  expect(Math.abs((await barScale(page)).w - rest.w)).toBeLessThan(0.5);
+  await page.mouse.up();
+  await page.evaluate(() => document.body.style.minHeight = '4000px');
+  for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(40); }
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).__barState().mini)).toBe(false);
+  expect(Math.abs((await barScale(page)).w - rest.w)).toBeLessThan(0.5);
 });

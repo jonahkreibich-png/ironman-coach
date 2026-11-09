@@ -23,6 +23,8 @@ import { parseFor } from '../../shared/ruleparse';
 import { withoutSource, hasSource } from '../../shared/activity/merge';
 import { evidenceSignature } from '../../shared/results';
 import { loadState } from './coach';
+import { decide, decisionMessage, openOffer, stripPlanAsReason, contradictsOffer, suggestsDoneAgain, ruleLinesForAi } from '../../shared/coach/decide';
+import { oneAnswer } from '../../shared/coach/answer';
 
 /* Oura-Daten dürfen laut Oura-API-Vertrag (gültig ab 08.06.2026, Abschnitt 4(d)) nicht an KI-Modelle gehen. Sie werden vor jedem KI-Aufruf entfernt. */
 export const NO_AI_SOURCES = ['oura'];
@@ -106,8 +108,8 @@ async function addUsage(env: Env, uid: number, model: string, usage: any, countM
 
 /* Regeln des Athleten (Auftrag 5): stehen im Systemprompt, gelten aber unabhängig davon in jedem Werkzeug */
 function rulesBlock(ctx: EngineCtx): string {
-  const rs = rulesOf(ctx.profile, parseFor(ctx.today)).filter(r => !r.hidden && r.kind !== 'info');
-  return rs.length ? '\n## Regeln des Athleten (nie brechen; „möglichst“ darf mit Begründung abweichen)\n' + rs.map(r => '- ' + ruleText(r) + (r.strength === 'soft' ? ' (möglichst)' : '')).join('\n') : '';
+  // Auftrag 32: eigene Regeln getrennt vom Wochenraster (kein Verbot für Ersatz oder spontane lockere Einheiten)
+  return '\n## Regeln und Wochenraster\n' + ruleLinesForAi(ctx, 40).join('\n');
 }
 function systemPrompt(ctx: EngineCtx): string {
   const minor = isMinor(ctx.profile, ctx.today);
@@ -149,6 +151,14 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
   const hits = checkMessage(text, { minor: isMinor(ctx.profile, ctx.today) });
   const hard = hits.find(h => h.flag === 'emergency' || h.flag === 'medication');
   if (hard) { out.messages.push({ id: `msg-safe-${now}`, at: now + 1, date: ctx.today, kind: 'warning', from: 'coach', text: hard.text, important: hard.flag === 'emergency' }); out.blocked = hard.flag; return out; }
+  // Auftrag 32: Tagesentscheidung trifft die App selbst (eine Antwort, höchstens ein Vorschlag, wie im Regel-Coach)
+  const dec = decide(ctx0, userMsg.text);
+  if (dec) {
+    const m = decisionMessage({ ...dec, text: fixCoachText(dec.text, ctx0) || dec.text }, ctx.today, now + 2, hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').map(h => h.text)[0] || '');
+    if (live) { live.reset(); m.text.split(/(?<=\s)/).forEach(t => live.delta(t)); }
+    out.messages.push(m);
+    return out;
+  }
   if (!out.status.active) {
     const why = !out.status.entitled ? 'Der KI-Coach ist für dein Konto noch nicht freigeschaltet.' : !out.status.keyPresent ? 'Der KI-Coach ist gerade nicht verfügbar.' : !out.status.consent ? 'Für den KI-Coach fehlt deine Einwilligung.' : !out.status.enabled ? 'Der KI-Coach ist ausgeschaltet.' : out.status.monthUsd >= out.status.budgetUsd ? 'Das Monatsbudget für den KI-Coach ist aufgebraucht.' : 'Für heute sind alle KI-Nachrichten verbraucht.';
     throw new HttpError(403, why + ' Die Schnellfragen und „Mit Claude besprechen“ funktionieren weiter.');
@@ -192,16 +202,18 @@ export async function aiChat(env: Env, uid: number, ctx0: EngineCtx, text: strin
     }
     messages.push({ role: 'user', content: results });
   }
-  // Warnhinweise (z. B. Fieber, Essen) zusätzlich zur Antwort
-  hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').forEach((h, i) => out.messages.push({ id: `msg-hint-${now}-${i}`, at: Date.now(), date: ctx.today, kind: 'warning', from: 'coach', text: h.text }));
   // Auftrag 17: behauptete Leistungen gegen die echten Daten prüfen; unbelegte Sätze werden nicht gezeigt
   let shown = finalText || 'Erledigt.'; try { shown = stripUnsupported(shown, claimFacts(ctx)) || shown; } catch (e) { /* unverändert */ }
   shown = fixCoachText(guardReadinessAnswer(shown, text, ctx0), ctx) || 'Erledigt.';
   // Auftrag 29: jede genannte Zahl gegen die gespeicherten Ist-Werte
   try { shown = checkValueClaims(shown, valueFacts(ctx), ctx.today).text || shown; } catch (e) { /* unverändert */ }
+  // Auftrag 32: „nicht im Plan“ ist nie ein Grund; heute Erledigtes nicht erneut vorschlagen; offenes Angebot nicht still zurücknehmen
+  { const sp = stripPlanAsReason(shown); if (sp.removed.length && sp.text) shown = sp.text; }
+  if (suggestsDoneAgain(ctx0, shown) || contradictsOffer(shown, openOffer(ctx0))) throw new HttpError(503, 'Die KI-Antwort passte nicht zu deinem Tag. Der Regel-Coach antwortet.');
   if (live) { live.reset(); shown.split(/(?<=\s)/).forEach(t => live.delta(t)); }
-  out.messages.push({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown, aiExcluded: shown.startsWith('Ampel der App:') });
-  { const props = out.messages.filter(m => m.kind === 'proposal'); const merged = mergeSwapProposals(props as any[]).map((m: any) => ({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx) })); out.messages = [...out.messages.filter(m => m.kind !== 'proposal'), ...merged]; }
+  // Auftrag 32: eine Antwort – Hinweis darunter, alle Vorschläge als ein Vorschlag an derselben Nachricht
+  { const props = out.messages.filter(m => m.kind === 'proposal').map((m: any) => ({ ...m, title: fixCoachText(m.title || '', ctx), text: fixCoachText(m.text || '', ctx) }));
+    out.messages = [...out.messages.filter(m => m.kind !== 'proposal'), ...oneAnswer({ id: `msg-ai-${now}`, at: Date.now() + 2, date: ctx.today, kind: 'answer', from: 'ai', text: shown, aiExcluded: shown.startsWith('Ampel der App:') }, hits.filter(h => h.flag !== 'emergency' && h.flag !== 'medication').map(h => h.text), props)]; }
   out.status = await aiStatus(env, uid, ctx.state.settings, needsParentConsent(ageOf(ctx.profile, ctx.today)));
   return out;
 }

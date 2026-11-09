@@ -1,0 +1,395 @@
+{
+ "total": 756,
+ "passed": 756,
+ "pct": 100,
+ "byCheck": {},
+ "byCat": {
+  "replace": [
+   21,
+   21
+  ],
+  "followup-long": [
+   42,
+   42
+  ],
+  "followup-easy": [
+   21,
+   21
+  ],
+  "followup-sport": [
+   21,
+   21
+  ],
+  "accept": [
+   21,
+   21
+  ],
+  "today": [
+   84,
+   84
+  ],
+  "today-insist": [
+   21,
+   21
+  ],
+  "decline": [
+   21,
+   21
+  ],
+  "which-sport": [
+   21,
+   21
+  ],
+  "tired": [
+   21,
+   21
+  ],
+  "shorter": [
+   21,
+   21
+  ],
+  "short-time": [
+   21,
+   21
+  ],
+  "move": [
+   21,
+   21
+  ],
+  "decline-generic": [
+   42,
+   42
+  ],
+  "swap": [
+   21,
+   21
+  ],
+  "no-time": [
+   21,
+   21
+  ],
+  "pain": [
+   21,
+   21
+  ],
+  "sick": [
+   21,
+   21
+  ],
+  "knowledge": [
+   84,
+   84
+  ],
+  "review": [
+   21,
+   21
+  ],
+  "goal": [
+   21,
+   21
+  ],
+  "plan": [
+   42,
+   42
+  ],
+  "why": [
+   21,
+   21
+  ],
+  "form": [
+   21,
+   21
+  ],
+  "nonsense": [
+   63,
+   63
+  ]
+ },
+ "judge": {
+  "sinn": 4.89,
+  "klar": 4.99,
+  "hilfe": 4.78
+ },
+ "users": [
+  {
+   "id": "u01-jonah-aehnlich",
+   "label": "17, Langdistanz, Fußball fällt aus, Kraft schon erledigt, Ampel gelb, Raster sperrt den Tag"
+  },
+  {
+   "id": "u02-jugend-gruen-team",
+   "label": "17, Fußball-Tag, Ampel grün, Training findet statt"
+  },
+  {
+   "id": "u03-jugend-krank",
+   "label": "17, krank eingetragen"
+  },
+  {
+   "id": "u04-vater-gruen-offen",
+   "label": "~50, Rad/Lauf, Einheit heute offen, Ampel grün"
+  },
+  {
+   "id": "u05-vater-knie",
+   "label": "~50, Knie-Beschwerden, Ruhetag"
+  },
+  {
+   "id": "u06-laeuferin-gelb",
+   "label": "nur Laufen, Halbmarathon, Ampel gelb, Einheit offen"
+  },
+  {
+   "id": "u07-laeuferin-rot",
+   "label": "nur Laufen, Ampel rot, Ruhetag"
+  },
+  {
+   "id": "u08-einsteiger-ruhetag",
+   "label": "Einsteiger Sprint, Ruhetag, keine Ampelwerte"
+  },
+  {
+   "id": "u09-einsteiger-erledigt",
+   "label": "Einsteiger, heutige Einheit schon erledigt"
+  },
+  {
+   "id": "u10-md-gruen",
+   "label": "Mitteldistanz/Marathon erfahren, Ampel grün, offen"
+  },
+  {
+   "id": "u11-md-rot-offen",
+   "label": "erfahren, Ampel rot, Einheit offen"
+  },
+  {
+   "id": "u12-regeln-ruhetag",
+   "label": "viele eigene Regeln, Ruhetag"
+  },
+  {
+   "id": "u13-regeln-gelb",
+   "label": "viele eigene Regeln, Ampel gelb, offen"
+  },
+  {
+   "id": "u14-marathon-anf",
+   "label": "Marathon-Anfänger, Ruhetag, keine Werte"
+  },
+  {
+   "id": "u15-marathon-anf-erledigt",
+   "label": "Anfänger, Lauf heute erledigt, Ampel grün"
+  },
+  {
+   "id": "u16-rad-event",
+   "label": "Rad-Event Alpen, Ampel grün, Ruhetag"
+  },
+  {
+   "id": "u17-rad-event-krank",
+   "label": "Rad-Event, krank"
+  },
+  {
+   "id": "u18-oly-gelb-ruhetag",
+   "label": "Olympisch erfahren, Ampel gelb, Ruhetag"
+  },
+  {
+   "id": "u19-oly-kraft-erledigt",
+   "label": "Olympisch, Kraft heute erledigt, Ampel grün"
+  },
+  {
+   "id": "u20-profi-gruen",
+   "label": "Ironman-Profi 15 h, Ampel grün, offen"
+  },
+  {
+   "id": "u21-profi-viel",
+   "label": "Profi, heute schon 2 h Rad gefahren"
+  }
+ ],
+ "questions": [
+  {
+   "name": "Ausfall + Folgefragen",
+   "steps": [
+    {
+     "q": "Mein Training fällt heute aus, soll ich noch was machen?",
+     "cat": "replace"
+    },
+    {
+     "q": "und wie lange?",
+     "cat": "followup-long"
+    },
+    {
+     "q": "wie locker?",
+     "cat": "followup-easy"
+    },
+    {
+     "q": "kann ich auch {alt}?",
+     "cat": "followup-sport"
+    },
+    {
+     "q": "ja",
+     "cat": "accept"
+    }
+   ]
+  },
+  {
+   "name": "Lust auf mehr",
+   "steps": [
+    {
+     "q": "Soll ich heute noch was machen?",
+     "cat": "today"
+    },
+    {
+     "q": "aber ich will heute irgendwas machen",
+     "cat": "today-insist"
+    },
+    {
+     "q": "wie lange soll ich {alt}?",
+     "cat": "followup-long"
+    },
+    {
+     "q": "nein danke",
+     "cat": "decline"
+    }
+   ]
+  },
+  {
+   "name": "Kann ich trainieren",
+   "steps": [
+    {
+     "q": "Kann ich heute trainieren?",
+     "cat": "today"
+    },
+    {
+     "q": "Lohnt sich heute noch eine kurze Einheit?",
+     "cat": "today"
+    }
+   ]
+  },
+  {
+   "name": "Sportwahl",
+   "steps": [
+    {
+     "q": "Ich hab Lust auf Sport, was kann ich heute machen?",
+     "cat": "today"
+    },
+    {
+     "q": "Soll ich heute lieber Rad fahren oder laufen?",
+     "cat": "which-sport"
+    }
+   ]
+  },
+  {
+   "name": "Müde und kürzer",
+   "steps": [
+    {
+     "q": "Ich bin müde",
+     "cat": "tired"
+    },
+    {
+     "q": "Mach das Training heute kürzer",
+     "cat": "shorter"
+    },
+    {
+     "q": "Ich habe heute nur 20 Minuten",
+     "cat": "short-time"
+    }
+   ]
+  },
+  {
+   "name": "Planänderungen",
+   "steps": [
+    {
+     "q": "Verschieb mein Training von heute auf morgen",
+     "cat": "move"
+    },
+    {
+     "q": "nein",
+     "cat": "decline-generic"
+    },
+    {
+     "q": "Tausch heute und morgen",
+     "cat": "swap"
+    },
+    {
+     "q": "nein",
+     "cat": "decline-generic"
+    },
+    {
+     "q": "Ich habe am Freitag keine Zeit",
+     "cat": "no-time"
+    }
+   ]
+  },
+  {
+   "name": "Gesundheit",
+   "steps": [
+    {
+     "q": "Mir tut das Knie weh",
+     "cat": "pain"
+    },
+    {
+     "q": "Ich bin krank",
+     "cat": "sick"
+    }
+   ]
+  },
+  {
+   "name": "Wissen",
+   "steps": [
+    {
+     "q": "Was ist Zone 2?",
+     "cat": "knowledge"
+    },
+    {
+     "q": "Wie atme ich beim Kraulen richtig?",
+     "cat": "knowledge"
+    },
+    {
+     "q": "Was soll ich vor dem Training essen?",
+     "cat": "knowledge"
+    },
+    {
+     "q": "Wie viel Schlaf brauche ich?",
+     "cat": "knowledge"
+    }
+   ]
+  },
+  {
+   "name": "Bewertung und Plan",
+   "steps": [
+    {
+     "q": "Wie war mein Training gestern?",
+     "cat": "review"
+    },
+    {
+     "q": "Wie läuft es mit meinem Ziel?",
+     "cat": "goal"
+    },
+    {
+     "q": "Was steht morgen an?",
+     "cat": "plan"
+    },
+    {
+     "q": "Was genau mache ich heute?",
+     "cat": "plan"
+    },
+    {
+     "q": "Warum ist heute locker?",
+     "cat": "why"
+    },
+    {
+     "q": "Bin ich übertrainiert?",
+     "cat": "form"
+    }
+   ]
+  },
+  {
+   "name": "Unsinn",
+   "steps": [
+    {
+     "q": "erzähl mir einen Witz",
+     "cat": "nonsense"
+    },
+    {
+     "q": "asdfgh",
+     "cat": "nonsense"
+    },
+    {
+     "q": "Wer wird Fußball-Weltmeister?",
+     "cat": "nonsense"
+    }
+   ]
+  }
+ ]
+}
