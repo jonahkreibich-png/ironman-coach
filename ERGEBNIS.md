@@ -1,6 +1,6 @@
 # Auftrag 33: Mitteilungen zuverlässig + Tab-Leiste wie iOS 26 (10.11.)
 
-**Stand:** Umgesetzt und getestet, Version **3.21.0**. **Veröffentlicht** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert. Was du am iPhone tun kannst: .
+**Stand:** Umgesetzt und getestet, Version **3.21.0**. **Veröffentlicht** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert. Was du am iPhone tun kannst: FUER-JONAH.md.
 
 ## 1. Mitteilungen
 
