@@ -1,6 +1,6 @@
 # Auftrag 33: Mitteilungen zuverlässig + Tab-Leiste wie iOS 26 (10.11.)
 
-**Stand:** Umgesetzt und getestet, Version **3.21.0**. RELEASE_STAND
+**Stand:** Umgesetzt und getestet, Version **3.21.0**. **Veröffentlicht** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert. Was du am iPhone tun kannst: .
 
 ## 1. Mitteilungen
 
@@ -54,4 +54,4 @@ Beide Videos mit ffmpeg zerlegt (10 und 60 Bilder/s, Leiste in voller Auflösung
 ## 4. Was vorhanden war, was neu ist
 - **Verbessert:** Prüfung der Anmeldung (`sync.ts`), Versand (`notify.ts`: einmal, Urgency/TTL, alte Kennungen), Seite Mitteilungen und Admin-Karte, Service Worker, Tab-Leiste (`tablens.ts`, gleiche Schnittstelle).
 - **Neu, weil es fehlte:** Tabelle `push_deliveries` (Stand je Mitteilung und Gerät) und `POST /api/push/receipt` (Bestätigung vom Gerät ohne Geräte-Schlüssel, mit Einmal-Schlüssel je Mitteilung).
-- **Tests:** Server `push33.mjs` (29 Prüfungen, 20 davon scheiterten mit dem alten Code), Unit `auftrag33-push.test.ts`, `sw.test.ts` (Empfang), Browser `auftrag33-push.spec.ts`, `auftrag33-tabbar.spec.ts` (WebKit + Chromium mit Touch), angepasste `tabbar.spec.ts`, `auftrag31-push.spec.ts`. ERGEBNIS_TESTS
+- **Tests:** Server `push33.mjs` (29 Prüfungen, 20 davon scheiterten mit dem alten Code), Unit `auftrag33-push.test.ts`, `sw.test.ts` (Empfang), Browser `auftrag33-push.spec.ts`, `auftrag33-tabbar.spec.ts` (WebKit + Chromium mit Touch), angepasste `tabbar.spec.ts`, `auftrag31-push.spec.ts`. Vor der Veröffentlichung: Typprüfung, 3.219 Unit-/Server-Tests und 710 Browser-Tests grün.

@@ -1,5 +1,14 @@
 # Für Jonah
 
+**Nach dem Update auf 3.21.0:**
+1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
+2. Mehr → Mitteilungen → „Test senden“. Die App wartet bis zu 30 s und sagt dir, ob die Mitteilung auf dem iPhone angekommen ist.
+3. Steht dort „angenommen, aber nicht bestätigt“: iPhone-Einstellungen → Mitteilungen → Stamio (alles an, „Sofort“ statt Übersicht) und Fokus prüfen (Stamio erlauben).
+
+---
+
+## Frühere Hinweise
+
 **Nach dem Update auf 3.20.0:** App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.** Sonst musst du nichts tun.
 
 ---
