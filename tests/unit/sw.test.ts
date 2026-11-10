@@ -39,3 +39,35 @@ test('pushsubscriptionchange: neu anmelden, Fenster benachrichtigen', async () =
   expect(subs[0].userVisibleOnly).toBe(true);
   expect(posted).toEqual([{ type: 'push-renew' }]);
 });
+
+/* Auftrag 33: nach dem Anzeigen meldet der Service Worker „angekommen“ (Empfangs-Schlüssel, ohne Geräte-Schlüssel) und informiert offene
+   Fenster (Test-Knopf wartet darauf). Scheitert die Meldung (kein Netz), wird die Mitteilung trotzdem angezeigt. */
+function pushWorker(fetchFn: (u: string, o: any) => Promise<any>, show: () => Promise<void> = async () => {}) {
+  const handlers: Record<string, (e: any) => void> = {}; const posted: any[] = []; const shown: any[] = [];
+  const self: any = { addEventListener: (k: string, fn: any) => { handlers[k] = fn; }, location: { origin: 'https://app.example' },
+    registration: { scope: 'https://app.example/', showNotification: async (title: string, o: any) => { shown.push({ title, ...o }); await show(); } },
+    clients: { matchAll: async () => [{ postMessage: (m: any) => posted.push(m) }] } };
+  new Function('self', 'caches', 'fetch', build())(self, {}, fetchFn);
+  const push = async (d: any) => { let wait: any; handlers.push({ data: { json: () => d }, waitUntil: (p: any) => { wait = p; } }); await wait; };
+  return { push, posted, shown };
+}
+test('push: zeigt an, meldet „angekommen“ mit Empfangs-Schlüssel und sagt offenen Fenstern Bescheid', async () => {
+  const calls: any[] = [];
+  const w = pushWorker(async (u, o) => { calls.push({ u, o }); return { ok: true }; });
+  await w.push({ title: 'Guten Morgen', body: 'x', tag: 'morning', mid: '2099-01-05|morning', rt: 'abcdefghijklmnopqrstuvwx' });
+  expect(w.shown[0].title).toBe('Guten Morgen');
+  expect(calls.length).toBe(1);
+  expect(calls[0].u).toBe('https://app.example/api/push/receipt');
+  expect(calls[0].o.method).toBe('POST');
+  expect(JSON.parse(calls[0].o.body).t).toBe('abcdefghijklmnopqrstuvwx');
+  expect(calls[0].o.headers.Authorization).toBeUndefined();
+  expect(w.posted).toEqual([{ type: 'push-received', mid: '2099-01-05|morning' }]);
+});
+test('push: ohne Netz wird trotzdem angezeigt; alte Mitteilung ohne Schlüssel: keine Meldung', async () => {
+  const calls: any[] = [];
+  const w = pushWorker(async (u) => { calls.push(u); throw new Error('offline'); });
+  await w.push({ title: 'A', rt: 'abcdefghijklmnopqrstuvwx', mid: 'm1' });
+  await w.push({ title: 'B' });
+  expect(w.shown.map(x => x.title)).toEqual(['A', 'B']);
+  expect(calls.length).toBe(1);
+});

@@ -42,7 +42,7 @@ import { initTabLens } from './tablens';
 import { calibrateIfDue, planRulesOnStart } from './replan';
 import { toast } from './toast';
 import { APP, FEATURES, STORAGE } from './config';
-import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState, retrySync, ensurePush } from './sync';
+import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState, retrySync, ensurePush, onPushChange } from './sync';
 /* Auftrag 29: „Erneut versuchen“ in der Abgleich-Meldung */
 on('sync-retry', () => { void retrySync().then(ok => toast(ok ? 'Alles gesichert.' : 'Noch nicht gesichert – ich versuche es automatisch weiter. Deine Einträge bleiben auf dem Gerät.')); });
 import { checkSwimSkill } from './testupdate';
@@ -364,7 +364,9 @@ if (isSyncOn()) {
   loadAiState().then(() => { if ((UI.tab === 'coach' || UI.sub === 'coachset') && JSON.stringify(aiState()) !== aiBefore) nav.refresh(); });
   loadConnections();
   // Auftrag 31: Mitteilungs-Anmeldung dieses Geräts prüfen und bei Bedarf erneuern (neue Geräte-Kennung, Update, neuer Schlüssel)
-  setTimeout(() => { void ensurePush().then(st => { if (st === 'renewed' && UI.sub === 'mitteilungen') nav.refresh(); }); }, 2500);
+  // Auftrag 33: geänderter Stand zeichnet Mehr-Tab und Seite „Mitteilungen“ neu (vorher zeigte der Mehr-Tab einen nie geladenen Stand → „Aus“)
+  onPushChange(() => { if (UI.tab === 'mehr') nav.refresh(); });
+  setTimeout(() => { void ensurePush(); }, 2500);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => { setTimeout(() => void ensurePush(true), 1500); });
     navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'push-renew') void ensurePush(true); });

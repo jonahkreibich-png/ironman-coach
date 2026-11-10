@@ -40,6 +40,14 @@ self.addEventListener('push', event => {
   if (typeof d.badge === 'number' && self.navigator && 'setAppBadge' in self.navigator) {
     tasks.push((d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()).catch(() => {}));
   }
+  /* Auftrag 33: nach dem Anzeigen dem Server „angekommen“ melden (Empfangs-Schlüssel dieser Mitteilung, Zeit) und offene Fenster
+     informieren (der Test-Knopf wartet darauf). Fehler hier dürfen die Mitteilung nie verhindern. */
+  const shown = tasks[0].then(() => true, () => false);
+  if (d.rt) tasks.push(shown.then(ok => ok && fetch(new URL('/api/push/receipt', self.location.origin).href, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: d.rt, at: Date.now() }), keepalive: true
+  })).catch(() => {}));
+  if (d.mid) tasks.push(shown.then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+    .then(list => list.forEach(c => c.postMessage({ type: 'push-received', mid: d.mid }))).catch(() => {}));
   event.waitUntil(Promise.all(tasks));
 });
 /* Auftrag 31: Der Browser hat die Anmeldung erneuert oder verworfen (Chrome/Firefox; Safari meldet das nicht): mit demselben Schlüssel neu

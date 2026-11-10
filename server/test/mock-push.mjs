@@ -56,7 +56,8 @@ http.createServer((req, res) => {
         const err = verifyVapid(req.headers.authorization, 'http://127.0.0.1:8798');
         if (err) { messages.push({ error: err }); res.writeHead(403); return res.end(); }
         if (req.headers['content-encoding'] !== 'aes128gcm') throw new Error('falsches Content-Encoding');
-        messages.push({ ...decrypt(Buffer.concat(chunks)), id });
+        // Auftrag 33: Dringlichkeit und Gültigkeit (TTL) mitschreiben
+        messages.push({ ...decrypt(Buffer.concat(chunks)), id, urgency: req.headers.urgency || null, ttl: req.headers.ttl != null ? +req.headers.ttl : null });
         res.writeHead(201); res.end();
       } catch (e) { messages.push({ error: e.message }); res.writeHead(400); res.end(); }
     });

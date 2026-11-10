@@ -4,55 +4,10 @@
    (/__push) durch: Erlauben → Test kommt an → neue Geräte-Kennung (wie nach Neu-Verbinden/Neuinstallation) → App meldet sich beim nächsten
    Start selbst neu an → abgelaufene Anmeldung (410) wird erkannt, ehrlich angezeigt und mit „Erneut erlauben“ ersetzt.
    Dazu: Ruhezeit in der Schule (neue Felder) eintippen, neu laden, gleicher Wert; ungültige Uhrzeit wird abgelehnt. */
-import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
-import crypto from 'node:crypto';
+import { test, expect, type Page } from '@playwright/test';
 import { seed, open, stored } from './helpers';
+import { BASE, account, pairNew, api, pushLog, fakePush, connect } from './push-helpers';
 
-const BASE = 'http://localhost:4180';
-const ecdh = crypto.createECDH('prime256v1'); ecdh.generateKeys();
-const KEYS = { p256dh: ecdh.getPublicKey().toString('base64url'), auth: crypto.randomBytes(16).toString('base64url') };
-
-async function account(request: APIRequestContext) {
-  await request.post('/__reset');
-  return await (await request.post('/api/setup', { data: { name: 'iPhone' } })).json();
-}
-async function pairNew(request: APIRequestContext, token: string) {
-  const c = (await (await request.post('/api/pair/create', { headers: { Authorization: 'Bearer ' + token } })).json()).code;
-  return await (await request.post('/api/pair/redeem', { data: { code: c, name: 'iPhone' } })).json();
-}
-const api = async (request: APIRequestContext, token: string, method: 'get' | 'post', path: string) => (await request[method](path, { headers: { Authorization: 'Bearer ' + token } })).json();
-const pushLog = async (request: APIRequestContext) => (await request.get('/__push-log')).json();
-
-/* Browser-Push nachmachen: Erlaubnis, Service Worker bereit, Anmeldung mit Adresse beim Push-Dienst des Testservers.
-   Die Anmeldung bleibt im sessionStorage (wie im Browser über Neuladen hinweg); `__nextId` bestimmt die Adresse der nächsten. */
-async function fakePush(page: Page, firstId: string) {
-  await page.addInitScript(([base, keys, firstId]) => {
-    const w = window as any;
-    const load = () => { try { return JSON.parse(sessionStorage.getItem('__fakeSub') || 'null'); } catch (e) { return null; } };
-    const save = (s: any) => sessionStorage.setItem('__fakeSub', JSON.stringify(s));
-    let perm = sessionStorage.getItem('__perm') || 'default';
-    class FakeNotification { static get permission() { return perm; } static async requestPermission() { perm = 'granted'; sessionStorage.setItem('__perm', perm); return perm; } }
-    Object.defineProperty(w, 'Notification', { value: FakeNotification, configurable: true });
-    if (!('PushManager' in w)) Object.defineProperty(w, 'PushManager', { value: function PushManager() {}, configurable: true });
-    const makeSub = (d: any) => d && ({ endpoint: d.endpoint, options: { applicationServerKey: new Uint8Array(d.key).buffer },
-      toJSON: () => ({ endpoint: d.endpoint, keys }), unsubscribe: async () => { save(null); w.__unsubscribed = (w.__unsubscribed || 0) + 1; return true; } });
-    const pushManager = {
-      getSubscription: async () => makeSub(load()),
-      subscribe: async (o: any) => {
-        const id = sessionStorage.getItem('__nextId') || firstId;
-        const d = { endpoint: `${base.replace('localhost', '127.0.0.1')}/__push/${id}`, key: Array.from(new Uint8Array(o.applicationServerKey)) };
-        save(d); return makeSub(d);
-      }
-    };
-    Object.defineProperty(ServiceWorkerContainer.prototype, 'ready', { get: () => Promise.resolve({ pushManager }), configurable: true });
-  }, [BASE, KEYS, firstId] as const);
-}
-async function connect(page: Page, acc: any) {
-  await page.addInitScript(a => {
-    const cur = JSON.parse(localStorage.getItem('ec_sync_auth') || 'null');
-    if (!cur || cur.deviceId !== a.deviceId) { localStorage.setItem('ec_sync_auth', JSON.stringify({ token: a.token, deviceId: a.deviceId, userId: a.userId, connectedAt: Date.now() })); localStorage.setItem('ec_owner', JSON.stringify(a.userId)); }
-  }, acc);
-}
 const state = (page: Page) => page.locator('[data-push-state]').first();
 
 test('Erlauben → Test kommt an → neue Geräte-Kennung: App meldet sich selbst neu an → abgelaufen: ehrlich anzeigen und ersetzen', async ({ page, request }) => {
@@ -70,8 +25,10 @@ test('Erlauben → Test kommt an → neue Geräte-Kennung: App meldet sich selbs
   expect(st.thisDevice).toBe(true);
 
   // Test-Mitteilung: kommt beim Push-Dienst an (mit VAPID, verschlüsselt), Anzeige „zuletzt zugestellt“
+  // Auftrag 33: der Test-Knopf wartet auf die Bestätigung des Geräts; hier bestätigt niemand → ehrlich „angenommen, nicht bestätigt“
+  await page.evaluate(() => { (window as any).__pushTestWait = 1500; });
   await page.locator('[data-act="push-test"]').click();
-  await expect(page.locator('#toast, .toast').first()).toContainText('unterwegs', { timeout: 10000 });
+  await expect(page.locator('[data-push-test]')).toContainText('nicht bestätigt', { timeout: 15000 });
   let log = await pushLog(request);
   expect(log.some((x: any) => x.id === 'iphone-1' && x.vapid && x.enc === 'aes128gcm' && x.bytes > 100)).toBe(true);
   await expect(page.locator('[data-push-last]')).toContainText('zugestellt');
@@ -92,12 +49,14 @@ test('Erlauben → Test kommt an → neue Geräte-Kennung: App meldet sich selbs
   await expect.poll(async () => (await api(request, acc2.token, 'get', '/api/push/status')).endTail, { timeout: 15000 }).toContain('gone-1');
   const r = await api(request, acc2.token, 'post', '/api/push/test');
   expect(r.results.find((x: any) => x.thisDevice).gone).toBe(true);
-  await page.evaluate(() => sessionStorage.setItem('__nextId', 'iphone-2'));
+  // wie iOS: ohne Antippen keine neue Anmeldung möglich → erst dann wirklich „erneut erlauben“ (Auftrag 33)
+  await page.evaluate(() => { sessionStorage.setItem('__nextId', 'iphone-2'); sessionStorage.setItem('__noSilentSubscribe', '1'); });
   await open(page, '/?go=mitteilungen');
   await expect(state(page)).toHaveAttribute('data-push-state', 'inactive', { timeout: 15000 });
   await expect(page.locator('[data-push-state="inactive"]')).toHaveText('Auf diesem Gerät nicht aktiv');
   expect((await api(request, acc2.token, 'get', '/api/push/status')).thisDevice).toBe(false);
   // „Erneut erlauben“: alte Anmeldung wird ersetzt, neue Adresse, wieder aktiv, Test kommt an
+  await page.evaluate(() => { (window as any).__userTap = true; });
   await page.locator('[data-act="push-on"]').first().click();
   await expect(state(page)).toHaveAttribute('data-push-state', 'on', { timeout: 15000 });
   st = await api(request, acc2.token, 'get', '/api/push/status');

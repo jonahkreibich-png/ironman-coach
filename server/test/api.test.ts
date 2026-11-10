@@ -53,7 +53,7 @@ beforeAll(async () => {
 }, 30000);
 afterAll(() => { procs.forEach(p => p.kill()); });
 
-for (const file of ['run.mjs', 'intervals.mjs', 'coach-server.mjs', 'push.mjs', 'push31.mjs']) {
+for (const file of ['run.mjs', 'intervals.mjs', 'coach-server.mjs', 'push.mjs', 'push31.mjs', 'push33.mjs']) {
   test(file, async () => {
     const api = await serverFor();
     const r = await run('test/' + file, { API: api });

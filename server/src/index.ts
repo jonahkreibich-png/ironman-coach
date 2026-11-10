@@ -7,7 +7,7 @@ import { HttpError, json, corsHeaders, readJson } from './http';
 import { type Auth, authDevice, setup, createPairCode, redeemPairCode, createInvite, listInvites } from './auth';
 import { runImport, intervalsCreds } from './intervals';
 import { runDaily, runWeekly, loadState, runAnalysis, dataSignature } from './coach';
-import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliverAll } from './notify';
+import { notifyTick, queueAfterImport, queueAdjustments, queueAchievements, checkAchievements, deliverAll, dropReplaced, newMid } from './notify';
 import { vapidPublicKey } from './webpush';
 import { logError, recentErrors, scrub } from './errlog';
 import { extraRoutes, publicRoutes, scheduledExtras, onRecordsChanged } from './extensions';
@@ -63,13 +63,13 @@ export async function resetUser(env: Env, uid: number): Promise<number> {
   const t = Date.now();
   const changes: Change[] = (rows.results || []).map((r: any, i: number) => ({ kind: r.kind, key: r.key, deleted: true, updatedAt: t + i }));
   if (changes.length) await putRecords(env, uid, changes);
-  for (const tbl of ['connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_gone', 'ai_usage', 'wai_usage', 'oauth_states']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
+  for (const tbl of ['connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_gone', 'push_deliveries', 'ai_usage', 'wai_usage', 'oauth_states']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare("DELETE FROM user_meta WHERE user_id = ? AND k <> 'reset_at'").bind(uid).run();
   await setMeta(env, uid, 'reset_at', t);
   return changes.length;
 }
 export async function deleteUser(env: Env, uid: number): Promise<void> {
-  for (const tbl of ['records', 'connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_subs', 'ai_usage', 'wai_usage', 'oauth_states', 'user_meta', 'devices', 'pair_codes', 'feedback']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
+  for (const tbl of ['records', 'connections', 'ingest_keys', 'blobs', 'backups', 'push_log', 'push_queue', 'push_subs', 'push_gone', 'push_deliveries', 'ai_usage', 'wai_usage', 'oauth_states', 'user_meta', 'devices', 'pair_codes', 'feedback']) await env.DB.prepare('DELETE FROM ' + tbl + ' WHERE user_id = ?').bind(uid).run();
   await env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'admin'").bind(uid).run();
 }
 
@@ -101,6 +101,9 @@ export async function nightly(env: Env) {
   await env.DB.prepare('DELETE FROM push_log WHERE day < ?').bind(berlinDate(Date.now() - 14 * 86400000)).run();
   // Auftrag 31: Anmeldungen von Geräten, die es nicht mehr gibt (neu verbunden, abgemeldet), bekommen nichts mehr
   await env.DB.prepare('DELETE FROM push_subs WHERE device_id NOT IN (SELECT id FROM devices)').run();
+  // Auftrag 33: alte Kennung desselben Geräts (ersetzt, lange nicht gesehen) bekommt nichts mehr; Empfangsprotokoll 14 Tage
+  for (const uid of await activeUsers(env)) { try { await dropReplaced(env, uid); } catch (e) { /* nächste Nacht */ } }
+  await env.DB.prepare('DELETE FROM push_deliveries WHERE sent_at < ?').bind(Date.now() - 14 * 86400000).run();
   await env.DB.prepare('DELETE FROM oauth_states WHERE created_at < ?').bind(Date.now() - 3600000).run();
   await purgeDeleted(env);
 }
@@ -118,6 +121,15 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   if (p === '/api/push/key' && M === 'GET') {
     if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
     return { key: vapidPublicKey(env) };
+  }
+  /* Auftrag 33: Empfangsbestätigung vom Service Worker („Mitteilung ist auf dem Gerät angekommen und angezeigt“). Der Service Worker hat
+     keinen Geräte-Schlüssel; jede Mitteilung trägt dafür einen eigenen zufälligen Empfangs-Schlüssel (nur für diese Mitteilung und dieses Gerät). */
+  if (p === '/api/push/receipt' && M === 'POST') {
+    const body: any = await readJson(req).catch(() => ({}));
+    const tk = String((body && body.t) || '');
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(tk)) throw new HttpError(400, 'Ungültige Bestätigung');
+    const r: any = await env.DB.prepare('UPDATE push_deliveries SET received_at = COALESCE(received_at, ?) WHERE token = ?').bind(Date.now(), tk).run();
+    return { ok: !!(r && r.meta && r.meta.changes) };
   }
   if (p === '/api/setup' && M === 'POST') {
     const r: any = await setup(env, await readJson(req), req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || 'local');
@@ -184,21 +196,32 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
     }
     /* Auftrag 31: Mitteilungen im Überblick – wer hat aktive Anmeldungen, letzte Zustellung, Sendefehler (ohne Inhalte) */
     if (p === '/api/admin/push' && M === 'GET') {
-      const subs: any = await env.DB.prepare('SELECT s.user_id, u.name AS user_name, d.name AS device, s.created_at, s.last_status, s.last_at, s.last_ok_at, s.fails, s.last_error FROM push_subs s LEFT JOIN users u ON u.id = s.user_id LEFT JOIN devices d ON d.id = s.device_id ORDER BY s.user_id').all();
+      const subs: any = await env.DB.prepare('SELECT s.user_id, s.device_id, u.name AS user_name, d.name AS device, d.last_seen, s.created_at, s.last_status, s.last_at, s.last_ok_at, s.fails, s.last_error FROM push_subs s LEFT JOIN users u ON u.id = s.user_id LEFT JOIN devices d ON d.id = s.device_id ORDER BY s.user_id').all();
       const gone: any = await env.DB.prepare('SELECT g.user_id, u.name AS user_name, d.name AS device, g.at, g.status, g.reason FROM push_gone g LEFT JOIN users u ON u.id = g.user_id LEFT JOIN devices d ON d.id = g.device_id WHERE g.at > ? ORDER BY g.at DESC').bind(Date.now() - 30 * 86400000).all();
-      const week: any = await env.DB.prepare('SELECT user_id, COUNT(*) AS n, SUM(CASE WHEN delivered > 0 THEN 1 ELSE 0 END) AS ok, SUM(CASE WHEN delivered = 0 THEN 1 ELSE 0 END) AS failed FROM push_log WHERE day >= ? GROUP BY user_id').bind(berlinDate(Date.now() - 7 * 86400000)).all();
+      // Auftrag 33: je Nutzer geplant / gesendet / angenommen (Apple bzw. Google) / angekommen (Bestätigung des Geräts)
+      const week: any = await env.DB.prepare(`SELECT l.user_id, COUNT(*) AS planned, SUM(CASE WHEN l.skipped IS NULL THEN 1 ELSE 0 END) AS n, SUM(CASE WHEN l.delivered > 0 THEN 1 ELSE 0 END) AS ok, SUM(CASE WHEN l.delivered = 0 THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN EXISTS (SELECT 1 FROM push_deliveries d WHERE d.user_id = l.user_id AND d.mid = l.mid AND d.received_at IS NOT NULL) THEN 1 ELSE 0 END) AS rec
+        FROM push_log l WHERE l.day >= ? GROUP BY l.user_id`).bind(berlinDate(Date.now() - 7 * 86400000)).all();
+      const recv: any = await env.DB.prepare('SELECT device_id, MAX(received_at) AS at FROM push_deliveries WHERE received_at IS NOT NULL GROUP BY device_id').all();
+      const recvAt = new Map(((recv.results || []) as any[]).map(x => [x.device_id, x.at]));
+      const recent: any = await env.DB.prepare(`SELECT d.user_id, u.name AS user_name, d.mid, d.type, MIN(d.sent_at) AS sent_at, COUNT(*) AS n, SUM(d.accepted) AS acc, SUM(CASE WHEN d.received_at IS NOT NULL THEN 1 ELSE 0 END) AS rec
+        FROM push_deliveries d LEFT JOIN users u ON u.id = d.user_id WHERE d.sent_at > ? GROUP BY d.user_id, d.mid ORDER BY sent_at DESC LIMIT 25`).bind(Date.now() - 7 * 86400000).all();
       const users: any = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE COALESCE(test, 0) = 0').first();
       const list = (subs.results || []) as any[];
       return { configured: !!env.VAPID_PRIVATE_JWK, users: (users && users.n) || 0, usersWithPush: new Set(list.map(x => x.user_id)).size, subs: list.length, failing: list.filter(x => (x.fails || 0) > 0).length,
-        list: list.map(x => ({ userId: x.user_id, user: x.user_name || ('Nutzer ' + x.user_id), device: x.device || 'Gerät', since: x.created_at, lastStatus: x.last_status, lastAt: x.last_at, lastOkAt: x.last_ok_at, fails: x.fails || 0, lastError: x.last_error || null })),
+        list: list.map(x => ({ userId: x.user_id, user: x.user_name || ('Nutzer ' + x.user_id), device: x.device || 'Gerät', since: x.created_at, lastStatus: x.last_status, lastAt: x.last_at, lastOkAt: x.last_ok_at, fails: x.fails || 0, lastError: x.last_error || null, lastSeen: x.last_seen || null, lastReceivedAt: recvAt.get(x.device_id) || null })),
+        recent: ((recent.results || []) as any[]).map(x => ({ userId: x.user_id, user: x.user_name || ('Nutzer ' + x.user_id), mid: x.mid, type: x.type, sentAt: x.sent_at, devices: x.n, accepted: x.acc || 0, received: x.rec || 0 })),
         expired: ((gone.results || []) as any[]).map(x => ({ userId: x.user_id, user: x.user_name || ('Nutzer ' + x.user_id), device: x.device || 'Gerät', at: x.at, status: x.status, reason: x.reason || null })),
-        week: ((week.results || []) as any[]).map(x => ({ userId: x.user_id, sent: x.n, delivered: x.ok || 0, failed: x.failed || 0 })) };
+        week: ((week.results || []) as any[]).map(x => ({ userId: x.user_id, planned: x.planned, sent: x.n || 0, delivered: x.ok || 0, accepted: x.ok || 0, received: x.rec || 0, failed: x.failed || 0 })) };
     }
     const apt = /^\/api\/admin\/push\/test\/(\d+)$/.exec(p);
     if (apt && M === 'POST') {
       if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
-      const r = await deliverAll(env, +apt[1], { title: BRAND.name, body: 'Test vom Betreiber: Mitteilungen kommen an. 💪', url: './?go=heute', tag: 'test-admin' });
-      return { delivered: r.delivered, results: r.results.map(x => ({ ok: x.ok, status: x.status, reason: x.reason, gone: x.gone })) };
+      const mid = newMid('test-admin'), day = berlinDate(Date.now());
+      await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at, delivered, mid) VALUES (?, ?, ?, ?, ?, NULL, ?)').bind(+apt[1], mid, day, 'test', Date.now(), mid).run();
+      const r = await deliverAll(env, +apt[1], { title: BRAND.name, body: 'Test vom Betreiber: Mitteilungen kommen an. 💪', url: './?go=heute', tag: 'test-admin' }, { mid, day, type: 'test', urgency: 'high', ttl: 600 });
+      await env.DB.prepare('UPDATE push_log SET delivered = ? WHERE user_id = ? AND day = ? AND key = ?').bind(r.delivered, +apt[1], day, mid).run();
+      return { mid, delivered: r.delivered, results: r.results.map(x => ({ ok: x.ok, status: x.status, reason: x.reason, gone: x.gone })) };
     }
     // Test-Nutzer: Einladung erzeugen (der Tester richtet sich damit selbst ein)
     if (p === '/api/admin/testusers' && M === 'POST') return await createInvite(env, a, (await readJson(req)).note || 'Test-Nutzer', true);
@@ -329,19 +352,47 @@ async function route(req: Request, env: Env, url: URL, ctx: any): Promise<any> {
   if (p === '/api/push/status' && M === 'GET') {
     const me: any = await env.DB.prepare('SELECT endpoint, last_status, last_at, last_ok_at, fails, last_error, created_at FROM push_subs WHERE device_id = ? AND user_id = ?').bind(a.deviceId, uid).first();
     const all = await env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?').bind(uid).first();
-    const gone: any = me ? null : await env.DB.prepare('SELECT at, status, reason FROM push_gone WHERE user_id = ? AND device_id = ?').bind(uid, a.deviceId).first();
+    const gone: any = me ? null : await env.DB.prepare('SELECT at, status, reason, end_tail FROM push_gone WHERE user_id = ? AND device_id = ?').bind(uid, a.deviceId).first();
+    const recv: any = await env.DB.prepare('SELECT MAX(received_at) AS at FROM push_deliveries WHERE user_id = ? AND device_id = ?').bind(uid, a.deviceId).first();
     return { configured: !!env.VAPID_PRIVATE_JWK, thisDevice: !!me, devices: (all && all.n) || 0,
       ...(me ? { endTail: String(me.endpoint).slice(-24), since: me.created_at, lastStatus: me.last_status, lastAt: me.last_at, lastOkAt: me.last_ok_at, fails: me.fails || 0, lastError: me.last_error || null } : {}),
-      ...(gone ? { expired: { at: gone.at, status: gone.status, reason: gone.reason || null } } : {}) };
+      lastReceivedAt: (recv && recv.at) || null,
+      ...(gone ? { expired: { at: gone.at, status: gone.status, reason: gone.reason || null, endTail: gone.end_tail || null } } : {}) };
   }
   if (p === '/api/push/test' && M === 'POST') {
     if (!env.VAPID_PRIVATE_JWK) throw new HttpError(503, 'Mitteilungen sind gerade nicht verfügbar.');
-    const r = await deliverAll(env, uid, { title: BRAND.name, body: 'Test: Mitteilungen kommen an. 💪', url: './?go=heute', tag: 'test' });
+    // Auftrag 33: eigene Kennung je Test – die App wartet damit bis zu 30 s auf die Bestätigung „auf dem Gerät angekommen“
+    const mid = newMid('test'), day = berlinDate(Date.now());
+    await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at, delivered, mid) VALUES (?, ?, ?, ?, ?, NULL, ?)').bind(uid, mid, day, 'test', Date.now(), mid).run();
+    const r = await deliverAll(env, uid, { title: BRAND.name, body: 'Test: Mitteilungen kommen an. 💪', url: './?go=heute', tag: 'test' }, { mid, day, type: 'test', urgency: 'high', ttl: 600 });
+    await env.DB.prepare('UPDATE push_log SET delivered = ? WHERE user_id = ? AND day = ? AND key = ?').bind(r.delivered, uid, day, mid).run();
     const names: any = await env.DB.prepare('SELECT id, name FROM devices WHERE user_id = ?').bind(uid).all();
     const nm = new Map(((names.results || []) as any[]).map(x => [x.id, x.name]));
-    return { delivered: r.delivered, results: r.results.map(x => ({ device: nm.get(x.deviceId) || 'Gerät', thisDevice: x.deviceId === a.deviceId, ok: x.ok, status: x.status, reason: x.reason, gone: x.gone })) };
+    return { mid, delivered: r.delivered, results: r.results.map(x => ({ device: nm.get(x.deviceId) || 'Gerät', thisDevice: x.deviceId === a.deviceId, ok: x.ok, status: x.status, reason: x.reason, gone: x.gone })) };
   }
 
+  /* Auftrag 33: Stand einer Mitteilung je Gerät (gesendet / angenommen / angekommen) – für den Test-Knopf */
+  if (p === '/api/push/receipt' && M === 'GET') {
+    const mid = String(url.searchParams.get('mid') || '').slice(0, 80);
+    const rows: any = await env.DB.prepare('SELECT d.device_id, v.name, d.sent_at, d.status, d.accepted, d.reason, d.received_at FROM push_deliveries d LEFT JOIN devices v ON v.id = d.device_id WHERE d.user_id = ? AND d.mid = ?').bind(uid, mid).all();
+    return { mid, devices: ((rows.results || []) as any[]).map(x => ({ device: x.name || 'Gerät', thisDevice: x.device_id === a.deviceId, sentAt: x.sent_at, status: x.status, accepted: !!x.accepted, reason: x.reason || null, receivedAt: x.received_at || null })) };
+  }
+  /* Auftrag 33: Mitteilungen der letzten 7 Tage (nur Art und Zeit, keine Inhalte) mit Stand je Gerät – für die Seite „Mitteilungen“ */
+  if (p === '/api/push/log' && M === 'GET') {
+    const since = berlinDate(Date.now() - 7 * 86400000);
+    const log: any = await env.DB.prepare('SELECT key, day, type, sent_at, delivered, mid, skipped FROM push_log WHERE user_id = ? AND day >= ? ORDER BY sent_at DESC LIMIT 40').bind(uid, since).all();
+    const del: any = await env.DB.prepare('SELECT d.mid, d.device_id, v.name, d.status, d.accepted, d.received_at FROM push_deliveries d LEFT JOIN devices v ON v.id = d.device_id WHERE d.user_id = ? AND d.day >= ?').bind(uid, since).all();
+    const by = new Map<string, any[]>();
+    for (const x of (del.results || []) as any[]) { const l = by.get(x.mid) || []; l.push({ device: x.name || 'Gerät', thisDevice: x.device_id === a.deviceId, status: x.status, accepted: !!x.accepted, receivedAt: x.received_at || null }); by.set(x.mid, l); }
+    return { items: ((log.results || []) as any[]).map(x => ({ mid: x.mid || null, day: x.day, type: x.type, sentAt: x.sent_at, skipped: x.skipped || null, delivered: x.delivered, devices: (x.mid && by.get(x.mid)) || [] })) };
+  }
+  // Nur für lokale Tests: Zeitstempel eines Geräts setzen (lange nicht gesehen, später angelegt)
+  if (p === '/api/test/device' && M === 'POST' && env.ALLOW_TEST_ROUTES === '1') {
+    const body = await readJson(req);
+    if (body.createdAt != null) await env.DB.prepare('UPDATE devices SET created_at = ? WHERE id = ? AND user_id = ?').bind(+body.createdAt, String(body.deviceId), uid).run();
+    if (body.lastSeen != null) await env.DB.prepare('UPDATE devices SET last_seen = ? WHERE id = ? AND user_id = ?').bind(+body.lastSeen, String(body.deviceId), uid).run();
+    return { ok: true };
+  }
   // Nur für lokale Tests: einen 5-Minuten-Lauf zu einer bestimmten Uhrzeit simulieren
   if (p === '/api/test/tick' && M === 'POST' && env.ALLOW_TEST_ROUTES === '1') {
     const body = await readJson(req);

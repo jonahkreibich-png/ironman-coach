@@ -10,7 +10,7 @@ import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refres
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
 import { bikeSpeedsOf, kindsOf, speedRange, mainKind, BIKE_KIND_LABEL, SPEED_HINT, type BikeKind } from '../../../shared/bikespeed';
 import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
-import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall, ensurePush, pushLocal, ago } from '../sync';
+import { aiState, loadAiState, isSyncOn, pushSupported, pushStatus, enablePush, disablePush, apiCall, ensurePush, pushView, pushIsChecking, pushReceipt, pushLog, ago } from '../sync';
 import { freeSettingsHtml } from './freeai';
 import { invalidate, D } from '../data';
 import { needsParentConsent } from '../../../shared/features';
@@ -52,12 +52,14 @@ export function applyTheme(v: string) {
    Zonen und Tests, Mitteilungen, Darstellung, Coach und KI, Einheiten, Sprache. Krankheitsphasen und Zyklus stehen unter
    Berücksichtigungen, die Laufschuhe unter Ausrüstung. */
 export const themeLabel = () => theme() === 'light' ? t('set.light') : theme() === 'dark' ? t('set.dark') : t('set.system');
+/* Auftrag 33: Stand im Mehr-Tab aus der Prüfung beim Start (bzw. beim Öffnen des Mehr-Tabs), nicht aus dem Stand der Seite „Mitteilungen“
+   (der war im Mehr-Tab nie geladen → immer „Aus“). Solange nichts Sicheres bekannt ist: „wird geprüft“, nie fälschlich „Aus“. */
 export function notifySummary(): string {
   if (!isSyncOn()) return t('mehr.notifyNoAccount');
-  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-  if (perm === 'denied') return t('mehr.notifyBlocked');
-  if (perm === 'granted' && PUSH && (!PUSH.thisDevice || PUSH.expired)) return t('mehr.notifyInactive');
-  return PUSH && PUSH.thisDevice && perm === 'granted' ? t('mehr.notifyOn') : t('mehr.notifyOff');
+  const v = pushView();
+  if (v === 'checking' && !pushIsChecking()) void ensurePush();
+  if (v === 'unsupported') return isIOS() && !isStandalone() ? t('mehr.notifyInstall') : t('mehr.notifyOff');
+  return v === 'blocked' ? t('mehr.notifyBlocked') : v === 'needs-tap' ? t('mehr.notifyInactive') : v === 'on' ? t('mehr.notifyOn') : v === 'checking' ? t('mehr.notifyChecking') : t('mehr.notifyOff');
 }
 export function renderDarstellung(): string {
   return sec(t('set.look'), `<div class="card stack"><div class="seg" role="group" aria-label="${esc(t('set.theme'))}">${[['', t('set.system')], ['light', t('set.light')], ['dark', t('set.dark')]].map(([v, l]) => `<button class="${theme() === v ? 'on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${theme() === v}">${esc(l)}</button>`).join('')}</div>
@@ -162,34 +164,59 @@ function pushHead(perm: string): string {
   if (PUSH && PUSH.configured === false) return `<div class="hint" data-push-state="server">${esc(t('set.notifyServer'))}</div>`;
   if (perm === 'denied') return `<div class="hint" data-push-state="blocked">${esc(t('set.notifyBlocked', { app: APP.shortName }))}</div>`;
   if (perm !== 'granted') return `<div class="hint" data-push-state="ask">${esc(t('set.notifyAsk'))}</div><button class="btn" data-act="push-on">${ic('bell')} ${esc(t('set.notifyAllow'))}</button>`;
-  if (!PUSH) return `<div class="hint" data-push-state="loading">${esc(t('set.notifyChecking'))}</div>`;
-  const inactive = !PUSH.thisDevice || PUSH.expired || pushLocal === 'needs-tap';
-  if (inactive) {
-    const why = PUSH.expired ? t('set.notifyExpired') : t('set.notifyNotHere');
+  // Auftrag 33: „Erneut erlauben“ nur, wenn iOS bzw. der Browser die Anmeldung wirklich verworfen hat (Prüfung: needs-tap)
+  const v = pushView();
+  if (v === 'needs-tap') {
+    const why = PUSH && PUSH.expired ? t('set.notifyExpired') : t('set.notifyNotHere');
     return `<div class="spread"><span class="sync-st warn" data-push-state="inactive">${esc(t('set.notifyInactive'))}</span></div><div class="hint">${esc(why)}</div><button class="btn" data-act="push-on">${ic('bell')} ${esc(t('set.notifyAgain'))}</button>`;
   }
-  const failing = (PUSH.fails || 0) > 0;
-  const last = PUSH.lastOkAt ? t('set.notifyLastOk', { when: ago(PUSH.lastOkAt) }) : t('set.notifyNoneYet');
-  return `<div class="spread" style="flex-wrap:wrap;gap:6px"><span class="sync-st ${failing ? 'warn' : 'ok'}" data-push-state="${failing ? 'failing' : 'on'}">${esc(t(failing ? 'set.notifyFailing' : 'set.notifyActive'))}</span><button class="btn ghost sm" data-act="push-test">${esc(t('set.notifyTest'))}</button></div>
-    <div class="xs muted" data-push-last>${esc(last)}${failing && PUSH.lastError ? ' · ' + esc(t('set.notifyLastErr', { err: String(PUSH.lastError) })) : ''}</div>
+  if (v === 'checking' || PUSH === null) return `<div class="hint" data-push-state="loading">${esc(t('set.notifyChecking'))}</div>`;
+  const P = PUSH && !PUSH.error ? PUSH : null;
+  const failing = !!P && (P.fails || 0) > 0;
+  const last = !P ? t('set.notifyUnreachable') : P.lastOkAt ? t('set.notifyLastOk', { when: ago(P.lastOkAt) }) : t('set.notifyNoneYet');
+  const recv = P && P.lastReceivedAt ? t('set.notifyLastRecv', { when: ago(P.lastReceivedAt) }) : '';
+  return `<div class="spread" style="flex-wrap:wrap;gap:6px"><span class="sync-st ${failing ? 'warn' : 'ok'}" data-push-state="${failing ? 'failing' : 'on'}">${esc(t(failing ? 'set.notifyFailing' : 'set.notifyActive'))}</span><button class="btn ghost sm" data-act="push-test" ${TEST.busy ? 'disabled' : ''}>${esc(t('set.notifyTest'))}</button></div>
+    <div class="xs muted" data-push-last>${esc(last)}${recv ? ' · ' + esc(recv) : ''}${failing && P.lastError ? ' · ' + esc(t('set.notifyLastErr', { err: String(P.lastError) })) : ''}</div>
+    ${TEST.text ? `<div class="hint" data-push-test role="status" aria-live="polite">${esc(TEST.text)}</div>` : ''}
     ${failing ? `<button class="btn ghost sm" data-act="push-on">${esc(t('set.notifyAgain'))}</button>` : ''}`;
 }
+/* Auftrag 33: Protokoll der letzten 7 Tage für dieses Gerät: gesendet / von Apple bzw. Google angenommen / auf dem Gerät angekommen */
+let LOG: any = undefined;
+function stepOf(x: any): string {
+  if (x.skipped) return t(x.skipped === 'quiet' ? 'set.logQuiet' : 'set.logLimit');
+  const me = (x.devices || []).find((d: any) => d.thisDevice);
+  if (!me) return (x.devices || []).length ? t('set.logOther') : x.delivered == null ? t('set.logSent') : t('set.logNoDevice');
+  return me.receivedAt ? t('set.logArrived') : me.accepted ? t('set.logAccepted') : t('set.logRejected', { s: String(me.status || '–') });
+}
+const typeName = (k: string) => { const v = t('notify.' + k); return v && v !== 'notify.' + k ? v : t('set.logType.' + k); };
+function logCard(): string {
+  if (LOG === undefined) { LOG = null; pushLog().then(r => { LOG = r || { items: [] }; nav.refresh(); }); }
+  const items = ((LOG && LOG.items) || []).slice(0, 12);
+  if (!items.length) return '';
+  const rows = items.map((x: any) => `<div class="kv" data-push-log><span class="muted small">${esc(fmtDate(x.day))} ${esc(new Date(x.sentAt).toTimeString().slice(0, 5))} · ${esc(typeName(x.type))}</span><b class="small">${esc(stepOf(x))}</b></div>`).join('');
+  return more(t('set.logTitle'), `<div class="stack" style="gap:4px">${rows}<div class="hint">${esc(t('set.logHint'))}</div></div>`);
+}
+const TEST: { busy: boolean; text: string } = { busy: false, text: '' };
 function notifyCard(): string {
   if (!isSyncOn()) return `<div class="card"><div class="hint">${esc(t('set.notifyNeedSync'))}</div></div>`;
-  if (PUSH === undefined) { PUSH = null; ensurePush().then(() => pushStatus()).then(s => { PUSH = s || { configured: false }; nav.refresh(); }); /* Auftrag 31: wartet, falls gerade eine Uhrzeit eingetippt wird */ }
+  // Auftrag 33: beim Öffnen gründlich prüfen (ohne 6-h-Abkürzung); Server nicht erreichbar → { error } statt „nicht eingerichtet“
+  if (PUSH === undefined) { PUSH = null; ensurePush(true).then(() => pushStatus()).then(s => { PUSH = s || { error: true }; nav.refresh(); }); /* Auftrag 31: wartet, falls gerade eine Uhrzeit eingetippt wird */ }
   const P = notifyPrefs();
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
   const head = pushHead(perm);
   const team = !!(profile().teamSport || profile().sports.includes('football'));
   const rows = NOTIFY_ROWS.filter(([k]) => k !== 'adductors' || team).map(([k, times]) => `<div>${toggle('np-' + k, t('notify.' + k), !!(P.types as any)[k], `data-ch="np" data-p="types.${k}"`)}${times.length ? `<div class="row" style="margin:4px 0 6px 44px;gap:8px;flex-wrap:wrap">${times.map(tk => `<label class="small muted">${esc(t('notify.t.' + tk))} <input class="inp sm" type="time" data-ch="np" data-p="times.${tk}" value="${esc((P.times as any)[tk])}"></label>`).join('')}</div>` : ''}</div>`).join('');
   const ios = isIOS() ? `<div class="hint" data-push-ios>${esc(t('set.notifyIosHint'))}</div>` : '';
-  return `<div class="card stack" data-notify>${head}${ios}
+  // Auftrag 33: Kopf in festem Behälter – wechselt er von „wird geprüft“ zu „aktiv“ (andere Anzahl Elemente), verschieben sich sonst beim
+  // Angleichen die Uhrzeit-Felder darunter; ein gerade getipptes Feld konnte dabei ersetzt werden und die Eingabe ging verloren
+  return `<div class="card stack" data-notify><div data-push-head style="display:contents">${head}</div>${ios}
     <div class="lbl" style="margin-top:var(--s2)">${esc(t('set.notifyQuiet'))}</div>
     <div class="row" style="gap:8px;flex-wrap:wrap"><label class="small muted">${esc(t('set.quietFrom'))} <input class="inp sm" type="time" data-ch="np" data-p="quietStart" value="${esc(P.quietStart)}"></label><label class="small muted">${esc(t('set.quietTo'))} <input class="inp sm" type="time" data-ch="np" data-p="quietEnd" value="${esc(P.quietEnd)}"></label></div>
     ${toggle('np-school', t('set.schoolQuiet'), !!P.schoolQuiet, 'data-ch="np" data-p="schoolQuiet"')}
     <div class="row" style="gap:8px;flex-wrap:wrap;margin-left:44px" data-school-times><label class="small muted">${esc(t('set.quietFrom'))} <input class="inp sm" type="time" data-ch="np" data-p="schoolStart" value="${esc(P.schoolStart)}"></label><label class="small muted">${esc(t('set.quietTo'))} <input class="inp sm" type="time" data-ch="np" data-p="schoolEnd" value="${esc(P.schoolEnd)}"></label></div>
     ${toggle('np-hol', t('set.holidays'), !!P.holidays, 'data-ch="np" data-p="holidays"')}
     ${more(t('set.notifyWhich'), `<div class="stack">${rows}<div class="hint">${esc(t('set.notifyHint'))}</div></div>`)}
+    ${logCard()}
     ${PUSH && PUSH.thisDevice ? `<button class="link" data-act="push-off">${esc(t('set.notifyOff'))}</button>` : ''}</div>`;
 }
 onChange('np', el => {
@@ -206,21 +233,45 @@ onChange('np', el => {
   if (parts.length === 2) STATE.settings.notify[parts[0]][parts[1]] = val; else STATE.settings.notify[parts[0]] = val;
   saveState(); toast(t('common.saved'));
 });
-on('push-on', async el => { (el as HTMLButtonElement).disabled = true; try { await enablePush(); await ensurePush(true); PUSH = await pushStatus(); toast(t('set.notifyOn')); } catch (e: any) { toast(e.message); } nav.rerender(); });
-on('push-off', async () => { try { await disablePush(); PUSH = await pushStatus(); } catch (e: any) { toast(e.message); } nav.rerender(); });
-/* Test: Ergebnis des Push-Dienstes für dieses Gerät ehrlich melden (angenommen, abgelaufen, abgelehnt mit Grund) */
-on('push-test', async el => {
-  (el as HTMLButtonElement).disabled = true;
+on('push-on', async el => { (el as HTMLButtonElement).disabled = true; try { await enablePush(); await ensurePush(true); PUSH = (await pushStatus()) || { error: true }; toast(t('set.notifyOn')); } catch (e: any) { toast(e.message); } nav.rerender(); });
+on('push-off', async () => { try { await disablePush(); PUSH = (await pushStatus()) || { error: true }; } catch (e: any) { toast(e.message); } nav.rerender(); });
+/* Test: Ergebnis ehrlich melden. Auftrag 33: nicht nur „Apple hat angenommen“, sondern bis zu 30 s auf die Bestätigung des Service Workers
+   warten („auf diesem Gerät angekommen“). Sonst klar sagen: angenommen, aber keine Bestätigung vom Gerät. */
+export const TEST_WAIT_MS = 30000;
+const waitMs = () => (window as any).__pushTestWait || TEST_WAIT_MS;   // Tests: kürzer
+function swMessage(mid: string, ms: number): Promise<boolean> {
+  return new Promise(res => {
+    if (!('serviceWorker' in navigator)) { setTimeout(() => res(false), ms); return; }
+    const fn = (e: MessageEvent) => { if (e.data && e.data.type === 'push-received' && e.data.mid === mid) { done(true); } };
+    const timer = setTimeout(() => done(false), ms);
+    const done = (v: boolean) => { clearTimeout(timer); navigator.serviceWorker.removeEventListener('message', fn); res(v); };
+    navigator.serviceWorker.addEventListener('message', fn);
+  });
+}
+async function waitArrived(mid: string): Promise<number | null> {
+  const t0 = performance.now(); let viaSw = false;   // Laufzeit, nicht Uhrzeit (die kann springen)
+  void swMessage(mid, waitMs()).then(v => { viaSw = v; });
+  while (performance.now() - t0 < waitMs()) {
+    try { const r = await pushReceipt(mid); const me = (r.devices || []).find((d: any) => d.thisDevice); if (me && me.receivedAt) return Math.max(0, me.receivedAt - (me.sentAt || me.receivedAt)); } catch (e) { /* weiter warten */ }
+    await new Promise(r => setTimeout(r, viaSw ? 300 : 2000));
+  }
+  return null;
+}
+on('push-test', async () => {
+  if (TEST.busy) return;
+  TEST.busy = true; TEST.text = t('set.testWaiting'); nav.rerender();
   try {
     const r = await apiCall('POST', '/api/push/test');
     const mine = (r.results || []).find((x: any) => x.thisDevice);
-    if (mine && mine.ok) toast(t('set.testSent'));
-    else if (mine && mine.gone) toast(t('set.testGone'));
-    else if (mine) toast(t('set.testRejected', { err: [mine.status, mine.reason].filter(Boolean).join(' ') }));
-    else toast(r.delivered ? t('set.testOther', { n: r.delivered }) : t('set.testNone'));
-    PUSH = await pushStatus();
-  } catch (e: any) { toast(e.message); }
-  nav.rerender();
+    if (mine && mine.ok) {
+      const ms = await waitArrived(r.mid);
+      TEST.text = ms != null ? t('set.testArrived', { s: String(Math.max(1, Math.round(ms / 1000))) }) : t('set.testNoReceipt');
+    } else if (mine && mine.gone) TEST.text = t('set.testGone');
+    else if (mine) TEST.text = t('set.testRejected', { err: [mine.status, mine.reason].filter(Boolean).join(' ') });
+    else TEST.text = r.delivered ? t('set.testOther', { n: r.delivered }) : t('set.testNone');
+    PUSH = (await pushStatus()) || PUSH; LOG = undefined;
+  } catch (e: any) { TEST.text = e.message; }
+  TEST.busy = false; toast(TEST.text); nav.rerender();
 });
 
 /* ---------- KI-Coach ---------- */

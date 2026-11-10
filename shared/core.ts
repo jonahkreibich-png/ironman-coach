@@ -583,6 +583,18 @@ function painInfo(state, weeks, date) {
   return best;
 }
 const groinFlag = (state, weeks, date) => !!painFlag(state, weeks, date);
+/* Auftrag 33: Ist gerade eine Beschwerde an Leiste/Adduktoren aktiv? (für die Adduktoren-Erinnerung)
+   Ja, wenn eine Berücksichtigung bzw. Regel „Leiste“ besteht (Profil-Regel, Notiz oder Verletzungs-Feld; nach „wieder schmerzfrei“ zählen
+   nur Regeln, die danach angelegt wurden) oder eine Notiz der letzten 7 Tage Leiste/Adduktoren mit Schmerz erwähnt. Liefert die Quelle oder null. */
+const GROIN_RE = /(leist|adduktor|adductor)/i, HURT_RE = /(\d+(?:[.,]\d)?\s*(?:\/|von)\s*10|schmerz|zieh|zwick|weh|ziept|verletz|zerr|stech|brenn)/i;
+function groinComplaint(state, weeks, date): string | null {
+  const cleared = state && state.settings && state.settings.painClearedOn;
+  const clearedAt = cleared ? +new Date(cleared + 'T23:59:59Z') : 0;
+  const rule = rulesOf(state && state.profile, parseFor(date)).find(r => r.kind === 'body' && r.body === 'groin' && (!clearedAt || (r.createdAt || 0) > clearedAt));
+  if (rule) return 'regel';
+  for (const t of painTexts(state, weeks, date, false)) { const s = String(t || ''); if (GROIN_RE.test(s) && HURT_RE.test(s) && !/\b0\s*(?:\/|von)\s*10/.test(s)) return 'notiz'; }
+  return null;
+}
 const LADDER = [[3, 6], [3, 8], [3, 10], [2, 15], [2, 20]];
 const STEP_RE = /(\d)\s*[×x]\s*(\d{1,2})(?!\d)/;
 function ladderIndex(title) {
@@ -1329,6 +1341,6 @@ export {
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
   isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays, titleIssue as sessionTitleIssue, titleWithoutNumbers,
-  recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, painFlag, painInfo, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
+  recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, groinComplaint, painFlag, painInfo, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
   isLocked, stageVerdict, stageSession, ladderVerdict as ladderVerdictOf, libStatus, canonicalActivityId, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
 };

@@ -1,28 +1,33 @@
-# Tab-Leiste: Stamio vs. iOS 26 (Auftrag 32)
+# Tab-Leiste: Stamio vs. iOS 26 (Auftrag 33)
 
-Videos (390 × 844, Safari-Engine und Chromium): [tabbar-ios26-webkit.webm](tabbar-ios26-webkit.webm) · [tabbar-ios26-chromium.webm](tabbar-ios26-chromium.webm)
-Ablauf im Video: Antippen (Heute → Mehr → Plan → Fortschritt → Heute), Halten + Ziehen über alle Tabs, schnelles Wischen, Halten auf „Coach“, Runterscrollen, Hochscrollen.
-Neu aufnehmen: `RECORD=1 NAME=ios26 npx playwright test tests/e2e/tabbar-video.spec.ts` (mit `SLOW=4` in Zeitlupe).
+Vorlage: Jonahs iPhone-Aufnahme von Apples **Fitness-App** (`docs/vergleich/ios26-fitness-tableiste.mp4`, 1170 × 2532 px = 390 × 844 pt, 57 Bilder/s), Bild für Bild mit ffmpeg zerlegt (10 und 60 Bilder/s, Ausschnitt der Leiste in voller Auflösung). Gegenprobe: Aufnahme der App vorher (`meine-app-tableiste.mp4`, Version 3.20.0).
+Vergleichsvideo nebeneinander: `docs/vergleich/vergleich-tableiste.mp4` (nicht im Repository, liegt lokal; neu erzeugen siehe unten).
 
-| Ruhe | Tropfen beim Wechsel | Halten (ganze Leiste) | Runtergescrollt |
+## Gemessen im Fitness-Video
+| | Fitness-App (iOS 26) | Stamio 3.20.0 | Stamio 3.21.0 |
 |---|---|---|---|
-| ![Ruhe](tabbar-ios26/1-ruhe.png) | ![Tropfen](tabbar-ios26/2-tropfen.png) | ![Halten](tabbar-ios26/3-halten.png) | ![Geschrumpft](tabbar-ios26/4-geschrumpft.png) |
+| Kapsel | 348 × 61 pt, 21 pt Rand, 22 pt über dem Rand | 366 × 66, 12 pt Rand | **348 × 61, 21 pt Rand, 22 pt** |
+| Markierung in Ruhe | flache dunkle Fläche, 53 pt hoch, 4 pt Abstand | runde Linse, größer als nötig | **flache Fläche, 53 hoch, 4 Abstand** |
+| Beschriftung | passt immer in die Markierung | „Fortschritt“ ragte heraus | **passt (Schrift passt sich an)** |
+| Antippen | Markierung hebt sich nach ~0,03 s als klarer Glastropfen ab (1,2× breit, 1,27× hoch, ragt über die Leiste, vergrößert den Inhalt), gleitet gedehnt (~0,1 s zum Nachbarn), schwingt leicht über, legt sich ab ~0,17 s flach, Ruhe nach ~0,28 s | Linse glitt, Leiste blieb starr | **gleich (Federn nach Video abgestimmt)** |
+| Leiste beim Antippen | wächst ~3 %, etwas in Bewegungsrichtung, federt zurück | nein | **ja (folgt dem Tropfen 70 ms verzögert, wie im Video)** |
+| Halten / Ziehen | Tropfen bleibt gehoben, folgt dem Finger; Leiste ~3 % größer, fast gleichmäßig um die Mitte, leicht zum Finger | ganze Leiste 3,5 % größer, zur Druckstelle | **gleich; Tropfen länger beim schnellen Ziehen, gestaucht beim Bremsen** |
+| Scrollen | **Leiste bleibt voll** | schrumpfte auf 88 % (mehrere Tipps nötig, Springen) | **bleibt voll** |
+| Überscrollen | nichts verschiebt sich | Linse löste sich nach oben, Tab doppelt | **Linse in der Kapsel, keine Kopie → nichts doppelt** |
 
-## Verhalten im Vergleich
+Hinweis: Der Auftragstext beschreibt das Zusammenklappen zu einem runden Knopf (wie Apple Musik). Die mitgeschickte Vorlage (Fitness) klappt nicht zusammen; gebaut ist die Vorlage (ENTSCHEIDUNGEN 524).
 
-| | iOS 26 (Apple Musik, Fotos, App Store) | Stamio |
-|---|---|---|
-| Glas | „Liquid Glass“: Inhalt dahinter unscharf, leicht gebrochen und aufgehellt, Glanzkante | Weichzeichner 18 px mit Sättigung/Helligkeit/Kontrast (Brechung angedeutet), Glanzkante oben, weiche Kante unten, dunkler Modus eigene Werte, „Transparenz reduzieren“ deckend |
-| Drücken / Halten | Glas-Element wird beim Berühren größer, wirkt wie Gel, federt beim Loslassen zurück | Halten oder Ziehen: ganze Leiste wird 3,5 % größer, gedehnt von der Druckstelle aus (Gummiband rückt bei weitem Ziehen nach); Loslassen: Feder mit kleinem Überschwingen |
-| Wechsel des Tabs | Auswahl gleitet wie ein Tropfen zum neuen Tab, dehnt sich in Bewegungsrichtung, federt nach | Eine Linse gleitet mit Feder (leichtes Überschwingen), dehnt sich mit der Geschwindigkeit (bis 24 %), schwillt beim Antippen kurz an |
-| Runterscrollen | Leiste minimiert sich („tabBarMinimizeBehavior .onScrollDown“) | Leiste schrumpft auf 88 % (Feder-Kurve), Beschriftung blasser |
-| Hochscrollen / Antippen | Leiste wird wieder groß | ebenso; auch beim Tab-Wechsel. Nur Scrollen mit Finger/Mausrad zählt, nicht automatisches Scrollen der App |
-| Linsen | eine Auswahl | genau ein Linsen-Element (Test) |
-| Flüssig | 60/120 fps | nur transform/scale, Gleiten und Zurückfedern als Web-Animation im Compositor; gemessen 16,0 ms je Bild beim Ziehen (60 fps) in WebKit und Chromium |
-| Drehen | Leiste passt sich an | Linse und Leiste messen nach Drehen neu (Ruhelage, auch während einer Verformung) |
-| Bewegung reduzieren | keine Feder-Effekte | keine Feder, kein Vergrößern, kein Schrumpfen, Linse springt direkt |
+## Aufbau
+- `.tabbar` (fest) → `.tabbar-glass` (Weichzeichner, bewegt sich nie) + `.tabbar-body` (sichtbare Kapsel mit Markierung und Tabs, wird verformt).
+- Eine Markierung (`.tab-lens`) mit zwei Schichten: flache Fläche und Glas; überblendet wird nur die Deckkraft.
+- Nur `transform` und `opacity`; Gleiten und Einrasten vorausberechnet als Web-Animation (läuft im Compositor weiter, während der neue Tab aufgebaut wird), Ziehen per `requestAnimationFrame` (Rechenzeit ~0,1 ms je Bild).
+- „Bewegung reduzieren“: kein Tropfen, keine Verformung, die Markierung wechselt direkt.
 
-Unterschied: Echte Lichtbrechung (Verzerrung am Rand) kann Safari im Web nicht (kein Verzerrungs-Filter hinter Elementen); die Brechung ist mit Sättigung, Helligkeit und Glanz angedeutet. Beim kurzen Antippen bewegt sich nur der Tropfen, nicht die ganze Leiste – sonst müsste der Weichzeichner der Leiste in jedem Bild neu gerechnet werden (kostete in WebKit Bilder).
+## Gemessen in der App (Playwright, 390 × 844, Touch)
+- Ziehen: 16,0 ms je Bild in Chromium; in WebKit 16–17 ms (erste Geste nach dem Start bis ~21 ms, Ebenen werden angelegt).
+- 20 schnelle Wechsel: feste Ebene in jedem Bild exakt gleich, Kapsel nie unter 98,5 % und nie über 106 %, höchstens ~4 px Änderung je Bild.
+- Unterschied zum iPhone: echte Lichtverzerrung kann Safari im Web nicht (angedeutet mit Kante, Farbrändern, Glanz und Vergrößerung). WebKit unter Windows zeichnet `backdrop-filter` gar nicht – in den WebKit-Tests ist der Weichzeichner deshalb unsichtbar (auf dem iPhone und in Chromium vorhanden).
 
-Quellen zum iOS-Verhalten: [Apple: tabBarMinimizeBehavior](https://developer.apple.com/tutorials/data/documentation/swiftui/view/tabbarminimizebehavior(_:).md), [Donny Wals: Tab bars on iOS 26 with Liquid Glass](https://www.donnywals.com/exploring-tab-bars-on-ios-26-with-liquid-glass/), [Create with Swift: Tab bar collapse while scrolling](https://www.createwithswift.com/making-the-tab-bar-collapse-while-scrolling/).
-Tests: `tests/e2e/tabbar.spec.ts` (28 Fälle, Chromium + WebKit).
+## Tests
+`tests/e2e/auftrag33-tabbar.spec.ts` (Fehler 1–4, Bildrate, „Bewegung reduzieren“) und `tests/e2e/tabbar.spec.ts`, beide in Chromium und WebKit.
+Neu aufnehmen: `RECORD=1 npx playwright test tests/e2e/tabbar-video.spec.ts --project=chromium-iphone` (gleicher Ablauf wie das Fitness-Video), dann `node scripts/tabbar-vergleich.mjs`.

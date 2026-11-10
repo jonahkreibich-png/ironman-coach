@@ -94,10 +94,16 @@ function rebaseline() {
 
 /* ---------- Datensätze vom Server übernehmen ---------- */
 let planChanged = false, adjustChanged = false, dictChanged = false;
-function applyRecord(rec) {
+function applyRecord(rec, sentAt?: Map<string, number>) {
   const k = rec.kind + '|' + rec.key;
   const p = META.pending[k];
   if (p && p.updatedAt > rec.updatedAt) return false; // lokale Änderung ist neuer und wird noch hochgeladen
+  /* Auftrag 33: Eine lokale Änderung, die mit dieser Anfrage gar nicht hochging (sie entstand, während die Anfrage unterwegs war), wird
+     von der Antwort nie überschrieben. Der Server vergibt beim Zusammenführen „Zeitstempel + 1“ – seine Kopie galt dann als neuer als die
+     frische Eingabe und ersetzte sie (gefunden: Schul-Ruhezeit an, sofort Uhrzeit geändert → Uhrzeit weg). Die Änderung geht im nächsten
+     Durchgang hoch; der Server führt feldweise mit ihrem Ausgangsstand zusammen, Änderungen anderer Geräte bleiben dabei erhalten. */
+  // Ihr Zeitstempel kommt knapp über die Server-Kopie: sonst verlöre sie beim Zusammenführen den Feld-Konflikt gegen genau diese Kopie.
+  if (p && sentAt && MERGE_KINDS.has(rec.kind) && sentAt.get(k) !== p.updatedAt) { p.updatedAt = Math.max(p.updatedAt, (rec.updatedAt || 0) + 1); again = true; return false; }
   setBase(k, rec.kind, rec.data, rec.deleted);
   const d = rec.data, del = rec.deleted;
   const field = DICT_KINDS[rec.kind];
@@ -290,7 +296,12 @@ async function drainSync(): Promise<boolean> {
       detect();
       uncommittedHashes = {...META.hashes};
       let appliedNow = false;
-      (res.records || []).forEach(r => { if (applyRecord(r)) { appliedAny = true; appliedNow = true; } });
+      const sentAt = new Map<string, number>(sent.map(c => [c.kind + '|' + c.key, c.updatedAt]));
+      /* Auftrag 33: Änderung, die während der Anfrage entstand: Ihr Ausgangsstand ist genau die eben hochgeladene Fassung. Ohne ihn ging sie
+         beim nächsten Mal nach „neueste gewinnt“ hoch und verlor gegen einen Server-Schreibvorgang mit neuerem Zeitstempel (z. B. Zonen aus
+         dem Analyse-Coach) – die Eingabe war weg. Mit Ausgangsstand führt der Server feldweise zusammen: beides bleibt. */
+      sent.forEach(c => { const k = c.kind + '|' + c.key, p = META.pending[k]; if (p && p.updatedAt !== c.updatedAt && MERGE_KINDS.has(c.kind) && !c.deleted && c.data != null) p.base = JSON.parse(JSON.stringify(c.data)); });
+      (res.records || []).forEach(r => { if (applyRecord(r, sentAt)) { appliedAny = true; appliedNow = true; } });
       // Zustand vor Cursor/Ausgang bestaetigen. Bei Fehler bleibt der Ausgang wiederholbar.
       // Auftrag 30: nur, wenn sich wirklich etwas geändert hat (vorher bei jedem Abgleich ganzer Speicher neu geschrieben)
       if (appliedNow && typeof saveState === 'function') saveState(true);
@@ -537,15 +548,23 @@ export async function pushStatus() { try { return await api('GET', '/api/push/st
 /* Auftrag 31: Anmeldung dieses Browsers holen – passend zum aktuellen Server-Schlüssel. Eine Anmeldung zu einem früheren Schlüssel
    (bisher einfach weiterverwendet) lehnt der Push-Dienst für immer ab; sie wird ersetzt. */
 const sameKey = (a: ArrayBuffer | null | undefined, b: Uint8Array) => { if (!a) return true; const x = new Uint8Array(a); return x.length === b.length && x.every((v, i) => v === b[i]); };
+/* Auftrag 33: Netz-Anfragen der Prüfung mit Zeitlimit – auf dem iPhone hängt eine Anfrage nach dem Aufwecken sonst ewig */
+class PushUnknown extends Error {}
+const within = <T>(p: Promise<T>, ms = 12000): Promise<T> => Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new PushUnknown('Zeitüberschreitung')), ms))]);
+async function serverKey(): Promise<Uint8Array<ArrayBuffer>> {
+  try { const { key } = await within(api('GET', '/api/push/key', null, true)); return b64ToBytes(key) as Uint8Array<ArrayBuffer>; } catch (e) { throw new PushUnknown(String((e as Error).message)); }
+}
 async function currentSubscription(reg: ServiceWorkerRegistration, create: boolean): Promise<PushSubscription | null> {
-  const { key } = await api('GET', '/api/push/key', null, true);
-  const want = b64ToBytes(key);
+  const want = await serverKey();
   let sub = await reg.pushManager.getSubscription();
   if (sub && !sameKey((sub.options as any) && (sub.options as any).applicationServerKey, want)) { try { await sub.unsubscribe(); } catch (e) { /* egal */ } sub = null; }
   if (!sub && create) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: want });
   return sub;
 }
 const workerReady = () => Promise.race([navigator.serviceWorker.ready, new Promise<null>(r => setTimeout(() => r(null), 10000))]);
+const endTail = (sub: PushSubscription) => sub.endpoint.slice(-24);
+/* Der Push-Dienst hat GENAU diese Anmeldung verworfen (404/410, alter Schlüssel)? „ersetzt“ (alte Geräte-Kennung) heißt nur: neu melden. */
+const discarded = (st: any, sub: PushSubscription | null) => !!(st && st.expired && !st.thisDevice && st.expired.reason !== 'ersetzt' && sub && (!st.expired.endTail || st.expired.endTail === endTail(sub)));
 export async function enablePush(prefs?: any) {
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') throw new Error(t('push.denied'));
@@ -554,42 +573,87 @@ export async function enablePush(prefs?: any) {
   if (!reg) throw new Error(t('push.noWorker'));
   // Auftrag 31: abgelaufene Anmeldung (Push-Dienst meldete 404/410) wirklich ersetzen, nicht erneut melden
   const st = await pushStatus();
-  if (st && st.expired && !st.thisDevice) { try { const old = await reg.pushManager.getSubscription(); if (old) await old.unsubscribe(); } catch (e) { /* egal */ } }
+  try { const old = await reg.pushManager.getSubscription(); if (discarded(st, old)) await old!.unsubscribe(); } catch (e) { /* egal */ }
   const sub = await currentSubscription(reg, true);
   await api('POST', '/api/push/subscribe', { subscription: sub!.toJSON(), ...(prefs ? { prefs } : {}) });
-  try { localStorage.setItem(PUSH_CHECK_KEY, JSON.stringify({ at: Date.now(), end: sub!.endpoint.slice(-24), dev: AUTH.deviceId })); } catch (e) { /* egal */ }
+  try { localStorage.setItem(PUSH_CHECK_KEY, JSON.stringify({ at: Date.now(), end: endTail(sub!), dev: AUTH.deviceId })); } catch (e) { /* egal */ }
+  setPushLocal('on');
 }
 /* Auftrag 31: Bei jedem Start (höchstens alle 6 h, nach Updates und neuem Verbinden sofort) prüfen, ob der Server noch die aktuelle
    Anmeldung DIESES Geräts hat, und sie sonst ohne Zutun erneuern. Ursache des Ausfalls bei Nutzer 1: Das iPhone bekam am 31.10. eine
    neue Geräte-Kennung, die Anmeldung hing an der alten – die App zeigte „erlaubt“, auf dem Server war für das Gerät nichts mehr.
-   Liefert den Stand für die Anzeige: 'on' | 'off' (nicht erlaubt) | 'renewed' | 'needs-tap' (erneut erlauben nötig) | 'unsupported'. */
+   Auftrag 33: Warum es trotzdem immer wieder „nicht aktiv“ hieß: Jeder Fehler der Prüfung (kein Netz direkt nach dem Aufwecken,
+   Zeitüberschreitung, Server kurz nicht erreichbar, Service Worker noch nicht bereit) ergab „needs-tap“ → „Erneut erlauben“, obwohl die
+   Anmeldung in Ordnung war. Und der Mehr-Tab las einen Stand, der erst auf der Seite „Mitteilungen“ geladen wurde → immer „Aus“.
+   Jetzt: „needs-tap“ nur, wenn iOS bzw. der Browser die Anmeldung wirklich verworfen hat (keine Anmeldung mehr und ohne Antippen keine
+   neue möglich, oder der Push-Dienst hat genau diese Anmeldung abgelehnt). Kann nicht geprüft werden → 'unknown', der letzte sichere Stand
+   bleibt (einmal erlaubt bleibt an).
+   Liefert: 'on' | 'renewed' | 'off' (nicht erlaubt) | 'blocked' | 'needs-tap' | 'unknown' | 'unsupported'. */
 const PUSH_CHECK_KEY = 'ec_push_check';
-/** letzter Stand der Prüfung auf diesem Gerät (für die Anzeige unter Mitteilungen) */
+const PUSH_VIEW_KEY = 'ec_push_view';   // letzter sicherer Stand (on / needs-tap) – damit die Anzeige nach dem Start nicht „Aus“ rät
+/** letzter Stand der Prüfung auf diesem Gerät (für die Anzeige) */
 export let pushLocal = '';
-export async function ensurePush(force = false): Promise<string> { pushLocal = await checkPush(force); return pushLocal; }
+let pushChecking: Promise<string> | null = null;
+const PUSH_FNS: (() => void)[] = [];
+export function onPushChange(fn: () => void) { PUSH_FNS.push(fn); }
+function setPushLocal(v: string) {
+  const prev = pushLocal; pushLocal = v;
+  if (v === 'on' || v === 'renewed' || v === 'needs-tap') { try { localStorage.setItem(PUSH_VIEW_KEY, JSON.stringify({ v: v === 'needs-tap' ? 'needs-tap' : 'on', at: Date.now(), dev: AUTH && AUTH.deviceId })); } catch (e) { /* egal */ } }
+  if (prev !== v) PUSH_FNS.forEach(f => { try { f(); } catch (e) { /* egal */ } });
+}
+/** Stand für die Anzeige: 'checking' (noch nichts Sicheres bekannt), 'on', 'needs-tap', 'off', 'blocked', 'unsupported' */
+export function pushView(): string {
+  if (!isSyncOn() || !pushSupported()) return 'unsupported';
+  const perm = Notification.permission;
+  if (perm === 'denied') return 'blocked';
+  if (perm !== 'granted') return 'off';
+  if (pushLocal === 'on' || pushLocal === 'renewed') return 'on';
+  if (pushLocal === 'needs-tap') return 'needs-tap';
+  let last: any = null; try { last = JSON.parse(localStorage.getItem(PUSH_VIEW_KEY) || 'null'); } catch (e) { last = null; }
+  if (last && last.dev === (AUTH && AUTH.deviceId) && (last.v === 'on' || last.v === 'needs-tap')) return last.v;
+  return 'checking';
+}
+export const pushIsChecking = () => !!pushChecking;
+export function ensurePush(force = false): Promise<string> {
+  if (pushChecking && !force) return pushChecking;
+  const run = (async () => { const v = await checkPush(force); setPushLocal(v); return v; })();
+  pushChecking = run; run.finally(() => { if (pushChecking === run) pushChecking = null; });
+  return run;
+}
 async function checkPush(force: boolean): Promise<string> {
   try {
     if (!isSyncOn() || !pushSupported()) return 'unsupported';
+    if (Notification.permission === 'denied') return 'blocked';
     if (Notification.permission !== 'granted') return 'off';
     let last: any = null; try { last = JSON.parse(localStorage.getItem(PUSH_CHECK_KEY) || 'null'); } catch (e) { last = null; }
-    const reg = await workerReady(); if (!reg) return 'needs-tap';
-    let sub: PushSubscription | null = null;
-    try { sub = await currentSubscription(reg, true); } catch (e) { sub = null; }
-    if (!sub) return 'needs-tap';   // iOS: neue Anmeldung ohne Antippen nicht möglich → „erneut erlauben“
-    const end = sub.endpoint.slice(-24);
-    const fresh = last && last.end === end && last.dev === AUTH.deviceId && Date.now() - last.at < 6 * 3600000;
-    if (fresh && !force) return 'on';
-    const st = await pushStatus();
-    // Push-Dienst hat die Anmeldung als abgelaufen gemeldet: nicht dieselbe tote Anmeldung erneut melden, sondern „erneut erlauben“ zeigen
-    if (st && st.expired && !st.thisDevice) return 'needs-tap';
+    const reg = await workerReady(); if (!reg) return 'unknown';           // Service Worker (noch) nicht bereit: kein Urteil
+    let sub: PushSubscription | null = await reg.pushManager.getSubscription();
+    if (sub && last && last.end === endTail(sub) && last.dev === AUTH.deviceId && Date.now() - last.at < 6 * 3600000 && !force) return 'on';
+    const want = await serverKey();                                         // ohne Netz → PushUnknown → 'unknown'
+    if (sub && !sameKey((sub.options as any) && (sub.options as any).applicationServerKey, want)) { try { await sub.unsubscribe(); } catch (e) { /* egal */ } sub = null; }
+    let st: any = null;
+    try { st = await within(api('GET', '/api/push/status')); } catch (e) { if (sub) return 'unknown'; }
+    if (discarded(st, sub)) { try { await sub!.unsubscribe(); } catch (e) { /* egal */ } sub = null; }
+    if (!sub) {
+      // keine Anmeldung (mehr): ohne Antippen neu anmelden; iOS lässt das oft nur nach einem Tipp zu → dann wirklich „erneut erlauben“
+      try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: want }); } catch (e) { return 'needs-tap'; }
+    }
+    const end = endTail(sub);
     let state = 'on';
-    if (!st || !st.thisDevice || st.endTail !== end) { await api('POST', '/api/push/subscribe', { subscription: sub.toJSON() }); state = 'renewed'; }
+    if (!st || !st.thisDevice || st.endTail !== end) {
+      try { await within(api('POST', '/api/push/subscribe', { subscription: sub.toJSON() })); } catch (e) { return 'unknown'; }
+      state = 'renewed';
+    }
     try { localStorage.setItem(PUSH_CHECK_KEY, JSON.stringify({ at: Date.now(), end, dev: AUTH.deviceId })); } catch (e) { /* egal */ }
     return state;
-  } catch (e) { return 'needs-tap'; }
+  } catch (e) { return 'unknown'; }
 }
+/* Auftrag 33: Stand einer Mitteilung je Gerät (Test-Knopf) und Protokoll der letzten 7 Tage (Seite „Mitteilungen“) */
+export async function pushReceipt(mid: string) { return await within(api('GET', '/api/push/receipt?mid=' + encodeURIComponent(mid))); }
+export async function pushLog() { try { return await within(api('GET', '/api/push/log')); } catch (e) { return null; } }
 export async function disablePush() {
-  try { localStorage.removeItem(PUSH_CHECK_KEY); } catch (e) { /* egal */ }
+  try { localStorage.removeItem(PUSH_CHECK_KEY); localStorage.removeItem(PUSH_VIEW_KEY); } catch (e) { /* egal */ }
+  setPushLocal('off');
   try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
   await api('POST', '/api/push/unsubscribe');
 }

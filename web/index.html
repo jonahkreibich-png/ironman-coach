@@ -45,7 +45,7 @@ try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElem
 <header class="top"><div class="top-in" id="top"></div></header>
 <p id="app-startup" role="status" hidden>Deine gespeicherten Daten werden geladen …</p>
 <main id="app" data-app-state="loading"></main>
-<nav class="tabbar" aria-label="Bereiche"><div class="tabbar-in" id="tabs"></div></nav>
+<nav class="tabbar" aria-label="Bereiche"><div class="tabbar-glass" aria-hidden="true"></div><div class="tabbar-body"><div class="tabbar-in" id="tabs"></div></div></nav>
 <div id="sheet" class="sheet-wrap" hidden>
   <div class="sheet-bg" data-act="sheet-close"></div>
   <div class="sheet" role="dialog" aria-modal="true" id="sheetPanel"></div>

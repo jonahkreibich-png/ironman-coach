@@ -38,15 +38,18 @@ const when = (ts: number | null) => ts ? ago(ts) : '–';
 function pushAdminCard(): string {
   const P = PUSHADM;
   if (!P) return `<div class="card"><div class="hint">${esc(t('data.pushNone'))}</div></div>`;
-  const rows = (P.list || []).map((x: any) => `<div class="li" data-push-sub="${esc(String(x.userId))}"><span class="grow"><span class="t small">${esc(x.user)} · ${esc(x.device)}</span><br><span class="s">${esc(t('data.pushRow', { ok: when(x.lastOkAt), since: when(x.since) }))}${x.fails ? ' · ' + esc(t('data.pushFails', { n: x.fails, err: x.lastError || String(x.lastStatus || '') })) : ''}</span></span>${x.fails ? pill(t('data.pushErr'), 'bad') : pill('OK', 'good')}<button class="btn ghost sm" data-act="push-adm-test" data-uid="${esc(String(x.userId))}">${esc(t('data.pushTest'))}</button></div>`).join('');
+  const rows = (P.list || []).map((x: any) => `<div class="li" data-push-sub="${esc(String(x.userId))}"><span class="grow"><span class="t small">${esc(x.user)} · ${esc(x.device)}</span><br><span class="s">${esc(t('data.pushRow', { ok: when(x.lastOkAt), since: when(x.since) }))}${x.lastReceivedAt ? ' · ' + esc(t('data.pushRecv', { when: when(x.lastReceivedAt) })) : ''}${x.fails ? ' · ' + esc(t('data.pushFails', { n: x.fails, err: x.lastError || String(x.lastStatus || '') })) : ''}</span></span>${x.fails ? pill(t('data.pushErr'), 'bad') : pill('OK', 'good')}<button class="btn ghost sm" data-act="push-adm-test" data-uid="${esc(String(x.userId))}">${esc(t('data.pushTest'))}</button></div>`).join('');
   const gone = (P.expired || []).map((x: any) => `<div class="li"><span class="grow small">${esc(x.user)} · ${esc(x.device)}<br><span class="s">${esc(t('data.pushGone', { when: when(x.at), status: [x.status, x.reason].filter(Boolean).join(' ') }))}</span></span></div>`).join('');
-  const week = (P.week || []).map((x: any) => { const u = (P.list || []).find((y: any) => y.userId === x.userId) || (P.expired || []).find((y: any) => y.userId === x.userId); return `<span class="chip">${esc((u && u.user) || ('Nutzer ' + x.userId))}: ${x.delivered}/${x.sent}</span>`; }).join('');
+  const week = (P.week || []).map((x: any) => { const u = (P.list || []).find((y: any) => y.userId === x.userId) || (P.expired || []).find((y: any) => y.userId === x.userId); return `<span class="chip" data-push-week>${esc((u && u.user) || ('Nutzer ' + x.userId))}: ${x.planned ?? x.sent} · ${x.sent} · ${x.accepted ?? x.delivered} · ${x.received ?? 0}</span>`; }).join('');
+  // Auftrag 33: letzte Mitteilungen je Nutzer: angenommen / angekommen
+  const recent = (P.recent || []).slice(0, 10).map((x: any) => `<div class="li" data-push-recent><span class="grow small">${esc(x.user)}<br><span class="s">${esc(t('data.pushRecentRow', { when: when(x.sentAt), type: x.type, acc: x.accepted, n: x.devices, rec: x.received }))}</span></span>${x.received ? pill('✓', 'good') : x.accepted ? pill('?', '') : pill('✗', 'bad')}</div>`).join('');
   return `<div class="card stack" data-push-admin>
     <div class="kv"><span class="muted">${esc(t('data.pushUsers'))}</span><b class="num" data-push-users>${P.usersWithPush} / ${P.users}</b></div>
     <div class="kv"><span class="muted">${esc(t('data.pushSubs'))}</span><b class="num">${P.subs}${P.failing ? ' · ' + esc(t('data.pushFailing', { n: P.failing })) : ''}</b></div>
     ${P.configured ? '' : `<div class="banner warn small">${esc(t('data.pushNoKey'))}</div>`}
     ${rows ? `<div class="list">${rows}</div>` : `<div class="hint">${esc(t('data.pushEmpty'))}</div>`}
-    ${week ? `<div class="lbl">${esc(t('data.pushWeek'))}</div><div class="chips">${week}</div>` : ''}
+    ${week ? `<div class="lbl">${esc(t('data.pushWeek7'))}</div><div class="chips">${week}</div>` : ''}
+    ${recent ? `<div class="lbl">${esc(t('data.pushRecent'))}</div><div class="list">${recent}</div>` : ''}
     ${gone ? `<div class="lbl">${esc(t('data.pushExpired'))}</div><div class="list">${gone}</div>` : ''}</div>`;
 }
 on('push-adm-test', async el => {

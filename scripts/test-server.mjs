@@ -71,7 +71,8 @@ http.createServer(async (req, res) => {
   if (u.pathname.startsWith('/__push/') && req.method === 'POST') {
     const chunks = []; for await (const c of req) chunks.push(c);
     const id = u.pathname.slice(8);
-    pushLog.push({ id, at: Date.now(), bytes: Buffer.concat(chunks).length, vapid: /^vapid t=/.test(req.headers.authorization || ''), enc: req.headers['content-encoding'] || '' });
+    // Auftrag 33: verschlüsselte Nachricht und Urgency/TTL mitschreiben (der Browser-Test entschlüsselt sie mit seinem Schlüssel und bestätigt den Empfang wie der Service Worker)
+    pushLog.push({ id, at: Date.now(), bytes: Buffer.concat(chunks).length, vapid: /^vapid t=/.test(req.headers.authorization || ''), enc: req.headers['content-encoding'] || '', body: Buffer.concat(chunks).toString('base64'), urgency: req.headers.urgency || null, ttl: req.headers.ttl != null ? +req.headers.ttl : null });
     res.writeHead(id.startsWith('gone') ? 410 : 201); return res.end();
   }
   if (u.pathname === '/__push-log') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(pushLog)); }

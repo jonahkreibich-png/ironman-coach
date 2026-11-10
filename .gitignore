@@ -27,3 +27,7 @@ Eingefügter Text*.txt
 AUFTRAG-NEU*.txt
 debug.log
 PLAN-C-STATUS.txt
+
+# Auftrag 33: Vergleichsvideos (iPhone-Aufnahmen, groß) nicht ins Repository
+docs/vergleich/*.mp4
+docs/vergleich/*.webm

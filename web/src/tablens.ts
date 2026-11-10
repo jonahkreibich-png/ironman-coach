@@ -1,86 +1,147 @@
-/* Tab-Leiste wie in iOS 26 (Auftrag 23, überarbeitet in Auftrag 24).
-   Genau EIN Linsen-Element: Es markiert in Ruhe den aktiven Tab und ist beim Drücken/Ziehen die vergrößerte Glas-Linse.
-   (Vorher gab es zusätzlich den Hintergrund von .tab.on – beim Ziehen standen dann zwei Linsen in der Leiste.)
-   Bewegung mit Feder-Physik (Masse, Dämpfung, leichtes Überschwingen); beim schnellen Bewegen dehnt sich die Linse in Bewegungsrichtung
-   und wird beim Abbremsen wieder rund. Beim Antippen eines anderen Tabs gleitet sie mit derselben Feder dorthin.
-   Flüssig: nur transform/opacity. Ziehen läuft über requestAnimationFrame (dem Finger folgen). Gleiten und Einrasten werden einmal
-   vorausberechnet und als Web-Animation abgespielt; die läuft im Compositor des Browsers weiter, auch während der neue Tab aufgebaut wird.
-   Der neue Tab wird erst gebaut, wenn die Animation gestartet ist (zwei Frames später) – vorher ruckelte genau das.
-   „Bewegung reduzieren“: keine Feder, keine Vergrößerung, die Linse wechselt ohne Animation.
-   Die Navigation selbst bleibt in main.ts (ACTIONS['go-tab']); hier nur Geste und Darstellung. */
+/* Tab-Leiste wie in iOS 26 (Auftrag 23/24/32, neu gebaut in Auftrag 33 nach Apples Fitness-App, Bild für Bild ausgemessen:
+   docs/tabbar-ios26.md, Videos in docs/vergleich/).
+   Ablauf wie im Video:
+   - Ruhe: flache, dunkle Markierung hinter dem aktiven Tab (eine Linse, genau ein Element).
+   - Berühren: die Markierung hebt sich sofort als klarer Glastropfen ab (1,2× breit, 1,27× hoch – ragt über die Leiste), der Inhalt darunter
+     wird vergrößert (Lichtbrechung), die ganze Leiste gibt etwas nach (+3 %) und dehnt sich in Bewegungsrichtung.
+   - Antippen: der Tropfen gleitet gedehnt zum Tab, schwingt nach, legt sich nach ~0,15 s wieder flach (gesamt ~0,3 s). Ein Tipp = Wechsel.
+   - Halten und Ziehen: der Tropfen folgt dem Finger, wird beim schnellen Ziehen länger, beim Bremsen gestaucht; Loslassen: rastet am
+     nächsten Tab ein, die Leiste federt kräftig zurück.
+   - Scrollen: die Leiste bleibt, wie sie ist (wie in der Fitness-App). Vorher schrumpfte sie beim Runterscrollen – das brauchte mehrere
+     Tipps, ruckelte und ließ sie bei schnellen Wechseln springen (Auftrag 33, Fehler 1 und 3).
+   Ebenen: .tabbar-glass (Weichzeichner, fest) NEBEN .tabbar-body (sichtbare Kapsel, Linse und Tabs; wird verformt, ohne backdrop-filter).
+   Läge die Kapsel im Element mit dem Weichzeichner, rechnete WebKit ihn bei jeder Verformung neu (gemessen: jedes 2.–3. Bild fiel aus). Die Linse liegt in der Kapsel und rechnet in deren Koordinaten
+   (offsetLeft, unabhängig von Verformung, Safe Area, Drehen) – sie kann sich nicht mehr gegen die Leiste verschieben (vorher eigene Ebene
+   in body mit Kopie der Tabs: doppelte Beschriftung beim Überscrollen, Fehler 2). Keine Kopie der Tabs mehr: vergrößert werden die echten.
+   Flüssig: nur transform und opacity. Ziehen per requestAnimationFrame; Gleiten und Einrasten werden vorausberechnet und als Web-Animation
+   abgespielt (läuft im Compositor weiter, während der neue Tab aufgebaut wird); der Tab wird erst zwei Bilder nach dem Start gebaut.
+   „Bewegung reduzieren“: kein Tropfen, keine Verformung, die Markierung wechselt direkt. */
 import { ACTIONS } from './kit';
 
-const HOLD_MS = 200;     // ab hier gilt Drücken als Halten
-const SLOP = 8;          // so weit darf der Finger beim Antippen wandern
-const PRESS = 1.2;       // Größe der Linse beim Drücken (Inhalt darunter wächst mit)
-/* Federn je Sekunde (Masse 1): k = Steifigkeit, z = Dämpfungsgrad (< 1 schwingt über) */
+const SLOP = 8;           // so weit darf der Finger beim Antippen wandern
+export const LIFT = 1.2;  // Breite des Tropfens im Verhältnis zur Markierung (Video: 119 / 99 pt)
+const LIFT_Y = 1.27;      // Höhe (Video: 67 / 53 pt)
+const MIN_LIFT = 0.15;    // so lange bleibt der Tropfen beim Antippen mindestens gehoben (Video: hebt bei 0,03 s, legt sich ab 0,17 s)
+/* Federn je Sekunde (Masse 1): k = Steifigkeit, z = Dämpfungsgrad (< 1 schwingt über). Aus dem Video: Weg zum Nachbar-Tab ~0,1 s,
+   leichtes Überschwingen, flach nach ~0,28 s. */
 export interface Spring { k: number; z: number }
-export const SP_FOLLOW: Spring = { k: 520, z: 0.8 };   // folgt dem Finger, knapp hinterher
-export const SP_GLIDE: Spring = { k: 300, z: 0.72 };   // Gleiten und Einrasten: rund 4 % Überschwingen
-export const SP_SCALE: Spring = { k: 420, z: 0.5 };    // Größe: weich, mit kleinem Nachfedern
-const STRETCH_MAX = 0.24, STRETCH_V = 1800;            // Dehnung: höchstens 24 %, halb bei etwa 1000 px/s
-const TAP_SWELL = 2.4;                                 // Antippen: Linse schwillt beim Losgleiten kurz an (Gelee)
+export const SP_FOLLOW: Spring = { k: 700, z: 0.82 };  // folgt dem Finger, knapp hinterher
+export const SP_GLIDE: Spring = { k: 900, z: 0.74 };   // Gleiten und Einrasten: rund 3 % Überschwingen
+export const SP_SCALE: Spring = { k: 1300, z: 0.55 };  // Heben/Absetzen: schnell, mit Nachfedern (Gelee)
+const STRETCH_MAX = 0.22, STRETCH_V = 1400;            // Dehnung: höchstens 22 %, halb bei etwa 770 px/s
+const BRAKE_MAX = 0.14, BRAKE_A = 30000;               // Stauchen beim Abbremsen (px/s²)
+const MAG = 0.14;                                      // Vergrößerung des Inhalts unter dem Tropfen
+const BAR_GROW = 0.03, BAR_DX = 0.0025, BAR_DX_MAX = 5, BAR_STRETCH = 0.012;   // Leiste: +3 %, gibt bis 5 px in Bewegungsrichtung nach
 
-export interface LensState { x: number; v: number; s: number; vs: number }
+/* b: Nachgeben der Leiste (folgt dem Heben des Tropfens leicht verzögert – Video: Leiste am weitesten bei 0,2 s, Tropfen schon bei 0,13 s) */
+export interface LensState { x: number; v: number; s: number; vs: number; a?: number; b?: number; bv?: number }
+const BAR_TAU = 0.07;   // Video: Leiste wächst in ~4 Bildern um ~10 px
 /* Ein Schritt der Feder (halbimplizites Euler-Verfahren, intern in 1/240 s, damit es bei jeder Bildrate gleich aussieht) */
 export function stepSpring(o: LensState, toX: number, toS: number, sp: Spring, dt: number): void {
   const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n;
   const cx = 2 * sp.z * Math.sqrt(sp.k), cs = 2 * SP_SCALE.z * Math.sqrt(SP_SCALE.k);
+  const v0 = o.v;
   for (let i = 0; i < n; i++) {
     o.v += (sp.k * (toX - o.x) - cx * o.v) * h; o.x += o.v * h;
     o.vs += (SP_SCALE.k * (toS - o.s) - cs * o.vs) * h; o.s += o.vs * h;
   }
+  o.a = dt > 0 ? (o.v - v0) / dt : 0;
+  const L = (o.s - 1) / (LIFT - 1);
+  const k = 1 - Math.exp(-dt / BAR_TAU);
+  o.b = (o.b ?? L) + (L - (o.b ?? L)) * k;
+  o.bv = (o.bv ?? o.v) + (o.v - (o.bv ?? o.v)) * k;   // Geschwindigkeit für das Nachgeben der Leiste, ebenso geglättet
 }
 export const settled = (o: LensState, toX: number, toS: number) => Math.abs(toX - o.x) < 0.25 && Math.abs(o.v) < 6 && Math.abs(toS - o.s) < 0.002 && Math.abs(o.vs) < 0.02;
-/* Bahn bis zum Stillstand (60 Werte pro Sekunde, höchstens 1,5 s); letzter Wert genau am Ziel */
-export function trajectory(from: LensState, toX: number, toS: number, sp: Spring): LensState[] {
-  const o = { ...from }, out: LensState[] = [{ ...o }];
-  for (let i = 0; i < 90; i++) { stepSpring(o, toX, toS, sp, 1 / 60); out.push({ ...o }); if (settled(o, toX, toS)) break; }
-  out[out.length - 1] = { x: toX, v: 0, s: toS, vs: 0 };
+/* Bahn bis zum Stillstand (60 Werte pro Sekunde, höchstens 1,5 s); letzter Wert genau am Ziel.
+   lift: wie beim Antippen – erst heben (Tropfen), nach MIN_LIFT und am Ziel wieder flach (toS). */
+export function trajectory(from: LensState, toX: number, toS: number, sp: Spring, lift = false): LensState[] {
+  const o = { ...from }, out: LensState[] = [{ ...o, a: 0 }];
+  for (let i = 0; i < 90; i++) {
+    const t = (i + 1) / 60;
+    const s = lift && (t < MIN_LIFT || Math.abs(toX - o.x) > 4) ? LIFT : toS;
+    stepSpring(o, toX, s, sp, 1 / 60); out.push({ ...o });
+    if (t >= MIN_LIFT && settled(o, toX, toS)) break;
+  }
+  // Ende: Tropfen genau am Ziel; die Leiste federt noch aus, bis auch sie ruht
+  for (let i = 0; i < 30 && (Math.abs(o.b || 0) > 0.01 || Math.abs(o.bv || 0) > 20); i++) { stepSpring(o, toX, toS, sp, 1 / 60); out.push({ ...o }); }
+  out[out.length - 1] = { x: toX, v: 0, s: toS, vs: 0, b: 0, bv: 0 };
   return out;
 }
-/* Dehnung aus der Geschwindigkeit: breiter in Bewegungsrichtung, etwas flacher; in Ruhe rund */
+/* Dehnung aus der Geschwindigkeit: länger in Bewegungsrichtung, etwas flacher; in Ruhe rund */
 export const stretchOf = (v: number) => STRETCH_MAX * Math.tanh(Math.abs(v) / STRETCH_V);
+const brakeOf = (o: LensState) => (o.a && o.v && Math.sign(o.a) !== Math.sign(o.v)) ? BRAKE_MAX * Math.tanh(Math.abs(o.a) / BRAKE_A) : 0;
+const liftOf = (o: LensState) => (o.s - 1) / (LIFT - 1);   // 0 = flach, 1 = gehoben (kurz auch etwas darunter: Nachfedern)
 
-let bar: HTMLElement | null = null, tabs: HTMLElement | null = null;
-let lens: HTMLElement | null = null, clip: HTMLElement | null = null, inner: HTMLElement | null = null;
+/* Geometrie in Koordinaten der Kapsel (offsetLeft/offsetTop: unabhängig von Verformung, Safe Area und Lage der Leiste) */
+interface Geo { w: number; h: number; top: number; centers: { tab: string; c: number }[]; left: number; right: number; bodyW: number }
+export interface Shape { lens: string; fill: number; glass: number; body: string; tabs: string[] }
+/* Ein Bild: Linse (Verschiebung, Größe, Dehnung, Stauchen), Deckkraft von Markierung und Glas, Verformung der Leiste, Vergrößerung der Tabs */
+export function shapeOf(o: LensState, g: Pick<Geo, 'w' | 'centers'> & { bodyW?: number }, still = false): Shape {
+  const L = still ? 0 : liftOf(o);
+  const str = still ? 0 : stretchOf(o.v), brk = still ? 0 : brakeOf(o);
+  const sx = (still ? 1 : o.s) * (1 + str - brk), sy = (1 + (LIFT_Y - 1) * L) * (1 - 0.4 * str + 0.6 * brk);
+  const glass = Math.max(0, Math.min(1, L));
+  // nie ganz 0: sonst rastert WebKit den Tropfen erst bei der ersten Berührung (die erste Geste stockte) – 0,001 ist unsichtbar
+  const vis = (v: number) => Math.max(0.001, v);
+  // Leiste: wächst mit dem Tropfen gleichmäßig um ihre Mitte (Video 5,0 s: +17 / +15 px), rückt etwas zum Finger und gibt in Bewegungsrichtung nach
+  const B = o.b ?? L, BV = o.bv ?? o.v;
+  const bsx = still ? 1 : 1 + BAR_GROW * B + BAR_STRETCH * Math.tanh(Math.abs(BV) / 1500), bsy = still ? 1 : 1 + BAR_GROW * 0.8 * B;
+  const mid = (g.bodyW || 0) / 2, pull = mid ? Math.max(-3, Math.min(3, (o.x - mid) * 0.02 * Math.max(0, B))) : 0;
+  const dx = still ? 0 : Math.max(-BAR_DX_MAX, Math.min(BAR_DX_MAX, BV * BAR_DX)) + pull + mid * (1 - bsx);
+  const tabs = g.centers.map(c => { const m = 1 + MAG * glass * Math.max(0, 1 - Math.abs(c.c - o.x) / g.w); return `scale(${m.toFixed(4)})`; });
+  return {
+    lens: `translate3d(${(o.x - g.w / 2).toFixed(2)}px,0,0) scale(${sx.toFixed(4)},${sy.toFixed(4)})`,
+    fill: +vis(1 - glass).toFixed(3), glass: +vis(glass).toFixed(3),
+    body: `translate3d(${dx.toFixed(2)}px,0,0) scale(${bsx.toFixed(4)},${bsy.toFixed(4)})`, tabs
+  };
+}
+
+let bar: HTMLElement | null = null, body: HTMLElement | null = null, tabs: HTMLElement | null = null;
+let lens: HTMLElement | null = null, fill: HTMLElement | null = null, glassEl: HTMLElement | null = null;
 const st: LensState = { x: 0, v: 0, s: 1, vs: 0 };
 let lensTab = '';                 // Tab, an dem die Linse steht bzw. auf den sie gerade zuläuft
 let pendingTab = '';              // Navigation ist angestoßen, aber noch nicht ausgeführt
-let placed = false;               // Linse hat schon eine Position
-let copied = '';                  // zuletzt kopierte Tab-Leiste (für die vergrößerte Ansicht)
-
-/* Geometrie wird nur bei Bedarf gelesen (Start, Größenänderung), nie im Animations-Frame */
-interface Geo { w: number; h: number; top: number; bottom: number; trLeft: number; trTop: number; trW: number; trH: number; left: number; right: number; centers: { tab: string; c: number }[] }
+let placed = false;
 let G: Geo | null = null;
 /* nur für Aufnahmen in docs/: Zeitlupe (window.__lensSlow = 4) */
 const slow = () => (typeof window !== 'undefined' && (window as any).__lensSlow) || 1;
 const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const tabButtons = () => tabs ? [...tabs.querySelectorAll<HTMLElement>('.tab')] : [];
-function measure(): Geo | null {
-  if (!tabs) return null;
-  // Auftrag 32: Leiste (und Linsen-Ebene) können gerade gedrückt oder geschrumpft sein – gemessen wird immer die Ruhelage
-  return untransformed(measureRaw);
+
+/* Beschriftung muss ganz in die Markierung passen (Auftrag 33: „Fortschritt“ ragte heraus) – in jeder Sprache und bei großer Schrift.
+   Passt die längste nicht, wird die Schrift aller Tabs gemeinsam so weit verkleinert, dass sie mit Abstand passt (höchstens auf 70 %). */
+const LABEL_PAD = 5;
+function fitLabels(w: number): void {
+  if (!tabs) return;
+  tabs.style.removeProperty('--tab-fs');
+  const spans = tabButtons().map(b => b.querySelector('span')).filter(Boolean) as HTMLElement[];
+  if (!spans.length) return;
+  const base = parseFloat(getComputedStyle(spans[0]).fontSize) || 11;
+  const widest = Math.max(...spans.map(s => { const r = s.getBoundingClientRect().width; return Math.max(s.scrollWidth, r); }));
+  const avail = w - 2 * LABEL_PAD;
+  if (widest > avail && widest > 0) tabs.style.setProperty('--tab-fs', Math.max(base * 0.7, Math.floor(base * avail / widest * 10) / 10) + 'px');
 }
-function measureRaw(): Geo | null {
-  if (!tabs) return null;
+function measure(): Geo | null {
+  if (!tabs || !body) return null;
   const list = tabButtons(); if (!list.length) return null;
-  const r = tabs.getBoundingClientRect(), b0 = list[0].getBoundingClientRect();
-  if (!r.width || !b0.height) return null;
-  /* Auftrag 30: Abstand nach unten wie die Leiste selbst (ihr CSS-„bottom“ inkl. Safe Area + Abstand Tab → Leistenrand), nicht aus
-     window.innerHeight: das meldet iOS nach dem Drehen kurz noch den alten Wert – danach stand die Linse versetzt. */
-  const barEl = tabs.closest('.tabbar') as HTMLElement | null;
-  const br = barEl ? barEl.getBoundingClientRect() : r;
-  const cssBottom = barEl ? parseFloat(getComputedStyle(barEl).bottom) || 0 : 0;
-  return { w: r.width / list.length, h: b0.height, top: b0.top, bottom: cssBottom + (br.bottom - b0.bottom), trLeft: r.left, trTop: r.top, trW: r.width, trH: r.height, left: r.left, right: r.right,
-    centers: list.map(b => { const q = b.getBoundingClientRect(); return { tab: b.dataset.tab || '', c: q.left + q.width / 2 }; }) };
+  const b0 = list[0];
+  if (!b0.offsetWidth || !b0.offsetHeight) return null;
+  // Markierung so breit wie ein Tab (Video: Tab-Fläche mit 4 pt Abstand zum Rand der Leiste), so hoch wie der Tab
+  return { w: b0.offsetWidth, h: b0.offsetHeight, top: b0.offsetTop, bodyW: body.offsetWidth,
+    left: b0.offsetLeft, right: list[list.length - 1].offsetLeft + list[list.length - 1].offsetWidth,
+    centers: list.map(b => ({ tab: b.dataset.tab || '', c: b.offsetLeft + b.offsetWidth / 2 })) };
 }
 const geo = () => G || (G = measure());
 function place(g: Geo): void {
-  if (!lens || !inner) return;
-  // unten verankert wie die Leiste selbst (Safari-Leiste ein-/ausgeblendet: beide wandern gleich)
-  lens.style.width = g.w + 'px'; lens.style.height = g.h + 'px'; lens.style.bottom = g.bottom.toFixed(2) + 'px';
-  inner.style.width = g.trW + 'px'; inner.style.height = g.trH + 'px';
+  if (!lens) return;
+  lens.style.width = g.w + 'px'; lens.style.height = g.h + 'px'; lens.style.top = g.top + 'px';
+  fitLabels(g.w);
+}
+/* Fingerstelle (Bildschirm) → Koordinate in der Kapsel; die Kapsel kann gerade verformt sein, deshalb über die unverformte Lage rechnen */
+function localX(clientX: number): number {
+  if (!body) return clientX;
+  const r = (bar || body).getBoundingClientRect();
+  return clientX - r.left - (body.offsetLeft || 0) - (bar ? bar.clientLeft : 0);
 }
 function nearest(x: number): string {
   const g = geo(); if (!g) return '';
@@ -91,136 +152,19 @@ function nearest(x: number): string {
 const centerOf = (tab: string) => { const g = geo(); const c = g && g.centers.find(x => x.tab === tab); return c ? c.c : 0; };
 const activeTab = () => { const b = tabs && tabs.querySelector<HTMLElement>('.tab.on'); return b ? b.dataset.tab || '' : ''; };
 
-/* Linse und Inhalt aus einem Zustand: Linse = Verschiebung + Größe + Dehnung; Inhalt (Kopie der Tabs) so, dass er unter der Linse
-   deckungsgleich liegt und um die Linsenmitte genau um die Linsengröße vergrößert ist (ohne Dehnung) */
-export function transforms(o: LensState, g: { w: number; h: number; top: number; trLeft: number; trTop: number }, noStretch = false): [string, string] {
-  const str = noStretch ? 0 : stretchOf(o.v);
-  const sX = o.s * (1 + str), sY = o.s * (1 - str * 0.45);
-  const kx = o.s / sX, ky = o.s / sY, cy = g.top + g.h / 2;
-  const ix = g.w / 2 + kx * (g.trLeft - o.x), iy = g.h / 2 + ky * (g.trTop - cy);
-  return [`translate3d(${(o.x - g.w / 2).toFixed(2)}px,0,0) scale(${sX.toFixed(4)},${sY.toFixed(4)})`,
-    `translate3d(${ix.toFixed(2)}px,${iy.toFixed(2)}px,0) scale(${kx.toFixed(4)},${ky.toFixed(4)})`];
+function paint(still = false): void {
+  const g = geo(); if (!lens || !fill || !glassEl || !body || !g) return;
+  const S = shapeOf(st, g, still || reduced());
+  lens.style.transform = S.lens; fill.style.opacity = String(S.fill); glassEl.style.opacity = String(S.glass);
+  body.style.transform = S.body === 'translate3d(0.00px,0,0) scale(1.0000,1.0000)' ? '' : S.body;
+  tabButtons().forEach((b, i) => { const v = S.tabs[i] || 'scale(1.0000)'; b.style.transform = v === 'scale(1.0000)' ? '' : v; });
 }
-function paint(): void {
-  const g = geo(); if (!lens || !inner || !g) return;
-  const [a, b] = transforms(st, g, reduced());
-  lens.style.transform = a; inner.style.transform = b;
-}
-/* Hervorhebung des Tabs unter der Linse (in der Leiste und in der vergrößerten Kopie) */
+/* Hervorhebung des Tabs unter dem Tropfen */
 let peeked = '';
-function peek(tab: string): void {
-  if (tab === peeked) return; peeked = tab;
+function peek(tab: string, force = false): void {
+  if (tab === peeked && !force) return; peeked = tab;
   for (const x of tabButtons()) x.classList.toggle('peek', !!tab && x.dataset.tab === tab);
-  if (inner) for (const x of inner.querySelectorAll<HTMLElement>('.ltab')) x.classList.toggle('peek', x.dataset.lens === tab);
 }
-
-/* Vergrößerte Kopie der Tabs: nur zum Ansehen. Eigene Klassen und keine data-tab/aria-Merkmale, damit weder Screenreader noch Tests
-   (oder Klicks) einen Tab doppelt finden. */
-function copyTabs(): void {
-  if (!inner || !tabs) return;
-  const html = tabs.innerHTML; if (html === copied) return; copied = html;
-  inner.innerHTML = html;
-  inner.querySelectorAll<HTMLElement>('*').forEach(e => {
-    if (e.classList.contains('tab')) { e.classList.replace('tab', 'ltab'); e.classList.remove('on', 'peek'); e.dataset.lens = e.dataset.tab || ''; }
-    for (const a of ['data-act', 'data-tab', 'aria-current', 'aria-label', 'id']) e.removeAttribute(a);
-    if (e.tagName === 'BUTTON') e.setAttribute('tabindex', '-1');
-  });
-  const p = peeked; peeked = ''; peek(p);
-}
-function ensureLens(): void {
-  if (lens) return;
-  // eigene Ebene über der Leiste (nicht darin): die Leiste hat einen Weichzeichner, der sonst bei jeder Bewegung neu berechnet würde
-  lens = document.createElement('div'); lens.className = 'tab-lens'; lens.setAttribute('aria-hidden', 'true');
-  const shadow = document.createElement('div'); shadow.className = 'tab-lens-shadow';
-  clip = document.createElement('div'); clip.className = 'tab-lens-clip';
-  inner = document.createElement('div'); inner.className = 'tabbar-in tab-lens-in';
-  const shine = document.createElement('div'); shine.className = 'tab-lens-shine';
-  // Auftrag 32: Linse in einer eigenen Ebene, die beim Drücken und Schrumpfen genauso verformt wird wie die Leiste (bleibt deckungsgleich)
-  wrap = document.createElement('div'); wrap.className = 'tab-lens-wrap'; wrap.setAttribute('aria-hidden', 'true');
-  clip.append(inner, shine); lens.append(shadow, clip); wrap.appendChild(lens); document.body.appendChild(wrap);
-}
-
-/* ---------- Auftrag 32: die ganze Leiste reagiert (wie iOS 26) ----------
-   Drücken: die Leiste wird leicht größer und dehnt sich zur Druckstelle (Gummiband, folgt dem Finger ein Stück), Loslassen: federt
-   elastisch mit kleinem Überschwingen zurück (vorausberechnete Feder als Web-Animation, läuft im Compositor).
-   Runterscrollen: Leiste schrumpft etwas (CSS „scale“/„translate“ mit Feder-Kurve), Hochscrollen, Antippen oder Tab-Wechsel: wieder groß.
-   Nur transform/scale (60 fps), Leiste und Linsen-Ebene immer gleich verformt. „Bewegung reduzieren“: nichts davon. */
-let wrap: HTMLElement | null = null;
-let mini = false;
-let squishX: number | null = null, squishX0 = 0, squishAnim: Animation[] = [];
-const SQ_S = 1.035, SQ_MAX = 7, SQ_K = 0.035;
-const SP_BOUNCE: Spring = { k: 360, z: 0.42 };
-const both = () => [bar, wrap].filter(Boolean) as HTMLElement[];
-function untransformed<T>(fn: () => T): T {
-  const els = both(); if (!els.length) return fn();
-  squishAnim.forEach(a => a.cancel()); squishAnim = [];
-  const prev = els.map(e => [e.style.transition, e.style.transform, e.style.scale, e.style.translate]);
-  els.forEach(e => { e.style.transition = 'none'; e.style.transform = 'none'; e.style.scale = 'none'; e.style.translate = 'none'; });
-  const out = fn();
-  els.forEach((e, i) => { e.style.transform = prev[i][1]; e.style.scale = prev[i][2]; e.style.translate = prev[i][3]; });
-  void (bar && bar.offsetWidth);                      // Ruhelage zurück, ohne Übergang
-  els.forEach((e, i) => { e.style.transition = prev[i][0]; });
-  return out;
-}
-/* Drehpunkt: beim Drücken die Druckstelle (Mitte der Leistenhöhe), sonst unten mittig */
-function origin(x: number | null): void {
-  if (!bar || !wrap) return;
-  const r = untransformed(() => bar!.getBoundingClientRect());
-  const ox = x == null ? r.left + r.width / 2 : Math.max(r.left, Math.min(r.right, x)), oy = x == null ? r.bottom : r.top + r.height / 2;
-  bar.style.transformOrigin = `${(ox - r.left).toFixed(1)}px ${(oy - r.top).toFixed(1)}px`;
-  wrap.style.transformOrigin = `${ox.toFixed(1)}px ${oy.toFixed(1)}px`;
-}
-const sqT = (dx: number, s: number) => `translate3d(${dx.toFixed(2)}px,0,0) scale(${s.toFixed(4)},${(1 + (s - 1) * 0.6).toFixed(4)})`;
-const sqDx = (x: number) => Math.max(-SQ_MAX, Math.min(SQ_MAX, (x - squishX0) * SQ_K));
-function squishIn(x: number): void {
-  if (reduced() || !bar || !wrap || mini) return;
-  squishAnim.forEach(a => a.cancel()); squishAnim = [];
-  origin(x); squishX0 = x; squishX = x;
-  for (const e of both()) { e.style.transition = 'transform .16s cubic-bezier(.2,.9,.3,1.25)'; e.style.transform = sqT(0, SQ_S); }
-}
-/* beim Ziehen bleibt die Leiste zur Druckstelle gedehnt stehen (sie dem Finger nachzuführen hieße, den Weichzeichner der Leiste in jedem
-   Bild neu zu rechnen – das kostete in WebKit spürbar Bilder); erst wenn der Finger weit wandert, rückt das Gummiband einmal nach */
-function squishMove(x: number): void {
-  if (squishX == null || !bar) return;
-  // Gummiband: rückt nur in groben Stufen nach (halbe Maximal-Auslenkung), nicht in jedem Bild
-  const cur = sqDx(squishX), next = sqDx(x);
-  if (Math.abs(next - cur) < SQ_MAX / 2) return;
-  squishX = x;
-  const t = sqT(next, SQ_S);
-  for (const e of both()) { e.style.transition = 'transform .22s cubic-bezier(.2,.9,.3,1.2)'; e.style.transform = t; }
-}
-function squishOut(): void {
-  if (squishX == null) return;
-  const dx = sqDx(squishX); squishX = null;
-  const els = both();
-  const path = trajectory({ x: dx, v: 0, s: SQ_S, vs: 0 }, 0, 1, SP_BOUNCE);
-  els.forEach(e => { e.style.transition = 'none'; e.style.transform = ''; });
-  if (typeof (bar as any).animate !== 'function' || path.length < 3) return;
-  const kf = path.map(o => ({ transform: sqT(o.x, o.s) }));
-  const dur = (path.length - 1) * 1000 / 60 * slow();
-  squishAnim = els.map(e => e.animate(kf, { duration: dur, easing: 'linear' }));
-  squishAnim[0].onfinish = () => { squishAnim = []; };
-}
-function setMini(on: boolean): void {
-  if (on === mini || !bar || !wrap) return;
-  if (on && (reduced() || dragging || squishX != null || pid != null)) return;
-  mini = on;
-  origin(null);
-  for (const e of both()) { e.style.transition = ''; e.classList.toggle('mini', on); }
-}
-let lastY = 0, acc = 0, userAt = -1e9;
-/* nur Scrollen durch Finger oder Mausrad zählt (inkl. Nachlaufen); automatisches Scrollen der App (z. B. Coach nach unten) nicht */
-function onScroll(): void {
-  const y = window.scrollY || 0, d = y - lastY; lastY = y;
-  if (!d || performance.now() - userAt > 1500) return;
-  if ((d > 0) !== (acc > 0)) acc = 0;
-  acc += d;
-  if (y < 40) setMini(false);
-  else if (acc > 24) setMini(true);
-  else if (acc < -16) setMini(false);
-}
-export const _barState = () => ({ mini, pressed: squishX != null, transform: bar ? bar.style.transform : '' });
-if (typeof window !== 'undefined') (window as any).__barState = _barState;
 
 /* ---------- Animation ---------- */
 /* Zeit- und Rechenmessung für die Tests „flüssig“: Rechenzeit je Frame (Summe, Anzahl, Maximum) */
@@ -228,9 +172,9 @@ const perf = { n: 0, total: 0, max: 0, glides: 0, glideFrames: 0 };
 if (typeof window !== 'undefined') (window as any).__lensPerf = perf;
 
 let raf = 0, last = 0;
-let followX = 0;                  // Ziel beim Ziehen (Finger)
+let followX = 0;                  // Ziel beim Halten/Ziehen (Finger)
 let dragging = false;
-interface Glide { a: Animation; b: Animation; path: LensState[]; toTab: string }
+interface Glide { anims: Animation[]; path: LensState[]; toTab: string }
 let glideAnim: Glide | null = null;
 let rafGlide: { path: LensState[]; t0: number; toTab: string } | null = null;   // Ersatz ohne Web-Animationen
 
@@ -238,42 +182,51 @@ let rafGlide: { path: LensState[]; t0: number; toTab: string } | null = null;   
 function stopGlide(): void {
   if (glideAnim) {
     const g = glideAnim; glideAnim = null;
-    const t = typeof g.a.currentTime === 'number' ? g.a.currentTime : 0;
-    Object.assign(st, g.path[Math.min(g.path.length - 1, Math.max(0, Math.round(t / (1000 / 60))))]);
-    g.a.cancel(); g.b.cancel(); paint();
+    const t = typeof g.anims[0].currentTime === 'number' ? g.anims[0].currentTime as number : 0;
+    Object.assign(st, g.path[Math.min(g.path.length - 1, Math.max(0, Math.round(t / (1000 / 60) / slow())))]);
+    paint(); g.anims.forEach(a => a.cancel());
   }
   if (rafGlide) {
     const t = performance.now() - rafGlide.t0;
-    Object.assign(st, rafGlide.path[Math.min(rafGlide.path.length - 1, Math.round(t / (1000 / 60)))]);
+    Object.assign(st, rafGlide.path[Math.min(rafGlide.path.length - 1, Math.round(t / (1000 / 60) / slow()))]);
     rafGlide = null;
   }
 }
 function settle(toTab: string): void {
   lensTab = toTab;
-  if (lens) lens.classList.remove('moving');
-  if (!dragging) { if (bar) bar.classList.remove('lens-on'); peek(toTab); }
+  if (lens) lens.classList.remove('moving', 'pressed');
+  if (!dragging) { if (bar) bar.classList.remove('lens-on'); peek(''); }
 }
-/* Gleiten zu einem Tab (Feder), optional mit Anschwellen; bei „Bewegung reduzieren“ sofort */
-function glideTo(tab: string, swell = 0): void {
-  const g = geo(); if (!g || !lens || !inner) return;
+/* Gleiten zu einem Tab: wie beim Antippen (Tropfen hebt sich, gleitet, legt sich); bei „Bewegung reduzieren“ sofort */
+function glideTo(tab: string, liftUp = true): void {
+  const g = geo(); if (!g || !lens) return;
   stopGlide();
   const toX = centerOf(tab);
-  lensTab = tab; peek(tab);
-  if (reduced() || !placed) { Object.assign(st, { x: toX, v: 0, s: 1, vs: 0 }); placed = true; paint(); settle(tab); return; }
-  if (swell) st.vs += swell;
-  const path = trajectory(st, toX, 1, SP_GLIDE);
+  lensTab = tab;
+  if (reduced() || !placed) { Object.assign(st, { x: toX, v: 0, s: 1, vs: 0, a: 0, b: 0, bv: 0 }); placed = true; paint(true); settle(tab); return; }
+  const path = trajectory(st, toX, 1, SP_GLIDE, liftUp);
   if (path.length <= 2) { Object.assign(st, path[path.length - 1]); paint(); settle(tab); return; }
   perf.glides++; perf.glideFrames += path.length;
-  lens.classList.add('moving');
+  lens.classList.add('moving'); if (bar) bar.classList.add('lens-on');
   const dur = (path.length - 1) * 1000 / 60;
+  const shapes = path.map(o => shapeOf(o, g));
+  // für Tests: Bahn der letzten Animation (die läuft im Compositor; Bilder per requestAnimationFrame fehlen, während der Tab aufgebaut wird)
+  const sc = path.map(o => { const L = liftOf(o), str = stretchOf(o.v), brk = brakeOf(o); return { sx: o.s * (1 + str - brk), sy: (1 + (LIFT_Y - 1) * L) * (1 - 0.4 * str + 0.6 * brk) }; });
+  (perf as any).last = { toTab: tab, xs: path.map(o => o.x), sx: sc.map(x => x.sx), sy: sc.map(x => x.sy), glass: shapes.map(x => x.glass), centers: Object.fromEntries(g.centers.map(c => [c.tab, c.c])), h: g.h, bodyH: body ? body.offsetHeight : 0 };
+  // Hervorhebung wandert mit dem Tropfen (Farbe wechselt am Ziel)
+  peek(tab);
   if (typeof lens.animate === 'function') {
-    const ka: Keyframe[] = [], kb: Keyframe[] = [];
-    for (const o of path) { const [a, b] = transforms(o, g); ka.push({ transform: a }); kb.push({ transform: b }); }
-    const opts: KeyframeAnimationOptions = { duration: dur, easing: 'linear', fill: 'forwards' };
-    const a = lens.animate(ka, opts), b = inner.animate(kb, opts);
-    if (slow() !== 1) { a.playbackRate = b.playbackRate = 1 / slow(); }
-    const me: Glide = { a, b, path, toTab: tab }; glideAnim = me;
-    a.onfinish = () => { if (glideAnim !== me) return; glideAnim = null; Object.assign(st, path[path.length - 1]); paint(); a.cancel(); b.cancel(); settle(tab); };
+    const opts: KeyframeAnimationOptions = { duration: dur * slow(), easing: 'linear', fill: 'forwards' };
+    const btns = tabButtons();
+    const anims = [
+      lens.animate(shapes.map(s => ({ transform: s.lens })), opts),
+      fill!.animate(shapes.map(s => ({ opacity: s.fill })), opts),
+      glassEl!.animate(shapes.map(s => ({ opacity: s.glass })), opts),
+      body!.animate(shapes.map(s => ({ transform: s.body })), opts),
+      ...btns.map((b, i) => b.animate(shapes.map(s => ({ transform: s.tabs[i] || 'scale(1)' })), opts))
+    ];
+    const me: Glide = { anims, path, toTab: tab }; glideAnim = me;
+    anims[0].onfinish = () => { if (glideAnim !== me) return; glideAnim = null; Object.assign(st, path[path.length - 1]); paint(); anims.forEach(a => a.cancel()); settle(tab); };
   } else {
     rafGlide = { path, t0: performance.now(), toTab: tab }; kick();
   }
@@ -283,9 +236,8 @@ function frame(t: number): void {
   raf = 0;
   const dt = Math.min(0.05, last ? (t - last) / 1000 : 1 / 60) / slow(); last = t;
   if (dragging) {
-    if (reduced()) { Object.assign(st, { x: followX, v: 0, s: 1, vs: 0 }); }
-    else stepSpring(st, followX, PRESS, SP_FOLLOW, dt);
-    paint();
+    if (reduced()) { Object.assign(st, { x: followX, v: 0, s: 1, vs: 0, a: 0, b: 0, bv: 0 }); paint(true); }
+    else { stepSpring(st, followX, LIFT, SP_FOLLOW, dt); paint(); }
   } else if (rafGlide) {
     const i = Math.round((performance.now() - rafGlide.t0) / (1000 / 60) / slow());
     Object.assign(st, rafGlide.path[Math.min(rafGlide.path.length - 1, i)]); paint();
@@ -311,74 +263,79 @@ function navigate(tab: string): void {
 }
 
 /* ---------- Geste ---------- */
-let pid: number | null = null, timer = 0, x0 = 0, y0 = 0, lx = 0, downTab = '', downType = '';
+let pid: number | null = null, x0 = 0, y0 = 0, moved = false;
 /* Nach dem Loslassen kommt noch der normale Klick derselben Geste; der würde ein zweites Mal navigieren. Die nächste Berührung setzt es zurück. */
 let swallowClick = false;
+const clampX = (x: number) => { const g = geo(); return g ? Math.max(g.left + g.w * 0.35, Math.min(g.right - g.w * 0.35, x)) : x; };
 
-function press(x: number): void {
-  if (dragging || !lens) return;
+/* Berühren: Tropfen hebt sich sofort und läuft zur Fingerstelle (wie im Video schon nach 0,03 s) */
+function press(cx: number): void {
+  if (!lens) return;
   const g = (G = measure()); if (!g) return;
-  place(g); copyTabs();
+  place(g);
   stopGlide();
   dragging = true;
+  const x = localX(cx);
   followX = reduced() ? centerOf(nearest(x)) : clampX(x);
-  bar!.classList.add('lens-on'); lens.classList.add('pressed', 'moving');
-  // Auftrag 32: Halten/Ziehen – die ganze Leiste wird größer und dehnt sich zur Druckstelle (kurzes Antippen: nur die Linse gleitet,
-  // damit Leiste mit Weichzeichner und Linse nicht gleichzeitig animieren)
-  squishIn(x);
+  if (bar) bar.classList.add('lens-on');
+  lens.classList.add('pressed', 'moving');
   peek(nearest(x)); kick();
 }
-const clampX = (x: number) => { const g = geo(); return g ? Math.max(g.left + g.w * 0.35, Math.min(g.right - g.w * 0.35, x)) : x; };
-function drag(x: number): void {
-  const tab = nearest(x);
+function drag(cx: number): void {
+  const x = localX(cx), tab = nearest(x);
   followX = reduced() ? centerOf(tab) : clampX(x);
-  peek(tab); kick(); squishMove(x);
+  peek(tab); kick();
 }
-function release(x: number): void {
-  const tab = nearest(x);
+function release(cx: number): void {
+  const tab = nearest(localX(cx));
   dragging = false;
-  if (lens) lens.classList.remove('pressed');
   swallowClick = true; window.setTimeout(() => { swallowClick = false; }, 800);
-  // rastet am nächsten Tab ein (Restgeschwindigkeit der Geste fließt in die Feder ein: weiches Nachfedern)
+  // rastet am nächsten Tab ein (Restgeschwindigkeit fließt in die Feder ein); Tropfen legt sich am Ziel flach, Leiste federt zurück
   glideTo(tab);
-  if (bar) bar.classList.remove('lens-on');
   if (tab) navigate(tab);
 }
-function tap(tab: string): void {
-  if (tab !== lensTab) glideTo(tab, TAP_SWELL);
-  // Maus (PC): der normale Klick öffnet den Tab sofort, die Linse gleitet im Compositor weiter. Finger/Stift (iPhone): Tab erst bauen,
-  // wenn die Animation läuft (zwei Frames), sonst ruckelt das Gleiten
-  if (downType === 'mouse') { window.setTimeout(syncTabLens, 50); return; }   // Klick abgelehnt (z. B. ungespeicherte Änderungen): Linse zurück
-  swallowClick = true; window.setTimeout(() => { swallowClick = false; }, 800);
-  navigate(tab);
-}
 function cancel(): void {
-  clearTimeout(timer); timer = 0; pid = null; squishOut();
-  if (dragging) { dragging = false; if (lens) lens.classList.remove('pressed'); if (bar) bar.classList.remove('lens-on'); glideTo(activeTab() || lensTab); }
+  pid = null;
+  if (dragging) { dragging = false; glideTo(activeTab() || lensTab); }
 }
 
-/* Nach jedem Neuzeichnen der Leiste (main.ts → render): Kopie auffrischen und die Linse zum aktiven Tab bringen
-   (auch wenn der Tab anders gewechselt wurde, z. B. per Tastatur oder Knopf im Inhalt) */
+/* Nach jedem Neuzeichnen der Leiste (main.ts → render): Linse zum aktiven Tab bringen (auch wenn der Tab anders gewechselt wurde,
+   z. B. per Tastatur oder Knopf im Inhalt); Hervorhebung erneut setzen (das Neuzeichnen setzt die Klassen zurück) */
 export function syncTabLens(): void {
   if (!lens || !tabs) return;
-  copyTabs();
+  peek(peeked, true);
+  if (G) fitLabels(G.w);
   if (dragging || pendingTab) return;
   const on = activeTab(); if (!on) return;
   if (!placed) { G = measure(); const g = geo(); if (!g) return; place(g); lens.classList.add('on'); glideTo(on); return; }
   const target = glideAnim ? glideAnim.toTab : rafGlide ? rafGlide.toTab : lensTab;
-  if (target !== on) { const g = geo(); if (g) place(g); glideTo(on); setMini(false); }
+  if (target !== on) glideTo(on);
 }
-/* Größe geändert (Drehen, Schriftgröße, Safari-Leiste): neu messen und ohne Animation an den aktiven Tab setzen */
+/* Größe geändert (Drehen, Schriftgröße, Sprache): neu messen. Unveränderte Maße (ResizeObserver beim Start, Nachmessen nach dem Drehen,
+   App-Wechsel) ändern nichts – auch kein laufendes Gleiten (Auftrag 33: das Neu-Ausmessen löste vorher Springen aus). */
 function relayout(): void {
   if (!lens || dragging) return;
-  const old = G; G = measure(); const g = geo(); if (!g) return;
+  const old = G; const g = measure(); if (!g) return;
+  const same = !!old && placed && Math.abs(old.w - g.w) < 0.5 && Math.abs(old.h - g.h) < 0.5 && Math.abs(old.top - g.top) < 0.5 && Math.abs(old.left - g.left) < 0.5 && Math.abs(old.bodyW - g.bodyW) < 0.5;
+  G = g;
+  if (same) return;
   place(g);
-  // Auftrag 30: unveränderte Maße (Nachmessen nach dem Drehen, ResizeObserver beim Start) unterbrechen kein laufendes Gleiten
-  const same = !!old && placed && Math.abs(old.trLeft - g.trLeft) < 0.5 && Math.abs(old.trW - g.trW) < 0.5 && Math.abs(old.top - g.top) < 0.5 && Math.abs(old.h - g.h) < 0.5 && Math.abs(old.bottom - g.bottom) < 0.5;
-  if (same) { if (!glideAnim && !rafGlide) { const on = pendingTab || activeTab() || lensTab; if (on && Math.abs(st.x - centerOf(on)) > 0.5) { Object.assign(st, { x: centerOf(on), v: 0, s: 1, vs: 0 }); lensTab = on; paint(); settle(on); } } return; }
   stopGlide();
   const on = pendingTab || activeTab() || lensTab; if (!on) return;
-  Object.assign(st, { x: centerOf(on), v: 0, s: 1, vs: 0 }); lensTab = on; placed = true; paint(); settle(on);
+  Object.assign(st, { x: centerOf(on), v: 0, s: 1, vs: 0, a: 0, b: 0, bv: 0 }); lensTab = on; placed = true; paint(true); settle(on);
+}
+
+function ensureLens(): void {
+  if (lens || !tabs) return;
+  // Kapsel um die Tabs (falls index.html sie nicht schon hat): sie trägt Tönung, Kante, Schatten, Linse und Tabs und wird verformt
+  body = tabs.parentElement && tabs.parentElement.classList.contains('tabbar-body') ? tabs.parentElement : null;
+  if (!body) { body = document.createElement('div'); body.className = 'tabbar-body'; tabs.parentElement!.insertBefore(body, tabs); body.appendChild(tabs); }
+  if (bar && !bar.querySelector('.tabbar-glass')) { const gl = document.createElement('div'); gl.className = 'tabbar-glass'; gl.setAttribute('aria-hidden', 'true'); bar.insertBefore(gl, bar.firstChild); }
+  lens = document.createElement('div'); lens.className = 'tab-lens'; lens.setAttribute('aria-hidden', 'true');
+  fill = document.createElement('i'); fill.className = 'tab-lens-fill';
+  glassEl = document.createElement('i'); glassEl.className = 'tab-lens-glass';
+  lens.append(fill, glassEl);
+  body.insertBefore(lens, tabs);
 }
 
 export function initTabLens(): void {
@@ -387,8 +344,7 @@ export function initTabLens(): void {
   if ((bar as any)._lens) { syncTabLens(); return; }
   (bar as any)._lens = true;
   ensureLens(); syncTabLens();
-  // Auftrag 30: bei jeder Größenänderung, Drehung, Safari-Leiste und Rückkehr in die App neu messen – sofort und noch einmal, wenn iOS
-  // das Layout nach dem Drehen fertig hat (Safe Area und Breite kommen dort erst etwas später an)
+  // Größe geändert (Drehen, Safari-Leiste, Schrift, Rückkehr in die App): neu messen – sofort und noch einmal, wenn iOS fertig ist
   let rt = 0; const late: number[] = [];
   const onResize = () => {
     cancelAnimationFrame(rt); rt = requestAnimationFrame(relayout);
@@ -397,46 +353,40 @@ export function initTabLens(): void {
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
   window.addEventListener('pageshow', onResize);
-  // Auftrag 32: Runterscrollen schrumpft die Leiste, Hochscrollen macht sie wieder groß
-  lastY = window.scrollY || 0; window.addEventListener('scroll', onScroll, { passive: true });
-  const mark = () => { userAt = performance.now(); };
-  window.addEventListener('touchmove', mark, { passive: true }); window.addEventListener('wheel', mark, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onResize(); });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
   if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(onResize); ro.observe(tabs); ro.observe(bar); }
+  if ((document as any).fonts && (document as any).fonts.ready) (document as any).fonts.ready.then(onResize).catch(() => {});
   const capture = (id: number) => { try { tabs!.setPointerCapture(id); } catch (er) { /* ältere Browser */ } };
   tabs.addEventListener('pointerdown', e => {
     if (pid != null || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const b = (e.target as HTMLElement).closest<HTMLElement>('.tab'); if (!b) return;
-    pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; lx = e.clientX; downTab = b.dataset.tab || ''; downType = e.pointerType; swallowClick = false;
-    // Auftrag 32: geschrumpfte Leiste wird beim Antippen wieder groß (die ganze Leiste reagiert beim Drücken/Halten, siehe press)
-    if (mini) setMini(false);
-    clearTimeout(timer);
-    timer = window.setTimeout(() => { timer = 0; if (pid != null) { capture(pid); press(lx); } }, HOLD_MS);
+    pid = e.pointerId; x0 = e.clientX; y0 = e.clientY; moved = false; swallowClick = false;
+    capture(e.pointerId);
+    press(e.clientX);
   });
   tabs.addEventListener('pointermove', e => {
-    if (e.pointerId !== pid) return;
-    lx = e.clientX;
-    if (!dragging) {
-      // Wischen über die Leiste startet die Linse sofort; senkrecht weg = keine Geste
-      if (Math.abs(lx - x0) > SLOP) { clearTimeout(timer); timer = 0; capture(e.pointerId); press(lx); drag(lx); }
-      else if (Math.abs(e.clientY - y0) > SLOP * 2) cancel();
-      return;
-    }
-    e.preventDefault(); drag(lx);
+    if (e.pointerId !== pid || !dragging) return;
+    if (!moved && Math.abs(e.clientX - x0) <= SLOP && Math.abs(e.clientY - y0) <= SLOP) return;
+    moved = true;
+    e.preventDefault(); drag(e.clientX);
   });
   tabs.addEventListener('pointerup', e => {
     if (e.pointerId !== pid) return;
-    clearTimeout(timer); timer = 0; pid = null; squishOut();
-    if (dragging) { e.preventDefault(); release(e.clientX); }
-    else if (downTab) tap(downTab);
+    pid = null;
+    if (!dragging) return;
+    e.preventDefault();
+    // kurzer Tipp ohne Wischen: der berührte Tab (nicht die Stelle, an der der Finger gerade ist)
+    release(moved ? e.clientX : x0);
   });
   tabs.addEventListener('pointercancel', e => { if (e.pointerId === pid) cancel(); });
-  // nach Linse bzw. Antippen kommt noch der normale Klick: der würde ein zweites Mal navigieren
+  tabs.addEventListener('lostpointercapture', e => { if (e.pointerId === pid) cancel(); });
+  // nach der Geste kommt noch der normale Klick: der würde ein zweites Mal navigieren
   window.addEventListener('click', e => { const el = e.target as HTMLElement; if (swallowClick && el && el.closest && el.closest('.tabbar')) { e.stopPropagation(); e.preventDefault(); swallowClick = false; } }, true);
   // langes Drücken öffnet auf iOS sonst Kontextmenü/Textauswahl
   tabs.addEventListener('contextmenu', e => { if (dragging || pid != null) e.preventDefault(); });
 }
-/* für Tests: Zustand und Anzahl sichtbarer Linsen (Linsen-Element + Tabs mit eigener Markierungsfläche) */
+/* für Tests: Zustand der Linse und der Leiste */
 export const _lensState = () => ({ dragging, tab: lensTab, pending: pendingTab, x: st.x, s: st.s, gliding: !!(glideAnim || rafGlide) });
-if (typeof window !== 'undefined') (window as any).__lensState = _lensState;
+export const _barState = () => ({ mini: false, pressed: dragging, transform: body ? body.style.transform : '' });
+if (typeof window !== 'undefined') { (window as any).__lensState = _lensState; (window as any).__barState = _barState; }

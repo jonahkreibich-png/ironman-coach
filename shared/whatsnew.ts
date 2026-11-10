@@ -1,5 +1,9 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.21.0', items: [
+    'Mitteilungen: Unter Mehr steht jetzt der richtige Stand („An“ statt fälschlich „Aus“). „Test senden“ wartet, bis die Mitteilung wirklich auf deinem Gerät angekommen ist, und sagt es ehrlich. Unter Mehr → Mitteilungen siehst du die letzten 7 Tage: gesendet, angenommen, angekommen.',
+    'Tab-Leiste wie in Apples Fitness-App: Ein Tipp wechselt immer sofort den Tab, die Auswahl hebt sich als Glastropfen ab und gleitet hinüber, die Leiste gibt elastisch nach. Sie schrumpft beim Scrollen nicht mehr und zeigt nie mehr eine Beschriftung doppelt.'
+  ] },
   { version: '3.20.0', items: [
     'Coach: pro Frage eine klare Antwort. Fällt Training aus oder willst du heute noch etwas machen, schlägt er einen passenden Ersatz mit Dauer vor (z. B. 40 min locker Rad) – mit „Übernehmen“. Er weiß, was du heute schon gemacht hast, und bleibt bei seinem Angebot.',
     'Tab-Leiste wie in iOS 26: Halten macht die ganze Leiste größer und sie federt zurück, die Auswahl gleitet wie ein Tropfen, beim Runterscrollen wird die Leiste kleiner, beim Hochscrollen wieder groß.'

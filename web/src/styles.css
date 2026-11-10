@@ -64,7 +64,7 @@ main { max-width: 720px; margin: 0 auto; padding: var(--s2) max(var(--s4), env(s
 .tab svg { width: 24px; height: 24px; }
 .tab.on { color: var(--accent); }
 .tab { min-width: 0; padding: 0 1px; }
-.tab span { max-width: 100%; white-space: nowrap; overflow-wrap: normal; -webkit-hyphens: manual; hyphens: manual; font-size: min(11.5px, 3.3vw); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; }
+.tab span { max-width: 100%; white-space: nowrap; overflow-wrap: normal; -webkit-hyphens: manual; hyphens: manual; font-size: var(--tab-fs, min(0.66rem, 3.3vw, 15px)); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; }
 .tab .dot { position: absolute; top: 9px; left: calc(50% + 8px); width: 8px; height: 8px; border-radius: 50%; background: var(--hl); border: 2px solid var(--surface); }
 body.no-plan .tabbar { display: none; }
 
@@ -674,62 +674,50 @@ details.fold[open] > summary .chev svg { transform: rotate(180deg); }
 [data-wish] .li.lever { background: var(--accent-soft); border-radius: 10px; }
 [data-wish] .lever-t { color: var(--accent); }
 
-/* Auftrag 23/24: EINE Glas-Linse in der Tab-Leiste. In Ruhe markiert sie den aktiven Tab, beim Drücken/Ziehen ist sie die vergrößerte Linse.
-   Animiert werden nur transform (per Skript, Feder) und opacity (Glanz und Schatten beim Drücken). */
+/* Auftrag 33: Tab-Leiste wie iOS 26 (Apples Fitness-App, Bild für Bild ausgemessen: docs/tabbar-ios26.md).
+   Ebenen: .tabbar-glass = Weichzeichner (fest, neben der Kapsel) · .tabbar-body = sichtbare Kapsel (Tönung, Kante, Schatten) mit Linse und Tabs – nur
+   sie wird beim Antippen/Ziehen verformt (transform, ohne backdrop-filter → flüssig). Die Linse liegt IN der Kapsel (gleiche Ebene);
+   keine Kopie der Tabs mehr (vorher eigene Ebene in body: beim Überscrollen verschoben, Beschriftung doppelt). */
 .tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tabbar-body { position: relative; transform-origin: 0 50%; border-radius: inherit; will-change: transform; }
 .tabbar-in#tabs { touch-action: none; }
-.tab-lens { position: fixed; left: 0; top: auto; bottom: 0; z-index: 31; pointer-events: none; opacity: 0; transform-origin: 50% 50%; will-change: transform; }
-.tab-lens.on { opacity: 1; }
+.tab { transform-origin: 50% 55%; will-change: transform; }
+.tab-lens { position: absolute; left: 0; top: 0; pointer-events: none; transform-origin: 50% 50%; will-change: transform; border-radius: 999px; }
+.tab-lens > i { position: absolute; inset: 0; border-radius: inherit; will-change: opacity; }
 body.no-plan .tab-lens { display: none; }
-.tab-lens-clip { position: absolute; inset: 0; border-radius: 999px; overflow: hidden;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 22%, #fff 78%), color-mix(in srgb, var(--bg) 55%, #fff 45%));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(0,0,0,.04), inset 0 0 0 .5px rgba(255,255,255,.7), 0 4px 14px color-mix(in srgb, var(--accent) 20%, transparent); }
-/* beim Drücken: kräftiger Schatten und Glanz (nur die Deckkraft wechselt) */
-.tab-lens-shadow { position: absolute; inset: 0; border-radius: 999px; box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.12); opacity: .001; transition: opacity .2s ease-out; }
-.tab-lens-shine { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .001; transition: opacity .2s ease-out;
-  background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.6), transparent 55%), radial-gradient(90% 60% at 50% 115%, rgba(255,255,255,.3), transparent 60%); }
-.tab-lens.pressed .tab-lens-shadow, .tab-lens.pressed .tab-lens-shine { opacity: 1; }
-.tab-lens-in { position: absolute; left: 0; top: 0; margin: 0 !important; max-width: none !important; pointer-events: none; transform-origin: 0 0; will-change: transform; }
-/* Kopie in der Linse: eigene Klassen (ltab), gleiche Form wie .tab */
-.tab-lens-in .ltab { height: var(--nav-h); border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--ink-2); font-size: min(0.6765rem, 23px); font-weight: 600; min-width: 0; padding: 0 1px; }
-.tab-lens-in .ltab svg { width: 24px; height: 24px; }
-.tab-lens-in .ltab span { max-width: 100%; white-space: nowrap; font-size: min(11.5px, 3.3vw); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; }
-.tab-lens-in .ltab.peek { color: var(--accent); }
-.tab-lens-in .ltab .dot { display: none; }
-[data-design="glas"] .tab-lens-in .ltab { height: calc(var(--nav-h) - 12px); }
-[data-design="glas"] .tab-lens-in .ltab svg { width: 26px; height: 26px; }
+/* Ruhe: flache Markierung (Video: dunkler als die Leiste im dunklen Modus, leicht grau im hellen) */
+.tab-lens-fill { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+/* gehoben: klarer Glastropfen – helle Kante, farbige Ränder (Lichtbrechung angedeutet), Glanz oben, Schatten; ohne Weichzeichner */
+.tab-lens-glass { opacity: .001; background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.30), rgba(255,255,255,.05) 55%, rgba(255,255,255,.10)), rgba(255,255,255,.04);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), inset 0 2px 1.5px -1px rgba(255,255,255,.9), inset 0 -2px 3px -1px rgba(255,255,255,.35),
+    inset 3px 0 3px -2px rgba(255,90,140,.45), inset -3px 0 3px -2px rgba(70,160,255,.5), 0 8px 22px rgba(0,0,0,.20), 0 1px 3px rgba(0,0,0,.12); }
 .tabbar.lens-on .tab.peek { color: var(--accent); }
-:root[data-theme="dark"] .tab-lens-clip { background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #fff 16%), color-mix(in srgb, var(--bg) 92%, #fff 8%)); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 .5px rgba(255,255,255,.14), 0 4px 14px rgba(0,0,0,.4); }
-:root[data-theme="dark"] .tab-lens-shine { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.18), transparent 55%); }
-:root[data-theme="dark"] .tab-lens-shadow { box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .tab-lens-fill { background: rgba(0,0,0,.42); }
+:root[data-theme="dark"] .tab-lens-glass { box-shadow: inset 0 0 0 1px rgba(255,255,255,.32), inset 0 2px 1.5px -1px rgba(255,255,255,.6), inset 0 -2px 3px -1px rgba(255,255,255,.18),
+    inset 3px 0 3px -2px rgba(255,90,140,.4), inset -3px 0 3px -2px rgba(70,160,255,.45), 0 8px 22px rgba(0,0,0,.45); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .tab-lens-clip { background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #fff 16%), color-mix(in srgb, var(--bg) 92%, #fff 8%)); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 .5px rgba(255,255,255,.14), 0 4px 14px rgba(0,0,0,.4); }
-  :root:not([data-theme="light"]) .tab-lens-shine { background: radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.18), transparent 55%); }
-  :root:not([data-theme="light"]) .tab-lens-shadow { box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+  :root:not([data-theme="light"]) .tab-lens-fill { background: rgba(0,0,0,.42); }
+  :root:not([data-theme="light"]) .tab-lens-glass { box-shadow: inset 0 0 0 1px rgba(255,255,255,.32), inset 0 2px 1.5px -1px rgba(255,255,255,.6), inset 0 -2px 3px -1px rgba(255,255,255,.18),
+    inset 3px 0 3px -2px rgba(255,90,140,.4), inset -3px 0 3px -2px rgba(70,160,255,.45), 0 8px 22px rgba(0,0,0,.45); }
 }
-@media (prefers-reduced-motion: reduce) { .tab-lens-shadow, .tab-lens-shine { transition: none; } }
-/* Auftrag 32: Leiste wie iOS 26. Linsen-Ebene wird genauso verformt wie die Leiste (Drücken, Schrumpfen), damit beide deckungsgleich bleiben.
-   Schrumpfen beim Runterscrollen: nur scale/translate mit Feder-Kurve (leichtes Nachfedern), Compositor-freundlich. */
-.tab-lens-wrap { position: fixed; inset: 0; z-index: 31; pointer-events: none; }
-body.no-plan .tab-lens-wrap { display: none; }
-.tabbar, .tab-lens-wrap { transition: scale .5s cubic-bezier(.34,1.5,.5,1), translate .5s cubic-bezier(.34,1.5,.5,1); }
-.tabbar.mini, .tab-lens-wrap.mini { scale: .88; translate: 0 6px; }
-.tabbar.mini .tab span, .tab-lens-wrap.mini .ltab span { opacity: .55; }
-.tab span, .ltab span { transition: opacity .3s ease; }
-/* Glas: Unschärfe und leichte Lichtbrechung (Sättigung/Helligkeit des Inhalts dahinter), Glanzkante oben und weiche Kante unten */
-[data-design="glas"] .tabbar { -webkit-backdrop-filter: blur(18px) saturate(190%) brightness(1.06) contrast(1.04); backdrop-filter: blur(18px) saturate(190%) brightness(1.06) contrast(1.04);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.12), inset 0 0 0 .5px rgba(255,255,255,.25); }
-[data-design="glas"] .tabbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+@media (prefers-reduced-transparency: reduce) { .tab-lens-glass { background: var(--surface-2); } }
+/* Glas: Weichzeichner und leichte Lichtbrechung (Sättigung/Helligkeit des Inhalts dahinter) auf der festen Ebene; Tönung, Glanzkante
+   und Schatten auf der Kapsel (die sich verformen darf) */
+/* Weichzeichner als eigene, feste Ebene NEBEN der Kapsel (nicht um sie herum): sonst rechnet WebKit ihn bei jeder Verformung neu (gemessen:
+   jedes zweite bis dritte Bild fiel aus) */
+[data-design="glas"] .tabbar { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.tabbar-glass { display: none; }
+[data-design="glas"] .tabbar-glass { display: block; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; -webkit-backdrop-filter: blur(18px) saturate(190%) brightness(1.06) contrast(1.04); backdrop-filter: blur(18px) saturate(190%) brightness(1.06) contrast(1.04); }
+[data-design="glas"] .tabbar-body { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.12), inset 0 0 0 .5px rgba(255,255,255,.25); }
+[data-design="glas"] .tabbar-body::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,0) 42%), radial-gradient(60% 120% at 50% 125%, rgba(255,255,255,.12), transparent 70%); }
-[data-design="glas"] .tab-lens-clip { -webkit-backdrop-filter: blur(3px) saturate(160%); backdrop-filter: blur(3px) saturate(160%); }
-:root[data-theme="dark"][data-design="glas"] .tabbar { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.1); }
-:root[data-theme="dark"][data-design="glas"] .tabbar::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%); }
+:root[data-theme="dark"][data-design="glas"] .tabbar-body { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.1); }
+:root[data-theme="dark"][data-design="glas"] .tabbar-body::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-design="glas"] .tabbar { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.1); }
-  :root:not([data-theme="light"])[data-design="glas"] .tabbar::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%); }
+  :root:not([data-theme="light"])[data-design="glas"] .tabbar-body { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.1); }
+  :root:not([data-theme="light"])[data-design="glas"] .tabbar-body::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%); }
 }
-@media (prefers-reduced-motion: reduce) { .tabbar, .tab-lens-wrap { transition: none; scale: none !important; translate: none !important; } }
-@media (prefers-reduced-transparency: reduce) { [data-design="glas"] .tabbar::before { display: none; } }
+@media (prefers-reduced-transparency: reduce) { [data-design="glas"] .tabbar-body::before { display: none; } }
 .prog2 .big.approx { font-size: clamp(1.25rem, 6vw, 1.6rem); white-space: nowrap; }
 
 /* Auftrag 25: Mehr-Tab wie die iOS-Einstellungen: Suche, Profilkarte, gruppierte Listen */

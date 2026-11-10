@@ -40,11 +40,17 @@ async function subscriptions(env: Env, uid: number) {
   return rows.results || [];
 }
 async function sentToday(env: Env, uid: number, day: string) {
-  const rows = await env.DB.prepare('SELECT key, type FROM push_log WHERE user_id = ? AND day = ?').bind(uid, day).all();
+  const rows = await env.DB.prepare('SELECT key, type, skipped FROM push_log WHERE user_id = ? AND day = ?').bind(uid, day).all();
   return rows.results || [];
 }
-async function logSent(env: Env, uid: number, day: string, key: string, type: string, delivered: number) {
-  await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at, delivered) VALUES (?, ?, ?, ?, ?, ?)').bind(uid, key, day, type, Date.now(), delivered).run();
+async function logSent(env: Env, uid: number, day: string, key: string, type: string, delivered: number, mid?: string) {
+  await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at, delivered, mid) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(uid, key, day, type, Date.now(), delivered, mid || null).run();
+}
+/* Auftrag 33: Eine geplante Mitteilung wird VOR dem Versand im Protokoll eingetragen. Nur wer den Eintrag anlegen konnte, verschickt sie –
+   so geht jede Mitteilung genau einmal raus, auch wenn zwei Läufe gleichzeitig arbeiten (vorher: erst senden, dann eintragen). */
+async function claim(env: Env, uid: number, day: string, key: string, type: string, mid: string, skipped: string | null = null): Promise<boolean> {
+  const r: any = await env.DB.prepare('INSERT OR IGNORE INTO push_log (user_id, key, day, type, sent_at, delivered, mid, skipped) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)').bind(uid, key, day, type, Date.now(), mid, skipped).run();
+  return !!(r && r.meta && r.meta.changes === 1);
 }
 export async function queueWarning(env: Env, uid: number, key: string, msg: any) {
   await env.DB.prepare('INSERT OR IGNORE INTO push_queue (user_id, key, type, payload, created_at) VALUES (?, ?, ?, ?, ?)').bind(uid, key, 'warnings', JSON.stringify(msg), Date.now()).run();
@@ -56,32 +62,83 @@ type PushFn = (sub: any, msg: any) => Promise<{ ok?: boolean; gone?: boolean; st
 let pushOverride: PushFn | null = null;
 export function setPushOverride(fn: PushFn | null) { pushOverride = fn; }
 export interface PushResult { deviceId: string; ok: boolean; status: number | null; reason: string; gone: boolean }
+export interface DeliverMeta { mid?: string; day?: string; type?: string; urgency?: 'very-low' | 'low' | 'normal' | 'high'; ttl?: number }
+const DAY_MS = 86400000;
+/** so lange nicht gesehen und durch eine neuere Kennung mit demselben Gerätenamen ersetzt → bekommt nichts mehr */
+export const REPLACED_DAYS = 7;
+const tail = (endpoint: string) => String(endpoint || '').slice(-24);
+const rid = () => { const b = crypto.getRandomValues(new Uint8Array(18)); let s = ''; for (const x of b) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+export const newMid = (prefix: string) => prefix + '-' + Date.now().toString(36) + '-' + rid().slice(0, 6);
+async function markGone(env: Env, uid: number, deviceId: string, status: number | null, reason: string | null, endpoint: string) {
+  await env.DB.prepare('INSERT OR REPLACE INTO push_gone (user_id, device_id, at, status, reason, end_tail) VALUES (?, ?, ?, ?, ?, ?)').bind(uid, deviceId, Date.now(), status, reason, tail(endpoint)).run();
+}
+/* Auftrag 33: Alte Kennung desselben Geräts aussortieren. Beispiel Nutzer 1: Das iPhone bekam am 31.10. eine neue Kennung; die Anmeldung der
+   alten Kennung (zuletzt gesehen 31.10.) bekam weiter jede Mitteilung, Apple nahm sie an (201) – angezeigt wurde dort nichts.
+   Ersetzt heißt: seit REPLACED_DAYS Tagen nicht gesehen UND es gibt eine Kennung mit demselben Gerätenamen, die erst danach angelegt wurde.
+   Echte Zweitgeräte (anderer Name, oder weiter benutzt) bleiben. Die alte Kennung erfährt beim nächsten Öffnen „ersetzt“ und meldet sich neu an. */
+export async function dropReplaced(env: Env, uid: number): Promise<number> {
+  const devs = ((await env.DB.prepare('SELECT id, name, created_at, last_seen FROM devices WHERE user_id = ?').bind(uid).all()).results || []) as any[];
+  const subs = ((await env.DB.prepare('SELECT id, device_id, endpoint FROM push_subs WHERE user_id = ?').bind(uid).all()).results || []) as any[];
+  let n = 0;
+  for (const s of subs) {
+    const dev = devs.find(d => d.id === s.device_id); if (!dev) continue;
+    const seen = dev.last_seen || dev.created_at || 0;
+    if (Date.now() - seen < REPLACED_DAYS * DAY_MS) continue;
+    if (!devs.some(o => o.id !== dev.id && o.name === dev.name && (o.created_at || 0) > seen)) continue;
+    await env.DB.prepare('DELETE FROM push_subs WHERE id = ?').bind(s.id).run();
+    await markGone(env, uid, dev.id, null, 'ersetzt', s.endpoint);
+    n++;
+  }
+  return n;
+}
 /* Auftrag 31: an alle Geräte; je Gerät wird die Antwort des Push-Dienstes gespeichert (Status, Grund, letzte Zustellung, Fehler in Folge).
    Abgelaufene Anmeldungen (404/410, falscher Schlüssel) werden entfernt und gemerkt – das Gerät zeigt dann „nicht aktiv – erneut erlauben“
-   und meldet sich beim nächsten Öffnen selbst neu an. */
-export async function deliverAll(env: Env, uid: number, msg: any): Promise<{ delivered: number; results: PushResult[] }> {
+   und meldet sich beim nächsten Öffnen selbst neu an.
+   Auftrag 33: je Mitteilung (mid) und Gerät ein Eintrag in push_deliveries (gesendet, angenommen) mit eigenem Empfangs-Schlüssel (rt);
+   der Service Worker meldet damit nach dem Anzeigen „angekommen“ (POST /api/push/receipt). */
+export async function deliverAll(env: Env, uid: number, msg: any, meta: DeliverMeta = {}): Promise<{ delivered: number; results: PushResult[]; mid: string }> {
+  await dropReplaced(env, uid);
   const subs = await subscriptions(env, uid);
+  const mid = meta.mid || msg.mid || newMid('m');
+  const day = meta.day || new Date().toISOString().slice(0, 10), type = meta.type || 'other';
+  const opts = { urgency: meta.urgency || (msg.urgent ? 'high' : 'normal'), ttl: meta.ttl };
   let ok = 0; const results: PushResult[] = [];
   for (const s of subs) {
+    const token = rid();
+    // vor dem Versand eintragen: die Bestätigung des Geräts kann schneller zurück sein als die Antwort von Apple
+    await env.DB.prepare('INSERT OR REPLACE INTO push_deliveries (user_id, mid, device_id, day, type, sent_at, status, accepted, reason, token, received_at) VALUES (?, ?, ?, ?, ?, ?, NULL, 0, NULL, ?, NULL)').bind(uid, mid, s.device_id, day, type, Date.now(), token).run();
+    const body = { ...msg, mid, rt: token };
     let r: any;
-    try { r = pushOverride ? await pushOverride(s, msg) : await sendPush(env, s, msg, { urgency: msg.urgent ? 'high' : 'normal' }); }
+    try { r = pushOverride ? await pushOverride(s, body) : await sendPush(env, s, body, opts); }
     catch (e) { r = { ok: false, status: null, reason: 'Netzwerk: ' + String((e && e.message) || e).slice(0, 80) }; }
     const status = r.status == null ? (r.ok ? 201 : null) : r.status;
     const reason = String(r.reason || '').slice(0, 120);
     results.push({ deviceId: s.device_id, ok: !!r.ok, status, reason, gone: !!r.gone });
+    await env.DB.prepare('UPDATE push_deliveries SET status = ?, accepted = ?, reason = ? WHERE user_id = ? AND mid = ? AND device_id = ?').bind(status, r.ok ? 1 : 0, reason || null, uid, mid, s.device_id).run();
     const now = Date.now();
     if (r.ok) { ok++; await env.DB.prepare('UPDATE push_subs SET last_status = ?, last_at = ?, last_ok_at = ?, fails = 0, last_error = NULL WHERE id = ?').bind(status, now, now, s.id).run(); }
     else if (r.gone) {
       await env.DB.prepare('DELETE FROM push_subs WHERE id = ?').bind(s.id).run();
-      await env.DB.prepare('INSERT OR REPLACE INTO push_gone (user_id, device_id, at, status, reason) VALUES (?, ?, ?, ?, ?)').bind(uid, s.device_id, now, status, reason || null).run();
+      await markGone(env, uid, s.device_id, status, reason || null, s.endpoint);
     } else {
       await env.DB.prepare('UPDATE push_subs SET last_status = ?, last_at = ?, fails = COALESCE(fails, 0) + 1, last_error = ? WHERE id = ?').bind(status, now, reason || ('HTTP ' + status), s.id).run();
       console.error('Push fehlgeschlagen:', status, reason);
     }
   }
-  return { delivered: ok, results };
+  return { delivered: ok, results, mid };
 }
-export async function deliver(env: Env, uid: number, msg: any): Promise<number> { return (await deliverAll(env, uid, msg)).delivered; }
+export async function deliver(env: Env, uid: number, msg: any, meta?: DeliverMeta): Promise<number> { return (await deliverAll(env, uid, msg, meta)).delivered; }
+
+/* Auftrag 33: Zeitgebundene Mitteilungen (Morgen, Erinnerungen, Abend, Warnungen) mit Urgency high, damit iOS sie nicht zurückhält
+   (Stromsparen), und mit einer TTL bis zu dem Zeitpunkt, ab dem sie nicht mehr passt – eine Morgen-Ampel um 15 Uhr nützt niemandem.
+   job.until: Ortszeit in Minuten, bis zu der die Mitteilung gilt. */
+const HIGH = new Set(['morning', 'preSession', 'eveEarly', 'evening', 'adductors', 'food', 'warnings', 'test']);
+export function deliveryOpts(job: any, min: number, isWarning: boolean): { urgency: 'high' | 'normal'; ttl: number } {
+  const type = isWarning ? 'warnings' : job.type;
+  let ttl = type === 'weekly' ? 12 * 3600 : type === 'achievements' ? 24 * 3600 : type === 'warnings' ? 6 * 3600 : 3 * 3600;
+  if (job.until != null) ttl = (job.until - min) * 60;
+  return { urgency: HIGH.has(type) ? 'high' : 'normal', ttl: Math.max(600, Math.min(86400, Math.round(ttl))) };
+}
 
 /* ---------- Inhalte ---------- */
 function todaySessions(L, date) {
@@ -104,6 +161,8 @@ export function buildJobs(L, b, prefs, prevMin) {
   const date = b.date, min = b.hour * 60 + b.minute;
   const due = hhmm => { const t = toMin(hhmm); return t != null && t > prevMin && t <= min; };
   const T = prefs.types, X = prefs.times;
+  // Auftrag 33: bis wann eine Mitteilung noch passt (Ortszeit in Minuten) – abends bis zur Ruhezeit, morgens bis 12 Uhr
+  const qs = toMin(prefs.quietStart); const bed = qs != null && qs > min ? qs : min + 120;
   const ill = C.illnessAt(L.state.illnessPeriods, date);
   const { weeks, list } = todaySessions(L, date);
   const R = C.readinessFor(L.state.trend, L.state.illnessPeriods, date, L.state.settings.readiness);
@@ -113,9 +172,9 @@ export function buildJobs(L, b, prefs, prevMin) {
   const weekend = b.dow === 0 || b.dow === 6 || prefs.holidays;
   if (T.morning && due(weekend ? X.morningWeekend : X.morningSchool)) {
     const sess = list.length ? list.map(s => sessLine(s, L)).join(', ') : 'Kein Training geplant.';
-    if (!C.hasRecovery(todayPoint)) jobs.push({ type: 'morning', key: 'morning', title: 'Guten Morgen', body: 'Noch keine Morgenwerte, kurz eintragen? Heute: ' + sess, url: './?go=heute&open=checkin' });
-    else if (ill) jobs.push({ type: 'morning', key: 'morning', title: 'Gute Besserung', body: 'Heute kein Training. Schlafen, trinken, genug essen.', url: './?go=heute' });
-    else jobs.push({ type: 'morning', key: 'morning', title: `Deine Ampel heute: ${LEVEL[R.level] || '⚪'} ${LEVEL_TXT[R.level] || ''}`, body: 'Heute: ' + sess, url: './?go=heute' });
+    if (!C.hasRecovery(todayPoint)) jobs.push({ type: 'morning', key: 'morning', title: 'Guten Morgen', body: 'Noch keine Morgenwerte, kurz eintragen? Heute: ' + sess, url: './?go=heute&open=checkin', until: 12 * 60 });
+    else if (ill) jobs.push({ type: 'morning', key: 'morning', title: 'Gute Besserung', body: 'Heute kein Training. Schlafen, trinken, genug essen.', url: './?go=heute', until: 12 * 60 });
+    else jobs.push({ type: 'morning', key: 'morning', title: `Deine Ampel heute: ${LEVEL[R.level] || '⚪'} ${LEVEL_TXT[R.level] || ''}`, body: 'Heute: ' + sess, url: './?go=heute', until: 12 * 60 });
   }
   // 1 h vor Nachmittagseinheiten
   if (T.preSession && !ill) list.forEach(s => {
@@ -126,7 +185,7 @@ export function buildJobs(L, b, prefs, prevMin) {
     const hh = String(Math.floor(at / 60)).padStart(2, '0') + ':' + String(at % 60).padStart(2, '0');
     if (!due(hh)) return;
     const bpm = C.zoneBpm(s, L.profile.thresholds, L.plan && L.plan.zonePercents);
-    jobs.push({ type: 'preSession', key: 'pre-' + s.id, title: `${t} ${s.title}`, body: [bpm ? 'Puls ' + bpm : (s.zone || null), SNACKS[new Date(date).getUTCDate() % SNACKS.length]].filter(Boolean).join(', '), url: './?go=heute' });
+    jobs.push({ type: 'preSession', key: 'pre-' + s.id, title: `${t} ${s.title}`, body: [bpm ? 'Puls ' + bpm : (s.zone || null), SNACKS[new Date(date).getUTCDate() % SNACKS.length]].filter(Boolean).join(', '), url: './?go=heute', until: toMin(t) });
   });
   // Vorabend früher Einheiten
   if (T.eveEarly && due(X.eveEarly)) {
@@ -137,22 +196,24 @@ export function buildJobs(L, b, prefs, prevMin) {
     const early = day ? day.sessions.filter(s => s.sport !== 'rest' && !s.cancelled && !s.fixed && (morningPerson || C.isEarly(s, L.state.sessions[s.id]))) : [];
     if (early.length && !C.illnessAt(L.state.illnessPeriods, tomorrow)) {
       const s = early[0]; const t = C.sessionTime(s, L.state.sessions[s.id]);
-      jobs.push({ type: 'eveEarly', key: 'eve-' + s.id, title: `Morgen ${t ? t + ' ' : 'früh '}${s.title}`, body: 'Sachen bereitlegen, um 22:30 ins Bett.', url: './?go=plan' });
+      jobs.push({ type: 'eveEarly', key: 'eve-' + s.id, title: `Morgen ${t ? t + ' ' : 'früh '}${s.title}`, body: 'Sachen bereitlegen, um 22:30 ins Bett.', url: './?go=plan', until: bed });
     }
   }
   // Abends: nicht abgehakt oder ohne Gefühl
   if (T.evening && due(X.evening) && !ill) {
     const open = list.filter(s => { const st = L.state.sessions[s.id] || {}; return !st.skipped && (!st.completed || !st.quality); });
-    if (open.length) jobs.push({ type: 'evening', key: 'evening', title: 'Wie war\'s?', body: `${open.map(s => s.title).join(', ')}: kurz abhaken und Gefühl eintragen.`, url: './?go=heute&open=export' });
+    if (open.length) jobs.push({ type: 'evening', key: 'evening', title: 'Wie war\'s?', body: `${open.map(s => s.title).join(', ')}: kurz abhaken und Gefühl eintragen.`, url: './?go=heute&open=export', until: bed });
   }
   // Routinen
-  // Abend-Check nur für Teamsportler (Leiste und Adduktoren bei Fußball und Laufen), sonst nie
+  // Abend-Check nur für Teamsportler (Leiste und Adduktoren bei Fußball und Laufen), sonst nie.
+  // Auftrag 33: und nur, solange eine passende Beschwerde aktiv ist (Leiste/Adduktoren als Berücksichtigung oder Schmerzangabe der letzten
+  // 7 Tage, nach „wieder schmerzfrei“ nicht mehr). Vorher kam sie jedem Fußballer Mo/Mi/Fr, auch ganz ohne Beschwerden.
   const team = !!(L.profile && (L.profile.teamSport || (L.profile.sports || []).includes('football')));
-  if (T.adductors && team && [1, 3, 5].includes(b.dow) && due(X.adductors) && !ill) jobs.push({ type: 'adductors', key: 'adductors', title: 'Adduktoren-Übungen', body: 'Kurz die Adduktoren-Übungen machen, 10 Minuten reichen.', url: './?go=heute' });
+  if (T.adductors && team && [1, 3, 5].includes(b.dow) && due(X.adductors) && !ill && C.groinComplaint({ ...(L.state || {}), profile: L.profile }, weeks, date)) jobs.push({ type: 'adductors', key: 'adductors', title: 'Adduktoren-Übungen', body: 'Kurz die Adduktoren-Übungen machen, 10 Minuten reichen.', url: './?go=heute', until: bed });
   if (T.food && due(X.food) && list.length && !ill) {
     const low = C.nutritionKcalLow(L.state, weeks, date, L.nutritionProfile);
     const eaten = ((L.state.nutrition || {})[date] || {}).kcal || 0;
-    if (eaten < low * 0.5) jobs.push({ type: 'food', key: 'food', title: 'Genug gegessen?', body: `Bisher ${eaten ? eaten + ' kcal' : 'nichts'} eingetragen, Ziel ab ${low} kcal. Heute ist Trainingstag, iss gut zu Abend.`, url: './?go=essen' });
+    if (eaten < low * 0.5) jobs.push({ type: 'food', key: 'food', title: 'Genug gegessen?', body: `Bisher ${eaten ? eaten + ' kcal' : 'nichts'} eingetragen, Ziel ab ${low} kcal. Heute ist Trainingstag, iss gut zu Abend.`, url: './?go=essen', until: bed });
   }
   // Sonntag: Wochenrückblick und Vorschau
   if (T.weekly && b.dow === 0 && due(X.weekly)) jobs.push(weeklyJob(L, b));
@@ -209,8 +270,8 @@ export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any>
   for (const row of (tests.results || []) as any[]) {
     await env.DB.prepare('DELETE FROM push_queue WHERE user_id = ? AND key = ?').bind(uid, row.key).run();
     let job: any = {}; try { job = JSON.parse(row.payload); } catch (_) { job = {}; }
-    const r = await deliverAll(env, uid, { title: job.title || 'Test', body: job.body || 'Test-Mitteilung', url: job.url || './?go=heute', tag: row.key });
-    await logSent(env, uid, b.date, row.key, 'test', r.delivered);
+    const r = await deliverAll(env, uid, { title: job.title || 'Test', body: job.body || 'Test-Mitteilung', url: job.url || './?go=heute', tag: row.key }, { mid: row.key, day: b.date, type: 'test', urgency: 'high', ttl: 600 });
+    await logSent(env, uid, b.date, row.key, 'test', r.delivered, row.key);
     testSent.push({ key: row.key, ...r });
   }
 
@@ -221,22 +282,30 @@ export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any>
   const quiet = inQuiet(prefs, min, b.dow);
   const sent = await sentToday(env, uid, b.date);
   const sentKeys = new Set(sent.map(r => r.key));
-  let count = sent.filter(r => r.type !== 'test').length;   // Tests zählen nicht zum Tageslimit
+  let count = sent.filter(r => r.type !== 'test' && !r.skipped).length;   // Tests und nicht verschickte zählen nicht zum Tageslimit
   const warnSent = sent.some(r => WARNING_TYPES.has(r.type));
   const max = prefs.maxPerDay || 4;
   const out: any[] = [];
 
-  const trySend = async (job, isWarning) => {
+  const trySend = async (job, isWarning, scheduled = false) => {
     if (sentKeys.has(job.key)) return false;
     const typeOn = isWarning ? prefs.types.warnings : prefs.types[job.type] !== false;
     if (!typeOn) return false;
+    const type = isWarning ? 'warnings' : job.type, mid = b.date + '|' + job.key;
     // Ein Platz bleibt für Warnungen frei, solange heute noch keine kam
     const limit = isWarning ? max : (warnSent ? max : max - 1);
-    if (count >= limit) return false;
+    if (count >= limit) {
+      // Auftrag 33: fällige geplante Mitteilung über dem Tageslimit im Protokoll als „geplant, nicht gesendet“ (Warteschlange wartet weiter)
+      if (scheduled) await claim(env, uid, b.date, job.key + '~limit', type, mid, 'limit');
+      return false;
+    }
+    // Auftrag 33: erst eintragen, dann senden – nur ein Lauf verschickt sie (genau einmal)
+    if (!await claim(env, uid, b.date, job.key, type, mid)) { sentKeys.add(job.key); return false; }
+    sentKeys.add(job.key); count++;
     const payload = { title: job.title, body: job.body, url: job.url || './', tag: job.key, badge: openCount(L, b.date), urgent: !!isWarning };
-    const n = await deliver(env, uid, payload);
-    await logSent(env, uid, b.date, job.key, isWarning ? 'warnings' : job.type, n);
-    sentKeys.add(job.key); count++; out.push(job.key);
+    const n = await deliver(env, uid, payload, { mid, day: b.date, type, ...deliveryOpts(job, min, !!isWarning) });
+    await env.DB.prepare('UPDATE push_log SET delivered = ? WHERE user_id = ? AND day = ? AND key = ?').bind(n, uid, b.date, job.key).run();
+    out.push(job.key);
     return true;
   };
 
@@ -250,8 +319,11 @@ export async function notifyTick(env: Env, uid: number, ctx?: any): Promise<any>
       if (await trySend(job, isWarn) || sentKeys.has(row.key) || (!isWarn && prefs.types[row.type] === false)) await env.DB.prepare('DELETE FROM push_queue WHERE user_id = ? AND key = ?').bind(uid, row.key).run();
     }
   }
-  // 2) Geplante Mitteilungen (in der Ruhezeit verfallen sie)
-  if (!quiet) for (const job of buildJobs(L, b, prefs, prevMin)) await trySend(job, false);
+  // 2) Geplante Mitteilungen (in der Ruhezeit verfallen sie – Auftrag 33: dann als „geplant, Ruhezeit“ im Protokoll)
+  for (const job of buildJobs(L, b, prefs, prevMin)) {
+    if (!quiet) await trySend(job, false, true);
+    else if (!sentKeys.has(job.key) && prefs.types[job.type] !== false) await claim(env, uid, b.date, job.key + '~quiet', job.type, b.date + '|' + job.key, 'quiet');
+  }
   return { sent: out, count, quiet, ...(testSent.length ? { tests: testSent } : {}) };
 }
 

@@ -193,7 +193,7 @@ describe('Tab-Leiste: Feder', () => {
     expect(path.length).toBeGreaterThan(12); expect(path.length).toBeLessThan(60);     // 0,2-1 s
     const max = Math.max(...path.map(o => o.x));
     expect(max).toBeGreaterThan(330.5); expect((max - 330) / 280).toBeLessThan(0.06);
-    expect(path[path.length - 1]).toEqual({ x: 330, v: 0, s: 1, vs: 0 });
+    expect(path[path.length - 1]).toEqual({ x: 330, v: 0, s: 1, vs: 0, b: 0, bv: 0 });   // Auftrag 33: b/bv = Nachgeben der Leiste, am Ende 0
     expect(Math.max(...path.map(o => stretchOf(o.v)))).toBeGreaterThan(0.1);           // dehnt sich in der Bewegung
     expect(stretchOf(0)).toBe(0);
   });
