@@ -35,7 +35,8 @@ export function execute(step) {
     fs.mkdirSync(path.dirname(step.file), { recursive: true });
     const args = [path.join(ROOT, 'server', 'node_modules', 'wrangler', 'bin', 'wrangler.js'), 'd1', 'export', TARGETS[step.target].db, '--remote', '--output', step.file, '--skip-confirmation'];
     if (step.target === 'test') args.push('--env', 'test');
-    runNode(args, path.join(ROOT, 'server'));
+    // Auftrag 34: Cloudflare meldete beim Export einmal kurz „Authentication error“ (gleich danach ging es) – bis zu 3 Versuche
+    for (let i = 1; ; i++) { try { runNode(args, path.join(ROOT, 'server')); break; } catch (e) { if (i >= 3) throw e; console.log('Sicherung fehlgeschlagen, neuer Versuch in 20 s'); spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},20000)']); } }
   } else if (step.kind === 'realdata') {
     // Auftrag 22: Umstellung und Laden aller Nutzer an einer Kopie der echten Daten (die Sicherung von eben)
     runNode([path.join(ROOT, 'node_modules', 'vite-node', 'vite-node.mjs'), path.join(ROOT, 'scripts', 'release-check-cli.ts'), step.file]);
