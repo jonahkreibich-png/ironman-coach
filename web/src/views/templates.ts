@@ -35,7 +35,7 @@ function mutable(id: string): boolean {
 }
 function totalsText(t: TrainingTemplate): string {
   const x = templateSession(t, 'summary-preview');
-  return `${x.plannedMinutes == null ? 'Dauer offen - Zeitvorgabe fehlt' : `${Math.round(x.plannedMinutes * 10) / 10} min${x.plannedDurationEstimated ? ' (geschaetzt / uebernommene Planvorgabe)' : ''}`}${x.plannedKm != null ? ` · ${Math.round(x.plannedKm * 1000)} m` : ''}`;
+  return `${x.plannedMinutes == null ? 'Dauer offen - Zeitvorgabe fehlt' : `${Math.round(x.plannedMinutes * 10) / 10} min${x.plannedDurationEstimated ? ' (geschätzt / übernommene Planvorgabe)' : ''}`}${x.plannedKm != null ? ` · ${Math.round(x.plannedKm * 1000)} m` : ''}`;
 }
 const previewHtml = (t: TrainingTemplate) => `<div class="card flat stack"><b>${esc(t.name)}</b><p class="muted">${esc(sportLabel(t.sport))} · ${esc(totalsText(t))}</p><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc([t.description, describeTrainingBlocks(t.blocks, 0, t.sport)].filter(Boolean).join('\n'))}</div></div>`;
 function filters(): string {
@@ -43,7 +43,7 @@ function filters(): string {
 }
 function listHtml(pick = false): string {
   const list = all().filter(t => (!filter || t.sport === filter) && `${t.name} ${t.description} ${describeTrainingBlocks(t.blocks, 0, t.sport)}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
-  return list.length ? list.map(t => `<div class="card stack" data-training-template="${esc(t.id)}"><h2>${esc(t.name)}</h2><p class="muted">${esc(sportLabel(t.sport))} · ${esc(totalsText(t))}${t.readOnly ? ' · Bestehende Kraftvorlage (Original bleibt erhalten)' : ''}</p><div class="row" style="flex-wrap:wrap">${pick ? `<button class="btn" data-act="tpl-pick" data-id="${esc(t.id)}">Auswaehlen und Vorschau</button>` : `<button class="btn" data-act="tpl-start" data-id="${esc(t.id)}">Als Einheit einfuegen</button><button class="btn ghost sm" data-act="tpl-view" data-id="${esc(t.id)}">Vorschau</button>${t.readOnly ? '' : `<button class="btn ghost sm" data-act="tpl-edit" data-id="${esc(t.id)}">Bearbeiten</button>`}<button class="btn ghost sm" data-act="tpl-copy" data-id="${esc(t.id)}">Duplizieren${t.readOnly ? ' und bearbeiten' : ''}</button>${t.readOnly ? '' : `<button class="btn ghost sm danger" data-act="tpl-delete" data-id="${esc(t.id)}">Loeschen</button>`}`}</div></div>`).join('') : '<p class="empty">Keine passenden Vorlagen.</p>';
+  return list.length ? list.map(t => `<div class="card stack" data-training-template="${esc(t.id)}"><h2>${esc(t.name)}</h2><p class="muted">${esc(sportLabel(t.sport))} · ${esc(totalsText(t))}${t.readOnly ? ' · Bestehende Kraftvorlage (Original bleibt erhalten)' : ''}</p><div class="row" style="flex-wrap:wrap">${pick ? `<button class="btn" data-act="tpl-pick" data-id="${esc(t.id)}">Auswählen und Vorschau</button>` : `<button class="btn" data-act="tpl-start" data-id="${esc(t.id)}">Als Einheit einfuegen</button><button class="btn ghost sm" data-act="tpl-view" data-id="${esc(t.id)}">Vorschau</button>${t.readOnly ? '' : `<button class="btn ghost sm" data-act="tpl-edit" data-id="${esc(t.id)}">Bearbeiten</button>`}<button class="btn ghost sm" data-act="tpl-copy" data-id="${esc(t.id)}">Duplizieren${t.readOnly ? ' und bearbeiten' : ''}</button>${t.readOnly ? '' : `<button class="btn ghost sm danger" data-act="tpl-delete" data-id="${esc(t.id)}">Loeschen</button>`}`}</div></div>`).join('') : '<p class="empty">Keine passenden Vorlagen.</p>';
 }
 export function renderTrainingTemplates(): string {
   return `<div class="stack" data-templates><p class="muted">Vorlagen fuer Schwimmen, Radfahren, Laufen und Kraft. Jede eingefuegte Einheit erhaelt eine eigene Kopie. Pausen gelten zwischen Wiederholungen und Saetzen.</p><button class="btn block" data-act="tpl-new">+ Trainingsvorlage erstellen</button><button class="btn ghost block" data-act="go-sub" data-sub="strength">Bestehende Kraftvorlagen bearbeiten</button>${filters()}<div class="stack" id="tpl-list">${listHtml()}</div></div>`;
@@ -70,7 +70,7 @@ function blockEditor(blocks: TrainingBlock[], prefix = ''): string {
   return blocks.map((b, i) => {
     const p = prefix + i;
     const f = (k: string, label: string, numeric = false) => field(`tpl-${p}-${k}`, label, k === 'equipment' ? b.equipment?.join(', ') : k === 'paceSecPerKm' && draft!.sport === 'swim' && b.paceSecPerKm != null && String(b.paceSecPerKm).trim() !== '' ? Number(b.paceSecPerKm) / 10 : (b as any)[k], { inputmode: numeric ? 'decimal' : 'text', data: `data-tpl-path="${p}" data-tpl-key="${k}" data-tpl-scale="${k === 'paceSecPerKm' && draft!.sport === 'swim' ? 10 : 1}"` });
-    return `<div class="card flat stack" style="margin-left:${prefix ? '8px' : '0'}" data-template-block="${p}"><b>${b.blocks ? 'Wiederkehrende Serie' : draft!.sport === 'strength' ? 'Uebung' : 'Baustein'} ${i + 1}</b><div class="fgrid">${f('name', 'Bezeichnung')}${b.blocks && draft!.sport === 'strength' ? f('timeBudgetSec', 'Zeitbudget fuer alle Uebungen (s), geschaetzt', true) : ''}${f('repeat', 'Wiederholungen der ' + (b.blocks ? 'Serie' : 'Einheit'), true)}${f('restSec', 'Pause zwischen Wiederholungen/Saetzen (s)', true)}${b.blocks ? '' : f('durationSec', draft!.sport === 'strength' ? 'Dauer je Satz (s), optional' : 'Dauer je Wiederholung (s)', true)}${!b.blocks && draft!.sport !== 'strength' ? f('distanceM', 'Distanz je Wiederholung (m)', true) + f(draft!.sport === 'bike' ? 'speedKmh' : 'paceSecPerKm', draft!.sport === 'bike' ? 'Geschwindigkeit (km/h), optional' : draft!.sport === 'swim' ? 'Pace (Sekunden/100 m), optional' : 'Pace (Sekunden/km), optional', true) : ''}${!b.blocks && draft!.sport === 'strength' ? f('sets', 'Saetze', true) + f('reps', 'Wiederholungen / Haltezeit') + f('kg', 'Gewicht (kg)', true) : ''}${f('intensity', draft!.sport === 'bike' ? 'Zone / Watt / Herzfrequenz' : 'Intensitaet / Zone')}${f('equipment', 'Ausruestung (Komma getrennt)')}${f('description', 'Hinweise')}</div>${b.blocks ? blockEditor(b.blocks, p + '-') + `<button class="btn ghost sm" data-act="tpl-row-add" data-parent="${p}">+ Baustein in Serie</button>` : ''}<div class="row" style="flex-wrap:wrap"><button class="btn ghost sm" data-act="tpl-row-move" data-path="${p}" data-dir="-1" ${i === 0 ? 'disabled' : ''}>Nach oben</button><button class="btn ghost sm" data-act="tpl-row-move" data-path="${p}" data-dir="1" ${i === blocks.length - 1 ? 'disabled' : ''}>Nach unten</button><button class="btn ghost sm danger" data-act="tpl-row-delete" data-path="${p}">Entfernen</button></div></div>`;
+    return `<div class="card flat stack" style="margin-left:${prefix ? '8px' : '0'}" data-template-block="${p}"><b>${b.blocks ? 'Wiederkehrende Serie' : draft!.sport === 'strength' ? 'Übung' : 'Baustein'} ${i + 1}</b><div class="fgrid">${f('name', 'Bezeichnung')}${b.blocks && draft!.sport === 'strength' ? f('timeBudgetSec', 'Zeitbudget für alle Übungen (s), geschätzt', true) : ''}${f('repeat', 'Wiederholungen der ' + (b.blocks ? 'Serie' : 'Einheit'), true)}${f('restSec', 'Pause zwischen Wiederholungen/Saetzen (s)', true)}${b.blocks ? '' : f('durationSec', draft!.sport === 'strength' ? 'Dauer je Satz (s), optional' : 'Dauer je Wiederholung (s)', true)}${!b.blocks && draft!.sport !== 'strength' ? f('distanceM', 'Distanz je Wiederholung (m)', true) + f(draft!.sport === 'bike' ? 'speedKmh' : 'paceSecPerKm', draft!.sport === 'bike' ? 'Geschwindigkeit (km/h), optional' : draft!.sport === 'swim' ? 'Pace (Sekunden/100 m), optional' : 'Pace (Sekunden/km), optional', true) : ''}${!b.blocks && draft!.sport === 'strength' ? f('sets', 'Saetze', true) + f('reps', 'Wiederholungen / Haltezeit') + f('kg', 'Gewicht (kg)', true) : ''}${f('intensity', draft!.sport === 'bike' ? 'Zone / Watt / Herzfrequenz' : 'Intensität / Zone')}${f('equipment', 'Ausrüstung (Komma getrennt)')}${f('description', 'Hinweise')}</div>${b.blocks ? blockEditor(b.blocks, p + '-') + `<button class="btn ghost sm" data-act="tpl-row-add" data-parent="${p}">+ Baustein in Serie</button>` : ''}<div class="row" style="flex-wrap:wrap"><button class="btn ghost sm" data-act="tpl-row-move" data-path="${p}" data-dir="-1" ${i === 0 ? 'disabled' : ''}>Nach oben</button><button class="btn ghost sm" data-act="tpl-row-move" data-path="${p}" data-dir="1" ${i === blocks.length - 1 ? 'disabled' : ''}>Nach unten</button><button class="btn ghost sm danger" data-act="tpl-row-delete" data-path="${p}">Entfernen</button></div></div>`;
   }).join('');
 }
 function editor(): string {
@@ -83,7 +83,7 @@ export function editTrainingTemplate(template?: TrainingTemplate) {
   openSheet('Trainingsvorlage', editor);
 }
 export function openSessionPrescriptionEditor(sessionId: string, date: string) {
-  if (!mutable(sessionId)) { toast('Bereits absolvierte Einheiten bleiben unveraendert.'); return; }
+  if (!mutable(sessionId)) { toast('Bereits absolvierte Einheiten bleiben unverändert.'); return; }
   const s = findSession(sessionId); if (!s?.trainingBlocks) { toast('Diese Einheit hat noch keine Vorlagenbausteine.'); return; }
   editSession = { id: sessionId, date }; picker = null; preview = null;
   draft = { id: uid(), name: s.title, sport: s.sport, description: s.trainingTemplateSnapshot?.description || '', blocks: clone(s.trainingBlocks), updatedAt: Date.now(), ...(s.trainingTemplateSnapshot?.prescriptionSummary ? { prescriptionSummary: clone(s.trainingTemplateSnapshot.prescriptionSummary) } : {}), ...(s.trainingTemplateSnapshot?.sourceSpec ? { sourceSpec: clone(s.trainingTemplateSnapshot.sourceSpec), sourcePlannedMinutes: s.trainingTemplateSnapshot.sourcePlannedMinutes, sourcePlannedKm: s.trainingTemplateSnapshot.sourcePlannedKm } : {}) };
@@ -109,7 +109,7 @@ on('tpl-save', async () => {
   readDraft(); if (!draft) return;
   try {
     const t = makeTrainingTemplate(draft);
-    if (editSession) { if (!mutable(editSession.id)) throw Error('Bereits absolvierte Einheiten bleiben unveraendert.'); showPreview(t, { date: editSession.date, sessionId: editSession.id }, 'replace'); return; }
+    if (editSession) { if (!mutable(editSession.id)) throw Error('Bereits absolvierte Einheiten bleiben unverändert.'); showPreview(t, { date: editSession.date, sessionId: editSession.id }, 'replace'); return; }
     (STATE.workoutTemplates ||= {})[t.id] = t;
     saveState();
     if (!await storage.settled()) { toast(storageMessage() || 'Vorlage noch nicht gespeichert. App offen lassen und Backup exportieren.'); return; }
@@ -117,25 +117,25 @@ on('tpl-save', async () => {
   } catch (e) { toast((e as Error).message); }
 });
 on('tpl-delete', async el => {
-  if (!armed(el, 'Vorlage wirklich loeschen?')) return;
+  if (!armed(el, 'Vorlage wirklich löschen?')) return;
   const t = own()[el.dataset.id!]; if (!t) return; delete STATE.workoutTemplates[t.id];
   saveState();
-  if (!await storage.settled()) { toast(storageMessage() || 'Loeschung noch nicht gespeichert. App offen lassen und Backup exportieren.'); return; } nav.rerender();
+  if (!await storage.settled()) { toast(storageMessage() || 'Löschung noch nicht gespeichert. App offen lassen und Backup exportieren.'); return; } nav.rerender();
 });
 
 export function openTemplatePicker(target: { date: string; sessionId?: string }) {
-  if (target.sessionId && !mutable(target.sessionId)) { toast('Bereits absolvierte Einheiten bleiben unveraendert.'); return; }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(target.date) || Number.isNaN(Date.parse(target.date)) || new Date(target.date).toISOString().slice(0, 10) !== target.date) { toast('Bitte ein gueltiges Datum waehlen.'); return; }
+  if (target.sessionId && !mutable(target.sessionId)) { toast('Bereits absolvierte Einheiten bleiben unverändert.'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(target.date) || Number.isNaN(Date.parse(target.date)) || new Date(target.date).toISOString().slice(0, 10) !== target.date) { toast('Bitte ein gültiges Datum wählen.'); return; }
   picker = { ...target }; preview = null;
   query = ''; filter = target.sessionId ? findSession(target.sessionId)?.sport || '' : '';
   openSheet('Aus Trainingsvorlage', () => `<div class="stack" data-template-picker><p>${esc(target.date)}${target.sessionId ? ' · Bestehende Einheit' : ' · Neue Einheit'}</p>${filters()}<div class="stack" id="tpl-list">${listHtml(true)}</div></div>`);
 }
 function showPreview(t: TrainingTemplate, target: { date: string; sessionId?: string }, mode: 'replace' | 'append', stableId?: string) {
-  if (target.sessionId && !mutable(target.sessionId)) { toast('Bereits absolvierte Einheiten bleiben unveraendert.'); return; }
+  if (target.sessionId && !mutable(target.sessionId)) { toast('Bereits absolvierte Einheiten bleiben unverändert.'); return; }
   const source = target.sessionId ? findSession(target.sessionId) : null;
   const session = source ? applyTemplate(source, t, mode) : templateSession(t, stableId || 'u-' + crypto.randomUUID());
   preview = { template: clone(t), target: { ...target }, session, mode, source: JSON.stringify(source) };
-  openSheet('Vorlage uebernehmen – Vorschau', () => `<div class="stack" data-template-preview><p>${esc(target.date)} · ${source ? mode === 'append' ? 'Geplanten Inhalt ergaenzen' : 'Geplanten Inhalt ersetzen' : 'Neue Einheit anlegen'}</p>${source ? `<div class="hint">Bisher: ${esc(source.title)} · ${source.plannedMinutes == null ? 'Dauer offen' : `${esc(source.plannedMinutes)} min`}</div>` : ''}${previewHtml({ ...session.trainingTemplateSnapshot, name: session.title })}${source ? '<p class="hint">Die ID bleibt erhalten. Erfasste Istwerte bleiben unveraendert.</p><div class="row"><button class="btn ghost" data-act="tpl-mode" data-mode="replace">Ersetzen</button><button class="btn ghost" data-act="tpl-mode" data-mode="append">Ergaenzen</button></div>' : ''}<button class="btn block" data-act="tpl-confirm">${source ? 'Aenderung bestaetigen' : 'Neue Einheit bestaetigen'}</button><button class="btn ghost block" data-act="tpl-cancel">Abbrechen</button></div>`);
+  openSheet('Vorlage uebernehmen – Vorschau', () => `<div class="stack" data-template-preview><p>${esc(target.date)} · ${source ? mode === 'append' ? 'Geplanten Inhalt ergänzen' : 'Geplanten Inhalt ersetzen' : 'Neue Einheit anlegen'}</p>${source ? `<div class="hint">Bisher: ${esc(source.title)} · ${source.plannedMinutes == null ? 'Dauer offen' : `${esc(source.plannedMinutes)} min`}</div>` : ''}${previewHtml({ ...session.trainingTemplateSnapshot, name: session.title })}${source ? '<p class="hint">Die ID bleibt erhalten. Erfasste Istwerte bleiben unveraendert.</p><div class="row"><button class="btn ghost" data-act="tpl-mode" data-mode="replace">Ersetzen</button><button class="btn ghost" data-act="tpl-mode" data-mode="append">Ergänzen</button></div>' : ''}<button class="btn block" data-act="tpl-confirm">${source ? 'Änderung bestätigen' : 'Neue Einheit bestaetigen'}</button><button class="btn ghost block" data-act="tpl-cancel">Abbrechen</button></div>`);
 }
 on('tpl-pick', el => { const t = get(el.dataset.id!); if (t && picker) { try { showPreview(t, picker, 'replace'); } catch (e) { toast((e as Error).message); } } });
 on('tpl-mode', el => { if (!preview) return; try { showPreview(preview.template, preview.target, el.dataset.mode as any, preview.session.id); } catch (e) { toast((e as Error).message); } });
@@ -144,20 +144,20 @@ on('tpl-start', el => {
   const t = get(el.dataset.id!); if (!t) return; picker = null;
   openSheet('Einheit aus Vorlage', () => `<div class="stack">${previewHtml(t)}${field('tpl-date', 'Trainingsdatum', todayStr(), { type: 'date' })}<button class="btn block" data-act="tpl-start-preview" data-id="${esc(t.id)}">Vorschau</button></div>`);
 });
-on('tpl-start-preview', el => { const t = get(el.dataset.id!); const date = value('tpl-date'); if (!t) return; if (!PLAN.weeks.some((w: any) => w.days.some((d: any) => d.date === date))) { toast('Bitte einen Tag im Trainingsplan waehlen.'); return; } showPreview(t, { date }, 'replace'); });
+on('tpl-start-preview', el => { const t = get(el.dataset.id!); const date = value('tpl-date'); if (!t) return; if (!PLAN.weeks.some((w: any) => w.days.some((d: any) => d.date === date))) { toast('Bitte einen Tag im Trainingsplan wählen.'); return; } showPreview(t, { date }, 'replace'); });
 on('tpl-confirm', () => {
   if (!preview) return; const p = preview;
   if (p.target.sessionId) {
-    if (!mutable(p.target.sessionId)) { preview = null; toast('Bereits absolvierte Einheiten bleiben unveraendert.'); return; }
-    if (JSON.stringify(findSession(p.target.sessionId)) !== p.source) { preview = null; toast('Die Einheit wurde inzwischen geaendert. Bitte Vorlage neu auswaehlen.'); return; }
+    if (!mutable(p.target.sessionId)) { preview = null; toast('Bereits absolvierte Einheiten bleiben unverändert.'); return; }
+    if (JSON.stringify(findSession(p.target.sessionId)) !== p.source) { preview = null; toast('Die Einheit wurde inzwischen geändert. Bitte Vorlage neu auswählen.'); return; }
   } else if (!PLAN.weeks.some((w: any) => w.days.some((d: any) => d.date === p.target.date))) { toast('Der Zieltag ist nicht mehr im Trainingsplan.'); return; }
   preview = null; picker = null; const group = 'user-' + crypto.randomUUID();
   if (p.target.sessionId) {
     // No actual data, identity, status, source or journal fields in a modify adjustment.
     const fields = ['sport', 'title', 'description', 'plannedMinutes', 'plannedKm', 'plannedDurationUnknown', 'plannedDurationEstimated', 'trainingBlocks', 'trainingTemplateSnapshot', 'spec', 'hard', 'long', 'zone'];
     const set = Object.fromEntries(fields.map(k => [k, clone(p.session[k] ?? null)]));
-    propose([{ id: group + '-template', group, type: 'modify', sessionId: p.target.sessionId, set, what: `Vorlage: ${p.template.name}`, reason: 'Von dir bestaetigt' }], 'Trainingsvorlage uebernommen.');
-  } else propose([{ id: group + '-template', group, type: 'add', to: p.target.date, session: clone(p.session), what: `Hinzugefuegt: ${p.template.name}`, reason: 'Von dir bestaetigt' }], 'Einheit aus Vorlage hinzugefuegt.');
+    propose([{ id: group + '-template', group, type: 'modify', sessionId: p.target.sessionId, set, what: `Vorlage: ${p.template.name}`, reason: 'Von dir bestätigt' }], 'Trainingsvorlage übernommen.');
+  } else propose([{ id: group + '-template', group, type: 'add', to: p.target.date, session: clone(p.session), what: `Hinzugefügt: ${p.template.name}`, reason: 'Von dir bestätigt' }], 'Einheit aus Vorlage hinzugefügt.');
 });
 
 

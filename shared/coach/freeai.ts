@@ -7,6 +7,7 @@ import type { EngineCtx } from './engine';
 import { readinessOf } from './engine';
 import { readinessContextLine } from '../readiness';
 import { ageOf, isMinor } from '../profile';
+import { sexLine } from './handbook';
 import { mainGoal } from '../goals';
 import { rulesOf, describe as ruleText } from '../constraints';
 import { parseFor } from '../ruleparse';
@@ -31,7 +32,7 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
   const L = [
     `Du bist der Coach in der Trainings-App „${appName}“: ein erfahrener Ausdauer-Coach für Laufen, Radfahren, Schwimmen, Triathlon und Kraft. Heute ist ${ctx.today} (${dd(ctx.today)}).`,
     'So antwortest du:',
-    '- Beantworte zuerst die konkrete Frage in einem direkten Satz. Begruende kurz mit aktuellen Daten; weitere Analyse nur, wenn sie fuer diese Frage hilft. Trenne Empfehlung, Messung, Eingabe und Schaetzung.',
+    '- Beantworte zuerst die konkrete Frage in einem direkten Satz. Begründe kurz mit aktuellen Daten; weitere Analyse nur, wenn sie für diese Frage hilft. Trenne Empfehlung, Messung, Eingabe und Schätzung.',
     '- Immer auf Deutsch, in der du-Form, kurz: höchstens 5 Sätze (etwa 80 Wörter), außer der Athlet will ausdrücklich mehr. Kein Markdown, keine Überschriften, keine Tabellen, keine Sternchen.',
     '- Ehrlich und konkret wie ein guter Trainer. Lob nur, wenn es stimmt. Wenn etwas nicht gut war, sag es freundlich.',
     '- Nutze nur die Daten unten und die Ergebnisse der Werkzeuge. Erfinde nichts: keine Zahlen, Einheiten, Termine, Messwerte oder Wettkämpfe. Puls, Pace, Watt, Minuten und Zonen übernimmst du genau so, wie sie dort stehen.',
@@ -52,6 +53,7 @@ export function coachSkill(ctx: EngineCtx, appName: string): string {
     '- Fragen zu Training, Technik (z. B. Kraul-Atmung), Zonen, Essen und Trinken rund ums Training (auch Rezept-Ideen), Material, Schlaf und Erholung beantwortest du immer, auch allgemein. Nur bei Themen ganz ohne Sport-Bezug (Fußball-Ergebnisse, Gedichte, Hausaufgaben, Unsinn) sagst du in einem Satz freundlich, dass du nur fürs Training da bist.'
   ];
   L.push(rulesForAi());
+  if (sexLine(ctx.profile && ctx.profile.sex)) L.push(sexLine(ctx.profile.sex)); // Auftrag 34
   if (minor) L.push(`- Der Athlet ist ${age} Jahre alt (minderjährig): keine Gewichtsziele, keine Diät, keine Kalorien zählen, kein Druck. Schule und Schlaf gehen vor. Bei Schmerzen immer Eltern und Arzt einbeziehen.`);
   // Auftrag 32: Wochenraster getrennt von eigenen Regeln (das Raster ist kein Verbot für Ersatz oder spontane lockere Einheiten)
   L.push(...ruleLinesForAi(ctx, 40));
@@ -304,6 +306,7 @@ export function focusedPrompt(ctx: EngineCtx, text: string, appName: string, pre
   if (topic === 'general') L.push('- Fehlen dir Daten zu einem anderen Tag oder einer Einheit, nutze get_data, review_training, explain_day oder get_analysis. Sonst sag ehrlich, was fehlt.');
   const swimQ = sport === 'swim' || /\b(hilfsmittel|pull ?buoy|kickbrett|flossen)\b/.test(j);
   if (S.swim && swimQ) L.push('- Hilfsmittel nur, wenn sie unter AUSRÜSTUNG stehen.');
+  if (sexLine(ctx.profile && ctx.profile.sex)) L.push(sexLine(ctx.profile.sex)); // Auftrag 34
   if (minor) L.push(`- Der Athlet ist ${ageOf(ctx.profile, ctx.today)} Jahre alt (minderjährig): keine Gewichtsziele, keine Diät, kein Kalorienzählen, kein Druck. Schule und Schlaf gehen vor. Bei Schmerzen immer Eltern und Arzt einbeziehen.`);
   if (topic === 'change' || topic === 'day' || topic === 'general') L.push(...ruleLinesForAi(ctx, 8));
   const rules = relevantRules(text); if (rules) L.push(rules);

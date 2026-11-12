@@ -27,7 +27,7 @@ export function isPlan(o) { return safePlan(o); }
 export function markBackedUp() { STATE.lastBackupAt = new Date().toISOString(); saveState(); }
 /* Liefert true, wenn die Seite neu geladen wird (Plan geändert). */
 export async function applyBackup(input): Promise<boolean> {
-  if (!isBackup(input)) throw new Error('Die Sicherung ist ungueltig oder stammt aus einer neueren App-Version.');
+  if (!isBackup(input)) throw new Error('Die Sicherung ist ungültig oder stammt aus einer neueren App-Version.');
   const data = clone(input), plan = data.plan;
   delete data.plan; delete data.exportedAt; delete data.backupVersion;
   const next = mergeIntoDefaults(data);
@@ -56,7 +56,7 @@ export async function shareBackupFile(after?: () => void): Promise<void> {
     let ta = document.getElementById('bk-in') as HTMLTextAreaElement | null;
     if (!ta) {
       const box = document.createElement('div'); box.className = 'card stack';
-      const label = document.createElement('p'); label.textContent = 'Persoenliches Backup: Text vollstaendig kopieren und privat als .json speichern.';
+      const label = document.createElement('p'); label.textContent = 'Persönliches Backup: Text vollständig kopieren und privat als .json speichern.';
       ta = document.createElement('textarea'); ta.id = 'bk-emergency'; ta.rows = 6; ta.className = 'inp';
       box.append(label, ta); document.getElementById('app')!.appendChild(box);
     }
@@ -75,6 +75,6 @@ export async function shareBackupFile(after?: () => void): Promise<void> {
   try {
     const url = URL.createObjectURL(new Blob([txt], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000); toast('Backup-Download gestartet. Bitte pruefen, ob die Datei gespeichert wurde.'); after && after();
-  } catch (err) { fallback(); toast('Download nicht moeglich. Den ausgewaehlten Backup-Text vollstaendig kopieren.'); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000); toast('Backup-Download gestartet. Bitte prüfen, ob die Datei gespeichert wurde.'); after && after();
+  } catch (err) { fallback(); toast('Download nicht möglich. Den ausgewählten Backup-Text vollständig kopieren.'); }
 }

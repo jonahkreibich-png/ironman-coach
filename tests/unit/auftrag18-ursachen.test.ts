@@ -94,7 +94,8 @@ describe('Bewertung nach der Einheit (Regel-Coach)', () => {
   test('5,5 h Schlaf, kein Puls: neutral, kein Zusammenhang mit dem Puls', () => {
     const { ctx, item } = world({ sleep: 5.5, hr: null });
     const t = autoReview(ctx, item, 'full');
-    expect(t).toMatch(/5,5 h geschlafen/); expect(t).not.toMatch(SLEEP_CAUSES_HR); expect(t).toMatch(/lieber locker/);
+    // Auftrag 34: bei einer lockeren Einheit ohne Pulsbezug kein Morgenwerte-Hinweis mehr (steht schon im Morgen-Briefing)
+    expect(t).not.toMatch(/Morgenwerte/); expect(t).not.toMatch(SLEEP_CAUSES_HR); expect(t).not.toMatch(/Mach heute lieber locker/);
     expect(unsupportedClaims(t, claimFacts(ctx, TODAY))).toEqual([]);
   });
   test('5,5 h Schlaf, Puls normal: kein Zusammenhang', () => {

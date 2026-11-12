@@ -89,7 +89,7 @@ function userGroupsActive(): string[] {
 export function canUndoGroups(groups:string[]):boolean {
  const extras=Object.values(STATE.customWorkouts||{}).flat() as any[];
  const blocked=Object.values(STATE.adjustments||{}).some((a:any)=>a&&groups.includes(a.group||a.id)&&(STATE.sessions[a.sessionId||a.session?.id]?.completed||extras.some(s=>s.id===(a.sessionId||a.session?.id)&&s.completed!==false)));
- if(blocked)toast('Bereits absolvierte Einheiten bleiben unveraendert.');return !blocked;
+ if(blocked)toast('Bereits absolvierte Einheiten bleiben unverändert.');return !blocked;
 }
 on('edit-toggle', () => { UI.planEdit = !UI.planEdit; saveUi(); nav.rerender(); });
 on('edit-undo', () => {
@@ -115,7 +115,7 @@ function actionPreview(action:PlanAction26,label:string) {
 }
 function previewAdjustments(adj:any[],label:string,warnings:string[]=[]) {
  PENDING={adj,label,warnings,rule:false};
- openSheet('Aenderung pruefen',()=>'<div class="stack" data-edit-preview>'+adj.map(a=>'<div class="card">'+esc(a.what)+'</div>').join('')+(warnings.length?'<div class="banner warn">'+warnings.map(x=>esc(x)).join('<br>')+'</div>':'')+'<div class="hint">Rueckgaengig im Plan ueber Undo.</div><button class="btn block" data-act="edit-preview-confirm">Aenderung bestaetigen</button><button class="btn ghost block" data-act="edit-cancel">Abbrechen</button></div>');
+ openSheet('Änderung prüfen',()=>'<div class="stack" data-edit-preview>'+adj.map(a=>'<div class="card">'+esc(a.what)+'</div>').join('')+(warnings.length?'<div class="banner warn">'+warnings.map(x=>esc(x)).join('<br>')+'</div>':'')+'<div class="hint">Rueckgaengig im Plan ueber Undo.</div><button class="btn block" data-act="edit-preview-confirm">Aenderung bestaetigen</button><button class="btn ghost block" data-act="edit-cancel">Abbrechen</button></div>');
 }
 on('edit-preview-confirm',()=>{if(!PENDING)return;const p=PENDING;PENDING=null;propose(p.adj,p.label);});
 const INT: [string, string][] = [['easy', 'edit.int.easy'], ['long', 'edit.int.long'], ['tempo', 'edit.int.tempo'], ['intervals', 'edit.int.intervals']];

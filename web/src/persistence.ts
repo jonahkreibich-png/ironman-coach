@@ -16,7 +16,7 @@ export class DurableStorage {
   onChange: () => void = () => {};
   changing = false;
   epoch = 0;
-  beginChange() { if (this.changing) throw new Error('Wiederherstellung laeuft bereits.'); this.changing = true; this.epoch++; }
+  beginChange() { if (this.changing) throw new Error('Wiederherstellung läuft bereits.'); this.changing = true; this.epoch++; }
   endChange() { this.changing = false; }
   constructor(private native: () => Storage, private journal?: Journal) {}
   async initialize() {
@@ -89,7 +89,7 @@ export class DurableStorage {
     this.pending++; this.onChange();
     this.flight = this.flight.then(async () => {
       try {
-        if (!this.journal) throw new Error('IndexedDB nicht verfuegbar');
+        if (!this.journal) throw new Error('IndexedDB nicht verfügbar');
         await this.journal.write(entries);
         entries.forEach(([key]) => {this.failed.delete(key);this.failedMergeBaseline.delete(key);});
       } catch (_) { entries.forEach(([key]) => this.failed.add(key)); }
@@ -103,7 +103,7 @@ export class DurableStorage {
   async commit(entries: [string, string | null][]): Promise<void> {
     if (this.blocked) throw new Error('Vorhandene Daten konnten nicht gelesen werden. Wiederherstellung abgebrochen.');
     await this.flight;
-    if (!this.journal) throw new Error('Sicheres Wiederherstellen braucht verfuegbaren Browserspeicher.');
+    if (!this.journal) throw new Error('Sicheres Wiederherstellen braucht verfügbaren Browserspeicher.');
     await this.journal.write(entries);
     entries.forEach(([k, v]) => {
       this.fallback.set(k, v); this.failed.delete(k);this.failedMergeBaseline.delete(k);
@@ -118,10 +118,10 @@ let database: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   return database ||= new Promise((resolve, reject) => {
     const request = indexedDB.open('stamio-durable-storage', 1);
-    const timeout = setTimeout(() => reject(new Error('Browserspeicher antwortet nicht. Bitte App erneut oeffnen.')), 10000);
+    const timeout = setTimeout(() => reject(new Error('Browserspeicher antwortet nicht. Bitte App erneut öffnen.')), 10000);
     request.onupgradeneeded = () => request.result.createObjectStore('values');
     request.onerror = () => { clearTimeout(timeout); reject(request.error); };
-    request.onblocked = () => { clearTimeout(timeout); reject(new Error('Browserspeicher blockiert. Andere App-Tabs schliessen.')); };
+    request.onblocked = () => { clearTimeout(timeout); reject(new Error('Browserspeicher blockiert. Andere App-Tabs schließen.')); };
     request.onsuccess = () => { clearTimeout(timeout); const d = request.result; d.onversionchange = () => d.close(); resolve(d); };
   });
 }
@@ -160,5 +160,5 @@ export const storage = new DurableStorage(() => globalThis.localStorage, typeof 
 export const storageMessage = () => ({
   saved: '', pending: 'Wird gespeichert. Bitte die App noch offen lassen.',
   error: 'Nicht gespeichert: Der Browserspeicher ist voll oder blockiert. App offen lassen und Backup exportieren.',
-  blocked: 'Vorhandene Daten konnten nicht gelesen werden. Automatisches Speichern und Synchronisieren sind gesperrt. Bitte erneut oeffnen; keine Browserdaten loeschen.'
+  blocked: 'Vorhandene Daten konnten nicht gelesen werden. Automatisches Speichern und Synchronisieren sind gesperrt. Bitte erneut öffnen; keine Browserdaten löschen.'
 }[storage.status]);

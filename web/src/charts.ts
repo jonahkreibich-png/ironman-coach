@@ -88,7 +88,7 @@ export function lineChart(pts, series, o) {
   s += '</svg>';
   CHARTS[id] = { pts, series, fmt, x, W, L, R, n, span, di };
   const legend = o.legend ? `<div class="legend">${series.map(se => `<span><i class="${se.dashed ? 'dash' : ''}" style="--c:${se.color}"></i>${esc(se.name)}</span>`).join('')}${(o.legendExtra || '')}</div>` : '';
-  return `<div class="chart" data-chart="${id}">${legend}${s}<div class="readout" id="ro-${id}">Tippe auf den Verlauf für einzelne Werte.</div></div>`;
+  return `<div class="chart" data-chart="${id}">${legend}${s}<div class="readout" id="ro-${id}" aria-live="polite"></div></div>`;
 }
 export function chartTap(e) {
   const hit = e.target.closest('[data-chart-hit]'); if (!hit) return false;

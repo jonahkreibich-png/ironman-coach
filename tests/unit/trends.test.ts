@@ -5,7 +5,7 @@ import * as C from '../../shared/core';
 import { legacyActivities } from '../../shared/scores';
 
 const TODAY = '2026-10-16';
-const profile: any = { name: 'Test', birthYear: 1990, sex: 'm', sports: ['run', 'bike', 'swim'], thresholds: { lthrRun: 170, lthrBike: 162 } };
+const profile: any = { name: 'Test', birthYear: 1990, sex: 'm', sports: ['run', 'bike', 'swim'], thresholds: { lthrRun: 170, lthrBike: 162 }, powerMeter: true, trainerType: 'smart' };
 const act = (o: any) => ({ id: o.id || 'a' + Math.random(), source: 'healthfit', sources: ['healthfit'], indoor: false, startMs: Date.parse(o.date + 'T16:00:00Z'), elapsedMin: null, maxHr: null, avgPower: null, ascentM: null, kcal: null, tempC: null, hrZones: null, decouplingPct: null, efficiency: null, laps: [], intervals: null, swim: null, km: null, speedKmh: null, paceSecKm: null, ...o });
 
 function world(opts: { days?: number; improving?: boolean } = {}): TrendInput {
@@ -42,6 +42,8 @@ describe('Trends mit genug Daten', () => {
   test('Schlaf: Schnitt und Bedarf', () => { const c = byId(cards, 'sleep'); expect(c.text).toMatch(/Bedarf ist 7,0-9,0 h/); });
   test('Laufen: schneller bei gleichem Puls', () => { const c = byId(cards, 'runpace'); expect(c.tone).toBe('good'); expect(c.delta).toMatch(/schneller/); expect(c.value).toMatch(/^\d:\d\d$/); });
   test('Rad: Watt bei gleichem Puls steigt', () => { const c = byId(cards, 'bikehr'); expect(c.title).toMatch(/Watt/); expect(c.tone).toBe('good'); });
+  // Auftrag 34: ohne Wattmesser (einfache Rolle) sind Watt geschätzt und zählen nicht
+  test('Rad ohne Wattmesser: keine Watt-Kurve', () => { const c = byId(trendCards({ ...I, profile: { ...profile, powerMeter: false, trainerType: null } }), 'bikehr'); expect(c.title).not.toMatch(/Watt/); });
   test('Entkopplung unter 5 % → gut', () => { const c = byId(cards, 'decoupling'); expect(c.tone).toBe('good'); });
   test('Intensität aus Pulszonen: 80/20 erkannt', () => { const c = byId(cards, 'intensity'); expect(c.value).toMatch(/^\d+\/\d+\/\d+$/); const [e] = c.value.split('/').map(Number); expect(e).toBeGreaterThanOrEqual(75); expect(c.tone).toBe('good'); });
   test('Schwimmen: Pace, Meter pro Zug, Züge pro Bahn besser; Kraul am Stück', () => {

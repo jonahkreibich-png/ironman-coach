@@ -169,7 +169,8 @@ function feedVariant(): string {
 /* Auftrag 18: freiwillige Hinweise (Laufschuhe, Zyklus) – nur wenn eingetragen */
 function careHints(): string {
   const d = D(); const st = STATE.settings || {};
-  const l = [cycleHint(st.cycle, d.today), shoeHint(STATE, BASE_WEEKS, st.shoe, d.today)].filter(Boolean) as string[];
+  // Auftrag 34: Zyklus nur, wenn das Profil nicht „männlich“ sagt (die Eingabe ist für Männer ohnehin ausgeblendet)
+  const l = [(d.profile as any).sex !== 'm' ? cycleHint(st.cycle, d.today) : null, shoeHint(STATE, BASE_WEEKS, st.shoe, d.today)].filter(Boolean) as string[];
   return l.length ? `<div class="card stack" data-care-hints style="margin-top:var(--s3)">${l.map(x => `<div class="hint">${esc(x)}</div>`).join('')}</div>` : '';
 }
 export function renderHeute(): string {

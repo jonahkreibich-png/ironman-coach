@@ -6,8 +6,10 @@ import { personalResponse } from './response';
    bleiben im Plan. Auftrag 11: Änderungen gelten ab heute (ab 18 Uhr ab morgen), nicht erst ab nächstem Montag. Vergangene Tage und
    erledigte Einheiten der laufenden Woche bleiben unverändert, der Rest der Woche wird neu verteilt (Erledigtes zählt mit).
    Vom Nutzer als „fest“ markierte Einheiten werden übernommen. */
-import { generatePlan, transitionPlan, continuationOf, mondayOf, dayCap, type GenResult } from './plangen';
+import { generatePlan, transitionPlan, continuationOf, mondayOf, dayCap, enforceRecovery, type GenResult } from './plangen';
+import { checkTrainingRules, repairTrainingRules, capLongSessions, TRULE_LABEL } from './trainingrules';
 import * as C from './core';
+import * as W from './workouts';
 import type { Profile } from './profile';
 import type { Goal } from './goals';
 import { repairSpacing } from './planrules';
@@ -129,4 +131,116 @@ export function calibrationDue(plan: any, state: any, today: string): { minutes:
   Object.entries((state && effectiveCustomBuckets(state)) || {}).forEach(([d, l]: any) => { if (d >= from && d < m.calibrateAt) (l || []).forEach((c: any) => { if (c && c.sport !== 'football') { min += +((c.metrics || {}).min) || c.plannedMinutes || 0; n++; } }); });
   if (n < 2) return null;
   return { minutes: Math.round(min / 2) };
+}
+
+/* ---------- Auftrag 34: Plan-Pflege für bestehende Pläne ----------
+   Ursache von „Erholungswoche zu niedrig/hoch“, „Ruhetage“, „Lange Einheit +10 min“ … im täglichen Daten-Check: Pläne, die mit einer
+   älteren Fassung des Generators erstellt wurden (vor Auftrag 30 durfte die Erholungswoche bei 50 % oder 82 % liegen), behielten ihre
+   Wochen; neue Regeln griffen erst beim nächsten Neu-Planen. Hier laufen dieselben Reparatur-Bausteine wie im Generator
+   (repairTrainingRules, enforceRecovery, capLongSessions) – aber nur in Wochen mit einem Verstoß und nur ab morgen. Das Ergebnis sind
+   normale Anpassungen (mit Grund, Mitteilung und Rückgängig), der gespeicherte Plan bleibt unverändert. Nicht angefasst: Erledigtes,
+   Feste/Gesperrte, Wettkämpfe, Teamsport, von Hand oder im Chat geänderte Einheiten. Hat jemand eine Pflege-Änderung rückgängig gemacht,
+   bleibt die Einheit, wie sie ist. Ergebnis nur, wenn danach weniger Verstöße übrig sind. */
+const UPKEEP_FIELDS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description', 'spec', 'hard', 'long'] as const;
+export interface Upkeep { adjustments: any[]; before: number; after: number; texts: string[]; /** Wochen, in denen eine Regel mit den eigenen Regeln der Person nicht erfüllbar ist (ehrliche Lücke, wie im Generator) */ gaps: { week: number; rule: string; why: string }[] }
+export function planUpkeep(baseWeeks: any[], state: any, profile: Profile, goals: Goal[], today: string, now = Date.now(), meta: any = {}): Upkeep {
+  const none: Upkeep = { adjustments: [], before: 0, after: 0, texts: [], gaps: [] };
+  const adjs: Record<string, any> = (state && state.adjustments) || {};
+  const from = C.addDays(today, 1);
+  const goalType = ((goals || []).find(g => g && g.priority === 'A' && !g.result) || (goals || [])[0] || ({} as any)).type || null;
+  const tOpts = { from, today, goals: goals || [], goalType };
+  const eff = C.applyAdjustments(baseWeeks || [], adjs);
+  const issues0 = checkTrainingRules(eff, profile, tOpts as any);
+  if (!issues0.length) return { ...none };
+  const bad = new Set(issues0.map(x => x.week));
+  // von Hand/Chat/KI geändert, oder eine frühere Pflege wurde rückgängig gemacht: so lassen
+  const byUser = (s: any) => (s._adj || []).some((id: string) => { const a = adjs[id]; return a && (a.from_user || a.from_ai || /^(user|chat|ai|plan-edit|edit)-/.test(String(a.group || a.id))); });
+  const refused = new Set(Object.values(adjs).filter((a: any) => a && a.undone && /^plancheck-/.test(String(a.id))).map((a: any) => a.sessionId || (a.session && a.session.id)));
+  const weeks = JSON.parse(JSON.stringify(eff));
+  const keepIds = new Set<string>(); const keepBase = new Set<string>();
+  const weekOf = new Map<string, any>();
+  weeks.forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((s: any) => {
+    weekOf.set(s.id, w);
+    const done = !!(((state && state.sessions) || {})[s.id] || {}).completed;
+    if (d.date < from || done || s.fixed || s.race || s.locked || s.ruleOverride || s.sport === 'football' || byUser(s) || refused.has(s.id)) keepBase.add(s.id);
+    // im Wochenraster festgelegt (pinned): Tag und Art bleiben, nur die Dauer darf sich ändern
+    if (!bad.has(w.weekNumber) || keepBase.has(s.id) || s.pinned) keepIds.add(s.id);
+  })));
+  const rules = rulesOf(profile, parseFor(today));
+  const dow = (d: string) => new Date(d + 'T12:00:00Z').getUTCDay();
+  const capOf = (date: string) => Math.min(dayCap(profile, dow(date)), dayLimit(rules, date).cap);
+  const opts: any = { ...tOpts, keep: (s: any) => keepIds.has(s.id), dayCap: capOf, runQualityOk: meta.runIntervalsAllowed !== false,
+    allowed: (s: any, date: string) => !evaluate(rules, { ...s, long: !!s.long, hard: !!s.hard }, date).hard.length && dayLimit(rules, date).cap > 0 && !(s.sport === 'swim' && s.place !== 'outdoor' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, date)) };
+  const fixTexts: string[] = [];
+  // welcher Schritt hat welche Einheit geändert (Grund in der Mitteilung)
+  const why = new Map<string, string>();
+  const snap = () => { const m = new Map<string, string>(); weeks.forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((x: any) => { if (x && x.id) m.set(x.id, d.date + JSON.stringify(x)); }))); return m; };
+  const mark = (before: Map<string, string>, label: string) => { const after = snap(); for (const [id, v] of after) if (before.get(id) !== v && !why.has(id)) why.set(id, label); for (const id of before.keys()) if (!after.has(id) && !why.has(id)) why.set(id, label); };
+  // gezielt je Regel (vorher lief die ganze Reparatur über jede Woche mit irgendeinem Verstoß und legte z. B. einen zweiten Ruhetag an,
+  // obwohl nur die lange Einheit zu lang war):
+  // 1) allgemeine Trainingsregeln (Ruhetage, Wettkampfwoche, nach langem Tag …) nur in Wochen mit genau so einem Verstoß
+  const SPECIAL = new Set(['recoveryDepth', 'longStep', 'longCap']);
+  const general = new Set(issues0.filter(x => !SPECIAL.has(x.rule)).map(x => x.week));
+  const generalLabel = (wn: number) => [...new Set(issues0.filter(x => x.week === wn && !SPECIAL.has(x.rule)).map(x => TRULE_LABEL[x.rule]))].join(', ');
+  if (general.size) { const b0 = snap(); fixTexts.push(...repairTrainingRules(weeks, profile, { ...opts, keep: (s: any) => keepIds.has(s.id) || !general.has((weekOf.get(s.id) || {}).weekNumber) })); const after = snap(); for (const [id, v] of after) if (b0.get(id) !== v) why.set(id, generalLabel((weekOf.get(id) || weeks.find((w: any) => w.days.some((d: any) => (d.sessions || []).some((y: any) => y && y.id === id))) || {}).weekNumber) || 'Trainingsregeln'); for (const id of b0.keys()) if (!after.has(id)) why.set(id, generalLabel((weekOf.get(id) || {}).weekNumber) || 'Trainingsregeln'); }
+  const gaps = weeks.filter((w: any) => general.has(w.weekNumber) && (w.qualityGap || (w.freqGap || []).length)).flatMap((w: any) => [...(w.qualityGap ? [{ week: w.weekNumber, rule: 'goalQuality', why: String(w.qualityGap) }] : []), ...((w.freqGap || []).length ? [{ week: w.weekNumber, rule: 'minFreq', why: 'Häufigkeit mit deinen Regeln nicht möglich' }] : [])]);
+  // 2) Erholungswoche: dieselbe Stelle wie der Generator (enforceRecovery), nur für die betroffene Woche und ihre Bezugswoche
+  for (const x of issues0.filter(i => i.rule === 'recoveryDepth')) {
+    const i = weeks.findIndex((w: any) => w.weekNumber === x.week); if (i < 1) continue;
+    let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || weeks[j].partial || weeks[j].entry || weeks[j].reduced || weeks[j].phase === 'taper' || weeks[j].phase === 'race')) j--;
+    if (j >= 0) { const b0 = snap(); enforceRecovery([weeks[i]], weeks[j], keepIds, capOf); mark(b0, TRULE_LABEL.recoveryDepth); }
+  }
+  // 3) lange Einheiten: genau auf die Grenze aus der Prüfung (gleiche Zahlen wie der Daten-Check)
+  const bL = snap();
+  for (let k = 0; k < 30; k++) {
+    const longs = checkTrainingRules(weeks, profile, tOpts as any).filter(x => x.rule === 'longStep' || x.rule === 'longCap');
+    if (!longs.length) break;
+    let changed = false;
+    for (const x of longs) {
+      const w = weeks.find((y: any) => y.weekNumber === x.week); if (!w) continue;
+      const bike = /Ausfahrt/.test(x.msg); const m = /(\d+) min nach (\d+) min/.exec(x.msg) || /höchstens (\d+) min/.exec(x.msg);
+      const lim = m ? (m.length > 2 ? +m[2] + (bike ? 15 : 10) : +m[1]) : null; if (!lim) continue;
+      const cand = (w.days || []).filter((d: any) => d.date >= from && (!x.date || d.date === x.date)).flatMap((d: any) => (d.sessions || []).filter((s2: any) => s2 && s2.spec && !s2.cancelled && !keepBase.has(s2.id) && s2.sport === (bike ? 'bike' : 'run') && (s2.long || /^Lang/.test(s2.title || ''))));
+      for (const s2 of cand) if ((s2.plannedMinutes || 0) > lim) { for (let t = 0; t < 4 && s2.plannedMinutes > lim; t++) { const rb = W.rebuildScaled(s2, lim / s2.plannedMinutes * (1 - 0.03 * t)); if (rb && rb.plannedMinutes < s2.plannedMinutes) { Object.assign(s2, rb, { plannedKm: rb.plannedKm ?? undefined }); changed = true; } } }
+    }
+    if (!changed) break;
+  }
+  // lange Ausfahrt mit Blöcken lässt sich nicht immer einfach skalieren: dann dieselbe Stelle wie der Generator (capLongSessions)
+  for (let k = 0; k < 3 && checkTrainingRules(weeks, profile, tOpts as any).some(x => x.rule === 'longStep' || x.rule === 'longCap'); k++) capLongSessions(weeks, profile, { ...opts, keep: (s2: any) => keepBase.has(s2.id) });
+  mark(bL, TRULE_LABEL.longStep);
+  // Unterschiede zum jetzigen Stand als normale Anpassungen
+  const where = (ws: any[]) => { const m = new Map<string, { s: any; date: string }>(); ws.forEach(w => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((s: any) => { if (s && s.id && s.sport !== 'rest') m.set(s.id, { s, date: d.date }); }))); return m; };
+  const A = where(eff), B = where(weeks);
+  const group = 'plancheck-' + today;
+  const out: any[] = [];
+  const dm = (d: string) => `${['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][dow(d)]} ${+d.slice(8)}.${+d.slice(5, 7)}.`;
+  const reasonOf = (id: string) => 'Trainingsregel: ' + (why.get(id) || 'Trainingsregeln');
+  const strip = (s: any) => { const o: any = {}; for (const k of UPKEEP_FIELDS) o[k] = s[k] == null ? null : s[k]; return o; };
+  for (const [id, a] of A) {
+    if (a.date < from || keepBase.has(id)) continue;
+    const b = B.get(id); const reason = reasonOf(id);
+    if (!b || b.s.cancelled && !a.s.cancelled) { if (!a.s.cancelled) out.push({ id: `${group}-${id}-cancel`, group, type: 'cancel', sessionId: id, what: `${a.s.title} (${dm(a.date)}) entfällt`, reason }); continue; }
+    if (b.date !== a.date) out.push({ id: `${group}-${id}-move`, group, type: 'move', sessionId: id, from: a.date, to: b.date, what: `${a.s.title}: ${dm(a.date)} → ${dm(b.date)}`, reason });
+    const sa = strip(a.s), sb = strip(b.s); const set: any = {};
+    for (const k of UPKEEP_FIELDS) if (JSON.stringify(sa[k]) !== JSON.stringify(sb[k])) set[k] = sb[k];
+    if (Object.keys(set).length) out.push({ id: `${group}-${id}-modify`, group, type: 'modify', sessionId: id, set, what: a.s.plannedMinutes !== b.s.plannedMinutes ? `${a.s.title} (${dm(b.date)}): ${a.s.plannedMinutes} → ${b.s.plannedMinutes} min` : `${a.s.title} (${dm(b.date)}) → ${b.s.title}`, reason });
+  }
+  for (const [id, b] of B) if (!A.has(id) && b.date >= from) { const { _adj, _orig, ...sess } = b.s; out.push({ id: `${group}-${id}-add`, group, type: 'add', to: b.date, session: sess, what: `${b.s.title} (${dm(b.date)}) dazu`, reason: reasonOf(id) }); }
+  if (!out.length) return { ...none, before: issues0.length, after: issues0.length, gaps };
+  // nur übernehmen, wenn es wirklich besser wird (gegen den gespeicherten Plan mit allen Anpassungen geprüft)
+  const trial = { ...adjs }; out.forEach((a, i) => { trial[a.id] = { ...a, createdAt: now + i, date: today }; });
+  const after = checkTrainingRules(C.applyAdjustments(baseWeeks || [], trial), profile, tOpts as any).length;
+  if (after >= issues0.length) return { ...none, before: issues0.length, after: issues0.length, gaps };
+  return { adjustments: out.map((a, i) => ({ ...a, createdAt: now + i, date: today, from_upkeep: true })), before: issues0.length, after, texts: out.map(a => a.what), gaps };
+}
+
+/* Auftrag 34: Mitteilung zur Plan-Pflege – kurz, mit Beispielen und Grund */
+export function upkeepText(up: Upkeep): string {
+  const n = up.adjustments.length; const ex = up.texts.slice(0, 3);
+  const reasons = [...new Set(up.adjustments.map(a => String(a.reason || '').replace(/^Trainingsregel: /, '')).filter(Boolean))].slice(0, 3);
+  const gap = up.gaps.find(g => g.rule === 'goalQuality');
+  return `Ich habe deinen Plan mit den Trainingsregeln abgeglichen und ${n === 1 ? 'eine Einheit' : n + ' Einheiten'} angepasst${ex.length ? ', zum Beispiel: ' + ex.join('; ') : ''}.`
+    + (reasons.length ? ` Grund: ${reasons.join(', ')}.` : '')
+    + (gap ? ` Hinweis: ${gap.why}` : '')
+    + ' Du kannst das rückgängig machen.';
 }

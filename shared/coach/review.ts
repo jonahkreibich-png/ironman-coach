@@ -14,6 +14,7 @@ import { fieldsOf } from '../fields';
 import { valueStory, storyText, STORY_METRICS } from '../valuestory';
 import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea, changedOf, actualSport, actualTitle, plannedLoadDropped, intervalsMode, changeZone, changeParts, placeLabel, omitLabel } from '../results';
 import { HR_ZONES } from '../sports';
+import { wattsTrusted } from '../scores';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
 import { de, mmss, dowName, joinDe } from './texts';
@@ -32,7 +33,7 @@ export function withWeeks<T extends EngineCtx>(ctx: T): T { return (ctx as any).
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 
 /* ---------- Erledigte Einheiten finden ---------- */
-export interface Done { key: string; date: string; sport: string; title: string; planned: any | null; st: any; act: any | null; custom: boolean; /** Auftrag 29: anders gemacht – die geplante Einheit und die Art der Änderung */ changedFrom?: any; change?: any }
+export interface Done { key: string; date: string; sport: string; title: string; planned: any | null; st: any; act: any | null; custom: boolean; /** Auftrag 34: false = Watt ohne Messgerät (geschätzt) */ powerOk?: boolean; /** Auftrag 29: anders gemacht – die geplante Einheit und die Art der Änderung */ changedFrom?: any; change?: any }
 export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
   const out: Done[] = []; const usedActs = new Set<string>();
   const acts: Record<string, any> = ctx.state.activities || {};
@@ -56,13 +57,23 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
     if (!a || a.mergedInto || usedActs.has(a.id) || a.date < from || a.date > to || a.sessionId) return;
     out.push({ key: a.id, date: a.date, sport: a.sport, title: a.sport === 'strength' ? actualStrength({}, a).title : a.name || SPORT[a.sport] || 'Einheit', planned: null, st: {}, act: a, custom: true });
   });
+  out.forEach(d => { if (d.sport === 'bike') d.powerOk = powerOkOf(ctx.profile, d); });
   return out.sort((a, b) => a.date.localeCompare(b.date) || (a.act && b.act ? a.act.startMs - b.act.startMs : 0));
+}
+/* Auftrag 34: Stammen die Watt von einem Messgerät? Einfache Rolle oder Rad ohne Wattmesser: geschätzt (z. B. 224 W auf einer Rolle ohne
+   Wattmessung). Gleiche Regel wie die Scores (wattsTrusted). */
+export function powerOkOf(p: any, d: Pick<Done, 'sport' | 'st' | 'act' | 'title'>): boolean {
+  if (d.sport !== 'bike' || !p) return true;
+  const m: any = actualMetrics(d.st || {}, d.act) || {};
+  const indoor = !!((d.act && d.act.indoor) || m.indoor === 'in' || m.indoor === true);
+  return wattsTrusted({ indoor, bikeType: m.bikeType || (d.act && d.act.bikeType) || null, name: d.title || (d.act && d.act.name) || '' } as any, p);
 }
 
 /* Werte einer Einheit: Uhr/Datei zuerst, sonst die Felder */
 export interface Vals { area: StrengthArea | null; areaSource: 'area' | 'exercises' | 'unknown'; exercises: any[]; longestPull: number | null; conflicts: string[]; min: number | null; km: number | null; meters: number | null; hr: number | null; pace: number | null; speed: number | null; power: number | null; cadence: number | null; dec: number | null;
   splits: { km: number; pace: string; hr: number | null }[]; hrZones: number[] | null; intervals: any; pattern: Pattern | null; spl: number | null; dps: number | null; longest: number | null; pace100: number | null; crawlShare: number | null;
-  rpe: number | null; feel: number | null; deviation: string; notes: string; technique: string; tempC: number | null; ascent: number | null; indoor: boolean; bikeType: string | null; fromWatch: boolean }
+  rpe: number | null; feel: number | null; deviation: string; notes: string; technique: string; tempC: number | null; ascent: number | null; indoor: boolean; bikeType: string | null; fromWatch: boolean;
+  /** Auftrag 34: Watt ohne Messgerät (einfache Rolle, Rad ohne Wattmesser) – nur zur Anzeige, nie für Vergleiche, Bestwerte, Trends */ powerEst: number | null }
 export function valsOf(d: Done): Vals {
   const f = fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport); const a = d.act ? effectiveActivity(d.act, d.st) : {};
   const sw = a.swim || {};
@@ -72,7 +83,7 @@ export function valsOf(d: Done): Vals {
     area: strength.area, areaSource: strength.source, exercises: strength.exercises, longestPull: num(actualMetrics(d.st, d.act).longestPull),
     conflicts: actualMetrics(d.st, d.act)._issues || [],
     min: a.min ?? f.min, km: d.sport === 'swim' ? null : (a.km ?? f.km), meters: d.sport === 'swim' ? (a.km ? Math.round(a.km * 1000) : f.meters) : null,
-    hr: a.avgHr ?? f.hr, pace: d.sport === 'run' ? (a.paceSecKm ?? f.paceSec) : null, speed: sp ? Math.round(sp * 10) / 10 : null, power: a.avgPower ?? f.power, cadence: a.avgCadence ?? f.cadence, dec: a.decouplingPct ?? f.decoupling,
+    hr: a.avgHr ?? f.hr, pace: d.sport === 'run' ? (a.paceSecKm ?? f.paceSec) : null, speed: sp ? Math.round(sp * 10) / 10 : null, power: d.powerOk === false ? null : (a.avgPower ?? f.power), powerEst: d.powerOk === false ? (a.avgPower ?? f.power ?? null) : null, cadence: a.avgCadence ?? f.cadence, dec: a.decouplingPct ?? f.decoupling,
     splits: (a.splits && a.splits.length ? a.splits : f.splits) || [], hrZones: a.hrZones || null, intervals: d.act ? intervalsOf(a) : (['run', 'bike', 'swim'].includes(d.sport) ? evalToIntervalOut(evaluateIntervals(d.planned || { sport: d.sport }, d.st, null, {}, d.sport)) : null), pattern: d.act ? patternOf(a) : null,
     spl: sw.strokesPerLength ?? f.spl, dps: sw.metersPerStroke ?? f.dps, longest: d.act ? crawlOf(a) : f.longestCrawl, pace100: sw.pace100 ?? f.pace100, crawlShare: f.crawlShare,
     rpe: f.rpe ?? num(a.rpe), feel: f.feel, deviation: f.deviation, notes: f.notes, technique: f.technique, tempC: a.tempC ?? null, ascent: a.ascentM ?? null,
@@ -117,7 +128,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   const facts: string[] = [];
   if (v.min) facts.push(`${Math.round(v.min)} min`);
   if (v.km) facts.push(`${de(v.km)} km`); if (v.meters) facts.push(`${v.meters} m`);
-  if (v.pace) facts.push(`${mmss(v.pace)}/km`); if (v.speed && d.sport === 'bike') facts.push(`${de(v.speed)} km/h`); if (v.power) facts.push(`${Math.round(v.power)} W`);
+  if (v.pace) facts.push(`${mmss(v.pace)}/km`); if (v.speed && d.sport === 'bike') facts.push(`${de(v.speed)} km/h`); if (v.power) facts.push(`${Math.round(v.power)} W`); else if (v.powerEst) facts.push(`ca. ${Math.round(v.powerEst)} W (geschätzt, ohne Wattmessung)`);
   if (v.hr && d.sport !== 'strength') facts.push(`Puls ${Math.round(v.hr)}`);
   const head = `${d.sport === 'strength' && !d.change ? actualStrength(d.st, d.act).title : d.title} (${fmtD(d.date)})${facts.length ? ': ' + facts.join(', ') : ''}.`;
   // Auftrag 29: kurz einordnen, was die Änderung bedeutet (die geplante Einheit wird nicht gegen das Gemachte bewertet)
@@ -303,11 +314,17 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   // Morgenwerte und Schlaf
   // Auftrag 18: Zusammenhang Morgenwerte → Puls nur, wenn der Puls dieser Einheit bei gleicher Pace wirklich über dem 6-Wochen-Schnitt lag;
   // sonst nur der Wert selbst (neutral) und heute ein Rat
+  // Auftrag 34: höchstens einmal pro Tag und nur, wenn es für die Einheit wichtig ist (vorher hing „nur 6 h geschlafen. Mach heute lieber
+  // locker.“ an jeder Bewertung, auch an lockeren, schon erledigten Einheiten; das Morgen-Briefing sagt es ohnehin). Wichtig = der Puls lag
+  // bei gleichem Tempo über dem 6-Wochen-Schnitt (Zusammenhang) oder die Einheit war hart und keine frühere harte Einheit des Tages hat ihn.
   const mf = readinessFacts(ctx, d.date);
   if (mf.length) {
     const hb = hrVsBase(ctx, d, v);
     const link = hb && hb.delta >= HR_DELTA ? ` Dein Puls lag bei gleichem Tempo ${hb.delta} Schläge über deinem 6-Wochen-Schnitt, das passt zu den Morgenwerten.` : '';
-    better.push(`Morgenwerte ${d.date === ctx.today ? 'heute' : 'an dem Tag'}: ${joinDe(mf)}.${link}${d.date === ctx.today && !link ? ' Mach heute lieber locker.' : ''}`); fatigue += 0.5 * mf.length;
+    const firstHard = () => { const list = doneItems(ctx, d.date, d.date); const i = list.findIndex(x => x.key === d.key); return !list.slice(0, Math.max(0, i)).some(x => isHardDone(x, valsOf(x))); };
+    if (link || ((hard || hardSeen) && firstHard())) {
+      better.push(`Morgenwerte ${d.date === ctx.today ? 'heute' : 'an dem Tag'}: ${joinDe(mf)}.${link || ' Nach einer harten Einheit an so einem Tag besonders auf Schlaf und Essen achten.'}`); fatigue += 0.5 * mf.length;
+    }
   }
   else { const tr = (ctx.state.trend || []).find((x: any) => x && x.date === d.date); if (tr && tr.sleepHours != null && tr.sleepHours >= 7.5) good.push(`Gut geschlafen (${de(tr.sleepHours)} h).`); }
   // Müdigkeit und Gefühl zuerst (die Antwort zeigt nur die ersten zwei Punkte), Strecke und Dauer danach

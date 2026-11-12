@@ -54,4 +54,15 @@ const UI: Record<string, string> = {
 const svg = (paths: string, w = 2) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 export function sportIcon(sport: string): string { return svg(SPORT_PATHS[sport] || SPORT_PATHS.other, 1.8); }
 export function ic(name: string): string { return svg(UI[name] || UI.info); }
+
+/* Auftrag 34: gefüllte Tab-Symbole (eigene Zeichnungen, kräftig wie in iOS 26; ausgewählt in Akzentfarbe). Flächen ohne Strich,
+   Linien (Strahlen, Ringe, Pfeil) mit rundem Strich. Aussparungen per evenodd. */
+const UI_FILL: Record<string, string> = {
+  sun: '<circle cx="12" cy="12" r="4.8" stroke="none"/><path fill="none" d="M12 2.3v2.2M12 19.5v2.2M2.3 12h2.2M19.5 12h2.2M5.1 5.1l1.6 1.6M17.3 17.3l1.6 1.6M5.1 18.9l1.6-1.6M17.3 6.7l1.6-1.6"/>',
+  calendar: '<path stroke="none" d="M6 4.6h12a3 3 0 0 1 3 3v1.9H3V7.6a3 3 0 0 1 3-3z"/><path stroke="none" fill-rule="evenodd" d="M3 10.9h18v6.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zM6.8 13h2.6v2.2H6.8zM10.7 13h2.6v2.2h-2.6zM14.6 13h2.6v2.2h-2.6zM6.8 16.4h2.6v2.2H6.8zM10.7 16.4h2.6v2.2h-2.6z"/><path fill="none" d="M8 2.6v3.6M16 2.6v3.6"/>',
+  chat: '<path stroke="none" fill-rule="evenodd" d="M5.2 3.8h13.6a2.7 2.7 0 0 1 2.7 2.7v8.6a2.7 2.7 0 0 1-2.7 2.7h-8.4l-4.5 3.4c-.7.5-1.6 0-1.6-.8v-2.6a2.7 2.7 0 0 1-1.8-2.6V6.5a2.7 2.7 0 0 1 2.7-2.7zM7 8.1h10v1.9H7zM7 11.6h6.6v1.9H7z"/>',
+  trend: '<path fill="none" stroke-width="3" d="M3.6 17.6l5.4-5.9 4 3.2 6.2-7"/><path stroke="none" d="M14.3 5h6.2c.8 0 1.4.6 1.4 1.4v6.2c0 1-1.2 1.5-1.9.8l-6.5-6.5c-.7-.7-.2-1.9.8-1.9z"/>',
+  grid: '<rect stroke="none" x="3.5" y="3.5" width="7.6" height="7.6" rx="2.2"/><rect stroke="none" x="12.9" y="3.5" width="7.6" height="7.6" rx="2.2"/><rect stroke="none" x="3.5" y="12.9" width="7.6" height="7.6" rx="2.2"/><rect stroke="none" x="12.9" y="12.9" width="7.6" height="7.6" rx="2.2"/>'
+};
+export function icFill(name: string): string { const p = UI_FILL[name]; return p ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>` : ic(name); }
 export const SPORT_LABEL_KEY: Record<string, string> = { swim: 'sport.swim', bike: 'sport.bike', run: 'sport.run', strength: 'sport.strength', football: 'sport.football', rest: 'sport.rest', walk: 'sport.walk', multi: 'sport.multi', other: 'sport.other' };

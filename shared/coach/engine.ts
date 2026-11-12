@@ -28,6 +28,7 @@ export interface CoachMsg {
   refs?: { sessionId?: string; activityId?: string; adjustmentIds?: string[] };
   proposal?: { changes: any[]; status: 'open' | 'accepted' | 'rejected' | 'superseded'; evidenceSignature?: string; skillsOnly?: boolean } | null;
   evidenceKey?: string;
+  /** Auftrag 34: Kern der Analyse-Erkenntnis (keine Wiederholung bei gleichem Kern) */ anaSig?: string;
   details?: string[];
   aiExcluded?: boolean;
   /** Auftrag 21: Fingerabdruck der Eingaben einer Bewertung (nur geänderte Werte sind eine Korrektur) */ inputSig?: string;
@@ -60,7 +61,8 @@ const fallback = readinessFallback;
 function effWeeks(ctx: EngineCtx, extra?: any[]) { return C.applyAdjustments(ctx.baseWeeks, Object.assign({}, ctx.state.adjustments, Object.fromEntries((extra || []).map(a => [a.id, a])))); }
 function dayOf(weeks: any[], date: string) { return C.planDays(weeks).find((d: any) => d.date === date) || null; }
 function live(day: any) { return day ? day.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled) : []; }
-const sessLabel = (s: any) => `${s.title}${s.plannedMinutes ? ` (${s.plannedMinutes} min)` : ''}`;
+/* Auftrag 34: Dauer nur, wenn sie nicht schon im Titel steht (vorher „Langer Lauf 60 min (60 min)“) */
+export const sessLabel = (s: any) => `${s.title}${s.plannedMinutes && !new RegExp(`(^|\\D)${s.plannedMinutes}\\s*min\\b`).test(s.title || '') ? ` (${s.plannedMinutes} min)` : ''}`;
 
 /* Gründe der Ampel als Sätze mit echten Zahlen */
 export function readinessFacts(ctx: EngineCtx, date: string): string[] {
@@ -89,7 +91,7 @@ export function adjustmentText(ctx: EngineCtx, list: any[], date: string): strin
     else if (a.type === 'modify' && /^Zone 2 statt/.test((a.set && a.set.title) || '')) parts.push(`Statt Intervallen heute ${a.set.plannedMinutes ? a.set.plannedMinutes + ' min ' : ''}locker in Zone 2.`);
     else if (a.type === 'modify' && /ladder/.test(a.id)) parts.push(`Rad-Leiter: ${a.what}. ${a.reason.replace(/^Intervall-Leiter Rad: /, '').replace(/^./, (c: string) => c.toUpperCase())}.`);
     else if (a.type === 'modify' && /-vol-/.test(a.id)) { /* Umfang: steht in der Zusammenfassung */ }
-    else if (a.type === 'note') parts.push(`${a.what}. ${a.reason}.`);
+    else if (a.type === 'note') parts.push([a.what, a.reason].filter(Boolean).join('. ') + '.');
     else parts.push(`${a.what}.`);
   }
   const vol = list.filter(a => /-vol-/.test(a.id));
@@ -175,7 +177,7 @@ export function weeklyReview(ctx: EngineCtx, date: string, adjustments: any[], s
     `Deine Woche: ${S.nDone} von ${S.nPlanned} Einheiten${S.ratio != null ? `, ${Math.round(S.ratio * 100)} % der geplanten Belastung` : ''}.`,
     S.withValues ? `${S.green} grüne, ${S.yellow} gelbe und ${S.red} rote Tage.` : '',
     S.sleepAvg != null ? `Schlaf im Schnitt ${de(S.sleepAvg)} h${S.sleepAvg < sleepNeed(ctx.profile, ctx.today)[0] ? ', da geht noch was' : ''}.` : '',
-    note ? `${note.what}: ${note.reason}.` : '',
+    note ? [note.what, note.reason].filter(Boolean).map((t: string) => t.replace(/\.$/, '')).join('. ') + '.' : '',
     next.length ? `Nächste Woche: ${next.length} Einheiten, ${de(hours)} h${key.length ? `, wichtig sind ${joinDe(key.slice(0, 3))}` : ''}.` : 'Für nächste Woche steht noch kein Plan.',
     pick(['Gute Erholung am Sonntagabend!', 'Starte gut in die neue Woche.', 'Weiter so!'], 'week-' + date)
   ].filter(Boolean);

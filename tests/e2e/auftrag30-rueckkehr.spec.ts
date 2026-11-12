@@ -102,7 +102,7 @@ test('Langzeit: drehen und App wechseln im Wechsel (4×), Linse richtig, kein Ne
   void view0;
   const aligned = async () => expect.poll(async () => page.evaluate(() => {
     const l = (document.querySelector('.tab-lens') as HTMLElement).getBoundingClientRect(); const t = (document.querySelector('#tabs .tab.on') as HTMLElement).getBoundingClientRect();
-    return Math.max(Math.abs((l.left + l.width / 2) - (t.left + t.width / 2)), Math.abs((l.top + l.height / 2) - (t.top + t.height / 2)), Math.abs(l.width - t.width));
+    return Math.max(Math.abs((l.left + l.width / 2) - (t.left + t.width / 2)), Math.abs((l.top + l.height / 2) - (t.top + t.height / 2)), Math.abs(l.width - t.width - 6)); // Auftrag 34: Markierung 6 px breiter als der Tab
   }), { timeout: 3000 }).toBeLessThan(1.5);
   await page.evaluate(() => { const w = window as any; Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => w.__vis || 'visible' }); });
   for (let i = 0; i < 4; i++) {

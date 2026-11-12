@@ -33,7 +33,7 @@ describe.skipIf(!hasLatestData())('Jonahs echte Daten (15.10.)', () => {
   });
   test('Rolle gestern: locker trotz „Intervalle“ im Titel, Vergleich mit einer ähnlichen Fahrt, RPE fehlt → Eintragen anbieten', () => {
     const r = ask('wie war die rolle gestern');
-    expect(r.text).toMatch(/Zone 1/); expect(r.text).toMatch(/pro Herzschlag als am/); expect(r.text).toMatch(/Es fehlen: Anstrengung/);
+    expect(r.text).toMatch(/Zone 1/); expect(r.text).not.toMatch(/Leistung pro Herzschlag/); expect(r.text).toMatch(/Es fehlen: Anstrengung/);
     expect(r.options![0]).toMatchObject({ label: 'Werte eintragen', go: 'session:w5-wed-bike' });
   });
   test('Schwimmen: Züge pro Bahn, Kraul am Stück, Technik-Thema mit Tipp', () => {

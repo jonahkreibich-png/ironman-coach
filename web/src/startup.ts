@@ -8,8 +8,8 @@ interface Notice { hidden: boolean }
 export type StartFailure = 'storage' | 'render';
 export interface StartHooks { onError?: (kind: StartFailure, err: unknown) => void }
 export const START_TEXT: Record<StartFailure, string> = {
-  storage: 'Deine gespeicherten Daten konnten nicht sicher gelesen werden. Bitte App erneut oeffnen. Es wurden keine Daten ersetzt. Keine Browserdaten loeschen.',
-  render: 'Die App konnte nicht gestartet werden. Deine Daten sind sicher. Keine Browserdaten loeschen.'
+  storage: 'Deine gespeicherten Daten konnten nicht sicher gelesen werden. Bitte App erneut öffnen. Es wurden keine Daten ersetzt. Keine Browserdaten löschen.',
+  render: 'Die App konnte nicht gestartet werden. Deine Daten sind sicher. Keine Browserdaten löschen.'
 };
 export async function startApplication(root:Root,notice:Notice|null,initialize:()=>Promise<unknown>,load:()=>Promise<unknown>,showAfterMs=0,hooks:StartHooks={}):Promise<void> {
  root.dataset.appState='loading';delete root.dataset.appError;

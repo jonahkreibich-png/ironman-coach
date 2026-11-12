@@ -175,7 +175,7 @@ export const de: Record<string, string> = {
   'quick.improved': 'Was hat sich verbessert?', 'quick.goal': 'Wie läuft es mit dem Ziel?',
 
   /* ---------- Fortschritt ---------- */
-  'trend.title': 'Trends', 'trend.aside': 'antippen für den Verlauf', 'trend.new': 'neu', 'trend.period': 'Zeitraum: {p}',
+  'trend.title': 'Trends', 'trend.aside': 'antippen für den Verlauf', 'trend.new': 'neu', 'trend.period': 'Zeitraum: {p}. Tippe auf einen Verlauf für einzelne Werte.',
   'trend.p.4w': '4 Wochen', 'trend.p.3m': '3 Monate', 'trend.p.1y': '1 Jahr',
   'trend.g.recovery': 'Erholung', 'trend.g.fitness': 'Fitness', 'trend.g.efficiency': 'Effizienz', 'trend.g.intensity': 'Intensitätsverteilung',
   'trend.g.swim': 'Schwimmen', 'trend.g.bests': 'Bestwerte', 'trend.g.long': 'Lange Einheiten', 'trend.g.relations': 'Zusammenhänge',

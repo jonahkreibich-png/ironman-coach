@@ -15,7 +15,7 @@ const text = (x: unknown) => String(x ?? '').trim();
 function number(x: unknown, label: string, integer = false, zero = false): number | null {
   if (x == null || text(x) === '') return null;
   const n = Number(text(x).replace(',', '.'));
-  if (!Number.isFinite(n) || (zero ? n < 0 : n <= 0) || (integer && !Number.isInteger(n))) throw Error(`${label}: Bitte eine gueltige ${zero ? 'nichtnegative' : 'positive'} Zahl eingeben.`);
+  if (!Number.isFinite(n) || (zero ? n < 0 : n <= 0) || (integer && !Number.isInteger(n))) throw Error(`${label}: Bitte eine gültige ${zero ? 'nichtnegative' : 'positive'} Zahl eingeben.`);
   return n;
 }
 function blocksOf(raw: any[], sport: TrainingSport, depth = 0): TrainingBlock[] {
@@ -29,14 +29,14 @@ function blocksOf(raw: any[], sport: TrainingSport, depth = 0): TrainingBlock[] 
       const n = number(b[k], k, k === 'sets', k === 'restSec' || k === 'kg'); if (n != null) out[k] = n;
     }
     if (text(b.reps)) out.reps = text(b.reps);
-    if (b.equipment != null) { if (!Array.isArray(b.equipment)) throw Error('Ausruestung muss eine Liste sein.'); out.equipment = b.equipment.map(text).filter(Boolean); }
-    if (sport !== 'strength' && (out.kg != null || out.sets != null || out.reps)) throw Error('Saetze, Gewicht und Uebungswiederholungen sind Kraftvorgaben.');
+    if (b.equipment != null) { if (!Array.isArray(b.equipment)) throw Error('Ausrüstung muss eine Liste sein.'); out.equipment = b.equipment.map(text).filter(Boolean); }
+    if (sport !== 'strength' && (out.kg != null || out.sets != null || out.reps)) throw Error('Sätze, Gewicht und Übungswiederholungen sind Kraftvorgaben.');
     if (sport === 'strength' && (out.distanceM != null || out.paceSecPerKm != null || out.speedKmh != null)) throw Error('Distanz und Pace gehoeren zu Ausdauereinheiten.');
     if (out.speedKmh != null && sport !== 'bike') throw Error('Geschwindigkeit in km/h ist eine Radvorgabe.');
     if (out.paceSecPerKm != null && sport === 'bike') throw Error('Bitte Radgeschwindigkeit statt Laufpace verwenden.');
-    if (out.timeBudgetSec != null && (sport !== 'strength' || !Array.isArray(b.blocks))) throw Error('Ein Zeitbudget gilt nur fuer eine Kraftserie mit Uebungen.');
+    if (out.timeBudgetSec != null && (sport !== 'strength' || !Array.isArray(b.blocks))) throw Error('Ein Zeitbudget gilt nur für eine Kraftserie mit Übungen.');
     if (Array.isArray(b.blocks)) {
-      if (out.durationSec != null || out.distanceM != null || out.sets != null) throw Error('Serien verwenden Unterbausteine statt eigener Dauer/Distanz/Saetze.');
+      if (out.durationSec != null || out.distanceM != null || out.sets != null) throw Error('Serien verwenden Unterbausteine statt eigener Dauer/Distanz/Sätze.');
       out.blocks = blocksOf(b.blocks, sport, depth + 1);
     } else if (out.durationSec == null && out.distanceM == null && !(sport === 'strength' && out.reps)) throw Error(`Baustein ${i + 1}: Dauer, Distanz oder Kraftwiederholungen fehlen.`);
     return out;
@@ -44,7 +44,7 @@ function blocksOf(raw: any[], sport: TrainingSport, depth = 0): TrainingBlock[] 
 }
 export function makeTrainingTemplate(input: { id: string; name: string; sport: string; blocks: any[]; description?: string; updatedAt?: number }): TrainingTemplate {
   if (!text(input.id) || !text(input.name)) throw Error('ID und Name der Vorlage fehlen.');
-  if (!['swim', 'bike', 'run', 'strength'].includes(input.sport)) throw Error('Diese Sportart wird nicht unterstuetzt.');
+  if (!['swim', 'bike', 'run', 'strength'].includes(input.sport)) throw Error('Diese Sportart wird nicht unterstützt.');
   return { id: text(input.id), name: text(input.name), sport: input.sport as TrainingSport, description: text(input.description), blocks: blocksOf(input.blocks, input.sport as TrainingSport), ...((input as any).sourceSpec ? { sourceSpec: copy((input as any).sourceSpec), sourcePlannedMinutes: (input as any).sourcePlannedMinutes ?? null, sourcePlannedKm: (input as any).sourcePlannedKm ?? null } : {}), ...((input as any).prescriptionSummary ? { prescriptionSummary: { fingerprint: String((input as any).prescriptionSummary.fingerprint), minutes: number((input as any).prescriptionSummary.minutes, 'Gesamtdauer', false, true), km: number((input as any).prescriptionSummary.km, 'Gesamtdistanz', false, true), estimated: !!(input as any).prescriptionSummary.estimated } } : {}), updatedAt: input.updatedAt ?? Date.now() };
 }
 export function templateTotals(template: Pick<TrainingTemplate, 'blocks'>): TemplateTotals {
@@ -68,7 +68,7 @@ export function templateTotals(template: Pick<TrainingTemplate, 'blocks'>): Temp
 }
 export function describeTrainingBlocks(blocks: TrainingBlock[], depth = 0, sport?: TrainingSport): string {
   return blocks.map(b => {
-    const prescription = [b.repeat && b.repeat > 1 ? `${b.repeat} x` : '', b.name, b.kind, b.timeBudgetSec ? `Zeitbudget ${b.timeBudgetSec} s (geschaetzt fuer alle Uebungen)` : '', b.sets ? `${b.sets} Saetze` : '', b.reps ? `${b.reps} Wdh.` : '', b.kg != null ? `${b.kg} kg` : '', b.durationSec ? `${b.durationSec} s` : '', b.distanceM ? `${b.distanceM} m` : '', b.restSec != null ? `${b.restSec} s Pause zwischen Wiederholungen/Saetzen` : '', b.paceSecPerKm ? sport === 'swim' ? `${b.paceSecPerKm / 10} s/100 m` : `${b.paceSecPerKm} s/km` : '', b.speedKmh ? `${b.speedKmh} km/h` : '', b.intensity, b.equipment?.join(', '), b.description].filter(Boolean).join(' · ');
+    const prescription = [b.repeat && b.repeat > 1 ? `${b.repeat} x` : '', b.name, b.kind, b.timeBudgetSec ? `Zeitbudget ${b.timeBudgetSec} s (geschätzt für alle Übungen)` : '', b.sets ? `${b.sets} Sätze` : '', b.reps ? `${b.reps} Wdh.` : '', b.kg != null ? `${b.kg} kg` : '', b.durationSec ? `${b.durationSec} s` : '', b.distanceM ? `${b.distanceM} m` : '', b.restSec != null ? `${b.restSec} s Pause zwischen Wiederholungen/Sätzen` : '', b.paceSecPerKm ? sport === 'swim' ? `${b.paceSecPerKm / 10} s/100 m` : `${b.paceSecPerKm} s/km` : '', b.speedKmh ? `${b.speedKmh} km/h` : '', b.intensity, b.equipment?.join(', '), b.description].filter(Boolean).join(' · ');
     return '  '.repeat(depth) + prescription + (b.blocks ? '\n' + describeTrainingBlocks(b.blocks, depth + 1, sport) : '');
   }).join('\n');
 }
@@ -80,9 +80,9 @@ export function templateSession(template: TrainingTemplate, id: string): any {
   return { id, sport: t.sport, title: t.name, description: [t.description, describeTrainingBlocks(t.blocks, 0, t.sport)].filter(Boolean).join('\n'), plannedMinutes: summary ? summary.minutes : totals.durationSec == null ? null : totals.durationSec / 60, plannedKm: summary ? summary.km : totals.distanceM ? totals.distanceM / 1000 : null, plannedDurationUnknown: summary ? summary.minutes == null : totals.unknownDuration, plannedDurationEstimated: totals.estimated || !!summary?.estimated, trainingBlocks: copy(t.blocks), trainingTemplateSnapshot: t, spec: null, long: false, hard: /[Zz]one ?[45]|[Zz][45]|[Ii]ntervall|[Ss]chwelle/.test(describeTrainingBlocks(t.blocks, 0, t.sport)), zone: t.blocks.map(b => b.intensity).filter(Boolean).join(', '), completed: false };
 }
 export function applyTemplate(session: any, template: TrainingTemplate, mode: 'replace' | 'append'): any {
-  if (session.completed || session.status === 'completed') throw Error('Bereits absolvierte Einheiten bleiben unveraendert.');
-  if (!['replace', 'append'].includes(mode)) throw Error('Bitte Ersetzen oder Ergaenzen waehlen.');
-  if (mode === 'append' && session.sport !== template.sport) throw Error('Ergaenzen ist nur innerhalb derselben Sportart moeglich.');
+  if (session.completed || session.status === 'completed') throw Error('Bereits absolvierte Einheiten bleiben unverändert.');
+  if (!['replace', 'append'].includes(mode)) throw Error('Bitte Ersetzen oder Ergänzen wählen.');
+  if (mode === 'append' && session.sport !== template.sport) throw Error('Ergänzen ist nur innerhalb derselben Sportart möglich.');
   const planned = templateSession(template, session.id); const out = copy(session);
   if (mode === 'append') {
     const base = sessionTrainingBlocks(session);
@@ -122,7 +122,7 @@ export function sessionTrainingBlocks(session: any): TrainingBlock[] {
   const spec = session.spec;
   if (Array.isArray(spec?.steps) && spec.steps.length) {
     const result: TrainingBlock[] = [];
-    const labels: Record<string, string> = { warm: 'Aufwaermen', main: 'Hauptteil', cool: 'Ausklang' };
+    const labels: Record<string, string> = { warm: 'Aufwärmen', main: 'Hauptteil', cool: 'Ausklang' };
     let swimSeries = 0;
     for (const step of spec.steps) {
       const name = labels[step.part] || step.part || 'Baustein';

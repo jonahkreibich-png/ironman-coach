@@ -1225,7 +1225,7 @@ function keepExcuse(old: any, next: any): any {
   const keep = String(old.description || '').split('\n').filter((l: string) => /^(Ausnahme:|Hitze-Gewöhnung|Wenn möglich im Freiwasser|Hügelig fahren|Mit Hügeln laufen|Zur Wettkampf-Uhrzeit)/.test(l) && !String(next.description || '').includes(l));
   return keep.length ? { ...next, description: [next.description, ...keep].filter(Boolean).join('\n') } : next;
 }
-function enforceRecovery(weeks: any[], prev: any = null, keepIds = new Set<string>(), capOf: ((date: string) => number) | null = null) {
+export function enforceRecovery(weeks: any[], prev: any = null, keepIds = new Set<string>(), capOf: ((date: string) => number) | null = null) {
   const all = prev ? [prev, ...weeks] : weeks;
   for (let i = prev ? 1 : 0; i < all.length; i++) {
     const w = all[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe) continue;
@@ -1244,13 +1244,16 @@ function enforceRecovery(weeks: any[], prev: any = null, keepIds = new Set<strin
     // nie über 80 % der kleinsten der letzten 3 normalen Wochen auffüllen (nach Änderungen der verfügbaren Zeit sind frühere Wochen kleiner)
     const normals = all.slice(Math.max(0, i - 6), i).filter((x: any) => !x.isRecoveryWeek && !x.partial && !x.reduced && !x.entry && x.phase !== 'taper' && x.phase !== 'race').slice(-3).map(ownWeekMinutes).filter((m: number) => m > 0);
     const fillMax = normals.length ? Math.min(...normals) * 0.8 : Infinity;
+    // Auftrag 34: höchstens +35 % je Einheit insgesamt (vorher je Durchgang, über 4 Durchgänge bis +80 %: lange Ausfahrt 85 → 130 min
+    // in einer Erholungswoche)
+    const orig0 = new Map<string, number>(); w.days.forEach((d: any) => d.sessions.forEach((s: any) => { if (s && s.id) orig0.set(s.id, s.plannedMinutes || 0); }));
     for (let guard = 0; guard < 4 && !nearRace && ownWeekMinutes(w) < Math.min(lo, fillMax); guard++) {
       const cur = ownWeekMinutes(w);
       const flex = w.days.flatMap((d: any) => d.sessions).filter((s: any) => s.spec && !s.stage && !keepIds.has(s.id) && !s.fixed && !s.race && !s.cancelled && !s.hard && !(s.sport === 'run' && (s.long || /^Lang/.test(s.title || ''))) && !s.ruleNote && !s.pinned && (s.sport === 'run' || s.sport === 'bike' || s.sport === 'swim') && !/test|Kraul-Check/i.test(s.title || ''));
       const flexMin = flex.reduce((a: number, s: any) => a + (s.plannedMinutes || 0), 0); if (!flexMin) break;
       const f = Math.min(1.35, 1 + (Math.min(mid, ref * 0.62, fillMax) - cur) / flexMin);
       let changed = false;
-      for (const s of flex) { const rb = W.rebuildScaled(s, f); if (!rb || rb.plannedMinutes <= s.plannedMinutes) continue; const day = w.days.find((d: any) => d.sessions.includes(s)); const dayMin = day ? day.sessions.filter((x: any) => x && !x.cancelled && x.sport !== 'rest' && !x.race).reduce((a: number, x: any) => a + (x.plannedMinutes || 0), 0) : 0; if (capOf && day && dayMin - (s.plannedMinutes || 0) + rb.plannedMinutes > capOf(day.date)) continue; Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); changed = true; }
+      for (const s of flex) { const f1 = Math.min(f, 1.35 * (orig0.get(s.id) || s.plannedMinutes) / (s.plannedMinutes || 1)); if (f1 <= 1.01) continue; const rb = W.rebuildScaled(s, f1); if (!rb || rb.plannedMinutes <= s.plannedMinutes) continue; const day = w.days.find((d: any) => d.sessions.includes(s)); const dayMin = day ? day.sessions.filter((x: any) => x && !x.cancelled && x.sport !== 'rest' && !x.race).reduce((a: number, x: any) => a + (x.plannedMinutes || 0), 0) : 0; if (capOf && day && dayMin - (s.plannedMinutes || 0) + rb.plannedMinutes > capOf(day.date)) continue; Object.assign(s, rb, { plannedKm: rb.plannedKm ?? undefined }); changed = true; }
       if (!changed) break;
     }
     for (let guard = 0; guard < 5 && ownWeekMinutes(w) > hi; guard++) {

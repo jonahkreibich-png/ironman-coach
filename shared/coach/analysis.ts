@@ -13,11 +13,30 @@ import { rulesOf } from '../constraints';
 import { parseFor } from '../ruleparse';
 import { doneItems } from './review';
 import { actualMetrics, evidenceSignature, changeText } from '../results';
-import { valueStory, storyText, STORY_METRICS, type Pt, type Story } from '../valuestory';
+import { valueStory, storyText, shownNewBest, STORY_METRICS, type Pt, type Story } from '../valuestory';
 import { valsOf } from './review';
 
 export type Trigger = 'morning' | 'activity' | 'weekly' | 'view';
-export interface Insight { id: string; kind: 'load' | 'recovery' | 'trend' | 'technique' | 'consistency' | 'illness'; tone: 'good' | 'info' | 'warn' | 'bad'; score: number; title: string; why: string; tip: string }
+export interface Insight { id: string; kind: 'load' | 'recovery' | 'trend' | 'technique' | 'consistency' | 'illness'; tone: 'good' | 'info' | 'warn' | 'bad'; score: number; title: string; why: string; tip: string;
+  /** Auftrag 34: Kern der Erkenntnis (gerundete Werte). Gleicher Kern wie die letzte Mitteilung dazu → keine neue Mitteilung. */ sig?: string }
+/* Auftrag 34: Text nach Geschlecht im Profil (Zyklus nur bei Frauen; ohne Angabe/divers neutral) */
+export const cycleHint = (sex: any): string => sex === 'f' ? ' Achte auch auf Veränderungen deines Zyklus.' : sex === 'm' ? '' : ' Falls du einen Zyklus hast: auch auf Veränderungen achten.';
+/* Auftrag 34: dieselbe Erkenntnis nicht immer wieder melden. Eine Mitteilung kommt nur, wenn die Erkenntnis neu ist oder sich ihr Kern
+   geändert hat (z. B. Effizienz deutlich weiter gesunken, neuer Bestwert). Spätestens nach 28 Tagen darf sie wiederkommen. */
+export const REPEAT_DAYS = 28;
+export function seenInsight(coachMsgs: Record<string, any>, i: Insight, today: string): boolean {
+  const prefix = `msg-ana-${i.id}-`;
+  const prev = Object.values(coachMsgs || {}).filter((m: any) => m && !m.deleted && typeof m.id === 'string' && m.id.startsWith(prefix)).sort((a: any, b: any) => (b.at || 0) - (a.at || 0))[0] as any;
+  if (!prev || (prev.date || '') < C.addDays(today, -REPEAT_DAYS)) return false;
+  // ältere Mitteilungen ohne Kern: gleicher Titel gilt als gleiche Erkenntnis
+  if (prev.anaSig == null) return prev.title === i.title;
+  // Kern „Art|Zahl“: gleiche Art und die Zahl nicht größer (nicht schlimmer bzw. nicht besser als zuletzt gemeldet) → schon bekannt.
+  // Kleine Schwankungen an einer Stufengrenze lösen so keine neue Mitteilung aus, nur eine echte Verschlechterung bzw. Verbesserung.
+  const cur = String(i.sig ?? i.title); const num = /^(.*?)(-?\d+(?:\.\d+)?)$/;
+  const a = num.exec(String(prev.anaSig)), b = num.exec(cur);
+  if (a && b && a[1] === b[1]) return +b[2] <= +a[2];
+  return prev.anaSig === cur;
+}
 export interface Analysis {
   date: string; trigger: Trigger; at: number;
   inputVersion: string; modelVersion: string;
@@ -91,13 +110,13 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const recentIll = (st.illnessPeriods || []).find((p: any) => p && p.end && p.end >= C.addDays(today, -21) && p.end < today);
   // Auftrag 14: erst ab etwas Trainingsverlauf (Fitness ab 15), sonst ergibt eine einzige Einheit Werte wie „483 % über deiner Fitness“
   if (acwr != null && !ill && (ctl || 0) >= 15) {
-    if (acwr > 1.5) add({ id: 'acwr-high', kind: 'load', tone: 'bad', score: 90, title: 'Belastung steigt zu schnell', why: `Müdigkeit (ATL ${Math.round(atl!)}) liegt ${Math.round((acwr - 1) * 100)} % über deiner Fitness (CTL ${Math.round(ctl!)}), ACWR ${de(acwr, 2)}. Das Verhältnis zeigt einen Belastungsunterschied, sagt allein aber weder Erschöpfung noch Verletzungsrisiko voraus.`, tip: 'Die nächsten 2-3 Tage locker, keine Intervalle.' });
-    else if (acwr > 1.3) add({ id: 'acwr-up', kind: 'load', tone: 'warn', score: 60, title: 'Belastung ist gerade hoch', why: `ACWR ${de(acwr, 2)} (ATL ${Math.round(atl!)}, CTL ${Math.round(ctl!)}). Das ist ein Modellhinweis; tatsächliche Erholung, Verlauf und Beschwerden entscheiden mit.`, tip: 'Achte auf Schlaf und plane nach der nächsten harten Einheit einen lockeren Tag.' });
+    if (acwr > 1.5) add({ id: 'acwr-high', kind: 'load', tone: 'bad', score: 90, title: 'Belastung steigt zu schnell', why: `Müdigkeit (ATL ${Math.round(atl!)}) liegt ${Math.round((acwr - 1) * 100)} % über deiner Fitness (CTL ${Math.round(ctl!)}), ACWR ${de(acwr, 2)}. Das Verhältnis zeigt einen Belastungsunterschied, sagt allein aber weder Erschöpfung noch Verletzungsrisiko voraus.`, tip: 'Die nächsten 2-3 Tage locker, keine Intervalle.', sig: 'hi|' + Math.floor(acwr * 5) });
+    else if (acwr > 1.3) add({ id: 'acwr-up', kind: 'load', tone: 'warn', score: 60, title: 'Belastung ist gerade hoch', why: `ACWR ${de(acwr, 2)} (ATL ${Math.round(atl!)}, CTL ${Math.round(ctl!)}). Das ist ein Modellhinweis; tatsächliche Erholung, Verlauf und Beschwerden entscheiden mit.`, tip: 'Achte auf Schlaf und plane nach der nächsten harten Einheit einen lockeren Tag.', sig: 'up' });
     else if (acwr < 0.8 && recentIll) add({ id: 'acwr-low-ill', kind: 'load', tone: 'info', score: 55, title: 'Fitness nach der Krankheit gesunken', why: `CTL ${ctl28 != null ? `von ${Math.round(ctl28)} auf ` : ''}${Math.round(ctl!)}, ATL nur ${Math.round(atl!)} (ACWR ${de(acwr, 2)}). Das ist nach einer Pause normal und kommt schnell zurück.`, tip: 'Nach tatsächlicher Verträglichkeit wieder einsteigen; ausgefallene Einheiten nicht nachholen und Steigerungen erst nach Prüfung übernehmen.' });
     else if (acwr < 0.8) add({ id: 'acwr-low', kind: 'load', tone: 'info', score: 35, title: 'Weniger Belastung als deine Fitness', why: `ACWR ${de(acwr, 2)}: in den letzten Tagen weniger trainiert als in den Wochen davor.`, tip: 'Ist das gewollt (Erholungswoche), passt es. Sonst die geplanten Einheiten wieder regelmäßig machen.' });
     if (tsb != null && tsb < -25) add({ id: 'tsb-low', kind: 'load', tone: 'warn', score: 65, title: 'Kurzfristige Modellbelastung ist hoch', why: `Form (TSB) ${Math.round(tsb)}: die Belastung der letzten Tage ist deutlich höher als deine Fitness.`, tip: 'Morgen locker oder frei, gut essen und schlafen.' });
   }
-  if (ctl != null && ctl28 != null && !recentIll && !ill && Math.abs(ctl - ctl28) >= 3) add({ id: ctl > ctl28 ? 'ctl-up' : 'ctl-down', kind: 'trend', tone: ctl > ctl28 ? 'good' : 'info', score: ctl > ctl28 ? 40 : 45, title: ctl > ctl28 ? 'Deine Fitness steigt' : 'Deine Fitness sinkt', why: `CTL in 4 Wochen von ${Math.round(ctl28)} auf ${Math.round(ctl)} (${src}).`, tip: ctl > ctl28 ? 'Weiter so: regelmäßig und überwiegend locker.' : 'Mehr Regelmäßigkeit bringt die Fitness zurück, nicht einzelne harte Einheiten.' });
+  if (ctl != null && ctl28 != null && !recentIll && !ill && Math.abs(ctl - ctl28) >= 3) add({ id: ctl > ctl28 ? 'ctl-up' : 'ctl-down', kind: 'trend', tone: ctl > ctl28 ? 'good' : 'info', score: ctl > ctl28 ? 40 : 45, title: ctl > ctl28 ? 'Deine Fitness steigt' : 'Deine Fitness sinkt', why: `CTL in 4 Wochen von ${Math.round(ctl28)} auf ${Math.round(ctl)} (${src}).`, tip: ctl > ctl28 ? 'Weiter so: regelmäßig und überwiegend locker.' : 'Mehr Regelmäßigkeit bringt die Fitness zurück, nicht einzelne harte Einheiten.', sig: ctl > ctl28 ? 'up|' + Math.floor(ctl / 5) : 'down|' + Math.floor((ctl28 - ctl) / 5) });
 
   /* ---------- Morgenwerte ---------- */
   const last5 = [0, 1, 2, 3, 4].map(i => C.addDays(today, -i));
@@ -107,10 +126,11 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
     const bH = C.baselineOf(st.trend, st.illnessPeriods, C.addDays(today, -4), 'hrv', Math.log);
     const rhrUp = bR && bR.n >= C.MIN_DAYS ? pts.filter((p: any) => p.restingHR && p.restingHR - bR.mean >= 3) : [];
     const hrvDown = bH && bH.n >= C.MIN_DAYS && bH.sd > 0 ? pts.filter((p: any) => p.hrv > 0 && (Math.log(p.hrv) - bH.mean) / bH.sd < -1) : [];
-    if (rhrUp.length >= 3 || hrvDown.length >= 3 || (rhrUp.length >= 2 && hrvDown.length >= 2)) add({ id: 'fatigue', kind: 'recovery', tone: 'warn', score: 85, title: ret || recentIll ? 'Noch nicht ganz erholt von der Krankheit' : 'Ermüdung steigt', why: [rhrUp.length ? `Ruhepuls an ${rhrUp.length} von ${pts.length} Tagen über normal (normal ${Math.round(bR!.mean)}, zuletzt ${(pts[0] as any).restingHR ?? '–'})` : '', hrvDown.length ? `HFV an ${hrvDown.length} Tagen deutlich unter normal (normal ${Math.round(Math.exp(bH!.mean))} ms)` : ''].filter(Boolean).join('; ') + '.', tip: ret || recentIll ? 'Weiter nur locker, bis Ruhepuls und HFV wieder im Normalbereich sind.' : 'Zwei lockere Tage einbauen. Fühlst du dich krank, trag es ein.' });
+    // Auftrag 34: ein einzelner erhöhter Ruhepuls ist kein Zeichen (vorher „Ruhepuls an 1 von 5 Tagen über normal … zuletzt 52“ neben der HFV)
+    if (rhrUp.length >= 3 || hrvDown.length >= 3 || (rhrUp.length >= 2 && hrvDown.length >= 2)) add({ id: 'fatigue', kind: 'recovery', tone: 'warn', score: 85, title: ret || recentIll ? 'Noch nicht ganz erholt von der Krankheit' : 'Ermüdung steigt', why: [rhrUp.length >= 2 ? `Ruhepuls an ${rhrUp.length} von ${pts.length} Tagen über normal (normal ${Math.round(bR!.mean)})` : '', hrvDown.length >= 2 ? `HFV an ${hrvDown.length} von ${pts.length} Tagen deutlich unter normal (normal ${Math.round(Math.exp(bH!.mean))} ms)` : ''].filter(Boolean).join('; ') + '.', tip: ret || recentIll ? 'Weiter nur locker, bis Ruhepuls und HFV wieder im Normalbereich sind.' : 'Zwei lockere Tage einbauen. Fühlst du dich krank, trag es ein.', sig: `${ret || recentIll ? 'ill' : 'tired'}|${rhrUp.length >= 3 ? 'r' : ''}${hrvDown.length >= 3 ? 'h' : ''}` });
     const need = sleepNeed(prof, today)[0];
     const sl = (st.trend || []).filter((p: any) => p && p.date > C.addDays(today, -7) && p.date <= today && typeof p.sleepHours === 'number').map((p: any) => p.sleepHours);
-    if (sl.length >= 4) { const avg = sl.reduce((a: number, b: number) => a + b, 0) / sl.length; if (avg < need - 0.4) add({ id: 'sleep', kind: 'recovery', tone: 'warn', score: 50, title: 'Zu wenig Schlaf', why: `Im Schnitt ${de(avg)} h in den letzten ${sl.length} Nächten, du brauchst etwa ${de(need)} h.`, tip: 'Eine halbe Stunde früher ins Bett bringt mehr als jede Zusatzeinheit.' }); }
+    if (sl.length >= 4) { const avg = sl.reduce((a: number, b: number) => a + b, 0) / sl.length; if (avg < need - 0.4) add({ id: 'sleep', kind: 'recovery', tone: 'warn', score: 50, title: 'Zu wenig Schlaf', why: `Im Schnitt ${de(avg)} h in den letzten ${sl.length} Nächten, du brauchst etwa ${de(need)} h.`, tip: 'Eine halbe Stunde früher ins Bett bringt mehr als jede Zusatzeinheit.', sig: 'sleep|' + Math.floor((need - avg) / 0.75) }); }
   }
 
   /* ---------- Einheiten: Felder und Trends ---------- */
@@ -133,8 +153,9 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
     const goalEff = prof.runGoal ? (60000 / prof.runGoal.paceSec) / prof.runGoal.hr : null;
     const lastE = effPts[effPts.length - 1].y;
     const goalTxt = goalEff ? ` Ziel ${mmss(prof.runGoal!.paceSec)}/km bei Puls ${prof.runGoal!.hr} entspricht ${de(goalEff, 2)} m pro Schlag, du bist bei ${Math.round(lastE / goalEff * 100)} %.` : '';
-    if (per4w >= 2) add({ id: 'eff-up', kind: 'trend', tone: 'good', score: 55, title: 'Aerobe Effizienz steigt', why: `Bei lockeren Läufen schaffst du ${de(per4w, 0)} % mehr Strecke pro Herzschlag als vor 4 Wochen (zuletzt ${de(lastE, 2)} m pro Schlag, ${effPts.length} Läufe).${goalTxt}`, tip: 'Genau so weiter: viel Zone 2, ruhig und regelmäßig.' });
-    else if (per4w <= -3) add({ id: 'eff-down', kind: 'trend', tone: 'warn', score: 60, title: 'Aerobe Effizienz sinkt', why: `Bei lockeren Läufen ${de(-per4w, 0)} % weniger Strecke pro Herzschlag als vor 4 Wochen (${effPts.length} Läufe). Mögliche Gründe prüfen: Schlaf, Hitze, beginnender Infekt.`, tip: 'Ein paar ruhige Tage, dann wieder locker in Zone 2.' });
+    // Auftrag 34: Kern in 5-%-Schritten – „5 % weniger“ und „6 % weniger“ ist dieselbe Erkenntnis, „14 % weniger“ eine neue
+    if (per4w >= 2) add({ id: 'eff-up', kind: 'trend', tone: 'good', score: 55, title: 'Aerobe Effizienz steigt', why: `Bei lockeren Läufen schaffst du ${de(per4w, 0)} % mehr Strecke pro Herzschlag als vor 4 Wochen (zuletzt ${de(lastE, 2)} m pro Schlag, ${effPts.length} Läufe).${goalTxt}`, tip: 'Genau so weiter: viel Zone 2, ruhig und regelmäßig.', sig: 'up|' + Math.floor(per4w / 5) });
+    else if (per4w <= -3) add({ id: 'eff-down', kind: 'trend', tone: 'warn', score: 60, title: 'Aerobe Effizienz sinkt', why: `Bei lockeren Läufen ${de(-per4w, 0)} % weniger Strecke pro Herzschlag als vor 4 Wochen (${effPts.length} Läufe). Mögliche Gründe prüfen: Schlaf, Hitze, beginnender Infekt.`, tip: 'Ein paar ruhige Tage, dann wieder locker in Zone 2.', sig: 'down|' + Math.floor(-per4w / 5) });
     else add({ id: 'eff-flat', kind: 'trend', tone: 'info', score: 25, title: 'Aerobe Effizienz stabil', why: `Zuletzt ${de(lastE, 2)} m pro Herzschlag bei lockeren Läufen.${goalTxt}`, tip: 'Mehr lockere Kilometer in Zone 2 bringen sie nach oben.' });
   }
   // Entkopplung bei längeren Einheiten
@@ -153,20 +174,25 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   // Auftrag 18: Warnzeichen für zu wenig Energie (RED-S): häufige Infekte plus Müdigkeit – vorsichtiger Hinweis, Arzt empfehlen, keine Diagnose
   { const ills = (st.illnessPeriods || []).filter((p: any) => p && p.start >= C.addDays(today, -90)).length;
     const tiredSigns = ins.some(x => ['feel', 'fatigue', 'eff-down'].includes(x.id));
-    if (ills >= 2 && tiredSigns) add({ id: 'reds', kind: 'recovery', tone: 'warn', score: 72, title: 'Mehrere Warnzeichen zusammen', why: `${ills} Infekte in 3 Monaten und Müdigkeit im Training.`, tip: 'Manchmal steckt zu wenig Energie dahinter: rund ums Training genug essen (Kohlenhydrate und Eiweiß). Bei Frauen auch auf Zyklus-Veränderungen achten. Lass das bitte ärztlich abklären, das ist keine Diagnose.' }); }
+    // Auftrag 34: Zyklus-Hinweis nur nach Geschlecht im Profil (vorher bekamen Männer „Bei Frauen auch auf Zyklus-Veränderungen achten“)
+    if (ills >= 2 && tiredSigns) add({ id: 'reds', kind: 'recovery', tone: 'warn', score: 72, title: 'Mehrere Warnzeichen zusammen', why: `${ills} Infekte in 3 Monaten und Müdigkeit im Training.`, tip: `Manchmal steckt zu wenig Energie dahinter: rund ums Training genug essen (Kohlenhydrate und Eiweiß).${cycleHint(prof.sex)} Lass das bitte ärztlich abklären, das ist keine Diagnose.`, sig: 'reds|' + ills }); }
   // Schwimmen: Kraul am Stück und Züge pro Bahn
   const swims = done.filter(x => x.sport === 'swim');
   // Auftrag 30: Bestwert, Tageswert und Trend unterscheiden (vorher erster gegen letzter Wert: „von 50 m auf 75 m“ trotz Bestwert 100 m)
   let stories: Record<string, Story> = {};
   try { stories = valueStories(ctx, today); } catch (e) { stories = {}; }
   for (const [k, title] of [['crawl', 'Kraul am Stück'], ['pull', 'Mit Pull Buoy am Stück']] as const) {
-    const sv = stories[k]; if (!sv || !sv.day || sv.n < 2 || sv.day.date < C.addDays(today, -21)) continue;
+    const sv = stories[k]; if (!sv || !sv.day || !sv.best || sv.n < 2 || sv.day.date < C.addDays(today, -21)) continue;
+    // Auftrag 34: „wird länger“ nur, wenn die letzte Einheit den Bestwert erreicht hat (vorher bei 75 m trotz Bestwert 100 m). Ein Tag unter
+    // dem Bestwert ist keine neue Erkenntnis: keine Meldung.
+    const atBest = sv.day.v >= sv.best.v;
+    if (!sv.isNewBest && !atBest) continue;
     const up = sv.isNewBest || sv.trend === 'up';
-    add({ id: k === 'crawl' ? 'swim-crawl' : 'swim-pull', kind: 'technique', tone: up ? 'good' : 'info', score: up ? 45 : 30, title: sv.isNewBest ? `Neuer Bestwert: ${title}` : sv.trend === 'up' ? `${title} wird länger` : title, why: storyLine(k, sv, today), tip: 'Weiter kurze Strecken sauber schwimmen, die Länge kommt mit der Atmung.' });
+    add({ id: k === 'crawl' ? 'swim-crawl' : 'swim-pull', kind: 'technique', tone: up ? 'good' : 'info', score: up ? 45 : 30, title: sv.isNewBest ? `Neuer Bestwert: ${title}` : sv.trend === 'up' ? `${title} wird länger` : title, why: storyLine(k, sv, today), tip: 'Weiter kurze Strecken sauber schwimmen, die Länge kommt mit der Atmung.', sig: 'best|' + sv.best.v });
   }
   for (const [k, sport] of [['run5k', 'Laufen'], ['bike20', 'Rad'], ['swim400', 'Schwimmen']] as const) {
-    const sv = stories[k]; if (!sv || !sv.isNewBest || !sv.day || sv.day.date < C.addDays(today, -14)) continue;
-    add({ id: 'best-' + k, kind: 'trend', tone: 'good', score: 42, title: `Neuer Bestwert ${sport}`, why: storyLine(k, sv, today), tip: 'Stark. Ein einzelner Spitzenwert ist noch kein neues Niveau – die Zonen passe ich erst nach einem Test oder wiederholten Werten an.' });
+    const sv = stories[k]; if (!sv || !shownNewBest(sv, STORY_METRICS[k].fmt) || !sv.day || sv.day.date < C.addDays(today, -14)) continue;
+    add({ id: 'best-' + k, kind: 'trend', tone: 'good', score: 42, title: `Neuer Bestwert ${sport}`, why: storyLine(k, sv, today), tip: 'Stark. Ein einzelner Spitzenwert ist noch kein neues Niveau – die Zonen passe ich erst nach einem Test oder wiederholten Werten an.', sig: STORY_METRICS[k].fmt(sv.day.v) });
   }
   const tech = swims.filter(x => x.f.technique).slice(-1)[0];
   if (tech && tech.date > C.addDays(today, -21)) add({ id: 'swim-tech', kind: 'technique', tone: 'info', score: 35, title: 'Technik-Schwerpunkt Schwimmen', why: `Zuletzt notiert: „${tech.f.technique}“ (${fmtD(tech.date)}).`, tip: /atm/i.test(tech.f.technique) ? 'Ins Wasser ausatmen (blubbern), nur kurz seitlich einatmen, Brett-Übungen mit Atmung.' : /bein|sink|wasserlage|kopf/i.test(tech.f.technique) ? 'Kopf ruhig, Blick zum Boden, Beinschlag aus der Hüfte: so liegen die Beine höher.' : 'Technikübungen am Anfang jeder Einheit, kurze Kraul-Strecken.' });
@@ -176,7 +202,7 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const planned14 = C.planDays(weeks).filter((d: any) => d.date >= from14 && d.date < today && !C.illnessAt(st.illnessPeriods, d.date)).flatMap((d: any) => d.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled && s.sport !== 'football'));
   if (planned14.length >= 4 && !ill) {
     const ok = planned14.filter((s: any) => (st.sessions[s.id] || {}).completed).length; const r = ok / planned14.length;
-    if (r < 0.6) add({ id: 'consistency', kind: 'consistency', tone: 'warn', score: 45, title: 'Viele Einheiten ausgelassen', why: `${ok} von ${planned14.length} Einheiten in den letzten 14 Tagen erledigt (ohne Krankheitstage).`, tip: 'Lieber kürzer als gar nicht: schreib mir „ich hab nur 20 min“, dann passe ich die Einheit an.' });
+    if (r < 0.6) add({ id: 'consistency', kind: 'consistency', tone: 'warn', score: 45, title: 'Viele Einheiten ausgelassen', why: `${ok} von ${planned14.length} Einheiten in den letzten 14 Tagen erledigt (ohne Krankheitstage).`, tip: 'Lieber kürzer als gar nicht: schreib mir „ich hab nur 20 min“, dann passe ich die Einheit an.', sig: 'low|' + Math.floor((1 - r) * 5) });
     else if (r >= 0.9) add({ id: 'consistency-good', kind: 'consistency', tone: 'good', score: 30, title: 'Sehr regelmäßig', why: `${ok} von ${planned14.length} Einheiten in den letzten 14 Tagen erledigt.`, tip: 'Regelmäßigkeit ist der wichtigste Baustein, weiter so.' });
   }
 
@@ -211,8 +237,10 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const messages: CoachMsg[] = [];
   const wk = C.weekRange(today)[0];
   const has = (id: string) => !!(st.coachMsgs || {})[id];
-  for (const i of top.filter(x => x.tone === 'warn' || x.tone === 'bad')) { const id = `msg-ana-${i.id}-${wk}`; if (!has(id)) messages.push({ id, at: ctx.now, date: today, kind: 'warning', from: 'coach', title: i.title, text: `${i.why} ${i.tip}`, important: i.tone === 'bad' }); }
-  for (const i of top.filter(x => x.tone === 'good')) { const id = `msg-ana-${i.id}-${wk}`; if (trigger !== 'view' && !has(id)) messages.push({ id, at: ctx.now + 1, date: today, kind: 'info', from: 'coach', title: i.title, text: `${i.why} ${i.tip}` }); }
+  // Auftrag 34: nur neue oder geänderte Erkenntnisse (vorher jede Woche wieder fast gleich: „Aerobe Effizienz sinkt“, „Kraul am Stück …“)
+  const fresh = (i: Insight) => !seenInsight(st.coachMsgs || {}, i, today);
+  for (const i of top.filter(x => x.tone === 'warn' || x.tone === 'bad')) { const id = `msg-ana-${i.id}-${wk}`; if (!has(id) && fresh(i)) messages.push({ id, at: ctx.now, date: today, kind: 'warning', from: 'coach', title: i.title, text: `${i.why} ${i.tip}`, important: i.tone === 'bad', anaSig: i.sig ?? i.title }); }
+  for (const i of top.filter(x => x.tone === 'good')) { const id = `msg-ana-${i.id}-${wk}`; if (trigger !== 'view' && !has(id) && fresh(i)) messages.push({ id, at: ctx.now + 1, date: today, kind: 'info', from: 'coach', title: i.title, text: `${i.why} ${i.tip}`, anaSig: i.sig ?? i.title }); }
   const autoNew = auto.filter(a => !(st.adjustments || {})[a.id]);
   if (autoNew.length) { const id = `msg-ana-adj-${today}`; if (!has(id)) messages.push({ id, at: ctx.now + 2, date: today, kind: 'adjust', from: 'coach', title: 'Plan angepasst', text: `${autoNew.map(a => a.what).join('. ')}. Grund: ${autoNew[0].reason}. Du kannst das rückgängig machen.`, refs: { adjustmentIds: autoNew.map(a => a.id) } }); }
   for (const p of proposals) { const id = `msg-ana-prop-${p.id}`; if (!has(id)) messages.push({ id, at: ctx.now + 3, date: today, kind: 'proposal', from: 'coach', title: p.title, text: p.text, proposal: { changes: p.changes, status: 'open' } }); }
@@ -248,7 +276,7 @@ export function swimReviewMessages(ctx: EngineCtx, update: any | null): CoachMsg
   return {kind:'adjust',key:aid,data:{...a,id:aid,group:'swim-review-'+key,createdAt:before?.data?.createdAt??ctx.now,date:ctx.today}};
  })];
  const details=[...new Set((update.adjustments||[]).map((a:any)=>String(a.what||'')).filter(Boolean))].slice(0,12) as string[];
- const m:CoachMsg={...(old||{}),id,at:old?.at??ctx.now,date:old?.date??ctx.today,kind:'proposal',from:'coach',title:'Schwimmen: bitte pruefen',text:update.text,details,important:true,unread:old?.unread??true,
+ const m:CoachMsg={...(old||{}),id,at:old?.at??ctx.now,date:old?.date??ctx.today,kind:'proposal',from:'coach',title:'Schwimmen: bitte prüfen',text:update.text,details,important:true,unread:old?.unread??true,
   proposal:{status:'open',skillsOnly:true,evidenceKey:key,evidenceSignature:evidenceSignature(ctx.state,ctx.baseWeeks),changes}};
  if(JSON.stringify(m)!==JSON.stringify(old))messages.push(m);
  return messages;

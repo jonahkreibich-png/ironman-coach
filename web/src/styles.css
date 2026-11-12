@@ -686,19 +686,19 @@ details.fold[open] > summary .chev svg { transform: rotate(180deg); }
 .tab-lens > i { position: absolute; inset: 0; border-radius: inherit; will-change: opacity; }
 body.no-plan .tab-lens { display: none; }
 /* Ruhe: flache Markierung (Video: dunkler als die Leiste im dunklen Modus, leicht grau im hellen) */
-.tab-lens-fill { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.tab-lens-fill { background: color-mix(in srgb, var(--ink) 10%, transparent); }
 /* gehoben: klarer Glastropfen – helle Kante, farbige Ränder (Lichtbrechung angedeutet), Glanz oben, Schatten; ohne Weichzeichner */
 .tab-lens-glass { opacity: .001; background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.30), rgba(255,255,255,.05) 55%, rgba(255,255,255,.10)), rgba(255,255,255,.04);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), inset 0 2px 1.5px -1px rgba(255,255,255,.9), inset 0 -2px 3px -1px rgba(255,255,255,.35),
-    inset 3px 0 3px -2px rgba(255,90,140,.45), inset -3px 0 3px -2px rgba(70,160,255,.5), 0 8px 22px rgba(0,0,0,.20), 0 1px 3px rgba(0,0,0,.12); }
+    inset 4px 0 5px -3px rgba(255,70,130,.7), inset -4px 0 5px -3px rgba(60,165,255,.75), inset 0 3px 4px -3px rgba(255,220,120,.35), 0 8px 22px rgba(0,0,0,.20), 0 1px 3px rgba(0,0,0,.12); }
 .tabbar.lens-on .tab.peek { color: var(--accent); }
-:root[data-theme="dark"] .tab-lens-fill { background: rgba(0,0,0,.42); }
+:root[data-theme="dark"] .tab-lens-fill { background: rgba(0,0,0,.55); }
 :root[data-theme="dark"] .tab-lens-glass { box-shadow: inset 0 0 0 1px rgba(255,255,255,.32), inset 0 2px 1.5px -1px rgba(255,255,255,.6), inset 0 -2px 3px -1px rgba(255,255,255,.18),
-    inset 3px 0 3px -2px rgba(255,90,140,.4), inset -3px 0 3px -2px rgba(70,160,255,.45), 0 8px 22px rgba(0,0,0,.45); }
+    inset 4px 0 5px -3px rgba(255,70,130,.7), inset -4px 0 5px -3px rgba(60,165,255,.75), inset 0 3px 4px -3px rgba(255,220,120,.35), 0 8px 22px rgba(0,0,0,.45); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .tab-lens-fill { background: rgba(0,0,0,.42); }
+  :root:not([data-theme="light"]) .tab-lens-fill { background: rgba(0,0,0,.55); }
   :root:not([data-theme="light"]) .tab-lens-glass { box-shadow: inset 0 0 0 1px rgba(255,255,255,.32), inset 0 2px 1.5px -1px rgba(255,255,255,.6), inset 0 -2px 3px -1px rgba(255,255,255,.18),
-    inset 3px 0 3px -2px rgba(255,90,140,.4), inset -3px 0 3px -2px rgba(70,160,255,.45), 0 8px 22px rgba(0,0,0,.45); }
+    inset 4px 0 5px -3px rgba(255,70,130,.7), inset -4px 0 5px -3px rgba(60,165,255,.75), inset 0 3px 4px -3px rgba(255,220,120,.35), 0 8px 22px rgba(0,0,0,.45); }
 }
 @media (prefers-reduced-transparency: reduce) { .tab-lens-glass { background: var(--surface-2); } }
 /* Glas: Weichzeichner und leichte Lichtbrechung (Sättigung/Helligkeit des Inhalts dahinter) auf der festen Ebene; Tönung, Glanzkante
@@ -741,3 +741,16 @@ body.no-plan .tab-lens { display: none; }
 .rg-c { font-size: min(var(--t-md), 4.4vw); }
 /* Auftrag 29: „geplant: …“ klein unter dem Titel, wenn anders trainiert wurde */
 .planned-was { display: block; font-weight: 400; overflow-wrap: anywhere; }
+
+/* Auftrag 34: Lichtbrechung in der Linse – vergrößerte Kopie der Tab-Reihe, nur innerhalb der Linse sichtbar (Rand der Linse schneidet ab),
+   in Akzentfarbe: die Farbe wandert mit der Linse. Darunter eine fast deckende Fläche, damit die unvergrößerten Tabs nicht durchscheinen.
+   Nur während die Linse gehoben ist sichtbar (sonst gäbe es jede Beschriftung zweimal). Nur transform und opacity werden animiert. */
+.tab-lens-mag { overflow: hidden; visibility: hidden; font-style: normal; }
+.tab-lens-bg { position: absolute; inset: 0; opacity: .001; background: linear-gradient(var(--surface), var(--surface)), var(--bg); will-change: opacity; }
+.tabbar.lens-on .tab-lens-mag { visibility: visible; }
+/* während der Bewegung liegt die Linse über den Tabs (sonst schienen die Originale durch); in Ruhe liegt die Markierung dahinter */
+#tabs .tab { z-index: 1; }
+.tabbar.lens-on .tab-lens { z-index: 2; }
+.tab-lens-row { position: absolute; left: 0; top: 0; margin: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
+.tabbar .tab-lens-row .tab, [data-design="glas"] .tabbar .tab-lens-row .tab { color: var(--accent); transform: none; }
+.tab-lens-row .dot { display: none; }

@@ -6,6 +6,7 @@ import * as C from './core';
 import { intervalsOf } from './activity/structure';
 import type { Activity } from './activity/analyze';
 import { sleepNeed, type Profile } from './profile';
+import { wattsTrusted } from './scores';
 
 export type Period = '4w' | '3m' | '1y';
 export const PERIOD_DAYS: Record<Period, number> = { '4w': 28, '3m': 91, '1y': 365 };
@@ -379,6 +380,8 @@ function weightCard(I: TrendInput, from: string, minor: boolean): TrendCard {
 
 /* ---------- alle Trends ---------- */
 export function trendCards(I: TrendInput): TrendCard[] {
+  // Auftrag 34: Watt ohne Messgerät (einfache Rolle, Rad ohne Wattmesser) sind geschätzt: nie für Watt-Trends, Effizienz und Bestwerte
+  I = { ...I, activities: (I.activities || []).map(a => a && a.sport === 'bike' && a.avgPower && I.profile && !wattsTrusted(a, I.profile) ? { ...a, avgPower: null, np: null } as Activity : a) };
   const from = C.addDays(I.today, -PERIOD_DAYS[I.period] + 1);
   const minor = (() => { const y = (I.profile as any).birthYear; return y ? +I.today.slice(0, 4) - y < 18 : false; })();
   const safe = (f: () => TrendCard | TrendCard[]): TrendCard[] => { try { const r = f(); return Array.isArray(r) ? r : [r]; } catch (e) { return []; } };

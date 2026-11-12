@@ -1228,7 +1228,10 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
       const built = stageSession(s, target, ladder === 'runwalk' ? null : swimCtxOf(state)); if (!built) return;
       push({ id: `${group}-stage-${s.id}`, type: 'modify', sessionId: s.id, set: built, what: `${s.title} → ${built.title}`, reason: (v.ok ? 'Letzte Stufe hat geklappt (' : 'Stufe wiederholen (') + v.why + ')' });
     });
-    stageWhy.push((v.ok ? 'nächste Stufe: ' : 'Stufe bleibt: ') + v.why);
+    // Auftrag 34: ein Satz („Kraul-Stufe bleibt (100 m Kraul am Stück nachgewiesen)“) statt „Stufe bleibt: … nachgewiesen: Stufe bleibt“
+    const stageName = ladder === 'runwalk' ? 'Lauf-Geh-Stufe' : ladder === 'swimBreast' ? 'Schwimm-Stufe' : 'Kraul-Stufe';
+    const vWhy = String(v.why || '').replace(/:\s*Stufe (bleibt|wiederholen|passend dazu)$/i, '');
+    stageWhy.push(`${stageName} ${v.ok ? 'steigt' : target < last.s.stage.n ? 'passt sich an' : 'bleibt'}${vWhy ? ` (${vWhy})` : ''}`);
   }
 
   // Schwimmtest: ab 400 m Kraul am Stück wird aus dem Kraul-Check der CSS-Test (400 m + 200 m)
@@ -1248,8 +1251,13 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     }
   });
 
+  // Auftrag 34: klare Sätze statt „Woche 9: Umfang 0 %: Erholungswoche …“ und „Lernstufen: Stufe bleibt: … nachgewiesen: Stufe bleibt“
+  const volTxt = next.isRecoveryWeek && pct === 0 ? `Woche ${next.weekNumber} ist eine Erholungswoche mit weniger Umfang, wie geplant`
+    : pct === 0 ? `Woche ${next.weekNumber}: Umfang bleibt gleich` : `Woche ${next.weekNumber}: ${Math.abs(pct)} % ${pct > 0 ? 'mehr' : 'weniger'} Umfang`;
+  const whyTxt = next.isRecoveryWeek && pct === 0 ? '' : String(why || '').replace(/^Diese Woche ([\d,]+) h eigenes Training erledigt: nächste Woche höchstens etwa 10 % mehr$/, 'Du hast diese Woche $1 h trainiert, mehr als etwa 10 % darüber wäre zu viel auf einmal');
+  const sentence = (t: string) => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
   push({ id: group + '-summary', type: 'note',
-    what: `Woche ${next.weekNumber}: Umfang ${pct > 0 ? '+' + pct : pct} %`, reason: why + (ladderWhy ? '. Rad-Leiter: ' + ladderWhy : '') + (stageWhy.length ? '. Lernstufen: ' + stageWhy.join('; ') : ''),
+    what: volTxt, reason: [whyTxt ? 'Grund: ' + whyTxt : '', ladderWhy ? 'Rad: ' + ladderWhy : '', ...stageWhy.map(sentence)].filter(Boolean).join('. '),
     stats: { ratio: S.ratio, red: S.red, green: S.green, withValues: S.withValues, sick: S.sick, loadRatio: S.loadRatio, pct } });
   return { adjustments: res, summary: S };
 }

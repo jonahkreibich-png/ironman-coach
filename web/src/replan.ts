@@ -12,6 +12,7 @@ import { rulesOf, type Rule } from '../../shared/constraints';
 import { parseFor } from '../../shared/ruleparse';
 import type { Conflict } from '../../shared/plangen';
 import { planDiff } from '../../shared/plandiff';
+import { orphanAdjustmentIds } from '../../shared/datacheck';
 import type { Profile } from '../../shared/profile';
 import type { Goal } from '../../shared/goals';
 import { t } from '../../shared/i18n';
@@ -81,6 +82,9 @@ export function replanFuture(reason: string, why: string, o: { needTests?: any; 
   const { plan: next, gen } = r;
   try { localStorage.setItem(PLAN_KEY + '_prev', JSON.stringify(old)); } catch (e) { return { ok: false, msg: 'Speichern nicht möglich.' }; }
   replacePlanInPlace(next);
+  // Auftrag 34: Anpassungen für Einheiten, die es im neuen Plan nicht mehr gibt, stilllegen (vorher blieben sie stehen: „Verwaiste
+  // Anpassungen“ im Daten-Check; bei einem zweiten Neu-Planen am selben Tag hätten sie eine neue Einheit mit gleicher Kennung treffen können)
+  for (const id of orphanAdjustmentIds(next.weeks || [], STATE)) STATE.adjustments[id] = { ...STATE.adjustments[id], undone: true, retired: true };
   // diese Woche: was jetzt gegen eine harte Regel verstößt, sofort verschieben oder streichen
   const changed = repairNow();
   const now = Date.now();

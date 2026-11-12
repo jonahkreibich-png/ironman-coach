@@ -19,36 +19,36 @@ function effectiveWeeks(weeks:any[],state:any):any[] {
 function index(weeks:any[]) {
  const days=new Map<string,any>(), sessions=new Map<string,{day:any;session:any}>();
  for(const w of weeks) for(const day of w.days||[]) { days.set(day.date,day); for(const session of day.sessions||[]) {
- if(sessions.has(session.id)) throw Error('Einheiten-ID mehrfach vorhanden. Bitte zuerst den Plan pruefen.');
+ if(sessions.has(session.id)) throw Error('Einheiten-ID mehrfach vorhanden. Bitte zuerst den Plan prüfen.');
  sessions.set(session.id,{day,session});
  }} return {days,sessions};
 }
 export function assertPlanAdjustments(weeks:any[],state:any,adjustments:any[]):void {
  const {days,sessions}=index(effectiveWeeks(weeks,state)), added=new Set<string>(), moved=new Set<string>();
  for(const a of adjustments) {
- if(a.sessionId && state.sessions?.[a.sessionId]?.completed) throw Error('Bereits absolvierte Einheiten bleiben unveraendert.');
+ if(a.sessionId && state.sessions?.[a.sessionId]?.completed) throw Error('Bereits absolvierte Einheiten bleiben unverändert.');
  const x=sessions.get(a.sessionId);
  if(x?.session.trainingBlocks && a.type==='modify' && !Array.isArray(a.set?.trainingBlocks) && Object.keys(a.set||{}).some(k=>['sport','plannedMinutes','plannedKm','spec','description','title','zone','hard'].includes(k))) throw Error('Bitte die Trainingsbausteine bearbeiten, damit Dauer und Beschreibung zusammenpassen.');
- if(x && (x.session.completed || (x.session._custom26 && x.session.completed!==false))) throw Error('Bereits absolvierte Einheiten bleiben unveraendert.');
- if(Object.keys(a.set||{}).some(k=>['completed','metrics','metricsManual','activityId','date','rpe','notes'].includes(k))) throw Error('Istwerte duerfen durch Planaktionen nicht geaendert werden.');
+ if(x && (x.session.completed || (x.session._custom26 && x.session.completed!==false))) throw Error('Bereits absolvierte Einheiten bleiben unverändert.');
+ if(Object.keys(a.set||{}).some(k=>['completed','metrics','metricsManual','activityId','date','rpe','notes'].includes(k))) throw Error('Istwerte dürfen durch Planaktionen nicht geändert werden.');
  if(a.type==='add') {
- if(!days.has(a.to)||!a.session?.id||sessions.has(a.session.id)||added.has(a.session.id)) throw Error('Ungueltiges Ziel oder doppelte Einheiten-ID.');
+ if(!days.has(a.to)||!a.session?.id||sessions.has(a.session.id)||added.has(a.session.id)) throw Error('Ungültiges Ziel oder doppelte Einheiten-ID.');
  added.add(a.session.id);
  } else if(a.type==='move'||a.type==='custom-move') {
- if(!x||!days.has(a.to)||x.day.date===a.to||moved.has(a.sessionId)||a.from!==x.day.date) throw Error('Der Plan wurde inzwischen geaendert. Bitte die Vorschau erneut oeffnen.');
+ if(!x||!days.has(a.to)||x.day.date===a.to||moved.has(a.sessionId)||a.from!==x.day.date) throw Error('Der Plan wurde inzwischen geändert. Bitte die Vorschau erneut öffnen.');
  if((x.session._custom26 && x.session.completed!==false) || x.session.completed || x.session.sport==='rest'||x.session.cancelled||x.session.removed||x.session.fixed||x.session.race) throw Error('Diese Einheit ist absolviert, ausgefallen oder fest geplant.');
  moved.add(a.sessionId);
  } else if(a.sessionId && !x && !added.has(a.sessionId)) throw Error('Diese Einheit ist nicht mehr im Plan.');
- if(a.set?.id && a.set.id!==a.sessionId) throw Error('Die Identitaet einer Einheit darf nicht geaendert werden.');
+ if(a.set?.id && a.set.id!==a.sessionId) throw Error('Die Identität einer Einheit darf nicht geändert werden.');
  }
 }
 export function proposePlanAction(weeks:any[],state:any,action:PlanAction26,group:string):{adjustments:any[];preview:PlanPreview26[];warnings:string[]} {
  const effective=effectiveWeeks(weeks,state); const {days,sessions}=index(effective); const preview:PlanPreview26[]=[];
  const move=(id:string,to:string)=>{ const x=sessions.get(id); if(!x) throw Error('Einheit nicht gefunden.'); preview.push({sessionId:id,title:x.session.title,from:x.day.date,to}); };
  if(action.type==='move') move(action.sessionId,action.to);
- else if(action.type==='swap') {const a=sessions.get(action.sessionId),b=sessions.get(action.otherSessionId);if(!a||!b||a.day.date===b.day.date) throw Error('Bitte Einheiten an unterschiedlichen Tagen waehlen.');move(action.sessionId,b.day.date);move(action.otherSessionId,a.day.date);}
+ else if(action.type==='swap') {const a=sessions.get(action.sessionId),b=sessions.get(action.otherSessionId);if(!a||!b||a.day.date===b.day.date) throw Error('Bitte Einheiten an unterschiedlichen Tagen wählen.');move(action.sessionId,b.day.date);move(action.otherSessionId,a.day.date);}
  else {
- const a=days.get(action.from),b=days.get(action.to); if(!a||!b||a===b) throw Error('Bitte unterschiedliche Tage im Plan waehlen.');
+ const a=days.get(action.from),b=days.get(action.to); if(!a||!b||a===b) throw Error('Bitte unterschiedliche Tage im Plan wählen.');
  for(const s of a.sessions||[]) if(s.sport!=='rest'&&!s.cancelled&&!s.removed) move(s.id,b.date);
  for(const s of b.sessions||[]) if(s.sport!=='rest'&&!s.cancelled&&!s.removed) move(s.id,a.date);
  }

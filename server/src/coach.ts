@@ -11,7 +11,7 @@ import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate, swimPaceU
 import { refreshFuture, trendThresholds, refreshAdjustments } from '../../shared/refresh';
 import { mainGoal } from '../../shared/goals';
 import { analyze, swimReviewMessages, type Trigger } from '../../shared/coach/analysis';
-import { extendPlan } from '../../shared/replan';
+import { extendPlan, planUpkeep, upkeepText } from '../../shared/replan';
 import { evidenceSignature } from '../../shared/results';
 import { dedupeIncoming } from '../../shared/coach/feed';
 
@@ -196,6 +196,19 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
         if (!su.silent && !L.state.coachMsgs[swimMsgId]) changes.push({ kind: 'coachMsg', key: swimMsgId, data: { id: swimMsgId, at: t, date: day, kind: 'adjust', from: 'coach', title: /^Korrigiert/.test(su.text) ? 'Schwimmen korrigiert' : 'Schwimm-Stufe', text: su.text, important: true }, updatedAt: t + 5 });
       }
     }
+  }
+  // Auftrag 34: Plan-Pflege – ältere Pläne an die Trainingsregeln anpassen (Erholungswoche 60–70 %, Ruhetage, lange Einheiten …), als
+  // normale Anpassungen mit Mitteilung und Rückgängig. Morgens und sonntags, nur wenn der Daten-Check etwas finden würde.
+  if (trigger === 'morning' || trigger === 'weekly') {
+    try {
+      const day = opts.date || berlinParts().date;
+      const up = planUpkeep(L.baseWeeks, L.state, L.profile, L.goals || [], day, t + 300, L.planMeta);
+      if (up.adjustments.length) {
+        up.adjustments.forEach((a, i) => { L.state.adjustments[a.id] = a; changes.push({ kind: 'adjust', key: a.id, data: a, updatedAt: t + 300 + i }); });
+        const mid = 'msg-plancheck-' + day;
+        if (!L.state.coachMsgs[mid]) changes.push({ kind: 'coachMsg', key: mid, data: { id: mid, at: t + 5, date: day, kind: 'adjust', from: 'coach', title: 'Plan an die Trainingsregeln angepasst', text: upkeepText(up), refs: { adjustmentIds: up.adjustments.map(a => a.id) } }, updatedAt: t + 299 });
+      }
+    } catch (e) { /* die Pflege darf die Analyse nie stören */ }
   }
   const ctx = engineCtx(L, opts.date);
   const r = analyze(ctx, trigger);

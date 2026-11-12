@@ -6,7 +6,7 @@
 import { esc } from '../util';
 import { on, onChange, srcBadge, more } from '../kit';
 import { toast } from '../toast';
-import { evaluateIntervals, plannedIntervals, actualRows, paceToSec, secToPace, IV_LIMITS, type IvRow, type IvEval, type IvTarget, type IvThresholds } from '../../../shared/intervals';
+import { evaluateIntervals, plannedIntervals, actualRows, paceToSec, secToPace, IV_LIMITS, ivLimit, type IvRow, type IvEval, type IvTarget, type IvThresholds } from '../../../shared/intervals';
 import { setSessionMetricManual } from '../../../shared/activity/merge';
 import { parseInput } from '../../../shared/validate';
 
@@ -151,7 +151,7 @@ export function readIvValue(f: string, kind: string, raw: string, sport: string)
     return { ok: true, v: s };
   }
   // Auftrag 29: dieselbe Prüfung wie überall, ohne stilles Runden (vorher wurde z. B. 155,5 bpm still zu 156)
-  const lim = IV_LIMITS[f] || [-1e9, 1e9];
+  const lim = ivLimit(f, sport) || [-1e9, 1e9];
   const IV: Record<string, [string, string?, Record<string, number>?]> = { m: ['Strecke', 'm', { km: 1000 }], hr: ['Ø Puls', 'bpm'], maxHr: ['max. Puls', 'bpm'], restHr: ['Puls in der Pause', 'bpm'], power: ['Leistung', 'W'], speed: ['Tempo', 'km/h'], cad: ['Kadenz', '/min', { spm: 1, rpm: 1 }], spl: ['Züge pro Bahn'], rpe: ['RPE'] };
   const d = IV[f] || ['Wert'];
   const r = parseInput({ label: d[0], unit: d[1], units: d[2], min: lim[0], max: lim[1], int: f === 'rpe' || f === 'm' }, v);

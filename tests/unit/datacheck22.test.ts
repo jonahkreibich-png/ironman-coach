@@ -82,11 +82,11 @@ describe('Täglicher Daten-Check', () => {
     const r = dataCheck({ ...base, baseWeeks: plan([{ id: 's1', sport: 'run', title: 'Lauf' }]), state });
     expect(r.fixes).toEqual([]);
   });
-  test('verwaiste Anpassungen: eine Zeile mit Anzahl, nichts gelöscht', () => {
+  test('verwaiste Anpassungen: eine Zeile mit Anzahl, sicher entfernt (Auftrag 34); gültige bleiben', () => {
     const state: any = { sessions: {}, adjustments: { a: { id: 'a', type: 'modify', sessionId: 'alt-1', set: {} }, b: { id: 'b', type: 'cancel', sessionId: 'alt-2' }, c: { id: 'c', type: 'modify', sessionId: 's1', set: {} } } };
     const r = dataCheck({ ...base, baseWeeks: plan([{ id: 's1', sport: 'run', title: 'Lauf' }]), state });
     const o = r.findings.filter(f => f.group === 'orphans');
-    expect(o).toHaveLength(1); expect(o[0].text).toMatch(/2 Anpassungen/); expect(r.fixes).toEqual([]);
+    expect(o).toHaveLength(1); expect(o[0].text).toMatch(/2 Anpassungen/); expect(r.fixes.map(f => [f.kind, f.key]).sort()).toEqual([['adjust', 'a'], ['adjust', 'b']]);
   });
   test('leerer neuer Nutzer: keine Befunde, kein Absturz', () => {
     expect(dataCheck({ ...base, baseWeeks: [], state: {} })).toEqual({ findings: [], fixes: [] });

@@ -49,9 +49,10 @@ test('genau ein Linsen-Element: steht in Ruhe am aktiven Tab, kein zweiter Hinte
   // der aktive Tab hat keine eigene Fläche mehr (das war die zweite Linse)
   const bg = await page.locator('#tabs .tab.on').evaluate(e => { const cs = getComputedStyle(e); return cs.backgroundImage + '|' + cs.backgroundColor; });
   expect(bg).toBe('none|rgba(0, 0, 0, 0)');
-  // Linse so groß wie ein Tab, innerhalb der Leiste
+  // Markierung etwas breiter als ein Tab (Auftrag 34: breite Kapsel wie in iOS 26, Symbol und Wort mit Luft), innerhalb der Leiste
   const lb = await lensBox(page), tb = await page.locator('#tabs .tab.on').boundingBox(), bb = await page.locator('.tabbar').boundingBox();
-  expect(Math.abs(lb.w - tb!.width)).toBeLessThan(2);
+  expect(lb.w).toBeGreaterThan(tb!.width + 2); expect(lb.w).toBeLessThan(tb!.width + 10);
+  expect(lb.x - lb.w / 2).toBeGreaterThanOrEqual(bb!.x); expect(lb.x + lb.w / 2).toBeLessThanOrEqual(bb!.x + bb!.width);
   expect(lb.y).toBeGreaterThanOrEqual(bb!.y);
   // Neuladen auf einem anderen Tab: Linse dort, nicht bei „Heute“
   await open(page, '/?go=fortschritt');
@@ -266,7 +267,7 @@ test('flüssig: Rechenzeit je Frame klein, Gleiten läuft als Web-Animation (Com
    Drehen kurz noch alt meldet. Hier: Drehen hin und zurück, auch mit „veralteter“ Fensterhöhe und Safe Area – Linse deckt den aktiven Tab genau. */
 const lensVsTab = (page: Page) => page.evaluate(() => {
   const l = (document.querySelector('.tab-lens') as HTMLElement).getBoundingClientRect(); const t = (document.querySelector('#tabs .tab.on') as HTMLElement).getBoundingClientRect();
-  return { dx: Math.abs((l.left + l.width / 2) - (t.left + t.width / 2)), dy: Math.abs((l.top + l.height / 2) - (t.top + t.height / 2)), dw: Math.abs(l.width - t.width), dh: Math.abs(l.height - t.height) };
+  return { dx: Math.abs((l.left + l.width / 2) - (t.left + t.width / 2)), dy: Math.abs((l.top + l.height / 2) - (t.top + t.height / 2)), dw: Math.abs(l.width - t.width - 6), dh: Math.abs(l.height - t.height) }; // Auftrag 34: Markierung 6 px breiter als der Tab
 });
 async function aligned(page: Page) {
   await expect.poll(async () => { const d = await lensVsTab(page); return Math.max(d.dx, d.dy, d.dw, d.dh); }, { timeout: 3000 }).toBeLessThan(1.5);

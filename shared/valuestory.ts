@@ -43,6 +43,8 @@ export function dayWord(date: string, today: string): string {
   if (date === addDays(today, -1)) return 'Gestern';
   return `Am ${DOW[new Date(date + 'T12:00:00Z').getUTCDay()]} ${dm(date)}`;
 }
+/* Auftrag 34: neuer Bestwert nur, wenn er sich in der angezeigten Zahl unterscheidet (6:41 nach 6:41 ist keiner) */
+export const shownNewBest = (s: Story, fmt: (v: number) => string): boolean => !!s.isNewBest && !!s.day && !(s.prevBest && fmt(s.prevBest.v) === fmt(s.day.v));
 export interface StoryText { fmt: (v: number) => string; what: string; today: string; plural?: boolean; stage?: boolean }
 /* Ein Satz (oder zwei) wie ein Trainer: Tageswert, Bestwert mit Datum, Trend nur mit mehreren Einheiten. Nie „Rückschritt“ wegen eines Tages. */
 export function storyText(s: Story, o: StoryText): string {
@@ -50,12 +52,15 @@ export function storyText(s: Story, o: StoryText): string {
   const word = dayWord(s.day.date, o.today); const val = o.fmt(s.day.v);
   const verb = o.plural ? 'sind' : 'ist';
   const out: string[] = [];
+  // Auftrag 34: „neuer Bestwert (vorher 6:41 min)“ bei gleicher angezeigter Zahl ist keiner – dann „so gut wie dein Bestwert“
+  if (s.isNewBest && s.prevBest && o.fmt(s.prevBest.v) === val) s = { ...s, isNewBest: false, best: s.prevBest, day: { ...s.day, v: s.prevBest.v } };
   if (s.isNewBest) out.push(`${word} ${val} ${o.what} – neuer Bestwert (vorher ${o.fmt(s.prevBest!.v)} am ${dm(s.prevBest!.date)}).${o.stage && s.confirmed != null && s.confirmed < s.day.v ? ' Ein einzelner Spitzenwert ist noch kein neues Niveau: für die Stufe zählt es, sobald du es ein zweites Mal schaffst.' : ''}`);
   else if (s.n === 1) out.push(`${word} ${val} ${o.what}.`);
   else if (s.day.v === s.best.v) out.push(`${word} ${val} ${o.what} – so gut wie dein Bestwert (${dm(s.best.date)}).`);
   else out.push(`${word} ${val} ${o.what}, dein Bestwert ${verb} ${o.fmt(s.best.v)} (${dm(s.best.date)}).`);
-  if (s.trend === 'up' && !s.isNewBest) out.push('Über die letzten Einheiten geht es nach oben.');
-  else if (s.trend === 'down') out.push('Die letzten Einheiten waren etwas schwächer – einzelne Tage schwanken, das ist kein Rückschritt.');
+  // Auftrag 34: „geht nach oben“ nur, wenn die letzte Einheit auf Bestwert-Niveau liegt; neben einem neuen Bestwert kein „schwächer“
+  if (s.trend === 'up' && !s.isNewBest && s.day.v === s.best.v) out.push('Über die letzten Einheiten geht es nach oben.');
+  else if (s.trend === 'down' && !s.isNewBest) out.push('Die letzten Einheiten waren etwas schwächer – einzelne Tage schwanken, das ist kein Rückschritt.');
   return out.join(' ');
 }
 // 12,5-m-Becken: halbe Meter bleiben stehen (nicht auf 13 m runden)

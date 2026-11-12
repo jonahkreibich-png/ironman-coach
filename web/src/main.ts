@@ -7,6 +7,7 @@ import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, re
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
 import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, safeBlock, safeRun } from './kit';
+import { icFill } from './icons';
 import { CHARTS, chartTap } from './charts';
 import { effStatus } from './domain';
 import { D, invalidate } from './data';
@@ -140,7 +141,7 @@ function renderTop() {
 function renderTabs() {
   if (!HAS_PLAN) { morph(byId('tabs'), ''); return; }
   const unread = coachUnread();
-  morph(byId('tabs'), TABS.map(x => `<button class="tab ${UI.tab === x.id ? 'on' : ''}" data-act="go-tab" data-tab="${x.id}" ${UI.tab === x.id ? 'aria-current="page"' : ''}>${ic(x.icon)}<span>${esc(t('tab.' + x.id))}</span>${x.id === 'coach' && unread && UI.tab !== 'coach' ? `<i class="dot" aria-label="${esc(t('tab.unread', { n: unread }))}">${unread > 9 ? '9+' : unread}</i>` : ''}</button>`).join(''));
+  morph(byId('tabs'), TABS.map(x => `<button class="tab ${UI.tab === x.id ? 'on' : ''}" data-act="go-tab" data-tab="${x.id}" ${UI.tab === x.id ? 'aria-current="page"' : ''}>${icFill(x.icon)}<span>${esc(t('tab.' + x.id))}</span>${x.id === 'coach' && unread && UI.tab !== 'coach' ? `<i class="dot" aria-label="${esc(t('tab.unread', { n: unread }))}">${unread > 9 ? '9+' : unread}</i>` : ''}</button>`).join(''));
 }
 
 let softInserted: Element[] | null = null;

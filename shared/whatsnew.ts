@@ -68,12 +68,12 @@ export const WHATS_NEW: { version: string; items: string[] }[] = [
     'Schwimmen: Hilfsmittel stehen an jeder Einheit, Kickbrett und Pull Buoy im Wechsel, Tempo-Vorgaben aus deinem echten Tempo je Lage. Kraul und Pull Buoy werden gleich bewertet, jede Coach-Meldung kommt nur noch einmal, und Vorschläge zeigen klar, was von wann nach wann geht.'
   ] },
   { version: '3.8.0', items: [
-    'Plan mit Trainingsdashboard zum Einklappen. Einheiten bleiben direkt abhakbar; Verschieben und Tauschen funktionieren ueber mehrere Wochen.',
-    'Trainingsvorlagen fuer Schwimmen, Rad, Laufen und Kraft: Vorschau, Ersetzen oder Ergaenzen bestehender Einheiten und neue Einheiten aus Vorlagen.',
-    'Extraeinheiten direkt mit allen Werten erfassen, Kraft ohne Kilometer. Wiederholen fehlgeschlagener Speicherungen behaelt neue Eintraege.'
+    'Plan mit Trainingsdashboard zum Einklappen. Einheiten bleiben direkt abhakbar; Verschieben und Tauschen funktionieren über mehrere Wochen.',
+    'Trainingsvorlagen für Schwimmen, Rad, Laufen und Kraft: Vorschau, Ersetzen oder Ergänzen bestehender Einheiten und neue Einheiten aus Vorlagen.',
+    'Extraeinheiten direkt mit allen Werten erfassen, Kraft ohne Kilometer. Wiederholen fehlgeschlagener Speicherungen behält neue Einträge.'
   ] },
   { version: '3.7.2', items: [
-    'Speichern wird erst nach bestaetigtem Browserspeicher abgeschlossen. Nicht gespeicherte Aenderungen bleiben sichtbar; fehlgeschlagene Lesevorgaenge ersetzen keine vorhandenen Daten.',
+    'Speichern wird erst nach bestätigtem Browserspeicher abgeschlossen. Nicht gespeicherte Änderungen bleiben sichtbar; fehlgeschlagene Lesevorgänge ersetzen keine vorhandenen Daten.',
     'Backups werden vor dem Wiederherstellen geprueft. Der vorherige Stand bleibt als Rueckfallkopie erhalten.',
     'Verschobene Einheiten behalten Beschreibung und Werte. Veraltete Tagesverweise werden entfernt; absolvierte Einheiten bleiben geschuetzt.'
   ] },

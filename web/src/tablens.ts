@@ -19,8 +19,11 @@
 import { ACTIONS } from './kit';
 
 const SLOP = 8;           // so weit darf der Finger beim Antippen wandern
-export const LIFT = 1.2;  // Breite des Tropfens im Verhältnis zur Markierung (Video: 119 / 99 pt)
-const LIFT_Y = 1.27;      // Höhe (Video: 67 / 53 pt)
+/* Auftrag 34: breite, flache Glas-Kapsel statt fast runder Linse (Video 2,09 s: ~100 × 62 pt gegenüber der Markierung ~92 × 50 pt;
+   beim Gleiten gedehnt über alten und neuen Tab, ~1,9 Tab-Breiten). Die Markierung ist breiter als der Tab (Symbol und Wort mit Luft). */
+export const LIFT = 1.3;  // Breite der Kapsel im Verhältnis zur Markierung
+const LIFT_Y = 1.22;      // Höhe: ragt oben und unten etwas über die Leiste
+export const MARK_EXTRA = 6; // Markierung so viel breiter als ein Tab (am Rand noch innerhalb der Kapsel: 4 px Innenabstand + 2)
 const MIN_LIFT = 0.15;    // so lange bleibt der Tropfen beim Antippen mindestens gehoben (Video: hebt bei 0,03 s, legt sich ab 0,17 s)
 /* Federn je Sekunde (Masse 1): k = Steifigkeit, z = Dämpfungsgrad (< 1 schwingt über). Aus dem Video: Weg zum Nachbar-Tab ~0,1 s,
    leichtes Überschwingen, flach nach ~0,28 s. */
@@ -28,9 +31,9 @@ export interface Spring { k: number; z: number }
 export const SP_FOLLOW: Spring = { k: 700, z: 0.82 };  // folgt dem Finger, knapp hinterher
 export const SP_GLIDE: Spring = { k: 900, z: 0.74 };   // Gleiten und Einrasten: rund 3 % Überschwingen
 export const SP_SCALE: Spring = { k: 1300, z: 0.55 };  // Heben/Absetzen: schnell, mit Nachfedern (Gelee)
-const STRETCH_MAX = 0.22, STRETCH_V = 1400;            // Dehnung: höchstens 22 %, halb bei etwa 770 px/s
+const STRETCH_MAX = 0.48, STRETCH_V = 900;             // Dehnung: bis 48 % (Video: spannt sich beim Wechsel über beide Tabs)
 const BRAKE_MAX = 0.14, BRAKE_A = 30000;               // Stauchen beim Abbremsen (px/s²)
-const MAG = 0.14;                                      // Vergrößerung des Inhalts unter dem Tropfen
+const MAG = 0.32, MAG_Y = 0.26;                         // Vergrößerung des Inhalts unter der Linse (Video: Symbol ~1,3×, Lichtbrechung)
 const BAR_GROW = 0.03, BAR_DX = 0.0025, BAR_DX_MAX = 5, BAR_STRETCH = 0.012;   // Leiste: +3 %, gibt bis 5 px in Bewegungsrichtung nach
 
 /* b: Nachgeben der Leiste (folgt dem Heben des Tropfens leicht verzögert – Video: Leiste am weitesten bei 0,2 s, Tropfen schon bei 0,13 s) */
@@ -73,13 +76,13 @@ const brakeOf = (o: LensState) => (o.a && o.v && Math.sign(o.a) !== Math.sign(o.
 const liftOf = (o: LensState) => (o.s - 1) / (LIFT - 1);   // 0 = flach, 1 = gehoben (kurz auch etwas darunter: Nachfedern)
 
 /* Geometrie in Koordinaten der Kapsel (offsetLeft/offsetTop: unabhängig von Verformung, Safe Area und Lage der Leiste) */
-interface Geo { w: number; h: number; top: number; centers: { tab: string; c: number }[]; left: number; right: number; bodyW: number }
-export interface Shape { lens: string; fill: number; glass: number; body: string; tabs: string[] }
+interface Geo { w: number; h: number; top: number; centers: { tab: string; c: number }[]; left: number; right: number; bodyW: number; lw?: number; rowL?: number; rowT?: number }
+export interface Shape { lens: string; fill: number; glass: number; body: string; tabs: string[]; mag: string }
 /* Ein Bild: Linse (Verschiebung, Größe, Dehnung, Stauchen), Deckkraft von Markierung und Glas, Verformung der Leiste, Vergrößerung der Tabs */
-export function shapeOf(o: LensState, g: Pick<Geo, 'w' | 'centers'> & { bodyW?: number }, still = false): Shape {
+export function shapeOf(o: LensState, g: Pick<Geo, 'w' | 'centers'> & { bodyW?: number; h?: number; top?: number; lw?: number; rowL?: number; rowT?: number }, still = false): Shape {
   const L = still ? 0 : liftOf(o);
   const str = still ? 0 : stretchOf(o.v), brk = still ? 0 : brakeOf(o);
-  const sx = (still ? 1 : o.s) * (1 + str - brk), sy = (1 + (LIFT_Y - 1) * L) * (1 - 0.4 * str + 0.6 * brk);
+  const sx = (still ? 1 : o.s) * (1 + str - brk), sy = (1 + (LIFT_Y - 1) * L) * (1 - 0.3 * str + 0.6 * brk);
   const glass = Math.max(0, Math.min(1, L));
   // nie ganz 0: sonst rastert WebKit den Tropfen erst bei der ersten Berührung (die erste Geste stockte) – 0,001 ist unsichtbar
   const vis = (v: number) => Math.max(0.001, v);
@@ -88,9 +91,18 @@ export function shapeOf(o: LensState, g: Pick<Geo, 'w' | 'centers'> & { bodyW?: 
   const bsx = still ? 1 : 1 + BAR_GROW * B + BAR_STRETCH * Math.tanh(Math.abs(BV) / 1500), bsy = still ? 1 : 1 + BAR_GROW * 0.8 * B;
   const mid = (g.bodyW || 0) / 2, pull = mid ? Math.max(-3, Math.min(3, (o.x - mid) * 0.02 * Math.max(0, B))) : 0;
   const dx = still ? 0 : Math.max(-BAR_DX_MAX, Math.min(BAR_DX_MAX, BV * BAR_DX)) + pull + mid * (1 - bsx);
-  const tabs = g.centers.map(c => { const m = 1 + MAG * glass * Math.max(0, 1 - Math.abs(c.c - o.x) / g.w); return `scale(${m.toFixed(4)})`; });
+  // Auftrag 34: die echten Tabs bleiben unverändert; vergrößert wird eine Kopie der Tab-Reihe NUR innerhalb der Linse (Lichtbrechung),
+  // in Akzentfarbe – so zieht die Linse die Farbe mit (wie im Video: nur der Teil unter der Linse ist farbig).
+  const tabs = g.centers.map(() => 'scale(1.0000)');
+  const lw = g.lw || g.w, lh = g.h || 0;
+  const mx = 1 + MAG * glass, my = 1 + MAG_Y * glass;
+  const kx = mx / (sx || 1), ky = my / (sy || 1);
+  // Punkt p der Reihe → Linsen-Koordinaten (unverformt) → um die Linsenmitte vergrößert; die Verformung der Linse selbst wird herausgerechnet
+  const tx = lw / 2 + kx * ((g.rowL || 0) - o.x), ty = lh / 2 + ky * ((g.rowT || 0) - (g.top || 0) - lh / 2);
+  const mag = `translate3d(${tx.toFixed(2)}px,${ty.toFixed(2)}px,0) scale(${kx.toFixed(4)},${ky.toFixed(4)})`;
   return {
-    lens: `translate3d(${(o.x - g.w / 2).toFixed(2)}px,0,0) scale(${sx.toFixed(4)},${sy.toFixed(4)})`,
+    mag,
+    lens: `translate3d(${(o.x - lw / 2).toFixed(2)}px,0,0) scale(${sx.toFixed(4)},${sy.toFixed(4)})`,
     fill: +vis(1 - glass).toFixed(3), glass: +vis(glass).toFixed(3),
     body: `translate3d(${dx.toFixed(2)}px,0,0) scale(${bsx.toFixed(4)},${bsy.toFixed(4)})`, tabs
   };
@@ -98,6 +110,7 @@ export function shapeOf(o: LensState, g: Pick<Geo, 'w' | 'centers'> & { bodyW?: 
 
 let bar: HTMLElement | null = null, body: HTMLElement | null = null, tabs: HTMLElement | null = null;
 let lens: HTMLElement | null = null, fill: HTMLElement | null = null, glassEl: HTMLElement | null = null;
+let magEl: HTMLElement | null = null, rowEl: HTMLElement | null = null, magBg: HTMLElement | null = null;   // Auftrag 34: vergrößerte Kopie der Tabs, nur in der Linse sichtbar
 const st: LensState = { x: 0, v: 0, s: 1, vs: 0 };
 let lensTab = '';                 // Tab, an dem die Linse steht bzw. auf den sie gerade zuläuft
 let pendingTab = '';              // Navigation ist angestoßen, aber noch nicht ausgeführt
@@ -121,21 +134,32 @@ function fitLabels(w: number): void {
   const avail = w - 2 * LABEL_PAD;
   if (widest > avail && widest > 0) tabs.style.setProperty('--tab-fs', Math.max(base * 0.7, Math.floor(base * avail / widest * 10) / 10) + 'px');
 }
+/* Kopie der Tab-Reihe für die Linse: gleiche Symbole und Wörter, aber keine Knöpfe (nicht fokussierbar, keine Aktionen) */
+let rowSig = '';
+function copyRow(): void {
+  if (!rowEl || !tabs) return;
+  const html = tabs.innerHTML; const fs = tabs.style.getPropertyValue('--tab-fs');
+  const sig = html + '|' + fs; if (sig === rowSig) return; rowSig = sig;
+  rowEl.innerHTML = html.replace(/<button\b/g, '<div').replace(/<\/button>/g, '</div>').replace(/\s(data-act|data-tab|aria-current|aria-label)="[^"]*"/g, '');
+  if (fs) rowEl.style.setProperty('--tab-fs', fs); else rowEl.style.removeProperty('--tab-fs');
+}
 function measure(): Geo | null {
   if (!tabs || !body) return null;
   const list = tabButtons(); if (!list.length) return null;
   const b0 = list[0];
   if (!b0.offsetWidth || !b0.offsetHeight) return null;
   // Markierung so breit wie ein Tab (Video: Tab-Fläche mit 4 pt Abstand zum Rand der Leiste), so hoch wie der Tab
-  return { w: b0.offsetWidth, h: b0.offsetHeight, top: b0.offsetTop, bodyW: body.offsetWidth,
+  return { w: b0.offsetWidth, h: b0.offsetHeight, top: b0.offsetTop, bodyW: body.offsetWidth, lw: b0.offsetWidth + MARK_EXTRA, rowL: tabs.offsetLeft, rowT: tabs.offsetTop,
     left: b0.offsetLeft, right: list[list.length - 1].offsetLeft + list[list.length - 1].offsetWidth,
     centers: list.map(b => ({ tab: b.dataset.tab || '', c: b.offsetLeft + b.offsetWidth / 2 })) };
 }
 const geo = () => G || (G = measure());
 function place(g: Geo): void {
   if (!lens) return;
-  lens.style.width = g.w + 'px'; lens.style.height = g.h + 'px'; lens.style.top = g.top + 'px';
+  lens.style.width = (g.lw || g.w) + 'px'; lens.style.height = g.h + 'px'; lens.style.top = g.top + 'px';
   fitLabels(g.w);
+  if (rowEl && tabs) { rowEl.style.width = tabs.offsetWidth + 'px'; rowEl.style.height = tabs.offsetHeight + 'px'; }
+  copyRow();
 }
 /* Fingerstelle (Bildschirm) → Koordinate in der Kapsel; die Kapsel kann gerade verformt sein, deshalb über die unverformte Lage rechnen */
 function localX(clientX: number): number {
@@ -156,6 +180,7 @@ function paint(still = false): void {
   const g = geo(); if (!lens || !fill || !glassEl || !body || !g) return;
   const S = shapeOf(st, g, still || reduced());
   lens.style.transform = S.lens; fill.style.opacity = String(S.fill); glassEl.style.opacity = String(S.glass);
+  if (magBg && rowEl) { magBg.style.opacity = String(S.glass); rowEl.style.transform = S.mag; }
   body.style.transform = S.body === 'translate3d(0.00px,0,0) scale(1.0000,1.0000)' ? '' : S.body;
   tabButtons().forEach((b, i) => { const v = S.tabs[i] || 'scale(1.0000)'; b.style.transform = v === 'scale(1.0000)' ? '' : v; });
 }
@@ -211,7 +236,7 @@ function glideTo(tab: string, liftUp = true): void {
   const dur = (path.length - 1) * 1000 / 60;
   const shapes = path.map(o => shapeOf(o, g));
   // für Tests: Bahn der letzten Animation (die läuft im Compositor; Bilder per requestAnimationFrame fehlen, während der Tab aufgebaut wird)
-  const sc = path.map(o => { const L = liftOf(o), str = stretchOf(o.v), brk = brakeOf(o); return { sx: o.s * (1 + str - brk), sy: (1 + (LIFT_Y - 1) * L) * (1 - 0.4 * str + 0.6 * brk) }; });
+  const sc = path.map(o => { const L = liftOf(o), str = stretchOf(o.v), brk = brakeOf(o); return { sx: o.s * (1 + str - brk), sy: (1 + (LIFT_Y - 1) * L) * (1 - 0.3 * str + 0.6 * brk) }; });
   (perf as any).last = { toTab: tab, xs: path.map(o => o.x), sx: sc.map(x => x.sx), sy: sc.map(x => x.sy), glass: shapes.map(x => x.glass), centers: Object.fromEntries(g.centers.map(c => [c.tab, c.c])), h: g.h, bodyH: body ? body.offsetHeight : 0 };
   // Hervorhebung wandert mit dem Tropfen (Farbe wechselt am Ziel)
   peek(tab);
@@ -222,6 +247,7 @@ function glideTo(tab: string, liftUp = true): void {
       lens.animate(shapes.map(s => ({ transform: s.lens })), opts),
       fill!.animate(shapes.map(s => ({ opacity: s.fill })), opts),
       glassEl!.animate(shapes.map(s => ({ opacity: s.glass })), opts),
+      ...(magBg && rowEl ? [magBg.animate(shapes.map(s => ({ opacity: s.glass })), opts), rowEl.animate(shapes.map(s => ({ transform: s.mag })), opts)] : []),
       body!.animate(shapes.map(s => ({ transform: s.body })), opts),
       ...btns.map((b, i) => b.animate(shapes.map(s => ({ transform: s.tabs[i] || 'scale(1)' })), opts))
     ];
@@ -305,6 +331,7 @@ export function syncTabLens(): void {
   if (!lens || !tabs) return;
   peek(peeked, true);
   if (G) fitLabels(G.w);
+  copyRow();
   if (dragging || pendingTab) return;
   const on = activeTab(); if (!on) return;
   if (!placed) { G = measure(); const g = geo(); if (!g) return; place(g); lens.classList.add('on'); glideTo(on); return; }
@@ -334,7 +361,12 @@ function ensureLens(): void {
   lens = document.createElement('div'); lens.className = 'tab-lens'; lens.setAttribute('aria-hidden', 'true');
   fill = document.createElement('i'); fill.className = 'tab-lens-fill';
   glassEl = document.createElement('i'); glassEl.className = 'tab-lens-glass';
-  lens.append(fill, glassEl);
+  magEl = document.createElement('i'); magEl.className = 'tab-lens-mag';
+  // deckende Fläche (blendet mit dem Glas ein): verdeckt die unvergrößerten Tabs unter der Linse
+  magBg = document.createElement('b'); magBg.className = 'tab-lens-bg';
+  rowEl = document.createElement('div'); rowEl.className = 'tabbar-in tab-lens-row';
+  magEl.append(magBg, rowEl);
+  lens.append(fill, magEl, glassEl);
   body.insertBefore(lens, tabs);
 }
 

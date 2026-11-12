@@ -22,7 +22,8 @@ import { daySummary, weekSummary } from '../../../shared/plan-summary26';
 export function adjustmentGroups() {
   const groups: Record<string, any> = {};
   Object.values(STATE.adjustments || {}).forEach((a: any) => {
-    if (!a || !a.id) return;
+    // Auftrag 34: nach dem Neu-Planen stillgelegte Anpassungen (Einheit gibt es nicht mehr) gehören nicht in die Liste
+    if (!a || !a.id || a.retired) return;
     const g = a.group || a.id;
     (groups[g] = groups[g] || { id: g, items: [], createdAt: 0, date: a.date }).items.push(a);
     groups[g].createdAt = Math.max(groups[g].createdAt, a.createdAt || 0);

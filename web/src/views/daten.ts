@@ -188,11 +188,14 @@ on('feat-toggle', el => busy(el, async () => {
   USERS = (await apiCall('GET', '/api/admin/users')).users; nav.rerender(); toast(t('common.saved'));
 }));
 
+/* Auftrag 34: lesbar statt roher Daten (vorher JSON direkt sichtbar, Umlaute fehlten) */
+const AREA: Record<string, string> = { settings: 'Einstellungen', session: 'Einheiten', custom: 'Extra-Einheiten', adjust: 'Plan-Änderungen', profile: 'Profil', goal: 'Ziele', trend: 'Morgenwerte', coachMsg: 'Coach-Nachrichten', plan: 'Plan', nutrition: 'Essen', activity: 'Aufzeichnungen', illness: 'Krankheitsphasen' };
+function conflictAreas(list: any[]): string { const s = new Set<string>(); list.forEach((c: any) => (c && c.values || []).forEach((v: any) => { const k = String((v && v.path) || '').split(/[|.]/)[0]; s.add(AREA[k] || 'weitere Daten'); })); return [...s].join(', ') || 'einzelne Einträge'; }
 function backupCard(): string {
   const recovery = localStorage.getItem('ec_restore_previous');
   const conflicts = STATE.storageConflicts || [];
-  const recoveryInfo = (recovery ? '<button class="btn ghost" data-act="bk-previous">Stand vor letzter Wiederherstellung zurueckholen</button>' : '')
-    + (conflicts.length ? '<div class="banner warn">Es gibt unterschiedliche gespeicherte Werte. Deine aktuelle Anzeige wurde behalten; die anderen Werte sind im persoenlichen Backup enthalten. Bitte die betroffenen Trainingseintraege pruefen.</div>' + more('Andere gespeicherte Werte', '<pre class="small" style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(conflicts,null,2)) + '</pre>') : '');
+  const recoveryInfo = (recovery ? '<button class="btn ghost" data-act="bk-previous">Stand vor letzter Wiederherstellung zurückholen</button>' : '')
+    + (conflicts.length ? '<div class="banner warn">Zwei gespeicherte Stände unterschieden sich. Die App zeigt den aktuellen Stand; der andere steckt im persönlichen Backup. Betroffen: ' + esc(conflictAreas(conflicts)) + '.</div>' + more('Technische Details', '<pre class="small" style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(JSON.stringify(conflicts,null,2)) + '</pre>') : '');
   const srv = isSyncOn() && BACKUPS ? (BACKUPS.length ? `<div class="lbl">${esc(t('data.serverBackups'))}</div><div class="list">${BACKUPS.slice(0, 7).map(b => `<div class="li" data-bk="${esc(b.day)}"><span class="grow"><span class="t">${dowShort(b.day)} ${fmtDate(b.day)}</span></span><button class="btn ghost sm" data-act="bk-restore">${esc(t('data.restore'))}</button></div>`).join('')}</div>` : `<div class="hint">${esc(t('data.firstBackupTonight'))}</div>`) : '';
   return `<div class="card stack">${recoveryInfo}<div class="hint">${esc(isSyncOn() ? t('data.backupSync') : t('data.backupLocal'))}</div>
     <div class="row"><button class="btn" data-act="backup-file">${esc(t('data.backupFile'))}</button><button class="btn ghost" data-act="backup-copy">${esc(t('data.backupCopy'))}</button></div>

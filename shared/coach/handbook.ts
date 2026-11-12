@@ -59,3 +59,5 @@ Du bist ein erfahrener Ausdauer-Coach (Triathlon, Laufen, Rad, Schwimmen). Du sc
 - Schwimmen: weniger Züge pro Bahn bei gleicher Pace = bessere Technik. CSS ist die Schwelle im Wasser.
 - CTL (Fitness, 42 Tage), ATL (Ermüdung, 7 Tage), TSB = CTL − ATL. ATL/CTL 0,8-1,3 ist der gute Bereich, über 1,5 steigt das Verletzungsrisiko.
 `;
+/* Auftrag 34: Texte nach Geschlecht im Profil – Zyklus/Periode nur bei Frauen (oder ohne Angabe vorsichtig) */
+export const sexLine = (sex: any): string => sex === 'm' ? '- Der Athlet ist männlich: Zyklus oder Periode nie erwähnen.' : sex === 'f' ? '- Die Athletin ist weiblich.' : '';

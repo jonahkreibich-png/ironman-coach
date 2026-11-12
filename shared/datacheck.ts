@@ -6,18 +6,19 @@
 import * as C from './core';
 import { actualMetrics } from './results';
 import { checkField, crossCheck } from './validate';
-import { IV_LIMITS } from './intervals';
+import { IV_LIMITS, ivLimit } from './intervals';
 import { duplicateMsgIds } from './coach/feed';
 import { checkTrainingRules, TRULE_LABEL } from './trainingrules';
 import { mainGoal } from './goals';
 import { sameWorkout } from './activity/merge';
 import { LIB } from './workoutlib';
 import { effectiveCustomBuckets } from './custom-state26';
+import { planUpkeep } from './replan';
 
 export type DCGroup = 'values' | 'duplicates' | 'messages' | 'rules' | 'stage' | 'orphans';
 export const DC_LABEL: Record<DCGroup, string> = { values: 'Widersprüchliche Werte', duplicates: 'Doppelte Einheiten', messages: 'Doppelte Meldungen', rules: 'Plan-Regel verletzt', stage: 'Stufe passt nicht zu den Ist-Werten', orphans: 'Verwaiste Anpassung' };
 export interface DCFinding { group: DCGroup; key: string; text: string; date?: string; fixed?: boolean }
-export interface DCFix { kind: 'custom' | 'coachMsg'; key: string; why: string }
+export interface DCFix { kind: 'custom' | 'coachMsg' | 'adjust'; key: string; why: string }
 export interface DCInput { state: any; baseWeeks: any[]; profile: any; goals?: any[]; today: string }
 export interface DCResult { findings: DCFinding[]; fixes: DCFix[] }
 
@@ -57,7 +58,7 @@ export function dataCheck(inp: DCInput): DCResult {
     for (const [k, v] of Object.entries(m)) { if (k.startsWith('_') || v == null || v === '' || typeof v === 'object') continue; const c = checkField(it.sport, k, v); if (!c.ok) bad.push(FIELD_WORD[k] || k); }
     for (const d of crossCheck(it.sport, m)) if (d.severe) bad.push(DOUBT_WORD[d.key] || d.key);
     const rows = Array.isArray(m.intervals) ? m.intervals : [];
-    rows.forEach((r: any) => { for (const [k, lim] of Object.entries(IV_LIMITS)) { const v = r && r[k]; if (typeof v === 'number' && (v < lim[0] || v > lim[1])) { bad.push('Intervall: ' + (FIELD_WORD[k] || k)); break; } } if (r && r.hr && r.maxHr && r.maxHr < r.hr) bad.push('Intervall: Ø Puls über max. Puls'); });
+    rows.forEach((r: any) => { for (const k of Object.keys(IV_LIMITS)) { const lim = ivLimit(k, it.sport)!; const v = r && r[k]; if (typeof v === 'number' && (v < lim[0] || v > lim[1])) { bad.push('Intervall: ' + (FIELD_WORD[k] || k)); break; } } if (r && r.hr && r.maxHr && r.maxHr < r.hr) bad.push('Intervall: Ø Puls über max. Puls'); });
     if (it.st.completed && it.st.skipped) bad.push('erledigt und ausgelassen zugleich');
     if (bad.length) findings.push({ group: 'values', key: 'values:' + it.key, date: it.date, text: `${DC_LABEL.values}: ${[...new Set(bad)].join(', ')} (${it.sport}, ${dm(it.date)})` });
   }
@@ -92,7 +93,13 @@ export function dataCheck(inp: DCInput): DCResult {
   // 4) Trainingsregeln ab heute
   try {
     const goals = inp.goals || [];
-    const iss = checkTrainingRules(weeks, profile, { from: today, today, goals, goalType: (mainGoal(goals, today) || ({} as any)).type || null });
+    const iss0 = checkTrainingRules(weeks, profile, { from: today, today, goals, goalType: (mainGoal(goals, today) || ({} as any)).type || null });
+    // Auftrag 34: wo eine Regel mit den eigenen Regeln der Person nicht erfüllbar ist (z. B. „Laufen nie Mo–Fr“ und Spiel am Freitag → kein
+    // Tag für den Tempolauf), sagt der Generator das ehrlich (qualityGap/freqGap), statt die Regel zu brechen. Dieselbe Rechnung für
+    // bestehende Pläne macht die Plan-Pflege (shared/replan.ts); solche Wochen sind kein Verstoß.
+    let gaps: { week: number; rule: string }[] = [];
+    if (iss0.length) { try { gaps = planUpkeep(baseWeeks || [], state, profile, goals, today, 0).gaps; } catch (e) { gaps = []; } }
+    const iss = iss0.filter(x => !gaps.some(g => g.week === x.week && g.rule === x.rule));
     const by = new Map<string, { n: number; date?: string }>();
     iss.forEach(x => { const g = by.get(x.rule) || { n: 0, date: x.date }; g.n++; by.set(x.rule, g); });
     by.forEach((v, rule) => findings.push({ group: 'rules', key: 'rule:' + rule, date: v.date, text: `${DC_LABEL.rules}: ${TRULE_LABEL[rule as keyof typeof TRULE_LABEL] || rule} (${v.n}×${v.date ? ', zuerst ' + dm(v.date) : ''})` }));
@@ -117,21 +124,23 @@ export function dataCheck(inp: DCInput): DCResult {
     } catch (e) { /* ohne Schwimm-Nachweise nichts zu prüfen */ }
   }
 
-  // 6) Verwaiste Anpassungen: Einheit gibt es im Plan nicht (mehr)
-  const ids = new Set<string>(); (baseWeeks || []).forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((s: any) => s && s.id && ids.add(s.id))));
-  const dates = new Set<string>(); (baseWeeks || []).forEach((w: any) => (w.days || []).forEach((d: any) => dates.add(d.date)));
-  const active = C.activeAdjustments(state.adjustments || {});
-  active.forEach((a: any) => { if (a && a.type === 'add' && a.session && a.session.id) ids.add(a.session.id); });
-  const orphans: string[] = [];
-  active.forEach((a: any) => {
-    if (!a) return;
-    const orphan = a.type === 'add' ? !dates.has(a.to) : !!a.sessionId && !ids.has(a.sessionId);
-    if (orphan) orphans.push(a.type || 'modify');
-  });
-  // eine Zeile je Nutzer (nach einem neuen Plan bleiben alte Anpassungen stehen; sie wirken nicht mehr, werden aber nicht gelöscht)
-  if (orphans.length) findings.push({ group: 'orphans', key: 'orphans', text: `${DC_LABEL.orphans}: ${orphans.length} Anpassungen für Einheiten, die es im Plan nicht mehr gibt (wirken nicht)` });
+  // 6) Verwaiste Anpassungen: Einheit gibt es im Plan nicht (mehr). Auftrag 34: sicher entfernen – sie wirken nicht, und bliebe eine stehen,
+  // könnte sie nach einem Neu-Planen am selben Tag an eine neue Einheit mit derselben Kennung geraten
+  const orphans = orphanAdjustmentIds(baseWeeks || [], state);
+  orphans.forEach(id => fixes.push({ kind: 'adjust', key: id, why: 'Einheit gibt es im Plan nicht mehr' }));
+  if (orphans.length) findings.push({ group: 'orphans', key: 'orphans', text: `${DC_LABEL.orphans}: ${orphans.length} Anpassungen für Einheiten, die es im Plan nicht mehr gibt – entfernt`, fixed: true });
 
   return { findings, fixes };
+}
+/* Auftrag 34: Anpassungen, deren Einheit (oder deren Tag) es im Plan nicht mehr gibt. Nicht dabei: Anpassungen erledigter Einheiten
+   (Verlauf) und Notizen. Eine Stelle für den Daten-Check (Server) und das Neu-Planen (App). */
+export function orphanAdjustmentIds(baseWeeks: any[], state: any): string[] {
+  const ids = new Set<string>(); (baseWeeks || []).forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((s: any) => s && s.id && ids.add(s.id))));
+  const dates = new Set<string>(); (baseWeeks || []).forEach((w: any) => (w.days || []).forEach((d: any) => dates.add(d.date)));
+  const active = C.activeAdjustments((state && state.adjustments) || {});
+  active.forEach((a: any) => { if (a && a.type === 'add' && a.session && a.session.id && dates.has(a.to)) ids.add(a.session.id); });
+  const done = (id: string) => !!id && !!(((state && state.sessions) || {})[id] || {}).completed;
+  return active.filter((a: any) => a && a.id && (a.type === 'add' ? !dates.has(a.to) && !done(a.session && a.session.id) : !!a.sessionId && !ids.has(a.sessionId) && !done(a.sessionId))).map((a: any) => a.id);
 }
 /** Gruppiert für die Anzeige: je Gruppe Anzahl und Beispiele */
 export function summarize(findings: DCFinding[]): { group: DCGroup; label: string; count: number; fixed: number; examples: string[] }[] {

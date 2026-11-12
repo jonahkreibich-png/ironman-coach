@@ -497,7 +497,7 @@ export async function pair(code: string, keepLocal = false) { await pairWith(cod
 export function stopSync() { disconnect(false); }
 /* Abmelden und Gerät für eine andere Person freimachen: Gerät beim Server abmelden, alle lokalen Daten löschen */
 export async function signOut() {
-  if (AUTH && (!await syncNow() || Object.keys(META.pending).length)) throw new Error('Abmelden abgebrochen: Noch nicht uebertragene Aenderungen. Bitte verbinden oder zuerst ein Backup exportieren.');
+  if (AUTH && (!await syncNow() || Object.keys(META.pending).length)) throw new Error('Abmelden abgebrochen: Noch nicht übertragene Änderungen. Bitte verbinden oder zuerst ein Backup exportieren.');
   if (AUTH) { try { await api('POST', '/api/devices/self/logout'); } catch (e) {} }
   disconnect(true);
   await wipeLocalData();

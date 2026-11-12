@@ -266,17 +266,17 @@ export function trainingChoice(ctx: EngineCtx, text: string): ChatReply | null {
  if(new Set(sports).size<2)return null;
  const date=dayIn(toks,ctx.today)||ctx.today;
  const reply=(text:string):ChatReply=>({intent:'sport-choice',text});
- if(C.illnessAt(ctx.state.illnessPeriods||[],date))return reply('Ich empfehle dir Pause: Fuer diesen Tag bist du als krank eingetragen.');
- const day=dayOf(ctx,date);if(!day)return reply(`Fuer ${fmtD(date)} liegt mir kein Plan vor. Wie fuehlst du dich, und welches Training hast du zuletzt gemacht?`);
+ if(C.illnessAt(ctx.state.illnessPeriods||[],date))return reply('Ich empfehle dir Pause: Für diesen Tag bist du als krank eingetragen.');
+ const day=dayOf(ctx,date);if(!day)return reply(`Für ${fmtD(date)} liegt mir kein Plan vor. Wie fühlst du dich, und welches Training hast du zuletzt gemacht?`);
  const planned=live(day).filter((s:any)=>!(ctx.state.sessions?.[s.id]?.completed||ctx.state.sessions?.[s.id]?.skipped));
  if(!planned.length)return reply(`Am ${fmtD(date)} empfehle ich dir Ruhetag, wie geplant. Erholung hat hier Vorrang.`);
  const candidates=planned.filter((s:any)=>sports.includes(s.sport)&&(ctx.profile.sports||[]).includes(s.sport));
- if(!candidates.length)return reply(`Fuer ${fmtD(date)} steht ${joinDe(planned.map(sessLine))} im Plan. Moechtest du diese Einheit ersetzen, oder zusaetzlich trainieren?`);
+ if(!candidates.length)return reply(`Für ${fmtD(date)} steht ${joinDe(planned.map(sessLine))} im Plan. Möchtest du diese Einheit ersetzen, oder zusätzlich trainieren?`);
  const readiness=date===ctx.today?readinessOf(ctx):null;
  if(readiness?.level===2)return reply('Ich empfehle heute Pause oder ruhige Alltagsbewegung: Deine Trainingsampel ist rot.');
  const chosen=(readiness?.level===1?candidates.find((s:any)=>!C.isHard(s)):null)||candidates[0];
  const name=chosen.sport==='run'?'Laufen':chosen.sport==='swim'?'Schwimmen':chosen.sport==='bike'?'Radfahren':'Krafttraining';
- return reply(`Fuer ${fmtD(date)} empfehle ich ${name}: Dafuer ist bereits ${sessLine(chosen)} vorgesehen.${readiness?.level===1?' Wegen der gelben Ampel nur locker.':date>ctx.today?' Beruecksichtige vorher noch deine Tagesform und eventuelle Beschwerden.':''}`);
+ return reply(`Für ${fmtD(date)} empfehle ich ${name}: Dafür ist bereits ${sessLine(chosen)} vorgesehen.${readiness?.level===1?' Wegen der gelben Ampel nur locker.':date>ctx.today?' Beruecksichtige vorher noch deine Tagesform und eventuelle Beschwerden.':''}`);
 }
 
 /** Gemeinsame bestehende Schmerzerkennung fuer Dialog und Sportwahl. */

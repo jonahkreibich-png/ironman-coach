@@ -342,6 +342,9 @@ export { hasIst as rowHasValues };
 
 /* ---------- Eingabe prüfen (eine Zeile) ---------- */
 export const IV_LIMITS: Record<string, [number, number]> = { sec: [5, 4 * 3600], m: [10, 100000], hr: [30, 230], maxHr: [30, 230], restHr: [30, 230], power: [20, 2000], speed: [3, 80], cad: [20, 230], spl: [4, 80], rpe: [1, 10], restSec: [0, 3600] };
+/* Auftrag 34: Grenzen je Sportart. Schwimm-Zugfrequenz liegt oft bei 15–40 Zügen/min (Brust, ruhiges Kraul); die Lauf-/Rad-Grenze ab 20
+   meldete echte Schwimm-Abschnitte (16 Züge/min) als „widersprüchlich“. */
+export const ivLimit = (k: string, sport?: string | null): [number, number] | undefined => k === 'cad' && sport === 'swim' ? [5, 80] : IV_LIMITS[k];
 
 /* ---------- intervals.icu: erkannte Abschnitte (icu_intervals) ----------
    Typ WORK = hart, RECOVERY/REST = Pause, sonst Ein-/Auslaufen. Gleich lange „harte“ Abschnitte ohne Pausen (automatische Runden) zählen nicht. */

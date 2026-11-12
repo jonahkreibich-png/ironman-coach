@@ -36,7 +36,7 @@ describe('plan actions preserve identity and actual journal',()=>{
  expect(()=>proposePlanAction(w,state(),{type:'move',sessionId:'swim',to:'2026-01-27'},'g')).toThrow(/mehrfach/);
  const p=proposePlanAction(fixture(),state(),{type:'move',sessionId:'swim',to:'2026-01-27'},'g');
  const moved=applyAdjustments(fixture(),Object.fromEntries(p.adjustments.map(a=>[a.id,a])));
- expect(()=>assertPlanAdjustments(moved,state(),p.adjustments)).toThrow(/geaendert/);
+ expect(()=>assertPlanAdjustments(moved,state(),p.adjustments)).toThrow(/geändert/);
  });
  it('warns about combining hard sessions without forbidding a move',()=>{
  const w=fixture(); Object.assign(w[0].days[0].sessions[0],{hard:true}); Object.assign(w[1].days[0].sessions[0],{hard:true});
