@@ -17,6 +17,7 @@ import { sportScores, legacyActivities, namedFromPlan, estimatesAt } from '../sh
 import { goalPrognoses, planFactsOf, correctionFromGoals, fmtDuration, trendHistory } from '../shared/prognosis';
 import { evaluateIntervals } from '../shared/intervals';
 import { dataCheck } from '../shared/datacheck';
+import { planUpkeep } from '../shared/replan';
 import { mainGoal } from '../shared/goals';
 import { localDate } from '../shared/tz';
 import * as C from '../shared/core';
@@ -70,6 +71,16 @@ export async function releaseDataCheck(src: string, today = localDate()): Promis
           stats.coachFixed = fixed;
         });
         await step('Daten-Check', () => { const r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today }); stats.findings = r.findings.length; stats.safeFixes = r.fixes.length; });
+        // Auftrag 34 (Pflicht): Plan-Pflege wie auf dem Server am Morgen, danach darf der Daten-Check keine Regel-Verstöße und keine
+        // widersprüchlichen Werte mehr melden (sicher behobene Befunde wie verwaiste Anpassungen zählen nicht)
+        await step('Plan-Pflege', () => {
+          const up = planUpkeep(L.baseWeeks, L.state, L.profile, L.goals || [], today, Date.now(), L.planMeta);
+          const st = { ...L.state, adjustments: { ...(L.state.adjustments || {}) } }; up.adjustments.forEach((a: any) => { st.adjustments[a.id] = a; });
+          const r = dataCheck({ state: st, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today });
+          const open = r.findings.filter(x => !x.fixed && (x.group === 'rules' || x.group === 'values'));
+          stats.upkeep = `${up.before} → ${up.after} Verstöße, ${up.adjustments.length} Anpassungen`;
+          if (open.length) throw new Error('nach der Pflege noch: ' + open.map(x => x.text).join(' | ').slice(0, 300));
+        });
       }
       await step('Scores', () => { const acts = [...namedFromPlan(L.state, L.baseWeeks, C.recordedActivities(L.state)), ...legacyActivities(L.state, L.baseWeeks, L.profile)] as any[]; const chosen = ['swim', 'bike', 'run', 'strength'].filter(x => ((L.profile && L.profile.sports) || []).includes(x)); // wie die App (Auftrag 24): nur gewählte Sportarten
         const sc = sportScores({ today, activities: acts, trend: L.state.trend, illness: L.state.illnessPeriods, profile: L.profile, goal: mainGoal(L.goals, today) } as any, chosen.length ? chosen as any : undefined); stats.scores = sc.map(x => `${x.sport} ${x.score}`).join(', '); for (const x of sc) if (!Number.isFinite(x.score)) throw new Error(`${x.sport}: ungültig`); });

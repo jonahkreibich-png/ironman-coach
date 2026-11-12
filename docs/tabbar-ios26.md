@@ -31,3 +31,18 @@ Hinweis: Der Auftragstext beschreibt das Zusammenklappen zu einem runden Knopf (
 ## Tests
 `tests/e2e/auftrag33-tabbar.spec.ts` (Fehler 1–4, Bildrate, „Bewegung reduzieren“) und `tests/e2e/tabbar.spec.ts`, beide in Chromium und WebKit.
 Neu aufnehmen: `RECORD=1 npx playwright test tests/e2e/tabbar-video.spec.ts --project=chromium-iphone` (gleicher Ablauf wie das Fitness-Video), dann `node scripts/tabbar-vergleich.mjs`.
+
+## Auftrag 34 (3.22.0): Linse, Lichtbrechung, Markierung, Symbole
+Vergleich Bild für Bild mit `docs/vergleich/meine-app-3-21-iphone.mp4` (echtes iPhone, 3.21). Die iPhone-Videos sind H.264; das mitgelieferte ffmpeg kann das nicht lesen – deshalb liest Chrome die Videos (`scripts/tabbar-vergleich.mjs`), ffmpeg schreibt nur das Ergebnis (WebM).
+
+| | iOS 26 Fitness | 3.21 (iPhone) | 3.22 |
+|---|---|---|---|
+| Markierung in Ruhe | ~92 × 50 pt, dunkel | 68 × 53, rundlich | 74 × 53 (Tab + 6), Schwarz 55 % |
+| Linse beim Wechsel | flache Kapsel ~100 × 62, gedehnt über zwei Tabs | fast rund | 96 × 65, gedehnt bis 131 × 66 |
+| Inhalt unter der Linse | vergrößert, Farbränder, Akzentfarbe wandert mit | kaum verändert | Kopie der Reihe 1,32 × 1,26 nur in der Linse, Akzentfarbe, Farbränder |
+| Symbole | gefüllt | Umrisse | gefüllt (`icFill`) |
+
+Aufbau der Linse: `.tab-lens` → `.tab-lens-fill` (Markierung) · `.tab-lens-mag` (deckende Fläche `.tab-lens-bg` + Kopie `.tab-lens-row`, abgeschnitten an der Linse) · `.tab-lens-glass` (Kante, Glanz, Farbränder). Die Kopie hat keine Knöpfe, ist für Screenreader verborgen und nur sichtbar, solange die Linse gehoben ist; währenddessen liegt die Linse über den Tabs. Die Kopie wird mit derselben Web-Animation bewegt (nur transform und opacity).
+
+Gemessen (8 Tab-Wechsel per Touch, 390 × 844): 95 % der Bilder ≤ 16 ms (WebKit) bzw. ≤ 17 ms (Chromium).
+Neu aufnehmen: `RECORD=1 TOUCH=1 NAME=meine-app-3-22 npx playwright test tests/e2e/tabbar-video.spec.ts --project=webkit-iphone`, dann `node scripts/tabbar-vergleich.mjs docs/vergleich/meine-app-3-22-webkit-touch.webm "Stamio 3.22"`.

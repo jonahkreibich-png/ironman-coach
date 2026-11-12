@@ -1,57 +1,60 @@
-# Auftrag 33: Mitteilungen zuverlässig + Tab-Leiste wie iOS 26 (10.11.)
+# Auftrag 34: Komplett-Prüfung, alles fixen, Tab-Leiste wie iOS 26 (11./12.11.)
 
-**Stand:** Umgesetzt und getestet, Version **3.21.0**. **Veröffentlicht** (erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten verändert. Was du am iPhone tun kannst: FUER-JONAH.md.
+**Stand:** Version **3.22.0**, umgesetzt und getestet. Veröffentlichung: siehe unten. Was du am iPhone tun kannst: FUER-JONAH.md.
 
-## 1. Mitteilungen
+## So wurde geprüft
+- **16 Testnutzer** (alle Ziele vom 5 km bis Langdistanz, Rad-Event, Schwimmziel; Uhr / von Hand / Wattmesser / nur Puls; 14–66 Jahre; mit und ohne Teamsport; krank und wieder gesund; Männer, Frauen, ohne Angabe), je **14 Tage** Coach (Morgen, Bewertung, Analyse, Woche): 531 Coach-Nachrichten gelesen.
+- **Alle 25 Bildschirme** (Heute, Plan, Coach, Fortschritt, Mehr und alle Unterseiten, alle Aufklapper offen, Einheit geöffnet) in **WebKit (iPhone)** und **Chromium**, hell und dunkel, große Schrift, Deutsch und Englisch.
+- **Echte App nur gelesen:** Fehlerprotokoll, Daten-Check aller Nutzer, Coach-Nachrichten der letzten 10 Tage (Kopie der Datenbank vom 11.11.).
 
-**Befund bestätigt** (echte Daten nur gelesen):
-- Der Mehr-Tab las einen Stand, der erst auf der Seite „Mitteilungen“ geladen wird → dort stand immer „Aus auf diesem Gerät“.
-- **Warum es bei dir immer wieder „inaktiv“ hieß:** Jeder Fehler der Prüfung (kein Netz direkt nach dem Aufwecken, Zeitüberschreitung, Service Worker noch nicht bereit) wurde zu „Erneut erlauben“, obwohl die Anmeldung in Ordnung war. Dazu die neue Geräte-Kennung vom 31.10.: Vom 31.10. bis 08.11. hatte dein iPhone (neue Kennung) **keine** Anmeldung – alle Mitteilungen gingen an die alte Kennung `dev-Bved…` (zuletzt gesehen 31.10.).
-- Apple antwortet mit 201, ob die Mitteilung angezeigt wird, wusste niemand.
-
-**Behoben (für alle Nutzer):**
-- Stand wird beim Start und beim Öffnen des Mehr-Tabs geprüft; solange: „Wird geprüft …“, nie fälschlich „Aus“. Einmal erlaubt bleibt „An“ (letzter sicherer Stand). „Erneut erlauben“ nur, wenn iOS die Anmeldung wirklich verworfen hat oder die Erlaubnis fehlt.
-- **Empfangsbestätigung:** Nach dem Anzeigen meldet das Gerät „angekommen“. Unter Mehr → Mitteilungen: letzte 7 Tage mit „angekommen / angenommen, nicht bestätigt / abgelehnt / Ruhezeit“. Im Admin-Bereich je Nutzer: geplant · gesendet · angenommen · angekommen. „Test senden“ wartet bis zu 30 s und sagt ehrlich, ob die Mitteilung angekommen ist.
-- **Alte Kennung desselben Geräts** (7 Tage nicht gesehen, durch neuere ersetzt) bekommt nichts mehr; echte Zweitgeräte bleiben. Deine alte iPhone-Kennung wird mit dem Update aussortiert.
-- **Zuverlässig:** Morgen, Erinnerungen, Abend mit Urgency high und Gültigkeit, bis sie nicht mehr passen (Morgen bis 12 Uhr, „1 h vorher“ bis zum Beginn, abends bis zur Ruhezeit). Uhrzeiten und Zeitzone stimmen (geprüft, auch Zeitumstellung). Jede geplante Mitteilung geht **genau einmal** raus, auch wenn zwei Läufe gleichzeitig arbeiten.
-- **Adduktoren-Erinnerung** war nicht berechtigt: Sie kam jedem Fußballer Mo/Mi/Fr. Bei dir ist keine Beschwerde eingetragen. Jetzt nur noch, solange eine Leisten-/Adduktoren-Beschwerde aktiv ist (Berücksichtigung oder Schmerz-Notiz der letzten 7 Tage).
-
-**Deine Geräte, letzte 7 Tage** (vor 3.21 wurde „angekommen“ noch nicht gemessen; die Antwort von Apple erst seit 08.11.):
-| Tag | geplant | gesendet | von Apple angenommen | angekommen |
+## Funde und Status
+| # | Schwere | Fund | Ursache | Status |
 |---|---|---|---|---|
-| Di 04.11. | Morgen 07:00, Adduktoren 20:00, Vorabend 21:00 | 3 – nur an alte Kennung | nicht gespeichert | nicht gemessen |
-| Mi 05.11. | Morgen 07:00, Abend 20:30, Vorabend 21:00 | 3 – nur an alte Kennung | nicht gespeichert | nicht gemessen |
-| Do 06.11. | Morgen 07:00, Adduktoren 20:00, Abend 20:30 | 3 – nur an alte Kennung | nicht gespeichert | nicht gemessen |
-| Fr 07.11. | Morgen 09:00, Abend 20:30, Vorabend 21:00 | 3 – nur an alte Kennung | nicht gespeichert | nicht gemessen |
-| Sa 08.11. | Morgen 09:00, Woche 19:30, Abend 20:30, Test 22:55 | 4 (Test an beide Kennungen) | Test: 2 von 2 | nicht gemessen |
-| So 09.11. | Morgen 07:10, Adduktoren 20:00 | 2 | 2 von 2 | nicht gemessen |
-| Mo 10.11. | Morgen 07:10 | 1 | 2 von 2 | nicht gemessen |
+| 1 | hoch | Daten-Check: „Erholungswoche zu niedrig/hoch“ (Nutzer 1: 46–49 %, 2: 78–79 %, 5: 79–83 %), dazu Ruhetage, Kraft in der Wettkampfwoche, Tempolauf vor dem Halbmarathon, langer Lauf +25 min, nach langem Tag, nach dem Wettkampf | Pläne aus älteren Fassungen des Plan-Generators; neue Regeln griffen erst beim nächsten Neu-Planen | **behoben:** Plan-Pflege passt ältere Pläne gezielt an (als normale Änderung mit Mitteilung und Rückgängig). Kopie der echten Daten: Nutzer 1 **6 → 0**, Nutzer 2 **15 → 0**, Nutzer 5 **5 → 0** Verstöße |
+| 2 | hoch | Rad Indoor 224–225 W zählten wie gemessen | Watt von Hand eingetragen, Rolle ohne Wattmessung | **behoben:** „ca. 225 W (geschätzt, ohne Wattmessung)“, nie für Vergleiche, Bestwerte, Watt-Trends |
+| 3 | mittel | Erholungswoche auffüllen machte eine lange Ausfahrt bis +80 % länger (85 → 130 min) | Grenze +35 % galt je Durchgang statt insgesamt | **behoben** (auch für neue Pläne) |
+| 4 | mittel | „Bei Frauen auch auf Zyklus-Veränderungen achten“ an Männer | fester Text | **behoben:** nach Geschlecht im Profil, auch für die KI |
+| 5 | mittel | Analyse-Hinweise jede Woche fast gleich („Aerobe Effizienz sinkt“, „Kraul am Stück …“) | jede neue Woche = neue Mitteilung | **behoben:** nur bei neuer Erkenntnis oder deutlicher Änderung (Simulation: 120 → 100 Analyse-Mitteilungen) |
+| 6 | mittel | „Kraul am Stück wird länger“ bei 75 m, Bestwert 100 m | Trend aus Mittelwerten, ohne Blick auf den Bestwert | **behoben:** nur, wenn der Bestwert erreicht ist |
+| 7 | mittel | „Morgenwerte … nur 6 h geschlafen. Mach heute lieber locker.“ an jeder Bewertung | Hinweis bei jeder Einheit des Tages | **behoben:** höchstens einmal am Tag, nur bei harter Einheit oder wenn der Puls dazu passt (Simulation: 21 → 1) |
+| 8 | mittel | 51 „verwaiste Anpassungen“ (Nutzer 1) | Neu-Planen ließ alte Änderungen stehen | **behoben:** werden stillgelegt bzw. nachts sicher entfernt |
+| 9 | mittel | „Widersprüchliche Werte: Intervall cad (swim)“ (Nutzer 2) | Grenze für Kadenz ab 20, Schwimmen hat 16 Züge/min | **behoben:** Grenzen je Sportart |
+| 10 | mittel | „neuer Bestwert (vorher 6:41)“ bei 6:41; „neuer Bestwert“ und „schwächer“ im selben Text | Rundung; Trend ohne Rücksicht auf den Bestwert | **behoben** (selbst gefunden) |
+| 11 | leicht | Briefing „Langer Lauf 60 min (60 min)“ | Dauer immer in Klammern | **behoben** (Simulation: 60 → 0 Stellen) |
+| 12 | leicht | Wochenrückblick „Umfang 0 %“, „Stufe bleibt: … nachgewiesen: Stufe bleibt“ | Bausteine aneinandergehängt | **behoben** (32 → 0) |
+| 13 | leicht | „Ruhepuls an 1 von 5 Tagen über normal (… zuletzt 52)“ als Grund für Müdigkeit | einzelner Wert mitgenannt | **behoben** (selbst gefunden) |
+| 14 | leicht | ~80 sichtbare Texte ohne Umlaute („pruefen“, „Aenderung“, „fuer“) | ältere Programmteile | **behoben** |
+| 15 | leicht | „Daten und Geräte“ zeigte rohe Daten (JSON) bei einem Speicher-Konflikt | Anzeige für Entwickler | **behoben:** lesbar, Details zum Aufklappen |
+| 16 | leicht | „Tippe auf den Verlauf …“ unter jedem Diagramm (bis 11×) | Text je Diagramm | **behoben:** einmal oben |
+| 17 | – | Englisch großteils Deutsch | nur „beta“ (64 von ~650 Texten) | **bewusst nicht:** vollständige Übersetzung wäre eine neue Funktion |
+| 18 | – | Fehlerprotokoll: Startfehler „e.today“ (1./3.11.), D1-Netzfehler (Okt.), Dropbox-Hinweise (14.10.) | alte Version / kurze Cloudflare-Störung / Einrichtung | **schon erledigt** (3.16.0) bzw. kein Code-Fehler |
+| – | – | Überlauf, Abstürze, Konsolenfehler | – | **nichts gefunden** (4 Varianten, alle Bildschirme) |
 
-**Wenn eine Mitteilung „angenommen“, aber nicht „angekommen“ ist** (am iPhone prüfen):
-1. Einstellungen → Mitteilungen → Stamio: „Mitteilungen erlauben“, Sperrbildschirm, Mitteilungszentrale und Banner an.
-2. Einstellungen → Fokus: bei Schlafen/Schule/Nicht stören Stamio erlauben.
-3. Einstellungen → Mitteilungen → „Zeitplan für Übersicht“: Stamio auf „Sofort“, nicht in die Übersicht.
-4. Stamio nur vom Home-Bildschirm öffnen (nicht in Safari). Wurde die App vom Home-Bildschirm gelöscht und neu hinzugefügt, einmal „Erneut erlauben“.
+## Coach-Texte vorher → nachher
+- **Warnzeichen (Mann):** „… genug essen. *Bei Frauen auch auf Zyklus-Veränderungen achten.* Lass das bitte ärztlich abklären …“ → „… genug essen. Lass das bitte ärztlich abklären …“ (Frau: „Achte auch auf Veränderungen deines Zyklus.“)
+- **Briefing:** „Heute: Langer Lauf 60 min (60 min) und Kraft Ganzkörper 25 min (25 min).“ → „Heute: Langer Lauf 60 min und Kraft Ganzkörper 25 min.“
+- **Wochenrückblick:** „Woche 9: Umfang 0 %: Erholungswoche aus dem Plan bleibt bestehen. Lernstufen: Stufe bleibt: 100 m Kraul am Stück nachgewiesen: Stufe bleibt.“ → „Woche 9 ist eine Erholungswoche mit weniger Umfang, wie geplant. Kraul-Stufe bleibt (100 m Kraul am Stück nachgewiesen).“
+- **Wochenrückblick:** „Woche 5: Umfang -20 %: Diese Woche 1,1 h eigenes Training erledigt: nächste Woche höchstens etwa 10 % mehr.“ → „Woche 5: 20 % weniger Umfang. Grund: Du hast diese Woche 1,1 h trainiert, mehr als etwa 10 % darüber wäre zu viel auf einmal.“
+- **Bewertung Rad Indoor:** „30 min, 225 W, Puls 136. … 🔧 Morgenwerte heute: du hast nur 6 h geschlafen. Mach heute lieber locker.“ → „30 min, ca. 225 W (geschätzt, ohne Wattmessung), Puls 136. 👍 Puls Ø 136 in Zone 1: schön locker.“
+- **Schwimmen:** „Kraul am Stück wird länger – Gestern 75 m …, dein Bestwert sind 100 m. Über die letzten Einheiten geht es nach oben.“ (täglich wiederholt) → keine Meldung; erst wieder bei 100 m oder mehr.
 
-## 2. Tab-Leiste wie iOS 26 (Fitness-Video Bild für Bild)
-Beide Videos mit ffmpeg zerlegt (10 und 60 Bilder/s, Leiste in voller Auflösung), gemessen und nachgebaut. Messwerte und Vergleich: `docs/tabbar-ios26.md`; Einzelbilder nebeneinander: `docs/tabbar-ios26/vergleich-bilder.png`; Video nebeneinander: `docs/vergleich/vergleich-tableiste.mp4` (lokal, nicht in Git).
+## Tab-Leiste wie iOS 26
+Videos Bild für Bild verglichen (Chrome liest die iPhone-Videos, 50–60 Bilder/s). Neu: Vergleichsaufnahme in **WebKit, iPhone-Größe, Touch** nebeneinander mit dem iOS-Video: `docs/vergleich/vergleich-tableiste-meine-app-3-22-webkit-touch.webm` (lokal, nicht in Git); Einzelbilder: `docs/tabbar-ios26/vergleich-bilder-meine-app-3-22-webkit-touch.png`.
 
-**Wichtig:** Im Fitness-Video bleibt die Leiste beim Scrollen voll – sie klappt **nicht** zu einem Knopf zusammen (das macht z. B. Apple Musik). Ich habe nach deinem Video gebaut.
-
-| Fehler | Ursache | Jetzt | Test (scheiterte vorher) |
+| | iOS 26 Fitness (Video) | Stamio 3.21 (iPhone-Video) | Stamio 3.22 |
 |---|---|---|---|
-| nach dem Scrollen mehrere Tipps, Ruckeln | Leiste schrumpfte, erster Tipp vergrößerte nur | Leiste bleibt voll, 1 Tipp = Wechsel | nach Scrollen 1 Fingertipp → Tab gewechselt |
-| doppelte Beschriftung beim Überscrollen | Linse + Kopie der Tabs in eigener Ebene, verschoben gegen die Leiste | Linse in der Leiste, keine Kopie | Überscrollen oben/unten: Bild der Leiste identisch, jede Beschriftung einmal |
-| Flackern / klein-groß bei schnellen Wechseln | Hochspringen und Neu-Ausmessen lösten Schrumpfen aus | kein Schrumpfen, Neu-Messen ohne Folgen | 20 schnelle Wechsel: feste Ebene in jedem Bild gleich, kein Springen |
-| „Fortschritt“ ragt aus der Linse | Linse zu groß/rund, Schrift fest | Markierung = Tab-Fläche, Schrift passt sich an | alle Tabs: Deutsch, Englisch, große Schrift, quer |
+| Markierung in Ruhe | breite dunkle Kapsel, ~92 × 50 pt, breiter als Symbol und Wort | 68 × 53, wirkte rundlich, heller | **74 × 53 pt** (Tab + 6), dunkler |
+| Linse beim Wechsel | flache Glas-Kapsel ~100 × 62 pt, gedehnt über alten und neuen Tab (~1,9 Tab-Breiten), ragt oben/unten über | fast rund (~82 × 67) | **~96 × 65 pt, gedehnt bis 131 × 66 pt (~1,9 Tab-Breiten)**, ragt über die 61-pt-Leiste |
+| Lichtbrechung | Symbol und Wort unter der Linse deutlich vergrößert, Farbränder | kaum, dünner Rand | **vergrößerte Kopie nur in der Linse (1,32×)**, rot/blaue Farbränder |
+| Akzentfarbe | wandert mit der Linse | blieb am Tab | **wandert mit (nur unter der Linse farbig)** |
+| Symbole | gefüllt, kräftig, gewählt in Akzentfarbe | dünne Umrisse | **gefüllt (eigene Zeichnungen)** |
+| Dauer bis Ruhe | Linse ~0,3 s | ~0,3 s | Linse ~0,3 s, Leiste federt bis 0,48 s aus (gemessen) |
+| Bildrate (8 Tab-Wechsel per Touch) | – | 60 fps | **WebKit: 95 % der Bilder ≤ 16 ms, Chromium ≤ 17 ms** (60 fps); einzelne Pause bis 78 ms im Hauptprogramm, während der neue Tab aufgebaut wird – die Linse läuft dann im Compositor weiter |
 
-**Wie im Video:** Ruhe = flache dunkle Markierung. Berühren → hebt sich sofort als klarer Glastropfen (1,2× breit, ragt über die Leiste, vergrößert den Inhalt), gleitet gedehnt, schwingt nach, legt sich nach ~0,3 s flach. Halten/Ziehen: Tropfen folgt dem Finger, länger beim schnellen Ziehen, gestaucht beim Bremsen; die Leiste gibt etwa 3 % nach und federt kräftig zurück. Nur transform/opacity, „Bewegung reduzieren“ beachtet, keine Verschiebung nach Drehen oder App-Wechsel.
-**Flüssig:** 16 ms je Bild (60 fps) in Chromium und WebKit. Dafür liegt der Weichzeichner auf einer eigenen, festen Ebene (sonst fiel in WebKit jedes 2.–3. Bild aus). Grenze: echte Lichtverzerrung kann Safari im Web nicht – angedeutet mit Kante, Farbrändern, Glanz und Vergrößerung.
+Gleich geblieben (wie gewünscht): helle Beschriftungen, durchsichtige Leiste, Leiste wird beim Tippen größer, kurze Linsen-Dauer. Nur transform/opacity, „Bewegung reduzieren“ ohne Linse/Verformung. Alle bisherigen Leisten-Tests grün; zwei Tests erwarteten „Markierung = Tab-Breite“ und prüfen jetzt „Tab + 6 px“.
+Grenze: WebKit unter Windows (Testrechner) zeigt den Weichzeichner der Leiste nicht – auf dem iPhone ist er da.
 
-## 3. Beim Testen gefunden: Eingabe ging manchmal verloren (alter Fehler)
-Ändert man zwei Dinge schnell hintereinander (z. B. „Auch in der Schule ruhig“ an und sofort die Uhrzeit), konnte die zweite Eingabe verschwinden: Sie ging ohne Ausgangsstand zum Server und verlor gegen einen gleichzeitigen Schreibvorgang des Server-Coachs. Das gab es schon in 3.20.0 (gleicher Test dort ~1 von 8 rot). Jetzt führt der Server beide Änderungen feldweise zusammen; Gegenprobe 25 von 25 grün, dauerhafter Test dazu.
-
-## 4. Was vorhanden war, was neu ist
-- **Verbessert:** Prüfung der Anmeldung (`sync.ts`), Versand (`notify.ts`: einmal, Urgency/TTL, alte Kennungen), Seite Mitteilungen und Admin-Karte, Service Worker, Tab-Leiste (`tablens.ts`, gleiche Schnittstelle).
-- **Neu, weil es fehlte:** Tabelle `push_deliveries` (Stand je Mitteilung und Gerät) und `POST /api/push/receipt` (Bestätigung vom Gerät ohne Geräte-Schlüssel, mit Einmal-Schlüssel je Mitteilung).
-- **Tests:** Server `push33.mjs` (29 Prüfungen, 20 davon scheiterten mit dem alten Code), Unit `auftrag33-push.test.ts`, `sw.test.ts` (Empfang), Browser `auftrag33-push.spec.ts`, `auftrag33-tabbar.spec.ts` (WebKit + Chromium mit Touch), angepasste `tabbar.spec.ts`, `auftrag31-push.spec.ts`. Vor der Veröffentlichung: Typprüfung, 3.219 Unit-/Server-Tests und 710 Browser-Tests grün.
+## Was vorhanden war, was neu ist
+- **Verbessert:** Analyse (`analysis.ts`), Bewertung (`review.ts`), Bestwert-Texte (`valuestory.ts`), Briefing/Wochenrückblick (`engine.ts`, `core.ts`), Daten-Check (`datacheck.ts`), Trends (`trends.ts`), Erholungswoche im Generator (`plangen.ts`), Tab-Leiste (`tablens.ts`, gleiche Schnittstelle), Symbole (`icons.ts`).
+- **Neu, weil es fehlte:** Plan-Pflege `planUpkeep` in `shared/replan.ts` (bestehende Pläne bekamen neue Trainingsregeln nie; nutzt nur die vorhandenen Reparatur-Bausteine des Generators, Ergebnis sind normale Anpassungen). Läuft auf dem Server morgens und sonntags und in der Release-Prüfung mit echten Daten (Pflicht).
+- **Tests:** `tests/unit/auftrag34.test.ts` (25 Prüfungen, 22 scheiterten mit 3.21.0, 3 sind Gegenproben), angepasste ältere Tests (Umlaute, geschätzte Watt, verwaiste Anpassungen werden entfernt). TESTSTAND

@@ -745,12 +745,14 @@ body.no-plan .tab-lens { display: none; }
 /* Auftrag 34: Lichtbrechung in der Linse – vergrößerte Kopie der Tab-Reihe, nur innerhalb der Linse sichtbar (Rand der Linse schneidet ab),
    in Akzentfarbe: die Farbe wandert mit der Linse. Darunter eine fast deckende Fläche, damit die unvergrößerten Tabs nicht durchscheinen.
    Nur während die Linse gehoben ist sichtbar (sonst gäbe es jede Beschriftung zweimal). Nur transform und opacity werden animiert. */
-.tab-lens-mag { overflow: hidden; visibility: hidden; font-style: normal; }
+.tab-lens-mag { overflow: hidden; display: none; font-style: normal; }
 .tab-lens-bg { position: absolute; inset: 0; opacity: .001; background: linear-gradient(var(--surface), var(--surface)), var(--bg); will-change: opacity; }
-.tabbar.lens-on .tab-lens-mag { visibility: visible; }
+.tabbar.lens-on .tab-lens-mag { display: block; }
 /* während der Bewegung liegt die Linse über den Tabs (sonst schienen die Originale durch); in Ruhe liegt die Markierung dahinter */
 #tabs .tab { z-index: 1; }
 .tabbar.lens-on .tab-lens { z-index: 2; }
 .tab-lens-row { position: absolute; left: 0; top: 0; margin: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .tabbar .tab-lens-row .tab, [data-design="glas"] .tabbar .tab-lens-row .tab { color: var(--accent); transform: none; }
 .tab-lens-row .dot { display: none; }
+/* Auftrag 34: vor der ersten Berührung keine Überblendung der Tab-Farbe (die Linse springt dann auch direkt an den Tab) */
+[data-design="glas"] .tabbar:not(.touched) .tab { transition: none; }

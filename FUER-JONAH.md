@@ -1,5 +1,14 @@
 # Für Jonah
 
+**Nach dem Update auf 3.22.0:**
+1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
+2. Am nächsten Morgen kommt im Coach „Plan an die Trainingsregeln angepasst“ (z. B. langer Lauf am 22.11. 70 statt 85 min, Erholungswochen etwas voller). Gefällt dir eine Änderung nicht: dort „Rückgängig“.
+3. Nur falls deine Rolle doch Watt misst (Smart-Trainer): Mehr → Ausrüstung → Rolle „Smart-Trainer mit Watt“. Sonst zeigt die App deine Rollen-Watt als Schätzung („ca. 225 W“).
+
+---
+
+## Frühere Hinweise
+
 **Nach dem Update auf 3.21.0:**
 1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
 2. Mehr → Mitteilungen → „Test senden“. Die App wartet bis zu 30 s und sagt dir, ob die Mitteilung auf dem iPhone angekommen ist.

@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.22.0', items: [
+    'Tab-Leiste noch näher an iOS 26: gefüllte, kräftige Symbole, breite dunkle Markierung, und beim Wechsel eine flache Glas-Kapsel, die sich über beide Tabs spannt, den Inhalt darunter vergrößert und die Farbe mitnimmt.',
+    'Coach: Hinweise kommen nur noch bei neuer Erkenntnis, nicht jede Woche fast gleich. Bewertungen nennen deine Morgenwerte nur noch, wenn sie für die Einheit wichtig sind. Keine doppelten Angaben mehr wie „60 min (60 min)“.',
+    'Plan: ältere Pläne werden an die Trainingsregeln angepasst (z. B. Erholungswoche bei etwa 60–70 %), mit Mitteilung und Rückgängig. Watt von einer Rolle ohne Wattmessung gelten als Schätzung und zählen nicht für Bestwerte und Trends.'
+  ] },
   { version: '3.21.0', items: [
     'Mitteilungen: Unter Mehr steht jetzt der richtige Stand („An“ statt fälschlich „Aus“). „Test senden“ wartet, bis die Mitteilung wirklich auf deinem Gerät angekommen ist, und sagt es ehrlich. Unter Mehr → Mitteilungen siehst du die letzten 7 Tage: gesendet, angenommen, angekommen.',
     'Tab-Leiste wie in Apples Fitness-App: Ein Tipp wechselt immer sofort den Tab, die Auswahl hebt sich als Glastropfen ab und gleitet hinüber, die Leiste gibt elastisch nach. Sie schrumpft beim Scrollen nicht mehr und zeigt nie mehr eine Beschriftung doppelt.'

@@ -223,12 +223,15 @@ function settle(toTab: string): void {
   if (!dragging) { if (bar) bar.classList.remove('lens-on'); peek(''); }
 }
 /* Gleiten zu einem Tab: wie beim Antippen (Tropfen hebt sich, gleitet, legt sich); bei „Bewegung reduzieren“ sofort */
+/* Auftrag 34: vor der ersten Berührung (Start, Öffnen aus einer Mitteilung mit ?go=…) springt die Linse direkt an den Tab – eine
+   Gleit-Animation ohne Antippen wirkt beim Start unruhig (und die vergrößerte Kopie wäre kurz zu sehen) */
+let touched = false;
 function glideTo(tab: string, liftUp = true): void {
   const g = geo(); if (!g || !lens) return;
   stopGlide();
   const toX = centerOf(tab);
   lensTab = tab;
-  if (reduced() || !placed) { Object.assign(st, { x: toX, v: 0, s: 1, vs: 0, a: 0, b: 0, bv: 0 }); placed = true; paint(true); settle(tab); return; }
+  if (reduced() || !placed || !touched) { Object.assign(st, { x: toX, v: 0, s: 1, vs: 0, a: 0, b: 0, bv: 0 }); placed = true; paint(true); settle(tab); return; }
   const path = trajectory(st, toX, 1, SP_GLIDE, liftUp);
   if (path.length <= 2) { Object.assign(st, path[path.length - 1]); paint(); settle(tab); return; }
   perf.glides++; perf.glideFrames += path.length;
@@ -390,6 +393,9 @@ export function initTabLens(): void {
   if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(onResize); ro.observe(tabs); ro.observe(bar); }
   if ((document as any).fonts && (document as any).fonts.ready) (document as any).fonts.ready.then(onResize).catch(() => {});
   const capture = (id: number) => { try { tabs!.setPointerCapture(id); } catch (er) { /* ältere Browser */ } };
+  const touch = () => { if (touched) return; touched = true; bar!.classList.add('touched'); };
+  window.addEventListener('pointerdown', touch, { capture: true, passive: true });
+  window.addEventListener('keydown', touch, { capture: true, passive: true });
   tabs.addEventListener('pointerdown', e => {
     if (pid != null || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const b = (e.target as HTMLElement).closest<HTMLElement>('.tab'); if (!b) return;
