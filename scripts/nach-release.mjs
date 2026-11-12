@@ -31,7 +31,9 @@ export async function liveSmoke(url) {
 export function startErrors(target, since, version) {
   const t = TARGETS[target];
   const sql = `SELECT e.user_id, e.msg, e.place, e.version, e.at FROM error_log e LEFT JOIN users u ON u.id = e.user_id WHERE e.at >= ${Math.floor(since)} AND e.place LIKE 'start:%' AND COALESCE(u.test, 0) = 0 ORDER BY e.id DESC LIMIT 50`;
-  const r = wrangler(['d1', 'execute', t.db, '--remote', '--json', '--command', sql, ...(target === 'test' ? ['--env', 'test'] : [])]);
+  // Auftrag 34: Cloudflare meldete beim Lesen einmal kurz 7403 (Zugriff) – bis zu 3 Versuche, bevor die Beobachtung abbricht
+  let r = null;
+  for (let i = 0; i < 3; i++) { r = wrangler(['d1', 'execute', t.db, '--remote', '--json', '--command', sql, ...(target === 'test' ? ['--env', 'test'] : [])]); if (r.status === 0) break; spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},15000)']); }
   if (r.status !== 0) throw new Error('Fehlerprotokoll nicht lesbar: ' + (r.stderr || r.stdout).slice(-300));
   const rows = (JSON.parse(r.stdout)[0] || {}).results || [];
   return rows.filter(x => !version || x.version === version);

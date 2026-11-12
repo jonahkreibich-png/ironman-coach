@@ -1,6 +1,6 @@
 # Auftrag 34: Komplett-Prüfung, alles fixen, Tab-Leiste wie iOS 26 (11./12.11.)
 
-**Stand:** Version **3.22.0**, umgesetzt und getestet. Veröffentlichung: siehe unten. Was du am iPhone tun kannst: FUER-JONAH.md.
+**Stand:** Version **3.22.0**, **veröffentlicht** (12.11., erst Test-App, dann echte App, vorher beide gesichert; Start-Test mit Kopien eurer Daten: alle drei starten fehlerfrei; 10 Minuten ohne Startfehler). Keine Nutzerdaten direkt verändert: Die Plan-Pflege läuft ab morgen früh als normale Änderung mit Mitteilung und Rückgängig. Was du am iPhone tun kannst: FUER-JONAH.md.
 
 ## So wurde geprüft
 - **16 Testnutzer** (alle Ziele vom 5 km bis Langdistanz, Rad-Event, Schwimmziel; Uhr / von Hand / Wattmesser / nur Puls; 14–66 Jahre; mit und ohne Teamsport; krank und wieder gesund; Männer, Frauen, ohne Angabe), je **14 Tage** Coach (Morgen, Bewertung, Analyse, Woche): 531 Coach-Nachrichten gelesen.
@@ -58,4 +58,4 @@ Grenze: WebKit unter Windows (Testrechner) zeigt den Weichzeichner der Leiste ni
 ## Was vorhanden war, was neu ist
 - **Verbessert:** Analyse (`analysis.ts`), Bewertung (`review.ts`), Bestwert-Texte (`valuestory.ts`), Briefing/Wochenrückblick (`engine.ts`, `core.ts`), Daten-Check (`datacheck.ts`), Trends (`trends.ts`), Erholungswoche im Generator (`plangen.ts`), Tab-Leiste (`tablens.ts`, gleiche Schnittstelle), Symbole (`icons.ts`).
 - **Neu, weil es fehlte:** Plan-Pflege `planUpkeep` in `shared/replan.ts` (bestehende Pläne bekamen neue Trainingsregeln nie; nutzt nur die vorhandenen Reparatur-Bausteine des Generators, Ergebnis sind normale Anpassungen). Läuft auf dem Server morgens und sonntags und in der Release-Prüfung mit echten Daten (Pflicht).
-- **Tests:** `tests/unit/auftrag34.test.ts` (25 Prüfungen, 22 scheiterten mit 3.21.0, 3 sind Gegenproben), angepasste ältere Tests (Umlaute, geschätzte Watt, verwaiste Anpassungen werden entfernt). TESTSTAND
+- **Tests:** `tests/unit/auftrag34.test.ts` (25 Prüfungen, 22 scheiterten mit 3.21.0, 3 sind Gegenproben), angepasste ältere Tests (Umlaute, geschätzte Watt, verwaiste Anpassungen werden entfernt). Vor der Veröffentlichung: Typprüfung, **3.246 Unit-/Server-Tests** und **710 Browser-Tests** (Chromium und WebKit) grün; Release-Prüfung mit Kopien der echten Daten inkl. Plan-Pflege (Pflicht) grün.
