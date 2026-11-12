@@ -28,6 +28,7 @@
 | 16 | leicht | „Tippe auf den Verlauf …“ unter jedem Diagramm (bis 11×) | Text je Diagramm | **behoben:** einmal oben |
 | 17 | – | Englisch großteils Deutsch | nur „beta“ (64 von ~650 Texten) | **bewusst nicht:** vollständige Übersetzung wäre eine neue Funktion |
 | 18 | – | Fehlerprotokoll: Startfehler „e.today“ (1./3.11.), D1-Netzfehler (Okt.), Dropbox-Hinweise (14.10.) | alte Version / kurze Cloudflare-Störung / Einrichtung | **schon erledigt** (3.16.0) bzw. kein Code-Fehler |
+| 19 | mittel | Erster Release-Versuch am 12.11.: Prüfung danach meldete Startfehler, echte App wurde automatisch auf 3.21 zurückgerollt | Cloudflare lieferte kurz neue Startseite mit alten Dateien; die Prüfung vorher umging den Zwischenspeicher | **behoben:** Prüfung lädt wie der Browser und wartet; danach neu veröffentlicht |
 | – | – | Überlauf, Abstürze, Konsolenfehler | – | **nichts gefunden** (4 Varianten, alle Bildschirme) |
 
 ## Coach-Texte vorher → nachher

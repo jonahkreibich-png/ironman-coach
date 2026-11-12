@@ -53,7 +53,11 @@ test('deployment check accepts matching health, JavaScript and service worker', 
 test('deployment check rejects wrong binding environment', async () => {
   await expect(verifyDeployment('test', { dist, fetchImpl: responses('production'), attempts: 1 })).rejects.toThrow(/Umgebung/);
 });
-test('deployment check rejects stale app bytes', async () => {
+test('Auftrag 34: deployment check waits until every file is served like the browser loads it (no HTML fallback)', async () => {
+    const half = async (url: string) => { const u = new URL(url); if (u.pathname === '/assets/app.js' && !u.searchParams.has('release_check')) return new Response('<!doctype html>', { headers: { 'content-type': 'text/html; charset=utf-8' } }); return responses()(url); };
+    await expect(verifyDeployment('test', { dist, fetchImpl: half, attempts: 2, wait: async () => {} })).rejects.toThrow(/noch nicht ausgeliefert/);
+  });
+  test('deployment check rejects stale app bytes', async () => {
   await expect(verifyDeployment('test', { dist, fetchImpl: responses('test', 'old-js'), attempts: 1 })).rejects.toThrow(/überein/);
 });
 

@@ -58,7 +58,9 @@ export async function watchRelease(target, { prevDir, minutes = 10, since = Date
     log(now === prevVersion ? `Zurückgerollt auf ${prevVersion}.` : `Zurückrollen angestoßen, live ist noch ${now}.`);
     return { ok: false, rolledBack: now === prevVersion, why };
   };
-  const smoke = await liveSmoke(t.url);
+  // Auftrag 34: kurz nach dem Hochladen kann Cloudflare noch gemischt ausliefern – erst nach 4 Versuchen (je 15 s) zurückrollen
+  let smoke = await liveSmoke(t.url);
+  for (let i = 1; i < 4 && !smoke.ok; i++) { log(`Startbildschirm noch nicht da (${smoke.state}), neuer Versuch in 15 s`); await wait(15000); smoke = await liveSmoke(t.url); }
   if (!smoke.ok) return back(`Startbildschirm erscheint nicht (${smoke.state}; ${smoke.errors.join(' | ')})`);
   log('Startbildschirm im Browser: ok');
   const end = Date.now() + minutes * 60000;

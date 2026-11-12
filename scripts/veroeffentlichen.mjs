@@ -76,7 +76,7 @@ export function verifyBackup(file) {
   } finally { db.close(); }
   return { bytes: sql.length, sha256: digest(sql) };
 }
-export async function verifyDeployment(target, { fetchImpl = fetch, dist = path.join(ROOT, 'dist'), attempts = 6, wait = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+export async function verifyDeployment(target, { fetchImpl = fetch, dist = path.join(ROOT, 'dist'), attempts = 30, wait = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   const t = TARGETS[target];
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
   const asset = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)].map(m => m[1]).find(s => /(?:^|\/)assets\/[^/]+\.js$/.test(s));
@@ -101,6 +101,13 @@ export async function verifyDeployment(target, { fetchImpl = fetch, dist = path.
       const liveJs = Buffer.from(await (await get(expected.href)).arrayBuffer());
       const liveSw = Buffer.from(await (await get(t.url + '/sw.js')).arrayBuffer());
       if (digest(liveJs) !== digest(localJs) || digest(liveSw) !== digest(localSw)) throw new Error('App oder Service Worker stimmen nicht mit dem lokalen Build überein.');
+      // Auftrag 34: auch so, wie der Browser lädt (ohne Zusatz in der Adresse): beim Release vom 12.11. lieferte Cloudflare kurz die neue
+      // Startseite, aber für eine neue Datei noch die Startseite statt JavaScript – die Prüfung danach rollte deshalb zurück
+      for (const a of [...html.matchAll(/\b(?:src|href)=["']\.?\/?(assets\/[^"']+\.(?:js|css))["']/gi)].map(m => m[1])) {
+        const r = await fetchImpl(new URL(a, t.url + '/').href, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+        const type = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
+        if (!r.ok || /text\/html/i.test(type)) throw new Error('Datei ' + a + ' wird noch nicht ausgeliefert.');
+      }
       console.log('Geprüft: ' + t.url);
       return;
     } catch (e) { last = e; if (attempt + 1 < attempts) await wait(2000); }
