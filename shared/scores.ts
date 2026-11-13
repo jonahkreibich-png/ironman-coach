@@ -1,5 +1,6 @@
 import {effectiveCustomBuckets} from './custom-state26';
 import { actualMetrics, crawlOf, actualTitle, actualSport, effectiveSession } from './results';
+import { mainPart } from './sections';
 /* Leistungs-Scores je Sportart (Auftrag 12): feste Leistungsskala 0-100 statt „Anteil am Ziel“.
    20 = Einsteiger, 50 = solider Hobbysportler, 70 = stark, 85 = Spitzenamateur, 100 = Elite; alters- und geschlechtsbereinigt, wenn bekannt.
    Kein Abschneiden bei 100 mehr: wer besser wird, steigt weiter.
@@ -699,6 +700,8 @@ function ctxFor(sport: ScoreSport, inp: ScoreInput, end: string): Ctx {
   const req = requirementFor(inp.goal, inp.profile);
   const need = inp.goal ? requirementFor({ ...inp.goal, targetTimeSec: null, splits: null }, inp.profile) : req;
   const wish = inp.goal && (inp.goal.targetTimeSec || (inp.goal.splits && Object.keys(inp.goal.splits).length)) ? req : null;
+  // Auftrag 35: Puls-basierte Schätzungen mit dem Hauptteil (withMain); Belastung kommt getrennt (loadsBySport)
+  if (inp.activities.some((a: any) => a && a.main)) inp = { ...inp, activities: inp.activities.map(withMain) };
   return { inp, end, req, need, wish, f: ageSexFactor(inp.profile, end, sport), prof0 };
 }
 function scoreAt(sport: ScoreSport, inp: ScoreInput, end: string, legacy = false) {
@@ -1014,9 +1017,25 @@ function testLap(sport: string, m: any): any[] {
 }
 /* Erledigte geplante Einheiten mit Aufzeichnung: der Name der Einheit aus dem Plan (z. B. „Radtest 20 min“), wenn die Uhr keinen hat */
 export function namedFromPlan(state: any, weeks: any[], acts: Activity[]): Activity[] {
-  const title = new Map<string, string>();
-  planDays(weeks).forEach(d => d.sessions.forEach((s: any) => { const st = (state.sessions || {})[s.id]; if (st && st.activityId && s.title) title.set(st.activityId, actualTitle(s, st)); }));
-  return acts.map(a => a.name || !title.has(a.id) ? a : { ...a, name: title.get(a.id)! });
+  const title = new Map<string, string>(); const plan = new Map<string, [any, any]>();
+  planDays(weeks).forEach(d => d.sessions.forEach((s: any) => { const st = (state.sessions || {})[s.id]; if (st && st.activityId) { plan.set(st.activityId, [s, st]); if (s.title) title.set(st.activityId, actualTitle(s, st)); } }));
+  const thr = (state.profile && state.profile.thresholds) || {};
+  return acts.map(a => {
+    const named = a.name || !title.has(a.id) ? a : { ...a, name: title.get(a.id)! };
+    // Auftrag 35: Hauptteil (ohne Aufwärmen/Ausklang) für Puls-basierte Schätzungen; Abschnitte von Hand in der Einheit gewinnen
+    if (a.sport !== 'run' && a.sport !== 'bike') return named;
+    const ps = plan.get(a.id); const mp = mainPart(ps ? ps[0] : { sport: a.sport }, ps ? ps[1] : {}, a, thr, a.sport);
+    return mp ? { ...named, main: mp } as any : named;
+  });
+}
+/* Auftrag 35: für Schätzungen aus Puls und Tempo/Watt zählt der Hauptteil (Aufwärmen hat niedrigen Puls bei niedrigem Tempo, Ausklang ebenso).
+   Dauer, Strecke und Belastung bleiben die der ganzen Einheit. */
+export function withMain(a: any): any {
+  const m = a && a.main; if (!m || !m.hr || (a.sport !== 'run' && a.sport !== 'bike')) return a;
+  const sp = a.sport === 'run' ? (m.paceSec ? 3600 / m.paceSec : null) : m.speed;
+  const pw = a.sport === 'bike' && a.avgPower && m.power ? m.power : a.avgPower;
+  return { ...a, avgHr: Math.round(m.hr), ...(sp ? { speedKmh: Math.round(sp * 10) / 10 } : {}), ...(a.sport === 'run' && m.paceSec ? { paceSecKm: m.paceSec } : {}), avgPower: pw,
+    efficiency: a.sport === 'bike' && pw ? Math.round(pw / m.hr * 100) / 100 : sp ? Math.round(sp / 3.6 * 60 / m.hr * 100) / 100 : a.efficiency };
 }
 /* Alte Einträge ohne Aufzeichnung (Werte von Hand oder von intervals.icu) als einfache Aktivitäten, damit sie zählen */
 export function legacyActivities(state: any, weeks: any[], profile: Profile): Activity[] {
@@ -1048,7 +1067,9 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       // Auftrag 22: eingetragene Intervalle (von Hand oder intervals.icu) zählen wie Runden der Uhr, mit Datenqualität der Quelle
       laps: [...testLap(sport, m), ...rowsToLaps(Array.isArray(m.intervals) ? m.intervals : [], sport)], intervals: Array.isArray(m.intervals) && m.intervals.length >= 2 ? statsOf(rowsToLaps(m.intervals, sport), sport === 'bike') : null,
       swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), longestCrawlM: num(m.longestCrawl), longestPullM: num(m.longestPull), strokeRate: num(m.rate) } : null,
-      rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {})
+      rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {}),
+      // Auftrag 35: Abschnitte von Hand → Hauptteil
+      ...((): any => { if (sport !== 'run' && sport !== 'bike' || !Array.isArray(m.sections)) return {}; const mp = mainPart({ sport }, { metrics: m }, null, (profile && profile.thresholds) || {}, sport); return mp ? { main: mp } : {}; })()
     } as Activity);
   };
   planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, actualTitle(s, st), { ...st, zone: effectiveSession(s, st).zone, race: !!s.race }, s.plannedMinutes); }));

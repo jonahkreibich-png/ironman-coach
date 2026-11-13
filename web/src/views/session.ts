@@ -20,12 +20,17 @@ import { checkTestResult, checkSwimSkill } from '../testupdate';
 import { structureOf } from '../../../shared/coach/explain';
 import { toast } from '../toast';
 import { SPORT_COLOR } from '../icons';
+import { kmOf, planView, viewToggle, totalOf } from '../planview';
+import { convertBlock } from './convertui';
 
 export function zoneText(s: any): string {
   const bpm = C.zoneBpm(s, profile().thresholds, null);
   return [s.zone, bpm].filter(Boolean).join(' · ');
 }
 export function metaLine(s: any): string {
+  // Auftrag 35: Lauf/Rad in Minuten oder km (dieselben Zahlen wie die Gesamtzeile der Einheit)
+  const k = kmOf(s);
+  if (k) return [...(planView() === 'km' ? [dist(k.km), `ca. ${duration(k.min)}`] : [duration(s.plannedMinutes || k.min), `ca. ${dist(k.km)}`]), zoneText(s) || null].filter(Boolean).join(' · ');
   return [s.plannedMinutes ? duration(s.plannedMinutes) : null, s.plannedKm ? (s.sport === 'swim' ? `${Math.round(s.plannedKm * 1000)} m` : dist(s.plannedKm)) : null, zoneText(s) || null].filter(Boolean).join(' · ');
 }
 /** Historical completed strength uses results; the sheet retains its original prescription. */
@@ -94,7 +99,7 @@ function sessionSheet(id: string): string {
   const fields = FIELDS[s.sport] || [['min', 'm.min']];
   let h = `<div class="stack">
     <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div>${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
-    ${s.sport === 'strength' && st.completed ? `<p class="xs muted">Geplant: ${esc(s.title)}. Die folgenden Trainingsvorgaben sind kein Leistungsnachweis; tatsächliche Übungen stehen in den Ergebnisfeldern.</p>` : ''}${structureHtml(s)}${templateButtons(s, !!st.completed)}`;
+    ${s.sport === 'strength' && st.completed ? `<p class="xs muted">Geplant: ${esc(s.title)}. Die folgenden Trainingsvorgaben sind kein Leistungsnachweis; tatsächliche Übungen stehen in den Ergebnisfeldern.</p>` : ''}${structureHtml(s)}${templateButtons(s, !!st.completed)}${convertBlock(s, !!st.completed)}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
     const o = s._orig || {};
@@ -127,7 +132,11 @@ export function structureHtml(s: any): string {
   const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
   // Auftrag 19: Ablaufbild aus den Bausteinen (Höhe = Anstrengung)
   const dia = s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length > 1 && s.sport !== 'strength' ? `<div class="wo-diagram-wrap" data-diagram>${diagramSvg(s.spec, { label: t('sess.diagram') })}</div>` : '';
-  return `<div class="card flat tight structure" data-structure>${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${p.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>
+  // Auftrag 35: in km – Strecke je Stück, Zieltempo und Zeit pro Wiederholung (shared/kmview)
+  const km = planView() === 'km' ? kmOf(s) : null;
+  const lines = (p: any) => km ? km.lines.filter(l => l.part === p.part).map(l => l.text) : p.lines;
+  const tot = totalOf(s);
+  return `<div class="card flat tight structure" data-structure data-view="${km ? 'km' : 'min'}">${viewToggle(s)}${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${lines(p).map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>${tot ? `<div class="small" data-total><b>Gesamt: ${esc(tot)}</b></div>` : ''}
     ${x.drills && x.drills.length ? `<div class="small" data-drills><b>${esc(t('sess.drills'))}:</b><ul>${x.drills.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : ''}${x.sum ? `<div class="small" data-swimsum><b>${esc(x.sum)}</b></div>` : ''}
     ${x.how ? `<div class="small"><b>${esc(t('sess.how'))}:</b> ${esc(x.how)}</div>` : ''}${x.tip ? `<div class="small"><b>${esc(t('sess.tip'))}:</b> ${esc(x.tip)}</div>` : ''}${x.why ? `<div class="small muted"><b>${esc(t('sess.why'))}:</b> ${esc(x.why)}</div>` : ''}
     ${x.derived && s.description ? more(t('sess.original'), `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>`) : ''}</div>`;

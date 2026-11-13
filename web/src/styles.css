@@ -130,6 +130,9 @@ button.li:active, a.li:active { background: var(--surface-2); }
 .fld.wide { grid-column: 1 / -1; }
 .fld label { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); }
 .inp { width: 100%; min-width: 0; min-height: var(--tap); padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); font-size: max(16px, min(0.9412rem, 32px)); font-variant-numeric: tabular-nums; }
+/* Auftrag 35: Platzhalter (Soll-Werte, Beispiele) lesbar: --ink-2 deckend statt Browser-Grau (vorher 2,3:1) */
+::placeholder { color: var(--ink-2); opacity: 1; }
+::-webkit-input-placeholder { color: var(--ink-2); opacity: 1; }
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 textarea.inp { resize: vertical; line-height: 1.4; }
 select.inp { appearance: auto; }
@@ -174,7 +177,9 @@ details.more > .body { margin-top: var(--s2); display: flex; flex-direction: col
 .session-hero.done { background: var(--good-soft); }
 .check { width: var(--tap); height: var(--tap); border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; color: var(--ink-3); flex-shrink: 0; }
 .check svg { width: 22px; height: 22px; }
-.check.on { background: var(--good); border-color: var(--good); color: var(--bg); }
+/* Auftrag 35: erledigt = weißer, kräftiger Haken auf vollem Grün (vorher Hintergrundfarbe auf Grün; im Glas-Design sogar auf weißem Glas) */
+.check.on, [data-design] .check.on { background: var(--done); border-color: var(--done); color: var(--done-ink); }
+.check.on svg { stroke-width: 3.2; }
 .crit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
 .crit { background: var(--surface-2); border-radius: 12px; padding: var(--s2) var(--s3); min-width: 0; border: 0; text-align: left; color: inherit; }
 .crit .k { font-size: min(0.6471rem, 22px); font-weight: 600; color: var(--ink-2); display: flex; align-items: center; gap: 4px; }
@@ -342,7 +347,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .now-card { padding: var(--s3) var(--s4); }
 .now-card > * + * { margin-top: 4px; }
 .msg { position: relative; }
-.msg .msg-pin { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); opacity: .55; display: grid; place-items: center; padding: 0; }
+.msg .msg-pin { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); /* Auftrag 35: ohne Abdunkeln, sonst unter 3:1 */ display: grid; place-items: center; padding: 0; }
 .msg .msg-pin svg { width: 15px; height: 15px; }
 .msg .msg-pin.on { color: var(--accent); opacity: 1; }
 .msg.coach { padding-right: 34px; }
@@ -615,7 +620,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .plan-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--s2); }
 .plan-metric { padding: var(--s4); background: var(--surface-2); border-radius: var(--r); min-width: 0; overflow-wrap: anywhere; }
 .plan-metric-primary { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 34%, var(--surface)), color-mix(in srgb, var(--accent) 16%, var(--surface))); color: var(--ink); }
-.plan-metric-primary .lbl { color: var(--ink-2); }
+.plan-metric-primary .lbl { color: var(--ink); } /* Auftrag 35: --ink-2 auf der Akzentfläche nur 3,9:1 */
 .plan-metric-value { font-family: var(--f-display); font-size: clamp(27px,6vw,40px); font-weight: 700; line-height: 1.2; margin: var(--s2) 0; font-variant-numeric: tabular-nums; }
 .plan-metric-value small { font: 500 var(--t-sm) var(--f-body); }
 .plan-metric p { font-size: var(--t-xs); margin: 0 0 var(--s2); }
@@ -756,3 +761,12 @@ body.no-plan .tab-lens { display: none; }
 .tab-lens-row .dot { display: none; }
 /* Auftrag 34: vor der ersten Berührung keine Überblendung der Tab-Farbe (die Linse springt dann auch direkt an den Tab) */
 [data-design="glas"] .tabbar:not(.touched) .tab { transition: none; }
+
+/* Auftrag 35: Umschalter Minuten | km (Einheit, Plan, Heute) */
+.plan-view { width: max-content; max-width: 100%; }
+.plan-view button { flex: 0 0 auto; min-width: 64px; min-height: 36px; }
+.structure .plan-view { margin-bottom: var(--s2); }
+.pr-what .plan-view.inline { margin-top: 6px; }
+.session-hero:has(.plan-view) { flex-wrap: wrap; }
+.session-hero .plan-view.hero { margin-left: 56px; }
+.origin-list { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }

@@ -29,7 +29,7 @@ function backdrops(t: Record<string, string>): RGB[] {
   return out;
 }
 const TEXT_ON_CARD = ['ink', 'ink-2'];
-const UI_ON_CARD = ['ink-3', 'accent', 'hl', 'good', 'warn', 'bad', 'swim', 'bike', 'run', 'strength', 'football'];
+const UI_ON_CARD = ['ink-3', 'accent', 'hl', 'good', 'warn', 'bad', 'swim', 'bike', 'run', 'strength', 'football', 'done'];
 
 // Auftrag 27: THEME (B + C) ist das Design der App; A, B, C bleiben als Herkunft geprüft
 for (const p of [THEME, ...PALETTES]) for (const mode of ['light', 'dark'] as const) {
@@ -43,7 +43,7 @@ for (const p of [THEME, ...PALETTES]) for (const mode of ['light', 'dark'] as co
     }
     for (const b of backdrops(t)) for (const f of TEXT_ON_CARD) { const r = ratio(parse(t[f])[0], b); if (r < 4.5) bad.push(`${f} auf Hintergrund: ${r.toFixed(2)}`); }
     // Knöpfe und Kennzeichen (Pillen: farbiger Text auf zarter Fläche über der Karte)
-    const pairs: [string, string][] = [['accent-ink', 'accent'], ['btn-ink', 'btn'], ['hl-ink', 'hl']];
+    const pairs: [string, string][] = [['accent-ink', 'accent'], ['btn-ink', 'btn'], ['hl-ink', 'hl'], ...(t.done ? [['done-ink', 'done'] as [string, string]] : [])];
     for (const [f, b] of pairs) { const r = ratio(parse(t[f])[0], parse(t[b])[0]); if (r < 4.5) bad.push(`${f} auf ${b}: ${r.toFixed(2)}`); }
     const card = over(t.surface, parse(t.bg)[0]);
     for (const k of ['accent', 'hl', 'good', 'warn', 'bad', 'info']) { const r = ratio(parse(t[k])[0], over(t[k + '-soft'], card)); if (r < 4.5) bad.push(`${k} auf ${k}-soft: ${r.toFixed(2)}`); }
@@ -51,7 +51,7 @@ for (const p of [THEME, ...PALETTES]) for (const mode of ['light', 'dark'] as co
   });
   test(`${label}: Symbole, Ampel und Sportfarben mindestens 3:1`, () => {
     const bad: string[] = [];
-    for (const b of backdrops(t)) { const card = over(t.surface, b); for (const f of UI_ON_CARD) { const r = ratio(parse(t[f])[0], card); if (r < 3) bad.push(`${f}: ${r.toFixed(2)}`); } }
+    for (const b of backdrops(t)) { const card = over(t.surface, b); for (const f of UI_ON_CARD.filter(k => t[k])) { const r = ratio(parse(t[f])[0], card); if (r < 3) bad.push(`${f}: ${r.toFixed(2)}`); } }
     expect([...new Set(bad)]).toEqual([]);
   });
   test(`${label}: Ampel eindeutig, Orange nicht mit Gelb verwechselbar, Sportarten unterscheidbar`, () => {

@@ -22,6 +22,9 @@ import { reviewMode } from '../review';
 import { DAYS } from '../store';
 import { effStatus } from '../domain';
 import { isTestS } from '../../../shared/trainingrules';
+import { hrZoneSuggest, applyHrSuggestion, dismissHrSuggestion, originText, HR_LABEL } from '../../../shared/hrzones';
+import { refreshFuture } from '../../../shared/refresh';
+import { BASE_WEEKS, PLAN, replacePlanInPlace } from '../store';
 
 const NOTIFY_DEFAULTS = {
   types: { morning: true, preSession: true, eveEarly: true, evening: true, warnings: true, adductors: true, food: true, weekly: true, achievements: true },
@@ -66,7 +69,7 @@ export function renderDarstellung(): string {
     <div class="lbl">${esc(t('set.heuteVariant'))}</div><div class="seg">${[['answer', t('set.variantA')], ['feed', t('set.variantB')]].map(([v, l]) => `<button class="${(UI.heuteVariant || 'answer') === v ? 'on' : ''}" data-act="set-variant" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`);
 }
 export function renderZonen(): string {
-  return sec(t('set.zones'), zonesCard(), t('set.zonesAside')) + sec(t('set.tests'), testsCard()) + sec(t('set.ready'), readyCard(), t('set.readyAside')) + sec(t('set.score'), scoreCard(), t('set.scoreAside'));
+  return hrSuggestCard() + sec(t('set.zones'), zonesCard(), t('set.zonesAside')) + sec(t('set.tests'), testsCard()) + sec(t('set.ready'), readyCard(), t('set.readyAside')) + sec(t('set.score'), scoreCard(), t('set.scoreAside'));
 }
 export function renderMitteilungen(): string { return sec(t('set.notify'), notifyCard()); }
 export function renderCoachSet(): string {
@@ -96,7 +99,8 @@ function testsCard(): string {
 /* ---------- Zonen ---------- */
 function zonesCard(): string {
   const p = profile(); const th = p.thresholds;
-  const zc = ['var(--rest)', 'var(--info)', 'var(--good)', 'var(--warn)', 'var(--bad)'];
+  // Auftrag 35: Zone 1 als Schrift in --ink-2 (--rest erreicht als Text nur 4,3:1)
+  const zc = ['var(--ink-2)', 'var(--info)', 'var(--good)', 'var(--warn)', 'var(--bad)'];
   const run = hrZonesFor(th.lthrRun), bike = hrZonesFor(th.lthrBike);
   const pace = (pct: number) => secToPace(th.thresholdPaceRunSec * 100 / pct);
   // Pace-Zonen: dieselben Prozent der Schwelle wie beim Puls (schneller = höherer Prozentwert)
@@ -113,8 +117,33 @@ function zonesCard(): string {
     ${hasRun ? `<div class="lbl">${esc(sportLabel('run'))}</div>` + tbl(run.map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${paceRange(i)}/km</td></tr>`)) : ''}
     ${hasBike ? `<div class="lbl">${esc(sportLabel('bike'))}</div>` + tbl(bike.map((z, i) => { const pw = th.ftp ? powerZonesFor(th.ftp)[i] : null; return `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${pw ? `${pw.lo}${pw.hi ? '–' + pw.hi : '+'} W` : ''}</td></tr>`; })) + bikeSpeedTable(p) : ''}
     ${hasSwim && th.cssSec ? `<div class="lbl">${esc(sportLabel('swim'))}</div>` + tbl(swimZonesFor(th.cssSec).map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${secToPace(z.fast)}–${secToPace(z.slow)} /100 m</td></tr>`)) : ''}
+    ${originList(p)}
     <div class="hint">${esc(t('set.zonesHint'))}</div></div>`;
 }
+/* Auftrag 35: woher jeder Wert stammt und wann er zuletzt angepasst wurde */
+function originList(p: any): string {
+  const th = p.thresholds; const today = todayStr();
+  const rows: [string, string, string][] = [];
+  if (p.sports.includes('run')) rows.push(['lthrRun', t('set.lthrRun'), `${th.lthrRun} bpm`], ['thresholdPaceRunSec', t('set.paceRun'), `${secToPace(th.thresholdPaceRunSec)}/km`]);
+  if (p.sports.includes('bike')) { rows.push(['lthrBike', t('set.lthrBike'), `${th.lthrBike} bpm`]); if (th.ftp) rows.push(['ftp', t('set.ftp'), `${th.ftp} W`]); }
+  if (p.sports.includes('swim') && th.cssSec) rows.push(['cssSec', t('set.css'), `${secToPace(th.cssSec)}/100 m`]);
+  rows.push(['maxHr', t('set.maxHr'), th.maxHr ? `${th.maxHr} bpm` : '–']);
+  return `<div class="stack" data-origins><div class="lbl">Woher die Werte stammen</div><ul class="origin-list small">${rows.map(([k, l, v]) => `<li data-origin="${k}"><b>${esc(l)}</b> ${esc(v)}: <span class="muted">${esc(originText(p, k, today))}</span></li>`).join('')}</ul></div>`;
+}
+/* Auftrag 35: Vorschlag neuer Puls-Zonen aus den Uhrdaten (vorher/nachher, Übernehmen) */
+function hrSuggestCard(): string {
+  let s: any = null; try { s = hrZoneSuggest(STATE, BASE_WEEKS, profile(), todayStr()); } catch (_) { s = null; }
+  if (!s) return '';
+  const zoneRows = s.zones.map((z: any) => `<div class="lbl">${esc(sportLabel(z.sport))}</div><div class="scroll-x"><table class="tbl" data-hr-zones="${z.sport}"><thead><tr><th>Zone</th><th class="num">vorher</th><th class="num">nachher</th></tr></thead><tbody>${z.before.map((b: any, i: number) => { const a = z.after[i]; return `<tr><td>Z${b.zone} ${esc(b.label)}</td><td class="num">${b.lo}${b.hi ? '–' + b.hi : '+'}</td><td class="num"><b>${a.lo}${a.hi ? '–' + a.hi : '+'}</b></td></tr>`; }).join('')}</tbody></table></div>`).join('');
+  return sec('Neue Puls-Zonen vorgeschlagen', `<div class="card stack" data-hr-suggest><ul class="small">${s.changes.map((c: any) => `<li data-hr-change="${c.key}"><b>${esc(HR_LABEL[c.key as 'maxHr'])} ${c.from ?? '–'} → ${c.to}</b><br><span class="muted">${esc(c.why)}</span></li>`).join('')}</ul>${zoneRows}<div class="hint">Einzelne Spitzen (Messfehler, Teamsport) zählen nicht. Übernehmen gilt ab morgen für alle kommenden Einheiten; du kannst die Werte jederzeit unten ändern.</div><div class="row" style="flex-wrap:wrap"><button class="btn" data-act="hr-suggest-apply">Übernehmen</button><button class="btn ghost" data-act="hr-suggest-dismiss">Nicht jetzt</button></div></div>`);
+}
+on('hr-suggest-apply', () => {
+  const today = todayStr(); const s = hrZoneSuggest(STATE, BASE_WEEKS, profile(), today); if (!s) return;
+  saveProfile(applyHrSuggestion(profile(), s, today));
+  const rf = refreshFuture(BASE_WEEKS, profile(), today, STATE); if (rf.changed) replacePlanInPlace({ ...PLAN, weeks: rf.weeks });
+  invalidate(); nav.rerender(); toast(`Neue Puls-Zonen übernommen${rf.changed ? `, ${rf.changed} kommende Einheiten angepasst` : ''}.`);
+});
+on('hr-suggest-dismiss', () => { const s = hrZoneSuggest(STATE, BASE_WEEKS, profile(), todayStr()); if (!s) return; saveProfile(dismissHrSuggestion(profile(), s)); nav.rerender(); toast('Vorschlag ausgeblendet. Bei neuen Werten melde ich mich wieder.'); });
 /* Rad-Tempo je Rad (Auftrag 12): Schwellen-Geschwindigkeit flach als Feld, Zonen in km/h als Tabelle, Hinweis auf Wind und Steigung */
 function bikeSpeedFields(p: any): string {
   const bs = bikeSpeedsOf(p);
@@ -122,7 +151,8 @@ function bikeSpeedFields(p: any): string {
 }
 function bikeSpeedTable(p: any): string {
   const bs = bikeSpeedsOf(p); const kinds = kindsOf(p);
-  const zc = ['var(--rest)', 'var(--info)', 'var(--good)', 'var(--warn)', 'var(--bad)'];
+  // Auftrag 35: Zone 1 als Schrift in --ink-2 (--rest erreicht als Text nur 4,3:1)
+  const zc = ['var(--ink-2)', 'var(--info)', 'var(--good)', 'var(--warn)', 'var(--bad)'];
   return `<div class="lbl" data-speed-zones>${esc(t('set.speedZones'))}</div><div class="scroll-x"><table class="tbl"><thead><tr><th></th>${kinds.map(k => `<th class="num">${esc(BIKE_KIND_LABEL[k])}</th>`).join('')}</tr></thead><tbody>${[1, 2, 3, 4, 5].map(z => `<tr><td><b style="color:${zc[z - 1]}">Z${z}</b></td>${kinds.map(k => `<td class="num">${esc(speedRange(bs[k], z))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="hint">${esc(SPEED_HINT)}${kinds.includes('indoor') ? ' ' + esc(t('set.speedIndoor')) : ''}</div>`;
 }
@@ -145,7 +175,7 @@ function estimatedNote(p: any): string {
 }
 onChange('thr', el => {
   const p = profile(); const k = el.dataset.k!; const raw = (el as HTMLInputElement).value.trim();
-  if (!el.dataset.tf && INPUTS.thr[k]) { const n = readNumberInput(el, INPUTS.thr[k]); if (n === undefined) return; if (n == null && !(k === 'ftp' || k === 'maxHr')) { toast(t('common.invalidNumber')); return; } saveProfile(setThreshold(p, k as ThresholdKey, n)); invalidate(); nav.rerender(); toast(t('common.saved')); return; }
+  if (!el.dataset.tf && INPUTS.thr[k]) { const n = readNumberInput(el, INPUTS.thr[k]); if (n === undefined) return; if (n == null && !(k === 'ftp' || k === 'maxHr')) { toast(t('common.invalidNumber')); return; } saveProfile(setThreshold(p, k as ThresholdKey, n, { src: 'von dir eingetragen', at: todayStr() })); invalidate(); nav.rerender(); toast(t('common.saved')); return; }
   let v: number | null = el.dataset.tf ? readTime(el) : (k === 'thresholdPaceRunSec' || k === 'cssSec') ? paceToSec(raw) : parseNum(raw);
   if (el.dataset.tf && v == null && k !== 'cssSec') return; // Feld wird gerade geleert
   if (v != null && isNaN(v)) { toast(t('time.invalid')); return; }
@@ -153,7 +183,7 @@ onChange('thr', el => {
   else if (v == null || v <= 0) { toast(t('common.invalidNumber')); return; }
   const lim: Record<string, [number, number]> = { lthrRun: [100, 215], lthrBike: [100, 215], maxHr: [120, 230], ftp: [50, 600], thresholdSpeedBikeKmh: [10, 60], thresholdPaceRunSec: [150, 600], cssSec: [50, 240] };
   if (v != null && lim[k] && (v < lim[k][0] || v > lim[k][1])) { toast(t('set.outOfRange')); return; }
-  saveProfile(setThreshold(p, k as ThresholdKey, v)); invalidate(); if (!el.dataset.tf) nav.rerender(); toast(t('common.saved'));
+  saveProfile(setThreshold(p, k as ThresholdKey, v, { src: 'von dir eingetragen', at: todayStr() })); invalidate(); if (!el.dataset.tf) nav.rerender(); toast(t('common.saved'));
 });
 
 /* ---------- Mitteilungen ---------- */

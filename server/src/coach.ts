@@ -9,6 +9,7 @@ import { goalFromPlanMeta, type Goal } from '../../shared/goals';
 import { migrateNotes, runTestUpdate, applyTestUpdate } from '../../shared/fields';
 import { swimBests, swimSkillUpdate, legacySwimReview, swimRateUpdate, swimPaceUpdate, swimStrokeUpdate, swimRateText } from '../../shared/swimskill';
 import { refreshFuture, trendThresholds, refreshAdjustments } from '../../shared/refresh';
+import { hrZoneSuggest } from '../../shared/hrzones';
 import { mainGoal } from '../../shared/goals';
 import { analyze, swimReviewMessages, type Trigger } from '../../shared/coach/analysis';
 import { extendPlan, planUpkeep, upkeepText } from '../../shared/replan';
@@ -160,6 +161,14 @@ export async function runAnalysis(env: Env, uid: number, trigger: Trigger, opts:
       changes.push({ kind: 'coachMsg', key: 'msg-trend-' + day, data: { id: 'msg-trend-' + day, at: t, date: day, kind: 'info', from: 'coach', title: 'Zonen aus deinen Uhrdaten aktualisiert', important: true,
         text: tr.text + (rf.changed ? ` ${rf.changed} kommende Einheiten rechnen ab jetzt damit.${rf.example ? ' Zum Beispiel ' + rf.example + '.' : ''}` : '') + ' Ändern kannst du die Werte unter Mehr → Zonen und Tests.' }, updatedAt: t + 2 });
     }
+  }
+  // Auftrag 35: Puls-Zonen aus den Uhrdaten prüfen – nur ein Vorschlag (vorher/nachher, „Übernehmen“ auf der Zonen-Seite), je Vorschlag eine Mitteilung
+  {
+    const day = opts.date || berlinParts().date;
+    let hs: any = null; try { hs = hrZoneSuggest(L.state, L.baseWeeks, L.profile, day); } catch (e) { hs = null; }
+    const hid = hs ? 'msg-hrzones-' + hs.signature.replace(/[^\w-]/g, '_') : '';
+    if (hs && !L.state.coachMsgs[hid]) changes.push({ kind: 'coachMsg', key: hid, data: { id: hid, at: t, date: day, kind: 'info', from: 'coach', title: 'Neue Puls-Zonen vorgeschlagen', important: true,
+      text: hs.text + ' Gründe, vorher/nachher und „Übernehmen“ findest du unter Mehr → Zonen und Tests. Ohne dein Okay ändert sich nichts.', options: [{ label: 'Zonen ansehen', say: '', go: 'zonen' }] }, updatedAt: t + 3 });
   }
   // Schwimmen: neue Bestwerte → Können eintragen und alle kommenden Schwimmeinheiten neu stufen
   {

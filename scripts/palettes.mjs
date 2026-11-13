@@ -42,6 +42,8 @@ export const PALETTES = [
       bg: '#edf1f2', surface: 'rgba(255,255,255,.72)', 'surface-2': 'rgba(255,255,255,.56)', ink: '#0d1a1e', 'ink-2': '#425157', 'ink-3': '#59686d', line: 'rgba(255,255,255,.78)',
       accent: '#0b6b76', 'accent-ink': '#ffffff', hl: '#a03c0d', 'hl-ink': '#ffffff', btn: '#0b6b76', 'btn-ink': '#ffffff',
       good: '#086b36', warn: '#875800', bad: '#b42318', info: '#2457c0',
+      // Auftrag 35: Erledigt-Haken weiß auf vollem Grün (Haken ≥ 4,5:1, Kreis zur Karte ≥ 3:1), hell und dunkel
+      done: '#086b36', 'done-ink': '#ffffff',
       swim: '#1f63d1', bike: '#13804a', run: '#c63a24', strength: '#7349d1', football: '#926400', rest: '#6c7a7f',
       'blob-1': '#bcdde0', 'blob-2': '#f3d9cb', 'blob-3': '#d3e7e3', scrim: 'rgba(8,14,16,.45)',
       shadow: '0 1px 0 rgba(255,255,255,.8) inset, 0 8px 28px rgba(20,40,46,.10)'
@@ -50,6 +52,7 @@ export const PALETTES = [
       bg: '#070b0d', surface: 'rgba(30,39,43,.6)', 'surface-2': 'rgba(40,51,55,.55)', ink: '#edf2f3', 'ink-2': '#a9b6b9', 'ink-3': '#909ea2', line: 'rgba(255,255,255,.11)',
       accent: '#35bdb9', 'accent-ink': '#021b1b', hl: '#ff8a4c', 'hl-ink': '#2a1102', btn: '#35bdb9', 'btn-ink': '#021b1b',
       good: '#4fd083', warn: '#f2c14e', bad: '#ff6b66', info: '#74a9ff',
+      done: '#178745', 'done-ink': '#ffffff',
       swim: '#4f9dff', bike: '#57c785', run: '#ff7a5c', strength: '#a98bff', football: '#e9b949', rest: '#7f8b8f',
       'blob-1': '#0d3237', 'blob-2': '#2a1a12', 'blob-3': '#0a2427', scrim: 'rgba(0,0,0,.55)',
       shadow: '0 1px 0 rgba(255,255,255,.07) inset, 0 10px 30px rgba(0,0,0,.5)'

@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.23.0', items: [
+    'Einheiten nach Abschnitten: Aufwärmen, Hauptteil und Ausklang (Schwimmen auch Technik) mit eigenen Werten. Von der Uhr erkennt die App den Hauptteil selbst („Hauptteil 40 min, Ø Puls 147 (Zone 2)“), die Grenze kannst du korrigieren. Der Coach bewertet die Zone nur noch am Hauptteil.',
+    'Lauf und Rad in Minuten oder km: umschalten in Heute, Plan und Einheit, auch Intervalle („4 × 600 m in ca. 3:00, 300 m traben“). Und an jeder Einheit: „Lieber Intervalle / locker / länger / kürzer“ mit Prüfung der Woche.',
+    'Puls-Zonen: Zeigen deine Uhrdaten mehrmals einen höheren Maximal- oder Schwellenpuls, schlägt die App neue Zonen vor (vorher/nachher). Unter Zonen steht jetzt, woher jeder Wert stammt. Dazu: kräftiger weißer Haken bei erledigten Einheiten und bessere Kontraste.'
+  ] },
   { version: '3.22.0', items: [
     'Tab-Leiste noch näher an iOS 26: gefüllte, kräftige Symbole, breite dunkle Markierung, und beim Wechsel eine flache Glas-Kapsel, die sich über beide Tabs spannt, den Inhalt darunter vergrößert und die Farbe mitnimmt.',
     'Coach: Hinweise kommen nur noch bei neuer Erkenntnis, nicht jede Woche fast gleich. Bewertungen nennen deine Morgenwerte nur noch, wenn sie für die Einheit wichtig sind. Keine doppelten Angaben mehr wie „60 min (60 min)“.',

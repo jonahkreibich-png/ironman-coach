@@ -4,6 +4,7 @@ import type { RawActivity, ActSport } from './types';
 import { GENERIC_LTHR } from '../profile';
 import { appTz } from '../tz';
 import { isAutoLaps, lapKinds, streamStructure, paceTrend, statsOf, type Pattern } from './structure';
+import { minuteSeries, type MinuteSeries } from '../sections';
 
 export type Source = 'healthfit' | 'file' | 'shortcut' | 'intervals' | 'oura' | 'whoop' | 'polar' | 'withings' | 'fitbit' | 'suunto' | 'coros' | 'wahoo' | 'zepp' | 'healthkit' | 'manual';
 
@@ -67,6 +68,8 @@ export interface Activity {
   /** wird nach dem Zusammenführen ersetzt durch die Aktivität mit Vorrang */
   mergedInto?: string | null;
   hasStreams?: boolean;
+  /** Auftrag 35: Puls, Strecke und Watt je Minute (klein), für Aufwärmen/Hauptteil/Ausklang */
+  series?: MinuteSeries | null;
   /** Rad-Art (road, gravel, mtb …), falls bekannt (Feld der Einheit oder Name) */
   bikeType?: string | null;
   createdAt?: number;
@@ -193,6 +196,7 @@ export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
     laps, intervals, swim, ...(segments ? { segments } : {}),
     pattern: withTrend(pattern, sport === 'run' ? paceTrend(splits) : null),
     hasStreams: recs.length > 0,
+    ...(((): any => { const ms = minuteSeries(raw); return ms ? { series: ms } : {}; })()),
     createdAt: Date.now()
   };
 }

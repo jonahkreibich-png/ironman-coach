@@ -6,7 +6,7 @@ import * as C from './core';
 import { intervalsOf } from './activity/structure';
 import type { Activity } from './activity/analyze';
 import { sleepNeed, type Profile } from './profile';
-import { wattsTrusted } from './scores';
+import { wattsTrusted, withMain } from './scores';
 
 export type Period = '4w' | '3m' | '1y';
 export const PERIOD_DAYS: Record<Period, number> = { '4w': 28, '3m': 91, '1y': 365 };
@@ -188,7 +188,8 @@ function refHr(I: TrendInput, sport: 'run' | 'bike') { const t: any = I.profile.
 function restHr(I: TrendInput) { const v = (I.trend || []).filter(p => p && num(p.restingHR) != null).slice(-14).map(p => num(p.restingHR)!); return v.length ? median(v)! : 55; }
 function runPaceCard(I: TrendInput, from: string): TrendCard {
   const ref = refHr(I, 'run'), rest = restHr(I);
-  const pts = sorted(runs(I, from).filter(a => a.avgHr && a.speedKmh && (a.min || 0) >= 15 && !isHardAct(a)).map(a => ({ date: a.date, sp: atRef(a.speedKmh!, a.avgHr!, ref, rest) })).filter(p => p.sp != null && p.sp > 4 && p.sp < 25)) as { date: string; sp: number }[];
+  // Auftrag 35: Effizienz aus dem Hauptteil (ohne Aufwärmen/Ausklang), wenn erkannt
+  const pts = sorted(runs(I, from).map(withMain).filter(a => a.avgHr && a.speedKmh && (a.min || 0) >= 15 && !isHardAct(a)).map(a => ({ date: a.date, sp: atRef(a.speedKmh!, a.avgHr!, ref, rest) })).filter(p => p.sp != null && p.sp > 4 && p.sp < 25)) as { date: string; sp: number }[];
   if (pts.length < 4) return lock('runpace', 'efficiency', `Laufen: Pace bei Puls ${ref}`, 4, pts.length, 'lockeren Läufen mit Puls');
   const fl = firstLast(pts.map(p => p.sp))!;
   const pace = (sp: number) => 3600 / sp;
@@ -200,7 +201,7 @@ function runPaceCard(I: TrendInput, from: string): TrendCard {
 }
 function bikeCard(I: TrendInput, from: string): TrendCard {
   const ref = refHr(I, 'bike'), rest = restHr(I);
-  const all = rides(I, from).filter(a => a.avgHr && (a.min || 0) >= 20 && !isHardAct(a));
+  const all = rides(I, from).map(withMain).filter(a => a.avgHr && (a.min || 0) >= 20 && !isHardAct(a));
   const withW = all.filter(a => a.avgPower);
   const usePower = withW.length >= 4;
   const pts = sorted((usePower ? withW : all.filter(a => a.speedKmh && !a.indoor)).map(a => ({ date: a.date, v: atRef(usePower ? a.avgPower! : a.speedKmh!, a.avgHr!, ref, rest) })).filter(p => p.v != null && p.v > 0)) as { date: string; v: number }[];
@@ -222,8 +223,8 @@ function decouplingCard(I: TrendInput, from: string): TrendCard {
     chart: { pts: pts.map(p => ({ date: p.date, [p.sport]: Math.round(p.v * 10) / 10 })), series: [{ key: 'run', name: 'Laufen', color: 'var(--run)' }, { key: 'bike', name: 'Rad', color: 'var(--bike)' }], lines: [{ v: 5, label: '5 %', color: 'var(--good)' }], invert: true, fmt: 'pct' } };
 }
 function efCard(I: TrendInput, from: string): TrendCard {
-  const r = sorted(runs(I, from).filter(a => a.avgHr && a.speedKmh && (a.min || 0) >= 15 && !isHardAct(a)).map(a => ({ date: a.date, run: Math.round(a.speedKmh! * 1000 / 60 / a.avgHr! * 100) / 100 })));
-  const b = sorted(rides(I, from).filter(a => a.avgHr && a.avgPower && (a.min || 0) >= 20 && !isHardAct(a)).map(a => ({ date: a.date, bike: Math.round(a.avgPower! / a.avgHr! * 100) / 100 })));
+  const r = sorted(runs(I, from).map(withMain).filter(a => a.avgHr && a.speedKmh && (a.min || 0) >= 15 && !isHardAct(a)).map(a => ({ date: a.date, run: Math.round(a.speedKmh! * 1000 / 60 / a.avgHr! * 100) / 100 })));
+  const b = sorted(rides(I, from).map(withMain).filter(a => a.avgHr && a.avgPower && (a.min || 0) >= 20 && !isHardAct(a)).map(a => ({ date: a.date, bike: Math.round(a.avgPower! / a.avgHr! * 100) / 100 })));
   const main = r.length >= b.length ? r.map(p => p.run) : b.map(p => p.bike);
   if (main.length < 4) return lock('ef', 'efficiency', 'Efficiency Factor', 4, Math.max(r.length, b.length), 'lockeren Einheiten mit Puls');
   const fl = firstLast(main)!; const rel = (fl.last - fl.first) / fl.first * 100;

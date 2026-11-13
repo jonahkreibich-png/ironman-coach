@@ -12,6 +12,7 @@ import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '.
 import { saveState } from '../store';
 import { toast } from '../toast';
 import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml } from './session';
+import { viewToggle } from '../planview';
 import { changedOf } from '../../../shared/results';
 import { openCheckin } from './werte';
 import { nav } from '../nav';
@@ -71,7 +72,7 @@ function answerCard(): string {
     return `<div class="session-hero ${st.completed ? 'done' : ''}" style="--c:${SPORT_COLOR[x.sport]}">
       <button class="row grow" data-act="sess-open" data-sid="${esc(x.id)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px"><span class="ic">${sportIcon(x.sport)}</span>
       <span class="grow"><span class="t">${esc(sessionTitle(x, st))}</span>${plannedHtml(x, st)}${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
-      ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}</div>`;
+      ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}${st.completed ? '' : viewToggle(x, 'hero')}</div>`;
   }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t(beforeStart ? 'plan.beforeStart' : 'heute.restDay'))}</span><br><span class="m">${esc(t(beforeStart ? 'heute.startsSoon' : 'heute.restLine'))}</span></span></div>`;
   return `<div class="answer l${s.level}">
     <div class="answer-top">${ring(d.ill ? null : d.readiness.score, s.level, t('heute.readiness'))}

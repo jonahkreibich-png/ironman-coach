@@ -56,7 +56,7 @@ export function li(o: { act?: string; data?: Record<string, string>; icon?: stri
 export function srcBadge(src?: string | null): string {
   if (!src) return '';
   const label = SOURCE_LABEL[src] || src;
-  const short = src === 'manual' ? '✎' : src === 'note' ? 'Notiz' : label.replace(/[^A-Za-zÄÖÜ]/g, '').slice(0, 2).toUpperCase();
+  const short = src === 'manual' ? '✎' : src === 'note' ? 'Notiz' : src === 'sections' ? 'Σ' : label.replace(/[^A-Za-zÄÖÜ]/g, '').slice(0, 2).toUpperCase();
   return `<span class="src ${src === 'manual' ? 'manual' : ''}" title="${esc(t('src.from', { s: label }))}" aria-label="${esc(t('src.from', { s: label }))}">${esc(short)}</span>`;
 }
 /* Auftrag 21: Hilfsmittel einer Schwimmeinheit als Symbol + Wort */

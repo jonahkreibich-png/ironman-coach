@@ -5,6 +5,7 @@
    Scores, Coach und Analyse lesen die Felder über fieldsOf(). */
 import * as C from './core';
 import { kindOf, mainKind, BIKE_KIND_LABEL } from './bikespeed';
+import { mainPart } from './sections';
 
 export type FieldKind = 'num' | 'pace' | 'text' | 'select' | 'splits' | 'exercises';
 export interface FieldDef { key: string; label: string; unit?: string; kind: FieldKind; options?: [string, string][]; ph?: string; more?: boolean; /** nur bei Tests */ test?: boolean }
@@ -67,7 +68,7 @@ export const SPORT_FIELDS: Record<string, FieldDef[]> = {
 };
 /* Für alle Sportarten (oben in der Einheit, nicht in metrics) */
 export const FEEL: [string, string][] = [['1', 'sehr frisch'], ['2', 'frisch'], ['3', 'normal'], ['4', 'müde'], ['5', 'sehr müde']];
-export const SOURCE_NAMES: Record<string, string> = { healthfit: 'HealthFit', file: 'Datei', shortcut: 'Apple Health', healthkit: 'Apple Health', intervals: 'intervals.icu', manual: 'von Hand', note: 'aus Notiz', oura: 'Oura' };
+export const SOURCE_NAMES: Record<string, string> = { healthfit: 'HealthFit', file: 'Datei', shortcut: 'Apple Health', healthkit: 'Apple Health', intervals: 'intervals.icu', manual: 'von Hand', note: 'aus Notiz', oura: 'Oura', sections: 'aus Abschnitten' };
 
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 const paceSec = (v: any): number | null => { const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v == null ? '' : v).trim()); return m ? +m[1] * 60 + +m[2] : null; };
@@ -110,13 +111,16 @@ export function fieldsOf(st: any, sport?: string): Fields {
 export function hrZone(hr: number, lthr: number): number { const f = hr / lthr; return f < 0.81 ? 1 : f < 0.9 ? 2 : f < 0.94 ? 3 : f <= 1.02 ? 4 : 5; }
 export function plannedZone(s: any): number | null { const z = [...String((s && s.zone) || '').matchAll(/\d/g)].map(x => +x[0]); return z.length ? Math.max(...z) : null; }
 /* „Zone 3 statt 2“ oder „Zone 2 wie geplant“; null ohne Puls */
-export function zoneVerdict(s: any, st: any, thr: any): { zone: number; planned: number | null; text: string; over: boolean } | null {
+export function zoneVerdict(s: any, st: any, thr: any, act?: any): { zone: number; planned: number | null; text: string; over: boolean; main?: boolean } | null {
   const sport = s && s.sport; if (sport !== 'run' && sport !== 'bike' && sport !== 'football') return null;
-  const f = fieldsOf(st, sport); if (!f.hr) return null;
+  // Auftrag 35: Zone des Hauptteils (ohne Aufwärmen/Ausklang), sonst der ganzen Einheit
+  const mp = sport === 'football' ? null : mainPart(s, st, act || null, thr || {}, sport);
+  const f = fieldsOf(st, sport); const hr = (mp && mp.hr) || f.hr; if (!hr) return null;
   const lthr = sport === 'bike' ? (thr && thr.lthrBike) || 0 : (thr && thr.lthrRun) || 0; if (!lthr) return null;
-  const zone = hrZone(f.hr, lthr); const planned = sport === 'football' ? null : plannedZone(s);
+  const zone = hrZone(hr, lthr); const planned = sport === 'football' ? null : plannedZone(s);
   const over = planned != null && zone > planned;
-  return { zone, planned, over, text: planned == null ? `Zone ${zone}` : zone === planned ? `Zone ${zone} wie geplant` : `Zone ${zone} statt ${planned}` };
+  const where = mp && mp.hr ? ' (Hauptteil)' : '';
+  return { zone, planned, over, main: !!where, text: (planned == null ? `Zone ${zone}` : zone === planned ? `Zone ${zone} wie geplant` : `Zone ${zone} statt ${planned}`) + where };
 }
 /* Fitness, Müdigkeit, Form an einem Tag: intervals.icu, sonst aus den eigenen Einheiten */
 export function loadOn(state: any, weeks: any[], date: string): { ctl: number; atl: number; tsb: number; source: string } | null {
@@ -324,6 +328,8 @@ export function applyTestUpdate(profile: any, u: TestUpdate): any {
   const th = { ...profile.thresholds, ...(u.thresholds || {}), ...(u.sport === 'swim' ? {} : { source: `${label} ${u.date.slice(8)}.${u.date.slice(5, 7)}.` }) };
   const done = Object.keys(u.thresholds || {});
   th.estimated = (th.estimated || []).filter((k: string) => !done.includes(k));
+  // Auftrag 35: Herkunft und Datum je Wert
+  th.origin = { ...((profile.thresholds || {}).origin || {}) }; done.forEach(k => { th.origin[k] = { src: label, at: u.date }; });
   return { ...profile, thresholds: th, ...(u.skills && Object.keys(u.skills).length ? { skills: { ...(profile.skills || {}), ...u.skills } } : {}), appliedTests: [...(profile.appliedTests || []), u.sessionId] };
 }
 

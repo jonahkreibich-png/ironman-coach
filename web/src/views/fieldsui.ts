@@ -16,6 +16,8 @@ import * as C from '../../../shared/core';
 import { strengthNumber } from '../../../shared/strength';
 import { editStrengthTemplate } from './strength';
 import { intervalsBlock, registerIntervalHost, registerPlannedLookup } from './intervalsui';
+import { sectionsBlock, registerSectionHost } from './sectionsui';
+import { plannedIntervals } from '../../../shared/intervals';
 import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay } from '../../../shared/validate';
 import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, CHANGE_ZONES, changedOf, changeZone, changeParts, intervalsMode, omitOptions, placeLabel } from '../../../shared/results';
 
@@ -83,7 +85,8 @@ export function fieldsBlock(tg: Target): string {
   const moved = tg.kind === 'session' && tg.planned ? movedKeys(st) : [];
   const main = defs.filter(f => !f.more && !moved.includes(f.key)), extra = defs.filter(f => f.more && !moved.includes(f.key));
   const prof = profile();
-  const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds);
+  const actZ = st.activityId ? (STATE.activities || {})[st.activityId] : null;
+  const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds, actZ) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds, actZ);
   const ld = loadOn(STATE, C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), tg.date);
   const auto = [zv ? `<span class="pill ${zv.over ? 'warn' : 'good'}" data-zone>${esc(t('fd.zone'))}: ${esc(zv.text)}</span>` : '', ld ? `<span class="pill" data-load>CTL ${ld.ctl} · ATL ${ld.atl} · TSB ${ld.tsb > 0 ? '+' : ''}${ld.tsb}</span>` : ''].filter(Boolean).join(' ');
   const srcs = [...new Set(Object.values(st.metricsSrc || {}).filter(Boolean))] as string[];
@@ -94,6 +97,7 @@ export function fieldsBlock(tg: Target): string {
     ${tg.kind === 'session' && tg.planned ? changeHtml(tg, st, defs.filter(f => moved.includes(f.key))) : ''}
     ${doubtsHtml(tg, st)}
     <div class="fgrid">${main.map(f => oneField(tg, f, st)).join('')}</div>
+    ${secHtml(tg, st)}
     ${ivHtml(tg, st)}
     ${extra.length ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}
     <div class="fld wide"><span class="lab">${esc(t('fd.rpe'))}</span><div class="rpe-row" role="group" aria-label="${esc(t('fd.rpe'))}">${Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button class="chip ${String(st.rpe ?? '') === String(n) ? 'on' : ''}" aria-pressed="${String(st.rpe ?? '') === String(n)}" data-act="fd-rpe" data-v="${n}" ${attrs(tg)}>${n}</button>`).join('')}</div><div class="xs muted">${esc(t('fd.rpeHint'))}</div></div>
@@ -107,6 +111,8 @@ const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
 /* Auftrag 29/30: „So wie geplant / Anders gemacht“ – je Art die passenden Felder, optional der Grund */
 const DUR_KINDS = ['shorter', 'longer', 'aborted'];
 function movedKeys(st: any): string[] { const c = changedOf(st); return c && DUR_KINDS.includes(c.kind) ? ['min', 'km', 'meters'] : []; }
+/* Auftrag 35: Abschnitte (Aufwärmen, Hauptteil, Ausklang) – bei geplanten Einheiten die tatsächliche Sportart (anders gemacht) */
+function secHtml(tg: Target, st: any): string { return sectionsBlock(tg, st, attrs(tg)); }
 function ivHtml(tg: Target, st: any): string {
   const mode = tg.kind === 'session' ? intervalsMode(st) : 'planned';
   if (mode === 'none') return '';
@@ -189,6 +195,11 @@ on('fd-doubt', el => {
 // Auftrag 22: Intervall-Liste nutzt denselben Datensatz, dieselbe Speicherung und dieselbe Neubewertung wie die übrigen Werte
 registerIntervalHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {},
   thresholds: () => { const p = profile(); const th: any = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; } });
+// Auftrag 35: Abschnitte nutzen denselben Datensatz und dieselbe Neubewertung
+const ivThr = () => { const p = profile(); const th: any = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; };
+registerSectionHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {}, thresholds: ivThr,
+  planned: (tg: Target) => (tg.kind === 'session' ? plannedFor(tg) : null),
+  hasIntervals: (tg: Target, st: any) => { const m = tg.kind === 'session' ? intervalsMode(st) : 'planned'; if (m === 'free') return true; if (m === 'none') return false; return plannedIntervals(tg.planned, ivThr()).length > 0 || (Array.isArray((st.metrics || {}).intervals) && st.metrics.intervals.length > 0); } });
 registerPlannedLookup((id, date) => { const s = plannedFor({ kind: 'session', id, date, sport: '' }); return s && intervalsMode(STATE.sessions[id]) === 'free' ? { ...s, spec: null } : s; });
 /* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
 const rev = (tg: Target) => { if(customDraft(tg.id))return; const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };

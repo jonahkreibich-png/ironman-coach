@@ -100,5 +100,7 @@ export function trendThresholds(state: any, weeks: any[], profile: any, goal: an
     if (JSON.stringify(speeds) !== JSON.stringify(th.bikeSpeeds || {})) t.bikeSpeeds = speeds;
   }
   if (!parts.length) return null;
-  return { thresholds: { ...t, trendAt: today, source: `Trend aus deinen Einheiten (${today.slice(8)}.${today.slice(5, 7)}.)` }, settings: s, text: `Deine Einheiten der letzten Wochen zeigen eine klare Veränderung: ${parts.join(', ')}.` };
+  // Auftrag 35: Herkunft und Datum je Wert
+  const origin = { ...(th.origin || {}) }; Object.keys(t).forEach(k => { origin[k] = { src: 'Trend aus deinen Einheiten', at: today }; });
+  return { thresholds: { ...t, origin, trendAt: today, source: `Trend aus deinen Einheiten (${today.slice(8)}.${today.slice(5, 7)}.)` }, settings: s, text: `Deine Einheiten der letzten Wochen zeigen eine klare Veränderung: ${parts.join(', ')}.` };
 }

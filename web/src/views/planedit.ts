@@ -43,15 +43,27 @@ function issuesOf(adjustments: any): string[] {
   ];
   return [...new Set(out)];
 }
+/* Auftrag 35: dieselbe Prüfung für „Einheit umwandeln“ – welche Hinweise kommen durch diese Änderung neu dazu (Regeln der Person,
+   harte Tage nebeneinander, zu viele harte Tage, Teamsport, Umfang)? */
+/* Auftrag 35: derselbe Hinweis mit anderen Zahlen ist nicht neu (vorher: „Woche 5: Umfang 405 min, 102 % mehr“ galt nach dem Kürzen einer
+   Einheit in Woche 4 als neue Warnung, nur weil sich die Prozentzahl änderte) */
+const sameIssue = (x: string) => x.replace(/[−-]?d+(?:[.,]d+)?/g, '#');
+export function freshWarnings(adj: any[]): { warnings: string[]; rule: boolean } {
+  const next = { ...STATE.adjustments, ...Object.fromEntries(adj.map(a => [a.id, a])) };
+  const before = new Set(issuesOf(STATE.adjustments).map(sameIssue)); const rb = new Set(ruleBreaks(STATE.adjustments).map(sameIssue));
+  const freshRules = ruleBreaks(next).filter(x => !rb.has(sameIssue(x)));
+  return { warnings: [...freshRules, ...issuesOf(next).filter(x => !before.has(sameIssue(x)))].map(friendly), rule: freshRules.length > 0 };
+}
+export function commitAdjustments(adj: any[], label: string, override = false) { commit(override ? adj.map(a => ({ ...a, override: true })) : adj, label); }
 let PENDING: { adj: any[]; warnings: string[]; label: string; rule: boolean } | null = null;
 /* Änderung vorschlagen: ohne neue Hinweise sofort übernehmen, sonst freundlich nachfragen */
 export function propose(adj: any[], label: string) {
   try { assertPlanAdjustments(PLAN.weeks, STATE, adj); } catch(e) { toast((e as Error).message); return; }
   const next = { ...STATE.adjustments, ...Object.fromEntries(adj.map(a => [a.id, a])) };
-  const before = new Set(issuesOf(STATE.adjustments));
-  const rb = new Set(ruleBreaks(STATE.adjustments));
-  const freshRules = ruleBreaks(next).filter(x => !rb.has(x));
-  const fresh = [...freshRules, ...issuesOf(next).filter(x => !before.has(x))];
+  const before = new Set(issuesOf(STATE.adjustments).map(sameIssue));
+  const rb = new Set(ruleBreaks(STATE.adjustments).map(sameIssue));
+  const freshRules = ruleBreaks(next).filter(x => !rb.has(sameIssue(x)));
+  const fresh = [...freshRules, ...issuesOf(next).filter(x => !before.has(sameIssue(x)))];
   if (!fresh.length) { commit(adj, label); return; }
   PENDING = { adj, warnings: fresh, label, rule: freshRules.length > 0 };
   openSheet(t('edit.checkTitle'), () => `<div class="stack" data-edit-warn><div class="banner warn">${fresh.slice(0, 4).map(w => esc(friendly(w))).join('<br>')}</div><div class="hint">${esc(t(PENDING.rule ? 'edit.ruleHint' : 'edit.checkHint'))}</div>

@@ -264,8 +264,10 @@ export function withEstimates(p: Profile, today: string): Profile {
 }
 export function isEstimated(p: Profile, k: ThresholdKey): boolean { return !!(p.thresholds.estimated || []).includes(k); }
 /* Wert von Hand oder aus einem Test gesetzt: nicht mehr geschätzt */
-export function setThreshold(p: Profile, k: ThresholdKey, v: number | null): Profile {
+export function setThreshold(p: Profile, k: ThresholdKey, v: number | null, origin?: { src: string; at: string }): Profile {
   const th: any = { ...p.thresholds, [k]: v };
+  // Auftrag 35: Herkunft und Datum je Wert (Zonen-Seite)
+  if (origin) th.origin = { ...((p.thresholds as any).origin || {}), [k]: origin };
   th.estimated = (p.thresholds.estimated || []).filter(x => x !== k);
   return { ...p, thresholds: th };
 }

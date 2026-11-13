@@ -5,6 +5,7 @@
    („geplant waren 100 m“, „(Ziel war 100 m)“) werden vor der Prüfung entfernt.
    Belegt sind nur eingetragene oder gemessene Werte (shared/results.ts), nie das Soll einer Einheit. */
 import * as C from '../core';
+import { mainPart } from '../sections';
 import type { EngineCtx } from './engine';
 import { doneItems, valsOf, withWeeks } from './review';
 import { sleepNeed } from '../profile';
@@ -269,6 +270,9 @@ export function valueFacts(ctx: EngineCtx, days = 21): ValueFacts {
   for (const d of doneItems(ctx, C.addDays(ctx.today, -days), ctx.today)) {
     const v: any = valsOf(d); const m: any = actualMetrics(d.st, d.act);
     items.push({ date: d.date, sport: d.sport, v: { dec: numOrNull(v.dec), hr: numOrNull(v.hr), maxHr: numOrNull(m.maxHr), pace: numOrNull(v.pace), power: numOrNull(v.power), cadence: numOrNull(v.cadence), rpe: numOrNull(v.rpe) } });
+    // Auftrag 35: Werte des Hauptteils (ohne Aufwärmen/Ausklang) sind ebenfalls gemessene Werte dieser Einheit
+    const mp = (d.sport === 'run' || d.sport === 'bike') ? mainPart(d.planned || { sport: d.sport }, d.st, d.act, (ctx.profile && ctx.profile.thresholds) || {}, d.sport) : null;
+    if (mp) items.push({ date: d.date, sport: d.sport, v: { dec: null, hr: numOrNull(mp.hr), maxHr: numOrNull(mp.maxHr), pace: numOrNull(mp.paceSec), power: numOrNull(mp.power), cadence: null, rpe: null } });
   }
   const trend: ValueFacts['trend'] = {};
   for (const p of (ctx.state.trend || []) as any[]) if (p && p.date >= C.addDays(ctx.today, -days)) trend[p.date] = { restingHR: numOrNull(p.restingHR), hrv: numOrNull(p.hrv), sleepHours: numOrNull(p.sleepHours) };

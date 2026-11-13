@@ -5,6 +5,7 @@
    kleine Planänderungen automatisch (mit Mitteilung und Rückgängig), größere als Vorschlag zum Bestätigen.
    Regeln sind die Grundlage; eine KI darf die Texte nur umformulieren. */
 import * as C from '../core';
+import { mainPart, type MainPart } from '../sections';
 import * as W from '../workouts';
 import type { EngineCtx, CoachMsg } from './engine';
 import { fieldsOf, hrZone, plannedZone } from '../fields';
@@ -54,9 +55,10 @@ const DOW = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const fmtD = (d: string) => `${DOW[new Date(d + 'T12:00:00Z').getUTCDay()]} ${d.slice(8)}.${d.slice(5, 7)}.`;
 
 /* Alle erledigten Einheiten mit ihren Feldern (geplante, Extra-Einheiten, Aufzeichnungen ohne Zuordnung) */
-export interface Done { id: string; date: string; sport: string; title: string; planned: any | null; f: ReturnType<typeof fieldsOf>; /** Auftrag 30: anders als geplant (Kurzform) */ change?: string | null }
+export interface Done { id: string; date: string; sport: string; title: string; planned: any | null; f: ReturnType<typeof fieldsOf>; /** Auftrag 30: anders als geplant (Kurzform) */ change?: string | null;
+  /** Auftrag 35: Hauptteil ohne Aufwärmen/Ausklang (nur wenn erkannt bzw. eingetragen) */ main?: MainPart | null }
 export function doneSessions(ctx: EngineCtx, from: string, to: string): Done[] {
-  return doneItems(ctx, from, to).map(d => ({ id: d.key, date: d.date, sport: d.sport, title: d.title, planned: d.planned, f: fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport), change: d.change && d.changedFrom ? changeText(d.changedFrom, d.st, d.act) : null }));
+  return doneItems(ctx, from, to).map(d => ({ id: d.key, date: d.date, sport: d.sport, title: d.title, planned: d.planned, f: fieldsOf({ ...d.st, metrics: actualMetrics(d.st, d.act) }, d.sport), main: d.sport === 'run' || d.sport === 'bike' ? mainPart(d.planned || { sport: d.sport }, d.st, d.act, (ctx.profile && ctx.profile.thresholds) || {}, d.sport) : null, change: d.change && d.changedFrom ? changeText(d.changedFrom, d.st, d.act) : null }));
 }
 /* Auftrag 30, Punkt 5: Serien je Wert für Bestwert / Tageswert / Trend (ein Jahr zurück, nur eingetragene oder gemessene Werte) */
 export function storySeries(ctx: EngineCtx, today = ctx.today): Record<string, Pt[]> {
@@ -76,7 +78,8 @@ export function valueStories(ctx: EngineCtx, today = ctx.today): Record<string, 
 }
 export const storyLine = (k: string, st: Story, today: string) => storyText(st, { ...STORY_METRICS[k], today });
 /* Laufökonomie: Meter pro Herzschlag bei lockeren Läufen (je höher, desto effizienter) */
-const runEff = (x: Done) => x.f.paceSec && x.f.hr ? (60000 / x.f.paceSec) / x.f.hr : null;
+const hrOf = (x: Done) => (x.main && x.main.hr) || x.f.hr;
+const runEff = (x: Done) => { const p = (x.main && x.main.hr && x.main.paceSec) || x.f.paceSec; const h = hrOf(x); return p && h ? (60000 / p) / h : null; };
 function slope(pts: { x: number; y: number }[]): number | null {
   if (pts.length < 3) return null;
   const mx = pts.reduce((a, p) => a + p.x, 0) / pts.length, my = pts.reduce((a, p) => a + p.y, 0) / pts.length;
@@ -137,10 +140,10 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const done = doneSessions(ctx, C.addDays(today, -42), today);
   const runs = done.filter(x => x.sport === 'run' && x.f.hr && (x.f.paceSec || x.f.km));
   // lockere Läufe: geplant Zone 1-2 (oder ohne Plan mit Puls unter der Schwelle für locker)
-  const easyRuns = runs.filter(x => { const pz = x.planned ? plannedZone(x.planned) : null; return pz != null ? pz <= 2 && !C.isIntervals(x.planned) : (easyMax ? x.f.hr! <= easyMax + 8 : true); });
+  const easyRuns = runs.filter(x => { const pz = x.planned ? plannedZone(x.planned) : null; return pz != null ? pz <= 2 && !C.isIntervals(x.planned) : (easyMax ? hrOf(x)! <= easyMax + 8 : true); });
   const last3 = easyRuns.slice(-3);
-  if (lthrRun && last3.length === 3 && last3.every(x => hrZone(x.f.hr!, lthrRun) > 2)) {
-    add({ id: 'run-hr-high', kind: 'trend', tone: 'warn', score: 75, title: '3 lockere Läufe in Folge mit zu hohem Puls', why: `${last3.map(x => `${fmtD(x.date)}: Ø ${x.f.hr}`).join(', ')}. Locker heißt bei dir bis etwa ${easyMax} Schläge${aet ? ' (aerobe Schwelle)' : ''}.`, tip: `Langsamer laufen, bergauf ruhig gehen. Ziel: Puls unter ${easyMax}. So wächst die Grundlage für ${prof.runGoal ? `${mmss(prof.runGoal.paceSec)}/km bei Puls ${prof.runGoal.hr}` : 'dein Ziel'}.` });
+  if (lthrRun && last3.length === 3 && last3.every(x => hrZone(hrOf(x)!, lthrRun) > 2)) {
+    add({ id: 'run-hr-high', kind: 'trend', tone: 'warn', score: 75, title: '3 lockere Läufe in Folge mit zu hohem Puls', why: `${last3.map(x => `${fmtD(x.date)}: Ø ${hrOf(x)}${x.main && x.main.hr ? ' im Hauptteil' : ''}`).join(', ')}. Locker heißt bei dir bis etwa ${easyMax} Schläge${aet ? ' (aerobe Schwelle)' : ''}.`, tip: `Langsamer laufen, bergauf ruhig gehen. Ziel: Puls unter ${easyMax}. So wächst die Grundlage für ${prof.runGoal ? `${mmss(prof.runGoal.paceSec)}/km bei Puls ${prof.runGoal.hr}` : 'dein Ziel'}.` });
     // kleine Änderung automatisch: beim nächsten lockeren Lauf eine Puls-Grenze in den Text
     const next = C.planDays(weeks).filter((d: any) => d.date >= today && d.date <= C.addDays(today, 7)).flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.cancelled && !C.isHard(s) && !(st.sessions[s.id] || {}).completed && !/Puls-Grenze/.test(s.description || '')).map((s: any) => ({ s, date: d.date })))[0];
     if (next && easyMax) auto.push({ id: `ana-hr-${next.s.id}`, type: 'modify', sessionId: next.s.id, group: `analysis-${today}`, set: { description: `Puls-Grenze: unter ${easyMax}. Lieber langsamer laufen oder kurz gehen, wenn der Puls darüber steigt.\n${next.s.description || ''}`.trim() }, what: `${next.s.title} (${fmtD(next.date)}): Puls-Grenze ${easyMax} dazu`, reason: '3 lockere Läufe in Folge mit zu hohem Puls' });

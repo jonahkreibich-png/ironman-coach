@@ -20,6 +20,7 @@ import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
 import { de, mmss, dowName, joinDe } from './texts';
 import { patternOf, intervalsOf, type Pattern } from '../activity/structure';
 import { evaluateIntervals, plannedIntervals, evalToIntervalOut, type IvEval, type IvThresholds } from '../intervals';
+import { mainPart, type MainPart } from '../sections';
 
 export interface ReviewOpt { label: string; say: string; go?: string }
 export interface Review { intent: 'review'; text: string; options: ReviewOpt[]; good: string[]; better: string[]; next: string[]; missing: string[]; items: number }
@@ -124,6 +125,14 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   const lthr = d.sport === 'bike' ? th.lthrBike : th.lthrRun;
   const pc = paceCtx(p, v.indoor, null, d.date);
   const z = plannedZone(s) ?? (hard ? 4 : 2);
+  // Auftrag 35: Zielzone nur am Hauptteil bewerten (Aufwärmen und Ausklang zählen nicht), mit Zeit in der Zielzone, wenn es einen Verlauf gibt
+  const mp: MainPart | null = (d.sport === 'run' || d.sport === 'bike') ? mainPart(s || { sport: d.sport }, d.st, d.act ? effectiveActivity(d.act, d.st) : null, th, d.sport) : null;
+  const hrJ = mp && mp.hr ? mp.hr : v.hr;
+  const inMain = mp && mp.hr ? ' im Hauptteil' : '';
+  const notCounted = mp && (mp.warmMin || mp.coolMin) ? ` (${[mp.warmMin ? `${Math.round(mp.warmMin)} min Aufwärmen` : '', mp.coolMin ? `${Math.round(mp.coolMin)} min Ausklang` : ''].filter(Boolean).join(' und ')} nicht mitgezählt)` : '';
+  const zs = mp && mp.zoneSec; const ztot = zs ? zs.reduce((a, x) => a + x, 0) : 0;
+  const shareAbove = zs && ztot ? zs.slice(z).reduce((a, x) => a + x, 0) / ztot : null;
+  const shareIn = zs && ztot ? zs[Math.max(0, Math.min(4, z - 1))] / ztot : null;
   let hardSeen = false; // ohne Plan: am Puls als harte Einheit erkannt
   const facts: string[] = [];
   if (v.min) facts.push(`${Math.round(v.min)} min`);
@@ -162,40 +171,46 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     }
   }
   // Puls und Zone
-  if (v.hr && lthr && (d.sport === 'run' || d.sport === 'bike')) {
-    const hz = hrZoneOf(v.hr, lthr); const zr = zoneRange(lthr, z);
+  if (hrJ && lthr && (d.sport === 'run' || d.sport === 'bike')) {
+    const hz = hrZoneOf(hrJ, lthr); const zr = zoneRange(lthr, z);
+    // mit Verlauf zählt die Zeit über der Zielzone (mehr als 30 %), sonst der Durchschnitt
+    const over = shareAbove != null ? shareAbove > 0.3 : hz > z;
     if (!hard) {
-      if (hz <= z) good.push(`Puls Ø ${Math.round(v.hr)} in Zone ${hz}${hz === z ? ` (geplant Zone ${z}, ${zr.lo ? `${zr.lo}-${zr.hi}` : `unter ${zr.hi}`})` : ''}: schön locker.`);
+      if (!over) good.push(`Puls${inMain} Ø ${Math.round(hrJ)} in Zone ${hz}${hz === z ? ` (geplant Zone ${z}, ${zr.lo ? `${zr.lo}-${zr.hi}` : `unter ${zr.hi}`})` : ''}${shareIn != null ? `, ${Math.round(shareIn * 100)} % der Zeit in Zone ${z}` : ''}${notCounted}: schön locker.`);
       else {
         let fix = '';
         if (d.sport === 'run' && v.pace) { const rg = W.runPaceRange(pc, z); fix = ` Nächstes Mal langsamer, etwa ${mmss(rg[0])}-${mmss(rg[1])}/km, auch wenn es sich zu ruhig anfühlt.`; }
         if (d.sport === 'bike') fix = ` Nächstes Mal ruhiger treten${pc.bikeKmh && !v.indoor ? `, auf flacher Strecke etwa ${speedRange(pc.bikeKmh, z)}` : ''}, bergauf kleinerer Gang.`;
         // Auftrag 14: selbst hinzugefügte Einheit: nichts war geplant – eine harte Einheit ist dann einfach hart
         if (!s && hz >= 4) hardSeen = true;
-        if (!s && hz >= 4) better.push(`Puls Ø ${Math.round(v.hr)} in Zone ${hz}: das war eine harte Einheit, keine lockere. Sie zählt als harter Tag, der Tag danach sollte locker sein.`);
-        else better.push(`Puls Ø ${Math.round(v.hr)} lag in Zone ${hz}, ${s ? 'geplant war' : 'für eine lockere Einheit passt'} Zone ${z} (bis ${zr.hi}). Locker trainiert die Grundlage, zu schnell macht nur müde.${fix}`);
+        if (!s && hz >= 4) better.push(`Puls${inMain} Ø ${Math.round(hrJ)} in Zone ${hz}: das war eine harte Einheit, keine lockere. Sie zählt als harter Tag, der Tag danach sollte locker sein.`);
+        else better.push(`Puls${inMain} Ø ${Math.round(hrJ)} lag in Zone ${hz}${shareAbove != null ? ` (${Math.round(shareAbove * 100)} % der Zeit über Zone ${z})` : ''}, ${s ? 'geplant war' : 'für eine lockere Einheit passt'} Zone ${z} (bis ${zr.hi}). Locker trainiert die Grundlage, zu schnell macht nur müde.${fix}`);
         if (hz >= z + 1) fatigue += 0.5;
       }
     } else {
-      if (hz >= 3) good.push(`Harte Einheit wirklich hart: Puls Ø ${Math.round(v.hr)} (Zone ${hz}).`);
-      else if (v.intervals && v.intervals.avgHrWork && hrZoneOf(v.intervals.avgHrWork, lthr) >= 3) good.push(`In den Belastungen Puls Ø ${v.intervals.avgHrWork} (Zone ${hrZoneOf(v.intervals.avgHrWork, lthr)}): hart genug. Der Schnitt mit Pausen (${Math.round(v.hr)}) ist natürlich niedriger.`);
-      else if (v.intervals || !s || !(s.spec && (s.spec.steps || []).some((x: any) => x.part === 'main' && (x.reps || 1) > 1))) better.push(`Puls Ø ${Math.round(v.hr)} nur Zone ${hz}. Für eine harte Einheit war das eher locker.`);
+      if (hz >= 3) good.push(`Harte Einheit wirklich hart: Puls${inMain} Ø ${Math.round(hrJ)} (Zone ${hz})${notCounted}.`);
+      else if (v.intervals && v.intervals.avgHrWork && hrZoneOf(v.intervals.avgHrWork, lthr) >= 3) good.push(`In den Belastungen Puls Ø ${v.intervals.avgHrWork} (Zone ${hrZoneOf(v.intervals.avgHrWork, lthr)}): hart genug. Der Schnitt mit Pausen (${Math.round(hrJ)}) ist natürlich niedriger.`);
+      else if (v.intervals || !s || !(s.spec && (s.spec.steps || []).some((x: any) => x.part === 'main' && (x.reps || 1) > 1))) better.push(`Puls${inMain} Ø ${Math.round(hrJ)} nur Zone ${hz}. Für eine harte Einheit war das eher locker.`);
     }
-    if (v.hrZones && !hard) {
-      const tot = v.hrZones.reduce((a, x) => a + x, 0) || 1; const hi = (v.hrZones[2] + v.hrZones[3] + v.hrZones[4]) / tot;
+    // Auftrag 35: Zeit in den Zonen nur im Hauptteil, wenn er erkannt ist (das Aufwärmen in Zone 1 ist nie „zu locker“)
+    const zt = zs || v.hrZones;
+    if (zt && !hard && !(zs && shareIn != null)) {
+      const tot = zt.reduce((a, x) => a + x, 0) || 1; const hi = (zt[2] + zt[3] + zt[4]) / tot;
       if (hi > 0.25) better.push(`${Math.round(hi * 100)} % der Zeit in Zone 3 oder höher. Bei lockeren Einheiten sollten es unter 10 % sein.`);
-      else if (tot > 600) good.push(`${Math.round((v.hrZones[0] + v.hrZones[1]) / tot * 100)} % der Zeit in Zone 1-2.`);
+      else if (tot > 600) good.push(`${Math.round((zt[0] + zt[1]) / tot * 100)} % der Zeit in Zone 1-2.`);
     }
-  } else if ((d.sport === 'run' || d.sport === 'bike') && !v.hr) missing.push('Puls');
+  } else if ((d.sport === 'run' || d.sport === 'bike') && !hrJ) missing.push('Puls');
   // Tempo, Leistung, km/h gegen die Vorgabe
-  if (d.sport === 'run' && v.pace && !hard) {
+  const paceJ = mp && mp.paceSec ? mp.paceSec : v.pace;
+  if (d.sport === 'run' && paceJ && !hard) {
     const rg = W.runPaceRange(pc, z);
-    if (v.pace < rg[0] - 10 && !(v.hr && lthr && hrZoneOf(v.hr, lthr) <= z)) better.push(`Mit ${mmss(v.pace)}/km schneller als die Vorgabe (${mmss(rg[0])}-${mmss(rg[1])}/km).`);
+    if (paceJ < rg[0] - 10 && !(hrJ && lthr && hrZoneOf(hrJ, lthr) <= z)) better.push(`Mit ${mmss(paceJ)}/km${inMain} schneller als die Vorgabe (${mmss(rg[0])}-${mmss(rg[1])}/km).`);
   }
-  if (d.sport === 'bike' && v.power && th.ftp && p.powerMeter) {
+  const powJ = mp && mp.power && v.power ? mp.power : v.power;
+  if (d.sport === 'bike' && powJ && th.ftp && p.powerMeter) {
     const pz = [0, 0.55, 0.75, 0.9, 1.05, 1.2][z]; const lo = [0, 0, 0.56, 0.76, 0.91, 1.06][z];
-    if (v.power >= th.ftp * lo && v.power <= th.ftp * pz) good.push(`${Math.round(v.power)} W, genau im Zielbereich (${Math.round(th.ftp * lo)}-${Math.round(th.ftp * pz)} W).`);
-    else if (v.power > th.ftp * pz && !hard) better.push(`${Math.round(v.power)} W lagen über Zone ${z} (bis ${Math.round(th.ftp * pz)} W).`);
+    if (powJ >= th.ftp * lo && powJ <= th.ftp * pz) good.push(`${Math.round(powJ)} W${inMain}, genau im Zielbereich (${Math.round(th.ftp * lo)}-${Math.round(th.ftp * pz)} W).`);
+    else if (powJ > th.ftp * pz && !hard) better.push(`${Math.round(powJ)} W${inMain} lagen über Zone ${z} (bis ${Math.round(th.ftp * pz)} W).`);
   }
   if (d.sport === 'bike' && v.speed && !v.indoor && !v.power && !hard) {
     const k = kindOf({ indoor: v.indoor, bikeType: v.bikeType, title: d.title }, p); const thr = bikeSpeedsOf(p)[k];

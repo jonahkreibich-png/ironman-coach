@@ -8,7 +8,7 @@ import { metaLine, statusIcon, sessionTitle, plannedHtml } from './session';
 import { editBar, editing, canUndoGroups } from './planedit';
 import { sportIc, gearChips } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
-import { shortPlan } from '../../../shared/workouts';
+import { whatText, viewToggle } from '../planview';
 import { duration } from '../../../shared/i18n';
 import { isHardSession, isTestSession, sessionMarks, intensityBand, weekLine, MARKS, type Mark } from '../../../shared/intensity';
 import { changedOf, effectiveSession, actualSport } from '../../../shared/results';
@@ -62,7 +62,7 @@ function planRow(s: any): string {
 }
 /* Auftrag 30: Tests deutlich hervorgehoben – eigene Karte mit Ablauf und „frisch sein“ */
 function testCard(s: any): string {
-  const how = s.spec ? shortPlan(s.spec) : '';
+  const how = s.spec ? whatText(s) : '';
   return `<div class="pr-testcard" data-test-card><div class="pr-testhead">${ic('target')}<b>${esc(s.sport === 'swim' ? 'Schwimmtest' : s.sport === 'bike' ? 'Radtest' : s.sport === 'run' ? 'Lauftest' : 'Test')}</b></div>${how ? `<div class="xs"><b>Ablauf:</b> ${esc(how)}</div>` : ''}<div class="xs muted">Frisch sein: am Tag davor locker oder frei, gut schlafen, 2–3 h vorher essen. Danach passt die App deine Zonen an.</div></div>`;
 }
 
@@ -133,8 +133,9 @@ function dayRows(x: DayInfo, _today: string): string {
 }
 /* kurz, was man tun soll (aus dem Aufbau der Einheit; Teamsport und Wettkampf ohne) */
 function whatLine(s: any): string {
-  const w = s.spec && !s.race && !s.cancelled ? shortPlan(s.spec) : '';
-  return w ? `<div class="pr-what" data-what>${esc(w)}</div>` : '';
+  const w = s.spec && !s.race && !s.cancelled ? whatText(s) : '';
+  // Auftrag 35: Lauf/Rad umschaltbar zwischen Minuten und km
+  return w ? `<div class="pr-what" data-what>${esc(w)}${viewToggle(s, 'inline')}</div>` : '';
 }
 const restRow = (x: DayInfo) => `<div class="pr pr-rest" data-rest-day><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="pr-t muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span></div>`;
 /* aufgeklappter Tag: angetippt, sonst heute (in anderen Wochen keiner) */

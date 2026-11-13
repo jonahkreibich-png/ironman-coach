@@ -1,5 +1,14 @@
 # Für Jonah
 
+**Nach dem Update auf 3.23.0:**
+1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
+2. Kommt im Coach „Neue Puls-Zonen vorgeschlagen“: Mehr → Zonen und Tests ansehen und „Übernehmen“ oder „Nicht jetzt“ wählen. Ohne dein Okay ändert sich nichts.
+3. Abschnitte und km-Ansicht musst du nicht einstellen; die Wahl Minuten/km merkt sich die App.
+
+---
+
+## Frühere Hinweise
+
 **Nach dem Update auf 3.22.0:**
 1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
 2. Am nächsten Morgen kommt im Coach „Plan an die Trainingsregeln angepasst“ (z. B. langer Lauf am 22.11. 70 statt 85 min, Erholungswochen etwas voller). Gefällt dir eine Änderung nicht: dort „Rückgängig“.
