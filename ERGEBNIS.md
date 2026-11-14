@@ -1,6 +1,6 @@
 # Auftrag 35: Abschnitte, Kontraste, km-Ansicht, Einheit umwandeln, Puls-Zonen (13.11.)
 
-**Stand:** Version **3.23.0**, STAND_RELEASE. Gilt für alle Nutzer und alle Sportarten. Was du am iPhone tun kannst: FUER-JONAH.md.
+**Stand:** Version **3.23.0**, **veröffentlicht am 14.11.** (erst Test-App, dann echte App; beide vorher gesichert, alle 3 Nutzer starten fehlerfrei, auch vom alten Stand aus; 10 Minuten ohne Startfehler). Gilt für alle Nutzer und alle Sportarten. Was du am iPhone tun kannst: FUER-JONAH.md.
 
 ## Was jetzt neu ist
 | # | Punkt | Was vorher da war | Was jetzt geht |
@@ -34,7 +34,7 @@
 | Lange Einheiten mit Pausen | Pausen in der Dauer | **schon gelöst** (Bewegungszeit) |
 
 ## Tests
-STAND_TESTS
+Alle grün im Release-Lauf: 3268 Unit-Tests, 738 Browser-Tests (WebKit/iPhone und Chromium), Plan-Check und Start-Test mit Kopien der echten Daten aller Nutzer. Neu: Kontrast-Test für jeden Bildschirm, Eingabe-/Anzeige-/Überlauf-Tests für Abschnitte, km-Ansicht, Umwandeln, Puls-Zonen und 3 Tests für die Tab-Leiste (langsames Gerät).
 
 ## Grenzen (ehrlich)
 - Erkennung aus dem Pulsverlauf nur für Aufzeichnungen ab 3.23.0; ältere Rad-Aufzeichnungen ohne Runden bleiben ohne Abschnitte.
