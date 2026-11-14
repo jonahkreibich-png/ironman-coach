@@ -8,6 +8,7 @@ import { t } from '../../shared/i18n';
 import { SOURCE_LABEL } from '../../shared/activity/merge';
 import { storage } from './persistence';
 import { logError } from './errlog';
+import { nav } from './nav';
 
 /* ---------- Aktionen ---------- */
 export type ActFn = (el: HTMLElement, ev: Event) => void | Promise<void>;
@@ -145,6 +146,7 @@ let sheetRender: (() => string) | null = null;
 /* Auftrag 17: an Fachbegriffen nur ein dezenter Link ins Lexikon (Mehr → Lexikon), keine Erklärtexte in den Ansichten */
 export function termLink(term: string, label = term): string { return `<button type="button" class="term" data-act="lex" data-q="${esc(term)}" aria-label="${esc(t('lexicon.open', { term }))}">${esc(label)}</button>`; }
 export function openSheet(title: string, render: () => string): void {
+  nav.seq++; // Auftrag 35: neuere Handlung – ein noch ausstehender Tab-Tipp schließt das Blatt nicht mehr
   sheetRender = () => `<div class="sheet-grip"></div><div class="sheet-h"><h2>${esc(title)}</h2><button class="icon-btn" data-act="sheet-close" aria-label="${esc(t('common.close'))}">${ic('close')}</button></div>${render()}`;
   $('#sheetPanel').innerHTML = sheetRender();
   $('#sheet').hidden = false; document.body.style.overflow = 'hidden';

@@ -279,14 +279,16 @@ function frame(t: number): void {
 const kick = () => { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } };
 
 /* Navigation erst, wenn die Animation läuft (zwei Frames später): Aufbau des neuen Tabs bremst das Gleiten dann nicht mehr */
+let pendSeq = 0;
 function navigate(tab: string): void {
   pendingTab = tab;
   // Auftrag 35 (Fund beim Release): wurde zwischen Tipp und Ausführung schon anders navigiert (z. B. gleich eine Unterseite geöffnet),
-  // verfällt der Tab-Tipp – sonst warf er die neue Seite wieder hinaus (app.spec, auch in 3.22.0 etwa jeder zweite Lauf)
-  const seq = nav.seq;
+  // verfällt der Tab-Tipp – sonst warf er die neue Seite wieder hinaus (app.spec, auch in 3.22.0 etwa jeder zweite Lauf).
+  // Der Tipp zählt selbst als Navigation: ein neuerer Tipp überholt den älteren (nie umgekehrt); der überholte lässt die Linse in Ruhe.
+  const seq = ++nav.seq; pendSeq = seq;
   const go = () => {
+    if (nav.seq !== seq) { if (pendSeq === seq) { pendingTab = ''; syncTabLens(); } return; }
     pendingTab = '';
-    if (nav.seq !== seq) { syncTabLens(); return; }
     const b = tabs && tabs.querySelector<HTMLElement>(`.tab[data-tab="${tab}"]`);
     if (b && ACTIONS['go-tab']) { try { ACTIONS['go-tab'](b, new Event('click')); } catch (e) { /* Navigation zeigt eigene Meldung */ } }
     // Navigation abgelehnt (z. B. ungespeicherte Änderungen): Linse zurück zum aktiven Tab

@@ -15,7 +15,7 @@
 | 5 | Puls-Zonen | nur nach Tests | Vorschlag aus Uhrdaten (Maximalpuls mehrmals höher bzw. Schwellenpuls aus harten 20–30-min-Abschnitten) mit vorher/nachher und „Übernehmen“, Schutz gegen Messfehler und Fußball-Spitzen. Zonen-Seite zeigt je Wert Herkunft und Datum. |
 
 ## Selbst gefunden und behoben
-- Tab-Leiste: Wer „Mehr“ antippte und gleich danach eine Unterseite, wurde manchmal wieder auf „Mehr“ zurückgeworfen (verspäteter Tab-Tipp; schon in 3.22.0, fiel beim Release-Test auf). Jetzt verfällt der verspätete Tipp.
+- Tab-Leiste: Wer „Mehr“ antippte und gleich danach eine Unterseite, wurde manchmal wieder auf „Mehr“ zurückgeworfen (verspäteter Tab-Tipp; schon in 3.22.0, fiel beim Release-Test auf). Jetzt verfällt der verspätete Tipp; bei zwei schnellen Tipps gewinnt immer der letzte, und eine gleich danach geöffnete Einheit bleibt offen (beim zweiten Release-Versuch gefunden und behoben).
 - Plan bearbeiten: Ein schon bestehender Hinweis galt als „neu“, wenn sich nur eine Zahl darin änderte (z. B. nach dem Kürzen einer Einheit „Woche 5: 102 % mehr“). Jetzt ohne Zahlen verglichen.
 
 ## Weitere Stellen mit demselben Problem (ein Wert für die ganze Einheit)

@@ -44,7 +44,8 @@ test.describe('Grundfunktionen', () => {
 
   test('Einheit öffnen und Messwert von Hand eintragen', async ({ page }) => {
     await tab(page, 'plan').click();
-    const open = page.locator('[data-act="sess-open"]').first();
+    await expect(page.locator('.view[data-view="plan"]')).toBeVisible();
+    const open = page.locator('.view[data-view="plan"] [data-act="sess-open"]').first();
     const sid = await open.getAttribute('data-sid');
     await open.click();
     await expect(page.locator('#sheet')).toBeVisible();

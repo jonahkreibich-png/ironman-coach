@@ -6,6 +6,6 @@ export const nav = {
   rerender: () => {},
   refresh: () => {},
   go: (_view: string, _scroll?: string | null) => {},
-  /** Auftrag 35: zählt jede Navigation (Tab, Unterseite, Zurück); ein verspäteter Tab-Tipp der Tab-Leiste verfällt, wenn sich der Zähler inzwischen geändert hat */
+  /** Auftrag 35: zählt jede Navigation (Tab-Tipp, Unterseite, Zurück, Blatt öffnen); ein verspäteter Tab-Tipp der Tab-Leiste verfällt, wenn sich der Zähler inzwischen geändert hat */
   seq: 0
 };
