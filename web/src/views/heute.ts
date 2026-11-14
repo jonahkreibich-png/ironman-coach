@@ -154,7 +154,7 @@ function coachPreview(): string {
 function foodMini(): string {
   const n = nutritionToday();
   if (!n) return '';
-  return sec(t('heute.food'), `<button class="card" data-act="go-sub" data-sub="essen"><div class="spread"><b>${esc(n.typeLabel)}</b><span class="small muted num">${n.eaten != null ? `${n.eaten} / ` : ''}${n.low}-${n.high} kcal</span></div>${n.eaten != null ? bar(n.eaten / n.high * 100, n.eaten < n.low ? 'var(--warn)' : 'var(--good)') : `<div class="hint">${esc(t('heute.foodNone'))}</div>`}</button>`);
+  return sec(t('heute.food'), `<button class="card" data-act="go-sub" data-sub="essen"><div class="spread" style="flex-wrap:wrap;row-gap:2px"><b>${esc(n.typeLabel)}</b><span class="small muted num">${n.eaten != null ? `${n.eaten} / ` : ''}${n.low}-${n.high} kcal</span></div>${n.eaten != null ? bar(n.eaten / n.high * 100, n.eaten < n.low ? 'var(--warn)' : 'var(--good)') : `<div class="hint">${esc(t('heute.foodNone'))}</div>`}</button>`);
 }
 
 /* Entwurf B: Coach-Feed mit Zeitleiste */
@@ -176,7 +176,8 @@ function careHints(): string {
 }
 export function renderHeute(): string {
   const d = D();
-  const head = `<div class="spread" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill hl">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
+  // Fix 3.23.0: Datum schrumpft nicht (bei langem Zielnamen war es 12 px breit), die Ziel-Pille bricht in die nächste Zeile um
+  const head = `<div class="spread heute-head" style="margin:var(--s1) 2px var(--s3)"><div><div class="lbl">${esc(dowLong(d.today))}, ${fmtDate(d.today)}</div></div>${d.goal && d.goal.date ? `<span class="pill hl">${esc(t('heute.goalIn', { name: d.goal.name, n: daysUntil(d.today, d.goal.date) }))}</span>` : ''}</div>${syncStatusLine()}`;
   // Auftrag 28: jede Karte für sich – ein Fehler in einer Karte zeigt nur dort „konnte nicht geladen werden“
   const b = (name: string, fn: () => string) => safeBlock('heute-' + name, fn);
   const week = () => sec(t('heute.week'), weekStrip());

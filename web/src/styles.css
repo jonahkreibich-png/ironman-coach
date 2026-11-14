@@ -767,6 +767,32 @@ body.no-plan .tab-lens { display: none; }
 .plan-view button { flex: 0 0 auto; min-width: 64px; min-height: 36px; }
 .structure .plan-view { margin-bottom: var(--s2); }
 .pr-what .plan-view.inline { margin-top: 6px; }
-.session-hero:has(.plan-view) { flex-wrap: wrap; }
+/* Fix 3.23.0: Der Titel-Knopf (Symbol + Titel) füllt immer die erste Zeile (nur der Haken passt daneben), der Umschalter kommt darunter.
+   Vorher hatte der Knopf Basis 0 (.grow) und schrumpfte auf ca. 38 px, sobald der Umschalter mit in die Zeile rutschte. */
+.session-hero:has(.plan-view) { flex-wrap: wrap; row-gap: var(--s2); }
+.session-hero:has(.plan-view) > .row.grow { flex: 1 1 calc(100% - var(--tap) - var(--s3)); }
 .session-hero .plan-view.hero { margin-left: 56px; }
+/* Fix 3.23.0 (gefunden mit der neuen Prüfung „Text in zu schmalem Bereich“): Datum im Heute-Kopf behält seine Breite, die Ziel-Pille bricht um */
+.heute-head { flex-wrap: wrap; row-gap: var(--s1); }
+.heute-head > div:first-child { flex: 0 0 auto; }
+.heute-head > .pill { white-space: normal; }
+/* Fix 3.23.0, gleiche Ursache an weiteren Stellen (gefunden mit „Text in zu schmalem Bereich“ bei 130 % Zoom bzw. sehr großer Schrift):
+   Ein Textbereich mit flex: 1 (Basis 0) neben Teilen, die nicht schrumpfen, wurde 30-60 px schmal (z. B. Verbindungen: Titel 43 px,
+   17 Zeilen). Jetzt hat der Textbereich eine Mindestbreite; was daneben steht, bricht in die nächste Zeile um. Bei normaler Breite
+   und Schrift ändert sich nichts (die Mindestbreite greift erst, wenn der Text sonst schmaler würde). */
+.li { flex-wrap: wrap; }
+.li > .grow { min-width: min(5.5rem, 100%); }
+.session-hero > .row.grow > .grow { min-width: min(6rem, 100%); }
+.pr-b { flex-wrap: wrap; }
+.pr-t { flex-basis: 0; min-width: min(6rem, 100%); }
+.ptable.three .prow { display: flex; flex-wrap: wrap; align-items: flex-start; }
+.ptable.three .prow > :first-child { flex: 1 1 6rem; min-width: 0; }
+.ptable.three .prow > :nth-child(2) { margin-left: auto; }
+.ptable.three .prow > :not(:first-child) { flex: 0 1 auto; text-align: right; }
+.freq-row { display: flex; flex-wrap: wrap; justify-content: space-between; }
+.freq-row > :first-child { flex: 1 1 6rem; min-width: 0; }
+.freq-row > :last-child { margin-left: auto; }
+.plan-metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); }
+.fld .seg { flex-wrap: wrap; }
+.fld .seg > button { min-width: min(5.5em, 100%); }
 .origin-list { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }

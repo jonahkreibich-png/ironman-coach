@@ -54,3 +54,38 @@ export async function writeStored(page: Page, state: any) {
   localStorage.setItem('ec_state_v2',JSON.stringify(value));
  },state);
 }
+
+/* Fix 3.23.0: Textbereiche dürfen nicht zu schmal werden. Die Überlauf-Tests prüften nur, ob etwas über einen Rand ragt – ein auf 38 px
+   geschrumpfter Titel (bricht nach fast jedem Buchstaben um, Karte über 500 px hoch) ragt nirgends heraus. Hier: jeder sichtbare Text
+   ab 12 Zeichen darf nicht auf 3 oder mehr Zeilen mit weniger als 7 Zeichen pro Zeile umbrechen (Breite) – dann ist auch der Kasten
+   unnötig hoch (Höhe). Die Meldung nennt die Elternkette mit Breiten, damit man sieht, wer den Platz wegnimmt.
+   Wird von layout.spec.ts und auftrag29-ueberlauf.spec.ts mitgeprüft. */
+export async function narrowText(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const desc = (el: Element) => `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''} „${(el.textContent || '').trim().slice(0, 40)}“`;
+    const short = (el: Element) => el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '') + ':' + Math.round(el.getBoundingClientRect().width);
+    const hiddenIn = (el: Element) => { for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) { if (!(d as HTMLDetailsElement).open) { const sm = el.closest('summary'); if (!sm || sm.parentElement !== d) return true; } } return false; };
+    const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const par = n.parentElement; const txt = (n.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!par || txt.replace(/ /g, '').length < 12 || par.closest('svg, [hidden], [aria-hidden="true"]') || hiddenIn(par)) continue;
+      const cs = getComputedStyle(par); if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      const rects = Array.from(rg.getClientRects()).filter(b => b.width > 0 && b.height > 0);
+      const lines = new Set(rects.map(b => Math.round(b.top / 4))).size;
+      if (lines < 3 || txt.length / lines >= 7) continue;
+      const bw = Math.round(Math.max(...rects.map(b => b.right)) - Math.min(...rects.map(b => b.left)));
+      const chain: string[] = []; for (let p: Element | null = par.parentElement, i = 0; p && p !== document.body && i < 3; p = p.parentElement, i++) chain.push(short(p));
+      out.push(`${desc(par)} Text in zu schmalem Bereich (${bw} px breit, ${lines} Zeilen; in ${chain.join(' < ')})`);
+    }
+    return [...new Set(out)].slice(0, 10);
+  });
+}
+/* Fix 3.23.0: offene Radeinheit mit Aufbau (spec) und einem der längsten Titel aus echten Plänen – nur mit spec erscheint der Umschalter
+   „Minuten | km“. Die Demo-Daten haben keine Lauf-/Radeinheit mit spec, darum sahen die Überlauf-Tests den Umschalter nie. */
+export function longBikeSession(id = 'long-bike') {
+  return { id, sport: 'bike', title: 'Lockere Ausfahrt 45 min (Gravelbike), mit Kadenz-Blöcken', plannedMinutes: 45, zone: 'Zone 2',
+    spec: { sport: 'bike', kind: 'long', variant: 'mit Kadenz-Blöcken', ctx: { runThrSec: 300, lthrRun: 170, lthrBike: 160, bikeKmh: 30, bikeName: 'Gravelbike' },
+      steps: [{ part: 'warm', min: 10, zone: 1 }, { part: 'main', min: 25, zone: 2, note: 'darin 5×5 min mit hoher Trittfrequenz (100+), dazwischen normal' }, { part: 'cool', min: 10, zone: 1 }] } };
+}

@@ -8,7 +8,7 @@ import { type Page } from '@playwright/test';
 import fs from 'node:fs';
 // @ts-ignore – reines JS ohne Typen
 import { makeDemo } from '../../fixtures/demo.mjs';
-import { TODAY } from './helpers';
+import { TODAY, narrowText, longBikeSession } from './helpers';
 
 const MAIN = fs.readFileSync('web/src/main.ts', 'utf8');
 const TABS = [...MAIN.matchAll(/\{ id: '(\w+)', icon: '\w+', render: /g)].map(m => m[1]);
@@ -33,6 +33,8 @@ function data(state: State) {
     const msgs: any = {};
     for (let i = 0; i < 30; i++) msgs['m' + i] = { id: 'm' + i, at: Date.parse(TODAY + 'T06:00:00Z') - i * 3600e3, date: TODAY, kind: i % 3 ? 'answer' : 'adjust', from: i % 2 ? 'coach' : 'user', title: i % 2 ? 'Plan angepasst: ' + LONG : undefined, text: `${LONG} ${'Wort '.repeat(30)} https://example.com/${LONG}`, actions: i === 1 ? [{ label: 'Ja, ' + LONG, kind: 'say', payload: 'x' }] : [] };
     demo.coachMsgs = msgs;
+    // Fix 3.23.0: offene Radeinheit mit langem echten Titel und Umschalter „Minuten | km“
+    { const d = demo.plan.weeks.flatMap((w: any) => w.days).find((x: any) => x.date === TODAY); if (d) d.sessions.push(longBikeSession()); }
     // Auftrag 9: Zeitleiste mit vielen Phasen, langen Zielnamen und Platzhaltern
     demo.plan.meta.timeline = { from: TODAY, to: '2029-09-16', segments: [['base', '2026-10-19', '2027-02-21', 's'], ['build', '2027-02-22', '2027-05-09', 's'], ['specific', '2027-05-10', '2027-06-06', 's'], ['race', '2027-06-07', '2027-06-13', 's'], ['build', '2027-06-14', '2027-08-15', 'o'], ['taper', '2027-08-16', '2027-08-22', 'o'], ['race', '2027-08-23', '2027-08-29', 'o'], ['base', '2027-08-30', '2029-08-31', 'A'], ['race', '2029-09-01', '2029-09-16', 'A']].map(([phase, from, to, goalId]) => ({ phase, from, to, goalId })),
       goals: [{ id: 's', name: 'Sprint-Triathlon ' + LONG, date: '2027-06-13', priority: 'C', placeholder: true }, { id: 'o', name: 'Olympische Distanz am See mit sehr langem Namen', date: '2027-08-29', priority: 'B', placeholder: true }, { id: 'A', name: 'Langdistanz ' + LONG, date: '2029-09-15', priority: 'A' }] };
@@ -63,7 +65,7 @@ async function prepare(page: Page, state: State, dark: boolean) {
 }
 /* Was ragt heraus? Elemente in einem eigenen Scroll-Kasten zählen nicht, der Kasten selbst schon. */
 async function overflow(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+  const found = await page.evaluate(() => {
     const W = document.documentElement.clientWidth;
     const out: string[] = [];
     // Auftrag 15: Safari auf dem iPhone zeichnet Datums-/Zeitfelder mit eigener Mindestbreite (etwa 250 px), WebKit auf dem PC nicht.
@@ -124,6 +126,8 @@ async function overflow(page: Page): Promise<string[]> {
     }
     return [...new Set(out)].slice(0, 15);
   });
+  // Fix 3.23.0: auch zu schmale Textbereiche (ragen nirgends heraus, brechen aber nach fast jedem Buchstaben um)
+  return [...found, ...await narrowText(page)];
 }
 const SCREENS = (state: State) => state === 'leer' ? ['/', '/?go=onboarding', '/?go=konto', '/?go=daten', '/?go=ueber', '/?go=verbindungen', '/?go=feedback', '/?invite=ABCDEFGH', '#intro'] : [...TABS.map(x => '/?go=' + x), ...SUBS.map(x => '/?go=' + x)];
 

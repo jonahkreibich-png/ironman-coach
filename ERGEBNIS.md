@@ -1,3 +1,13 @@
+# Fix 3.23.1: Heute-Karte zu schmal und riesig hoch (14.11.)
+
+**Stand:** behoben und getestet; Veröffentlichung siehe unten.
+
+- **Fehler:** In der Heute-Karte rutschte der Umschalter „Minuten | km“ mit dem Haken in die Titelzeile. Der Titel schrumpfte auf 21–38 px, die Karte wurde 700–1100 px hoch.
+- **Fix:** Titel (mit Symbol) füllt immer die erste Zeile, nur der Haken daneben, Umschalter darunter. Plan-Zeile und geöffnete Einheit hatten das Problem nicht (Umschalter steht dort schon unter dem Text) – jetzt dauerhaft mitgeprüft.
+- **Warum die Überlauf-Tests es nicht fanden:** 1. Sie prüften nur, ob etwas über einen Rand ragt. Ein zu schmaler Titel ragt nirgends heraus, er wird nur schmal und hoch. 2. Ihre Testdaten hatten keine einzige Lauf-/Radeinheit mit Aufbau – der Umschalter erschien dort nie. 3. Der Test zum Umschalter (Auftrag 35) prüfte nur „ragt nichts heraus“ und nutzte einen kurzen Titel.
+- **Neue Tests:** `auftrag35-umschalter-breite.spec.ts` (WebKit + Chromium, 320/375/390 px, Schrift normal und groß, Minuten und km, 4 der längsten und 2 häufige Titel aus echten Plänen): Titelbereich ≥ 60 % der Kartenbreite, Umschalter unter dem Titel, Karte nur eine Zeile höher, höchstens ca. 160 px (mittellange Titel) bzw. 210 px (längste). Mit altem Stand: 9 von 12 rot. Alle Überlauf-Tests prüfen jetzt zusätzlich „Text in zu schmalem Bereich“, und ihre Daten enthalten die lange Radeinheit.
+- **Dabei gefunden und behoben (gleiche Ursache):** Datum auf Heute neben langem Zielnamen (12 px breit), Verbindungen und Notizen bei 130 % Zoom (≈ 40 px), Prognosen, Plan-Zeilen und -Kennzahlen, Wochenstunden, Fragebogen bei sehr großer Schrift. Bei normaler Größe sieht alles gleich aus wie vorher (Bildvergleich).
+
 # Auftrag 35: Abschnitte, Kontraste, km-Ansicht, Einheit umwandeln, Puls-Zonen (13.11.)
 
 **Stand:** Version **3.23.0**, **veröffentlicht am 14.11.** (erst Test-App, dann echte App; beide vorher gesichert, alle 3 Nutzer starten fehlerfrei, auch vom alten Stand aus; 10 Minuten ohne Startfehler). Gilt für alle Nutzer und alle Sportarten. Was du am iPhone tun kannst: FUER-JONAH.md.

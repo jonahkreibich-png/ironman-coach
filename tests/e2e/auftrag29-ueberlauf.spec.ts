@@ -8,7 +8,7 @@ import { type Page } from '@playwright/test';
 import fs from 'node:fs';
 // @ts-ignore – reines JS ohne Typen
 import { makeDemo } from '../../fixtures/demo.mjs';
-import { TODAY } from './helpers';
+import { TODAY, narrowText, longBikeSession } from './helpers';
 
 const MAIN = fs.readFileSync('web/src/main.ts', 'utf8');
 const TABS = [...MAIN.matchAll(/\{ id: '(\w+)', icon: '\w+', render: /g)].map(m => m[1]);
@@ -26,6 +26,8 @@ function bigData() {
   // Extra-Einheiten mit großen Werten und langem Titel, erledigte Einheit mit vielen Werten
   demo.customWorkouts = { [today.date]: [{ id: 'c-big', sport: 'swim', title: 'Schwimmen ' + LONG, completed: true, source: 'manual', plannedMinutes: 1439, metrics: { min: '1439', meters: '19999', pace100: '9:59', spl: '79', longestCrawl: '19999' }, metricsSrc: { min: 'manual', meters: 'manual' } }] };
   const s = today.sessions.find((x: any) => x.sport !== 'rest');
+  // Fix 3.23.0: offene Radeinheit mit langem echten Titel und Umschalter „Minuten | km“ (Heute, Plan, Einheit)
+  today.sessions.push(longBikeSession());
   if (s) demo.sessions = { ...(demo.sessions || {}), [s.id]: { completed: true, notes: LONG + ' ' + 'Wort '.repeat(40), rpe: '10', metrics: { min: '1439', km: '299.9', hr: '229', maxHr: '239', decoupling: '-49.9', power: '1999', cadence: '239', strideLen: '2.99', ascent: '9999' }, metricsSrc: { min: 'manual' } } };
   demo.trend = [...(demo.trend || []).filter((p: any) => p.date !== TODAY), { date: TODAY, sleepHours: 15.9, hrv: 299, restingHR: 129, bodyTemp: -2.9, spo2: 99.9, breathingRate: 39.9, _src: { hrv: 'manual' } }];
   const msgs: any = {};
@@ -45,7 +47,7 @@ async function prepare(page: Page, dark: boolean, px: number) {
 }
 /* Prüfung wie layout.spec.ts: Bildschirm, Karte, eigener Kasten, Abschneiden, Wortbruch in Knöpfen/Zahlen */
 async function overflow(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+  const found = await page.evaluate(() => {
     const W = document.documentElement.clientWidth; const out: string[] = [];
     const desc = (el: Element) => `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''} „${(el.textContent || '').trim().slice(0, 40)}“`;
     if (document.documentElement.scrollWidth > W + 1) out.push(`Seite scrollt seitlich (${document.documentElement.scrollWidth} > ${W})`);
@@ -74,6 +76,8 @@ async function overflow(page: Page): Promise<string[]> {
     }
     return [...new Set(out)].slice(0, 12);
   });
+  // Fix 3.23.0: auch zu schmale Textbereiche (ragen nirgends heraus, brechen aber nach fast jedem Buchstaben um)
+  return [...found, ...await narrowText(page)];
 }
 const SCREENS = [...TABS.map(x => '/?go=' + x), ...SUBS.map(x => '/?go=' + x)];
 
