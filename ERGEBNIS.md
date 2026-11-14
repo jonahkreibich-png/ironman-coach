@@ -1,6 +1,6 @@
 # Fix 3.23.1: Heute-Karte zu schmal und riesig hoch (14.11.)
 
-**Stand:** behoben und getestet; Veröffentlichung siehe unten.
+**Stand:** veröffentlicht als 3.23.1 (14.11.): alle Tests grün (750), Sicherungen von Test- und echter App, erst stamio-test, dann echte App; Start-Test im Browser ok, 10 Minuten ohne Startfehler.
 
 - **Fehler:** In der Heute-Karte rutschte der Umschalter „Minuten | km“ mit dem Haken in die Titelzeile. Der Titel schrumpfte auf 21–38 px, die Karte wurde 700–1100 px hoch.
 - **Fix:** Titel (mit Symbol) füllt immer die erste Zeile, nur der Haken daneben, Umschalter darunter. Plan-Zeile und geöffnete Einheit hatten das Problem nicht (Umschalter steht dort schon unter dem Text) – jetzt dauerhaft mitgeprüft.
