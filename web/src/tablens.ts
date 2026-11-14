@@ -17,6 +17,7 @@
    abgespielt (läuft im Compositor weiter, während der neue Tab aufgebaut wird); der Tab wird erst zwei Bilder nach dem Start gebaut.
    „Bewegung reduzieren“: kein Tropfen, keine Verformung, die Markierung wechselt direkt. */
 import { ACTIONS } from './kit';
+import { nav } from './nav';
 
 const SLOP = 8;           // so weit darf der Finger beim Antippen wandern
 /* Auftrag 34: breite, flache Glas-Kapsel statt fast runder Linse (Video 2,09 s: ~100 × 62 pt gegenüber der Markierung ~92 × 50 pt;
@@ -280,8 +281,12 @@ const kick = () => { if (!raf) { last = 0; raf = requestAnimationFrame(frame); }
 /* Navigation erst, wenn die Animation läuft (zwei Frames später): Aufbau des neuen Tabs bremst das Gleiten dann nicht mehr */
 function navigate(tab: string): void {
   pendingTab = tab;
+  // Auftrag 35 (Fund beim Release): wurde zwischen Tipp und Ausführung schon anders navigiert (z. B. gleich eine Unterseite geöffnet),
+  // verfällt der Tab-Tipp – sonst warf er die neue Seite wieder hinaus (app.spec, auch in 3.22.0 etwa jeder zweite Lauf)
+  const seq = nav.seq;
   const go = () => {
     pendingTab = '';
+    if (nav.seq !== seq) { syncTabLens(); return; }
     const b = tabs && tabs.querySelector<HTMLElement>(`.tab[data-tab="${tab}"]`);
     if (b && ACTIONS['go-tab']) { try { ACTIONS['go-tab'](b, new Event('click')); } catch (e) { /* Navigation zeigt eigene Meldung */ } }
     // Navigation abgelehnt (z. B. ungespeicherte Änderungen): Linse zurück zum aktiven Tab

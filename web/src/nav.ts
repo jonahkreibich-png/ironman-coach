@@ -5,5 +5,7 @@ export const nav = {
   render: () => {},
   rerender: () => {},
   refresh: () => {},
-  go: (_view: string, _scroll?: string | null) => {}
+  go: (_view: string, _scroll?: string | null) => {},
+  /** Auftrag 35: zählt jede Navigation (Tab, Unterseite, Zurück); ein verspäteter Tab-Tipp der Tab-Leiste verfällt, wenn sich der Zähler inzwischen geändert hat */
+  seq: 0
 };

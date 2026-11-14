@@ -194,6 +194,7 @@ function warmSoon() {
 }
 on('view-retry', () => { invalidate(); rerender(); });
 function go(target: string, scroll?: string | null) {
+  nav.seq++;
   let [a, b] = target.split(':');
   if (a in SUB_ALIAS && !b) { const to = SUB_ALIAS[a]; if (to) a = to; else { a = 'mehr'; } }
   // offene, nicht übernommene Änderungen (Auftrag 6): vor dem Verlassen nachfragen
@@ -262,6 +263,7 @@ window.addEventListener('popstate', () => {
   subPushed = false;
   if (sheetOpen()) { closeSheet(); if (UI.sub) pushSub(); return; }
   if (!UI.sub) return;
+  nav.seq++;
   if (guardLeave('mehr', () => { UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); })) { pushSub(); return; }
   UI.sub = null; saveUi(); render(); window.scrollTo(0, 0);
 });
@@ -272,7 +274,7 @@ nav.render = render; nav.rerender = rerender; nav.refresh = refresh; nav.go = go
 on('go-tab', el => { if (sheetOpen()) closeSheet(); const tab = el.dataset.tab!; if (tab === UI.tab && !UI.sub) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } if (tab === 'plan') UI.planDate = null; go(tab); });
 on('lex', el => { if (sheetOpen()) closeSheet(); setLexiconQuery(el.dataset.q || ''); go('lexikon'); });
 on('go-sub', el => { if (sheetOpen()) closeSheet(); go(el.dataset.sub!); });
-on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; leaveSubHistory(); UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
+on('back', () => { if (guardLeave('mehr', () => ACTIONS.back(document.body, new Event('click') as any))) return; nav.seq++; leaveSubHistory(); UI.sub = null; saveUi(); render(); window.scrollTo(0, 0); });
 // Auftrag 27: Gesundheits-Knöpfe über den gemeinsamen Weg (views/coach.ts healthAction, shared/coach/ops): Phasen werden frisch aus STATE
 // gesucht (nie aus dem Zwischenspeicher), alle laufenden Phasen enden, Rückgängig über Bestätigung und Coach-Nachricht.
 on('ill-start', () => healthAction([{ op: 'illness-start', date: todayStr() }], t('ill.started')));
