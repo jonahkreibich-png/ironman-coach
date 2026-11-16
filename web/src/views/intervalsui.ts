@@ -176,7 +176,7 @@ export function intervalsBlock(tg: any, st: any, attrs: string, free = false): s
     const mixed: Record<string, boolean> = { stroke: new Set(at.map(a => a.stroke)).size > 1, gear: new Set(at.map(a => [...a.gear].sort().join(','))).size > 1, zone: new Set(at.map(a => a.zone)).size > 1, type: new Set(at.map(a => a.type)).size > 1, terrain: new Set(at.map(a => a.terrain)).size > 1, title: new Set(at.map(a => a.ownTitle ? a.title : '')).size > 1 };
     const rowsHtml = g.idx.map((i, k) => {
       const r = rows[i] || {}; const t = targetOfRow(rows, targets, i); const l = gl[k];
-      const [word, cls] = l && l.extra ? ['zusätzlich', 'info'] : l ? VERDICT[l.verdict || ''] || ['ohne Ziel', ''] : t ? VERDICT.missing : ['', ''];
+      const [word, cls] = l && l.extra ? ['zusätzlich', 'info'] : l ? VERDICT[l.verdict || ''] || ['ohne Ziel', ''] : t ? VERDICT.missing : ['zusätzlich', 'info'];
       const a = ivAttrs(r, t, sport); const g0 = g.attrs;
       const own = [a.stroke !== g0.stroke ? a.title : '', a.gear.join() !== g0.gear.join() ? (a.gear.length ? 'mit Hilfsmittel' : 'ohne Hilfsmittel') : '', a.zone !== g0.zone ? `Zone ${a.zone}` : '', a.ownTitle && a.title !== g0.title ? a.title : ''].filter(Boolean);
       const mt = mainText(r, t, sport);
@@ -354,6 +354,9 @@ if (typeof document !== 'undefined') document.addEventListener('keydown', e => {
   if (nx0) { const det = nx0.closest('details.iv-det') as HTMLDetailsElement | null; if (det && !det.open) { det.open = true; const k = det.getAttribute('data-ivk'); if (k) OPEN.add(k); } }
   (el as HTMLInputElement).dispatchEvent(new Event('change', { bubbles: true }));
   const id = nx0 && nx0.id;
-  setTimeout(() => { const nx = id ? document.getElementById(id) as HTMLInputElement | null : null; if (nx) { nx.focus(); nx.select && nx.select(); } }, 0);
+  if (!id) return;
+  // Speichern zeichnet das Blatt neu (auch etwas später, z. B. unter Last): Fokus dann erneut setzen, solange niemand sonst ihn hat
+  const put = (first: boolean) => { const nx = document.getElementById(id) as HTMLInputElement | null; if (!nx || document.activeElement === nx) return; const a = document.activeElement as HTMLElement | null; if (!first && a && a !== document.body && a.isConnected) return; nx.focus(); nx.select && nx.select(); };
+  setTimeout(() => put(true), 0); [80, 250, 600].forEach(ms => setTimeout(() => put(false), ms));
 });
 export { paceToSec };
