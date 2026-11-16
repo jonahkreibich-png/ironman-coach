@@ -19,7 +19,7 @@ import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
 import { de, mmss, dowName, joinDe } from './texts';
 import { patternOf, intervalsOf, type Pattern } from '../activity/structure';
-import { evaluateIntervals, plannedIntervals, evalToIntervalOut, type IvEval, type IvThresholds } from '../intervals';
+import { evaluateIntervals, plannedIntervals, evalToIntervalOut, ivDiffNotes, type IvEval, type IvThresholds } from '../intervals';
 import { mainPart, type MainPart } from '../sections';
 
 export interface ReviewOpt { label: string; say: string; go?: string }
@@ -620,6 +620,8 @@ export function intervalReview(ctx: EngineCtx, d: Done): { good: string[]; bette
     else if (e.recovery < 12) out.better.push(`In den Pausen fiel der Puls nur um ${e.recovery} Schläge. Pause ganz locker (gehen bzw. rollen); bleibt das so, waren die Intervalle zu hart.`);
   }
   if (parts.length) { const t = parts.join(', '); out.lead = t.charAt(0).toUpperCase() + t.slice(1) + quality + '.'; }
+  // Auftrag 36: anders gemacht als geplant (Lage, Hilfsmittel, Zone, bergauf) – so sagen, wie es war
+  out.good.unshift(...ivDiffNotes(e));
   if (e.extra) out.good.push(`${e.extra} Intervall${e.extra > 1 ? 'e' : ''} mehr als geplant – zählt mit, die nächste Stufe richtet sich nach den geplanten.`);
   if (e.short) out.better.push(`${e.short} Intervall${e.short > 1 ? 'e' : ''} abgebrochen oder deutlich kürzer. Lieber alle etwas ruhiger als das letzte abbrechen.`);
   else if (e.done < n) out.better.push(`${e.done} von ${n} Intervallen gemacht${quality}.`);

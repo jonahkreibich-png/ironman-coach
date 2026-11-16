@@ -1,5 +1,5 @@
 import {effectiveCustomBuckets} from './custom-state26';
-import { manualIntervals, rowsToLaps } from './intervals';
+import { manualIntervals, rowsToLaps, swimIvFacts, type SwimIvFacts } from './intervals';
 import { statsOf } from './activity/structure';
 import { checkField } from './validate';
 /* Tatsächliche Ergebnisse, ohne Planwerte. Eine manuelle Korrektur (auch ein bewusst
@@ -61,6 +61,15 @@ export function actualMetrics(st: any = {}, a: any = null): Record<string, any> 
     if (!changed('speed')) m.speed = null;
     if (!changed('pace100')) m.pace100 = null;
   }
+  // Auftrag 36: eingetragene Wiederholungen mit Lage/Hilfsmittel: Kraul ohne Hilfsmittel zählt als Kraul am Stück, Kraul mit Pull Buoy
+  // als „mit Pull Buoy am Stück“, Kickboard/Beine als nichts davon. Selbst eingetragene Felder gewinnen (Hand gewinnt).
+  // (Zustände geplanter Einheiten tragen keine Sportart; Lauf-/Rad-Wiederholungen haben keine Lage und liefern hier nichts)
+  if (sport === 'swim' || !sport) {
+    const fx = swimFactsOf(st);
+    const own = (k: string) => !!st?.metricsManual?.[k] || st?.metricsSrc?.[k] === 'manual';
+    if (fx && fx.crawlMaxM && !own('longestCrawl') && !((resultNumber(m.longestCrawl) || 0) >= fx.crawlMaxM)) m.longestCrawl = fx.crawlMaxM;
+    if (fx && fx.pullMaxM && !own('longestPull') && !((resultNumber(m.longestPull) || 0) >= fx.pullMaxM)) m.longestPull = fx.pullMaxM;
+  }
   m._issues = [];
   const longest = resultNumber(m.longestCrawl), meters = resultNumber(m.meters);
   if (longest != null && meters != null && longest > meters) {
@@ -73,6 +82,19 @@ export function actualMetrics(st: any = {}, a: any = null): Record<string, any> 
     m.longestPull = null;
   }
   return m;
+}
+/** Auftrag 36: Schwimm-Werte einer Einheit um die Wiederholungen ergänzen (Lagen in Metern, Hilfsmittel, Pace je Art) */
+export function withSwimFacts(sw: any, fx: SwimIvFacts): any {
+  const byStroke: Record<string, number> = {};
+  const name: Record<string, string> = { crawl: 'freestyle', pull: 'pull', kick: 'kick', breast: 'breaststroke', back: 'backstroke', fly: 'butterfly', im: 'im', drill: 'drill' };
+  Object.entries(fx.byStroke).forEach(([k, v]) => { byStroke[name[k] || k] = v; });
+  const mixed = fx.aided || Object.keys(fx.byStroke).some(k => k !== 'crawl');
+  return { ...(sw || {}), iv: fx, ...(mixed ? { byStroke, gear: fx.gear.length ? fx.gear : (sw || {}).gear } : {}) };
+}
+/** Auftrag 36: was die von Hand eingetragenen Schwimm-Wiederholungen sagen (Lage, Hilfsmittel); null ohne eigene Liste */
+export function swimFactsOf(st: any): SwimIvFacts | null {
+  const man = manualIntervals(st);
+  return man && man.length ? swimIvFacts(man) : null;
 }
 export type StrengthArea = 'upper' | 'lower' | 'core' | 'full';
 export const STRENGTH_AREA_LABEL: Record<StrengthArea, string> = { upper: 'Oberkörper', lower: 'Unterkörper', core: 'Rumpf', full: 'Ganzkörper' };
@@ -105,6 +127,8 @@ export function effectiveActivity(a: any, st: any = {}): any {
   out.paceSecKm = pace(m.pace) ?? (out.km > 0 && out.min > 0 ? out.min * 60 / out.km : null);
   out.speedKmh = resultNumber(m.speed) ?? (out.km > 0 && out.min > 0 ? out.km * 60 / out.min : null);
   if (a.sport === 'swim') out.swim = { ...(a.swim || {}), longestPullM: resultNumber(m.longestPull), longestCrawlM: resultNumber(m.longestCrawl), longestContinuousM: resultNumber(m.longestCrawl), pace100: pace(m.pace100), strokesPerLength: resultNumber(m.spl), metersPerStroke: resultNumber(m.dps), strokeRate: resultNumber(m.rate) };
+  // Auftrag 36: Lagen und Hilfsmittel aus den eingetragenen Wiederholungen – die Gesamt-Pace gilt dann nicht als Kraul ohne Hilfsmittel
+  if (a.sport === 'swim') { const fx = swimFactsOf(st); if (fx) out.swim = withSwimFacts(out.swim, fx); }
   if (['km', 'meters', 'min', 'pace', 'power', 'hr'].some(k => st.metricsManual?.[k] || st.metricsSrc?.[k] === 'manual')) {
     out.laps = []; out.intervals = null; out.pattern = null; out.splits = [];
     if (!st.metricsManual?.decoupling && st.metricsSrc?.decoupling !== 'manual') out.decouplingPct = null;

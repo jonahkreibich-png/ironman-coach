@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.24.0', items: [
+    'Intervalle nach Sätzen: „4 × 100 m Kraul“ als kurze Liste, eine Zeile je Wiederholung, Antippen öffnet die Details. „Ganzer Satz gleich“ (z. B. alle in 1:55), einzelne Wiederholungen abweichend. Je Satz: Titel, Lage, Hilfsmittel (Pull Buoy, Kickboard, Paddles, Flossen), Zone; Laufen/Rad: Art (bergauf, Fahrtspiel …) und Untergrund. Coach, Kraul am Stück und Scores nutzen, was du wirklich gemacht hast.',
+    'Kraft: „Wie letztes Mal“ übernimmt Übungen und Gewichte. Der Kraft-Score zählt jetzt auch Umfang je Bereich, Abdeckung (Beine, einbeinig, Rumpf, Zug, Druck) und Steigerung der Gewichte.',
+    'Prognose: Passen Schwelle und VO2max deiner Uhr nicht zusammen, sagt die App das ehrlich und schlägt einen Lauftest vor. Gesamt-Form hat ein „Warum?“.'
+  ] },
   { version: '3.23.1', items: [
     'Heute: Einheiten mit Umschalter „Minuten | km“ sind wieder gut lesbar. Der Titel nutzt die ganze Breite, der Umschalter steht darunter (vorher brach der Titel nach fast jedem Buchstaben um).',
     'Bei großer Schrift oder Zoom werden Listen, Plan-Zeilen und die Prognose-Tabelle nicht mehr zu schmal: Was daneben steht, rutscht in die nächste Zeile.'

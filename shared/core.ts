@@ -9,6 +9,7 @@ import { rulesOf, evaluate, dayLimit } from './constraints';
 import { parseFor } from './ruleparse';
 import { actualMetrics, effectiveActivity, changedOf, actualSport, plannedLoadDropped, effectiveSession, changeKeepsStage, changeZone } from './results';
 import { evaluateIntervals } from './intervals';
+import { hardBlocked } from './trainingrules';
 import { LIB } from './workoutlib';
 import { runQualitySpec, bikeQualitySpec, runEasyForm, bikeEasyForm } from './workoutbuild';
 /* ---------- Datum ---------- */
@@ -419,7 +420,9 @@ function applyAdjustments(weeks, adjustments) {
     if (a.type === 'modify') { const prevSpec = s.spec || null; Object.assign(s, a.set || {}); harmonizeModified(s, a.set || {}, prevSpec); }
     // Auftrag 21: vom Coach gekürzte Woche (weniger Umfang nach Krankheit/verpassten Einheiten) gilt als reduzierte Woche: die Woche danach
     // darf wieder zum Plan zurück, ohne als zu großer Sprung zu zählen (wie bei geplanten reduzierten Wochen)
-    if (a.type === 'modify' && /-vol-/.test(a.id || '') && /Umfang -/.test(a.reason || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) w.reduced = true; }
+    if (a.type === 'modify' && /-vol-/.test(a.id || '') && /Umfang -/.test(a.reason || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) { w.reduced = true; w.reducedByCoach = true; } }
+    // Auftrag 36: Wiedereinstieg nach einer Pause (eine Woche ohne Intensität, kürzer) – keine Pflicht-Qualität, Bezug bleibt der Plan
+    if (a.type === 'modify' && /^pause-/.test(a.id || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) { w.reduced = true; w.reducedByCoach = true; w.returnWeek = true; } }
     else if (a.type === 'cancel') { s.cancelled = true; s.cancelReason = a.reason; if (a.removed) s.removed = true; }
     else if (a.type === 'move') {
       const to = dayByDate[a.to]; if (!to || to === d) continue;
@@ -763,6 +766,9 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   const doneHarder = s => { const st = (state.sessions || {})[s.id]; return !!(st && st.completed && (changedOf(st) || {}).kind === 'harder' && (changeZone(st, s) || 0) >= 4); };
   const hardDay = (d, exceptId) => live(d).some(s => s.id !== exceptId && (isHard(s) || doneHarder(s)));
   const gameDay = d => live(d).some(isGame);
+  // Auftrag 36: auch die Trainingsregeln der Woche (Wettkampfwoche, Tage nach einem Wettkampf, Erholungswoche, Tag nach einem langen Tag)
+  // – vorher holte die App z. B. eine abgebrochene Schwellen-Einheit am Montag der Wettkampfwoche nach (Simulation, Daten-Check)
+  const ruleBlocked = (to, s) => isHard(s) && hardBlocked(weeks, to, Object.values(state.goals || {}) as any);
   for (const back of [1, 2]) {
     const from = addDays(date, -back);
     if (illnessAt(illness, from)) continue;
@@ -775,6 +781,7 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
         if (hardDay(to, s.id)) continue;                         // Ziel muss frei oder locker sein
         if (hardDay(addDays(to, -1), s.id) || hardDay(addDays(to, 1), s.id)) continue; // nie zwei harte Tage hintereinander
         if (gameDay(addDays(to, 1))) continue;                   // nie direkt vor einem Spiel
+        if (ruleBlocked(to, s)) continue;                        // nie in Wettkampf-/Erholungswoche oder nach einem Wettkampf
         if (!ruleOk(rules, s, to, live(to))) continue;           // nie gegen die Regeln der Person (Auftrag 5)
         const easySame = live(to).find(x => x.sport === s.sport && !isHard(x) && !sessDone(state, x));
         push({ id: 'move-' + s.id, type: 'move', sessionId: s.id, from, to, group: 'move-' + s.id,
@@ -795,7 +802,7 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
         const to = addDays(from, k);
         if (to < date || !dayOf(to) || illnessAt(illness, to)) continue;
         if (to === date && R.level > 0) continue;
-        if (hardDay(to, s.id) || hardDay(addDays(to, -1), s.id) || hardDay(addDays(to, 1), s.id) || gameDay(addDays(to, 1))) continue;
+        if (hardDay(to, s.id) || hardDay(addDays(to, -1), s.id) || hardDay(addDays(to, 1), s.id) || gameDay(addDays(to, 1)) || ruleBlocked(to, s)) continue;
         if (!ruleOk(rules, s, to, live(to))) continue;
         const copy = Object.assign({}, s, { id: s.id + '-nach', title: s.title, nachVon: from }); delete copy._adj; delete copy._orig; delete copy.movedFrom; delete copy.date;
         push({ id: 'redo-' + s.id, type: 'add', to, session: copy, group: 'redo-' + s.id,
@@ -1225,7 +1232,10 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
       else { v.ok = conf >= 25; target = v.ok ? cur + 1 : cur; v.why = v.ok ? `${conf} m Kraul am Stück in 2 Einheiten geschafft` : 'für Kraul-Stücke braucht es 2 Einheiten mit mindestens 25 m Kraul am Stück'; }
     }
     nextSessions.filter(s => s.stage && s.stage.ladder === ladder && !s.cancelled && s.stage.n !== target).forEach(s => {
-      const built = stageSession(s, target, ladder === 'runwalk' ? null : swimCtxOf(state)); if (!built) return;
+      let built = stageSession(s, target, ladder === 'runwalk' ? null : swimCtxOf(state)); if (!built) return;
+      // Auftrag 36: in der Erholungswoche bleibt die kürzere Dauer (vorher setzte „Stufe wiederholen“ wieder die volle Einheit ein, z. B.
+      // 16 → 28 min, und die Erholungswoche lag über 78 % der Aufbauwoche – Daten-Check „Erholungswoche“)
+      if (next.isRecoveryWeek && ladder !== 'runwalk' && s.plannedMinutes && built.plannedMinutes > s.plannedMinutes + 2) { const fit = W.rebuildScaled({ ...s, ...built }, s.plannedMinutes / built.plannedMinutes); if (fit && fit.plannedMinutes < built.plannedMinutes) built = { ...built, title: fit.title, plannedMinutes: fit.plannedMinutes, plannedKm: fit.plannedKm ?? null, description: fit.description, spec: fit.spec }; }
       push({ id: `${group}-stage-${s.id}`, type: 'modify', sessionId: s.id, set: built, what: `${s.title} → ${built.title}`, reason: (v.ok ? 'Letzte Stufe hat geklappt (' : 'Stufe wiederholen (') + v.why + ')' });
     });
     // Auftrag 34: ein Satz („Kraul-Stufe bleibt (100 m Kraul am Stück nachgewiesen)“) statt „Stufe bleibt: … nachgewiesen: Stufe bleibt“

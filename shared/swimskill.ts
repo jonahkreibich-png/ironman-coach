@@ -170,7 +170,10 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
       // Auftrag 17: Schwerpunkt der Einheit bleibt, Hilfsmittel nach der aktuellen Ausrüstung (Kickbrett, Pull Buoy …)
       spec = K.swimVariant(spec, K.swimFocusIndex(s.spec && s.spec.variant, ctx.gear, spec.stage), 1, 'base');
       spec = K.fitSwim(spec, fill);
-      const b = W.build(spec);
+      let b: any = W.build(spec);
+      // Auftrag 36: in der Erholungswoche bleibt die kürzere Dauer (wie bei „Stufe wiederholen“ in core.ts, Entscheidung 576)
+      const wk = eff.find((w: any) => (w.days || []).some((x: any) => x.date === d.date));
+      if (wk && wk.isRecoveryWeek && s.plannedMinutes && b.plannedMinutes > s.plannedMinutes + 2) { const sc = W.rebuildScaled({ ...s, ...b }, s.plannedMinutes / b.plannedMinutes); if (sc && sc.plannedMinutes < b.plannedMinutes) b = { ...b, ...sc, stage: b.stage, zone: b.zone }; }
       adj.push({ id: `${g}-${s.id}`, group: g, type: 'modify', sessionId: s.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, stage: b.stage || null, zone: b.zone },
         what: `${s.title} → ${b.title}`, reason: `${best.authoritative ? 'Aktualisierte Schwimmnachweise' : 'Neue Bestwerte'} (${source}): ${crawl} m Kraul am Stück${pull ? `, ${pull} m mit Pull Buoy` : ''}` });
     }

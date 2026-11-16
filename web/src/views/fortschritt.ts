@@ -20,7 +20,7 @@ export function renderFortschritt(): string {
   const d = D();
   const f = d.form;
   let h = `<div class="card"><div class="spread"><div><div class="lbl">${termLink('Gesamt-Form', t('prog.form'))}</div><div class="hero-num">${f.score}<small class="xs muted"> / 100</small></div></div>${d.goal ? `<div style="text-align:right" class="small muted">${esc(t('prog.formOf', { name: d.goal.name }))}<br>${termLink('CTL')} ${num(f.ctl ?? 0, 0)} / ${f.target}</div>` : ''}</div>
-    ${bar(f.score, 'var(--accent)')}</div>`;
+    ${bar(f.score, 'var(--accent)')}${f.why && f.why.length ? `<details class="more" data-form-why><summary>Warum?</summary><div class="body xs">${f.why.map((x: string) => `<p>${esc(x)}</p>`).join('')}</div></details>` : ''}</div>`;
   h += fold('scores', t('prog.scores'), d.scores.map(s => `${sportLabel(s.sport)} ${s.score}`).join(' · '), `<div class="score-grid">${d.scores.map(s => {
     const first = s.trend[0].score, last = s.score; const delta = last - first;
     return `<button class="score" data-act="score-open" data-sport="${s.sport}" style="--c:${SPORT_COLOR[s.sport]}"><div class="top-l"><span style="color:var(--c);width:20px;height:20px;display:inline-block">${sportIcon(s.sport)}</span><span class="nm">${esc(sportLabel(s.sport))}</span></div>
@@ -136,6 +136,7 @@ export function progCard(goal: Goal, p: Prognosis, compact: boolean, placeholder
     ${compact ? '' : moveLine(goal)}
     ${wishHtml}
     ${p.improve && !(wc && wc.verdict !== 'realistisch') ? `<div class="banner info">${esc(p.improve)}</div>` : ''}
+    ${p.sources && p.sources.text ? `<div class="banner ${p.sources.uncertain ? 'warn' : 'info'} small" data-sources>${esc(p.sources.text)}</div>` : ''}
     ${(p.missing || []).length ? `<div class="small" data-missing>${(p.missing || []).map(m => esc(m)).join('<br>')}</div>` : ''}
     ${why}
     ${compact ? '' : more(t('race.pacing'), `<div class="list">${pace.map(x => `<div class="li"><span class="grow small"><b>${esc(x.leg)} · ${esc(x.part)}</b><br><span class="muted">${esc(x.hint)}</span></span><span class="v small">${esc(x.target)}</span></div>`).join('')}</div>`)}

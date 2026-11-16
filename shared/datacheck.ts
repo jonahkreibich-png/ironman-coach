@@ -99,7 +99,17 @@ export function dataCheck(inp: DCInput): DCResult {
     // bestehende Pläne macht die Plan-Pflege (shared/replan.ts); solche Wochen sind kein Verstoß.
     let gaps: { week: number; rule: string }[] = [];
     if (iss0.length) { try { gaps = planUpkeep(baseWeeks || [], state, profile, goals, today, 0).gaps; } catch (e) { gaps = []; } }
-    const iss = iss0.filter(x => !gaps.some(g => g.week === x.week && g.rule === x.rule));
+    // Auftrag 36: Verstöße, die nur durch eigene Änderungen der Person entstehen (Plan bearbeiten, Umwandeln, Chat – mit Hinweis und
+    // „Trotzdem übernehmen“), sind kein Fehler des Plans; die Plan-Pflege lässt solche Einheiten ohnehin, wie sie sind. Betroffen ist ein
+    // Verstoß, wenn am Tag (bzw. Nachbartag) oder in der Woche eine selbst geänderte Einheit liegt.
+    const adjs: Record<string, any> = state.adjustments || {};
+    const own = (id: string) => { const a = adjs[id]; return !!a && !a.undone && (!!a.override || !!a.from_user || !!a.from_ai || /^(user|chat|ai|plan-edit|edit)-/.test(String(a.group || a.id))); };
+    const ownDays = new Set<string>(); const ownWeeks = new Set<number>();
+    weeks.forEach((w: any) => (w.days || []).forEach((d: any) => (d.sessions || []).forEach((x: any) => { if ((x._adj || []).some(own)) { ownDays.add(d.date); ownWeeks.add(w.weekNumber); } })));
+    // Wochen-Vergleiche (lange Einheit, Erholungswoche, Anzahl harter Einheiten) hängen auch an den Vorwochen
+    const WEEKLY = new Set(['longStep', 'recoveryDepth', 'hardCount', 'longCap']);
+    const byPerson = (x: any) => (WEEKLY.has(x.rule) || !x.date ? [0, 1, 2].some(k => ownWeeks.has(x.week - k)) : false) || (!!x.date && [x.date, C.addDays(x.date, -1), C.addDays(x.date, 1)].some(d => ownDays.has(d)));
+    const iss = iss0.filter(x => !gaps.some(g => g.week === x.week && g.rule === x.rule) && !byPerson(x));
     const by = new Map<string, { n: number; date?: string }>();
     iss.forEach(x => { const g = by.get(x.rule) || { n: 0, date: x.date }; g.n++; by.set(x.rule, g); });
     by.forEach((v, rule) => findings.push({ group: 'rules', key: 'rule:' + rule, date: v.date, text: `${DC_LABEL.rules}: ${TRULE_LABEL[rule as keyof typeof TRULE_LABEL] || rule} (${v.n}×${v.date ? ', zuerst ' + dm(v.date) : ''})` }));

@@ -1,5 +1,14 @@
 # Für Jonah
 
+**Nach dem Update auf 3.24.0:**
+1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
+2. Im Coach kommt evtl. „Vorschlag: Lauftest am …“ (deine Schwelle 5:39/km passt nicht zu VO2max 57,5 der Uhr). „Übernehmen“ ersetzt eine Laufeinheit durch den 30-min-Lauftest; danach stimmen Zonen und Prognose.
+3. Beim Schwimmen nach dem Training: Satz antippen → „Satz bearbeiten“ → z. B. „Pull Buoy“ wählen und „Ganzer Satz gleich“ eintragen.
+
+---
+
+## Frühere Hinweise
+
 **Nach dem Update auf 3.23.0:**
 1. App vom Home-Bildschirm öffnen. Kommt die neue Version nicht sofort: App ganz schließen und wieder öffnen. **Keine Browserdaten löschen.**
 2. Kommt im Coach „Neue Puls-Zonen vorgeschlagen“: Mehr → Zonen und Tests ansehen und „Übernehmen“ oder „Nicht jetzt“ wählen. Ohne dein Okay ändert sich nichts.

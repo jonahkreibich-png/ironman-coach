@@ -58,6 +58,20 @@ const hardS = (s: any) => isHardSession(s) && !(s.spec && s.spec.kind === 'test'
 const ownHard = (s: any) => hardS(s) && !fixedS(s) && !isTestS(s);
 const legsS = (s: any) => !!s && s.sport === 'strength' && s.area !== 'upper' && s.area !== 'core';
 const minOf = (s: any) => (s && s.plannedMinutes) || 0;
+/* Auftrag 36: vom Coach gekürzte Woche (Umfang −x %, w.reduced): als Bezug zählt der ursprünglich geplante Umfang. Vorher fiel die Woche
+   als Bezug ganz weg; dann galt eine viel ältere, kleinere Woche, und die Rückkehr zum Plan sah wie ein zu großer Sprung aus
+   (Daten-Check nachts: „Lange Einheit höchstens +10 min/Woche“, „Erholungswoche zu niedrig/hoch“; die Pflege kürzte morgens wieder). */
+/* nur bei Kürzungen (Coach „Umfang −x %“, Ampel/Tagesanpassung, Wochen-Vorschlag „leichter“), nicht bei Stufen- oder Formwechseln */
+const cutAdj = (s: any) => (s && s._adj || []).some((id: string) => /-vol-|^daily-|^ana-week-|^pause-/.test(String(id)));
+const abRaceWeek = (w: any) => (w.days || []).some((d: any) => live(d).some((s: any) => s.race && (s.priority || 'A') !== 'C'));
+const origMinOf = (s: any) => cutAdj(s) ? Math.max(minOf(s), (s && s._orig && Number(s._orig.plannedMinutes)) || 0) : minOf(s);
+/* Bezug für Steigerung und Erholungswoche ist immer der Plan-Wert (vor Kürzungen durch Coach, Ampel oder Tagesanpassung), die geprüfte
+   Woche selbst zählt mit den aktuellen Werten. Ein gekürzter langer Lauf bleibt als langer Lauf erkennbar (Titel vor der Änderung). */
+const refMinOf = (_w: any) => origMinOf;
+const longRef = (s: any) => isLongS(s) || (cutAdj(s) && !!s._orig && /^Lang/i.test(String(s._orig.title || '')));
+/* geplante reduzierte Wochen (z. B. nach einem Wettkampf) bleiben wie bisher ohne Bezug; nur vom Coach gekürzte zählen (mit dem Plan-Wert) */
+export const plannedReduced = (w: any) => !!(w && w.reduced && !w.reducedByCoach);
+const refOfW = (w0: any, sp: string) => Math.max(0, ...(w0.days || []).flatMap((d: any) => live(d)).filter((s: any) => s.sport === sp && !s.race && !isTestS(s) && !isBrick(s)).map(refMinOf(w0)));
 const dayMin = (d: any) => live(d).filter((s: any) => !s.race).reduce((a: number, s: any) => a + minOf(s), 0);
 const sportsOf = (d: any) => new Set<string>(live(d).filter((s: any) => !s.race).map((s: any) => isBrick(s) ? 'run' : s.sport));
 const hardDay = (d: any) => !!d && live(d).some(hardS);
@@ -241,7 +255,10 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
   // Wochen
   let lastLR: number | null = o.prevLongRun ?? null, lastLB: number | null = o.prevLongBike ?? null;
   const simCount: Record<string, number> = {};
+  let afterAB = false;
   for (const w of weeks) {
+    // Auftrag 36: nach einem A/B-Wettkampf beginnt der Aufbau neu – kein Vergleich mit den Wochen davor
+    if (afterAB) { lastLR = null; lastLB = null; } afterAB = abRaceWeek(w);
     const days = w.days || [];
     const inW = !o.from || (w.endDate || addD(w.startDate, 6)) >= o.from;
     const own = days.flatMap((d: any) => live(d).filter((s: any) => !s.race));
@@ -261,7 +278,8 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
       // harte Einheiten pro Woche (Spiele und C-Wettkämpfe kommen dazu, Tests nicht)
       const fixedHard = days.filter((d: any) => live(d).some((s: any) => isGame(s) || (s.race && s.priority === 'C'))).length;
       const ph = (w.phase || 'base') as any;
-      const n = own.filter(ownHard).length;
+      // Auftrag 36: eine nachgeholte Einheit (abgebrochen bzw. locker statt hart) und ihr Original zählen zusammen einmal
+      const n = own.filter(ownHard).filter((s: any) => !(s.nachVon && own.some((x: any) => x.id + '-nach' === s.id))).length;
       const max = w.isRecoveryWeek || ph === 'race' ? 0 : ownHardBudget(p, ph, w.startDate, 4, fixedHard);
       if (!w.partial && n > max && !w.isRecoveryWeek && ph !== 'race') add('hardCount', w, undefined, `Woche ${w.weekNumber}: ${n} eigene harte Einheiten, passend wären höchstens ${max}.`);
       // Erholungswoche: keine Intervalle (Tests erlaubt), höchstens ein harter Test
@@ -280,12 +298,15 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
         if (lastLR != null && lr > lastLR + 11 && !w.partial) add('longStep', w, ref.date, `${fmt(ref.date)}: langer Lauf ${lr} min nach ${lastLR} min (höchstens +10 min).`);
       }
       if (lb && lastLB != null && lb > lastLB + 16 && !w.partial) add('longStep', w, undefined, `Woche ${w.weekNumber}: lange Ausfahrt ${lb} min nach ${lastLB} min (höchstens +15 min).`);
-      if (!w.isRecoveryWeek && ph !== 'taper' && ph !== 'race' && !w.entry && !w.reduced) { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
+      if (!w.isRecoveryWeek && ph !== 'taper' && ph !== 'race' && !w.entry && !plannedReduced(w)) { const lrR = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && longRef(s)).map(origMinOf)), lbR = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && longRef(s)).map(origMinOf));
+        if (lrR && !testIn(w, 'run')) lastLR = Math.max(lrR, refOfW(w, 'run')); if (lbR && !testIn(w, 'bike')) lastLB = Math.max(lbR, refOfW(w, 'bike')); }
       // Wettkampf-Simulationen: höchstens 3 pro Saison (Kalenderjahr)
       for (const d of days) if (raceSimDay(d) && sportsOf(d).size > 2) { const y = d.date.slice(0, 4); simCount[y] = (simCount[y] || 0) + 1; if (simCount[y] > 3) add('raceSim', w, d.date, `${fmt(d.date)}: mehr als 3 Wettkampf-Simulationen in ${y}.`); }
     } else {
       const lr = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && isLongS(s)).map(minOf)); const lb = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && isLongS(s)).map(minOf));
-      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race') { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
+      // Auftrag 36: vergangene Wochen genauso (gekürzt → ursprünglich geplanter Wert)
+      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race' && !plannedReduced(w)) { const lrR = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && longRef(s)).map(origMinOf)), lbR = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && longRef(s)).map(origMinOf));
+        if (lrR && !testIn(w, 'run')) lastLR = Math.max(lrR, refOfW(w, 'run')); if (lbR && !testIn(w, 'bike')) lastLB = Math.max(lbR, refOfW(w, 'bike')); }
     }
   }
   // Auftrag 19: Tempo im langen Lauf nur jede 2. Woche und nie in derselben Woche wie ein harter Qualitätslauf
@@ -325,7 +346,7 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
     // Laufziel: in den letzten 7 Wochen davor jede (normale) Woche ein Schwellen- bzw. Wettkampftempo-Lauf
     if (isRunGoal(r.type) && r.priority !== 'C' && o.runQualityOk !== false) for (const w of weeks) {
       const k = Math.floor(diffD(w.startDate, r.date) / 7);
-      if (k < 1 || k > 7 || w.isRecoveryWeek || w.phase === 'race' || w.partial || (o.from && w.startDate < o.from) || w.entry || w.qualityGap) continue;
+      if (k < 1 || k > 7 || w.isRecoveryWeek || w.phase === 'race' || w.partial || (o.from && w.startDate < o.from) || w.entry || w.returnWeek || w.qualityGap) continue;
       const runs = (w.days || []).flatMap((d: any) => live(d).filter((s: any) => s.sport === 'run' && !s.race && !isBrick(s)));
       if (runs.some((s: any) => s.stage)) continue;
       if (!runs.some((s: any) => hardS(s) && RUN_Q.has((s.spec && s.spec.kind) || (isTestS(s) ? 'test' : '')))) add('goalQuality', w, undefined, `Woche ${w.weekNumber}: kein Schwellen- oder Wettkampftempo-Lauf, ${k} Woche${k === 1 ? '' : 'n'} vor ${r.name}.`);
@@ -333,16 +354,21 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
   }
   // Auftrag 30: Tiefe der Erholungswoche – etwa 60–70 % des eigenen Umfangs der letzten Aufbauwoche (geprüft mit Spielraum 50–78 %, damit
   // feste Termine, Tests und Lernstufen nicht zu Fehlalarmen führen)
-  const ownMin = (w: any) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.sport !== 'football').reduce((b: number, s: any) => b + minOf(s), 0), 0);
+  const ownMin = (w: any, plan = true) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.sport !== 'football').reduce((b: number, s: any) => b + (plan ? refMinOf(w)(s) : minOf(s)), 0), 0);
   // Lernstufen (Lauf-Geh, Kraul lernen) bleiben jede Woche gleich und werden nicht gekürzt: besteht die Erholungswoche zu mindestens 30 %
   // daraus, ist „zu flach“ kein Fehler
   const stageMin = (w: any) => (w.days || []).reduce((a: number, d: any) => a + live(d).filter((s: any) => !fixedS(s) && s.stage).reduce((b: number, s: any) => b + minOf(s), 0), 0);
   for (let i = 1; i < weeks.length; i++) {
     // Woche mit Rennen oder direkt danach: dort gelten „Wettkampfwoche“ und „Locker nach dem Wettkampf“
     const w = weeks[i]; if (!w.isRecoveryWeek || w.partial || w.vorgabe || (o.from && w.startDate < o.from) || (races.some(r => r.date >= addD(w.startDate, -7) && r.date <= w.endDate))) continue;
-    let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || weeks[j].partial || weeks[j].entry || weeks[j].reduced || weeks[j].phase === 'taper' || weeks[j].phase === 'race')) j--;
+    let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || weeks[j].partial || weeks[j].entry || plannedReduced(weeks[j]) || weeks[j].phase === 'taper' || weeks[j].phase === 'race')) j--;
     if (j < 0) continue;
-    const ref = ownMin(weeks[j]), cur = ownMin(w); if (ref < 120) continue;
+    // Auftrag 36: liegt zwischen Bezugswoche und Erholungswoche ein A/B-Wettkampf (Tapering, Rennen, Neubeginn), gibt es keinen sinnvollen
+    // Vergleich (vorher: erste Erholungswoche nach dem Rennen gegen eine Aufbauwoche davor → „32 %“)
+    const jEnd = weeks[j].endDate || addD(weeks[j].startDate, 6);
+    if (races.some(r => r.priority !== 'C' && r.date > jEnd && r.date <= (w.endDate || addD(w.startDate, 6)))) continue;
+    // die Erholungswoche selbst zählt mit dem, was jetzt geplant ist (auch wenn der Coach sie zusätzlich gekürzt hat)
+    const ref = ownMin(weeks[j]), cur = ownMin(w, false); if (ref < 120) continue;
     const pct = cur / ref;
     // unter 30 %: Urlaub/Sperrzeit (eigene Regel), kein Fehler; über 78 % mit Test in der Woche: der Test (erlaubt) bringt die Minuten
     const hasTest = (w.days || []).some((d: any) => live(d).some((s: any) => isTestS(s)));
@@ -490,7 +516,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
     let qn = 0;
     for (const w of weeks) {
       const k = Math.floor(diffD(w.startDate, r.date) / 7);
-      if (k < 1 || k > 7 || w.isRecoveryWeek || w.phase === 'race' || w.partial || w.entry || (o.from && w.startDate < o.from)) continue;
+      if (k < 1 || k > 7 || w.isRecoveryWeek || w.phase === 'race' || w.partial || w.entry || w.returnWeek || (o.from && w.startDate < o.from)) continue;
       const D = daysOf(weeks); const idx = (d: any) => D.findIndex(y => y.d === d);
       const runs = (w.days || []).flatMap((d: any) => live(d).filter((s: any) => s.sport === 'run' && !s.race && !isBrick(s)).map((s: any) => ({ d, s })));
       if (runs.some(({ s }: any) => s.stage)) continue;
@@ -509,7 +535,9 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       const fitQ = (room: number) => { const q = { ...rq0 }; while (q.reps > 1 && q.reps * q.min + (q.reps - 1) * q.rest > room) q.reps--; if (q.reps * q.min > room) q.min = Math.max(5, Math.floor(room / 5) * 5); return q; };
       // Auftrag 19: auch kein längerer Lauf (über 46 min) am Nachbartag; kurze lockere Läufe daneben werden begründet (siehe unten)
       const runNear = (y: DayRef | null) => !!y && live(y.d).some((z: any) => z.sport === 'run' && !z.race && !isBrick(z) && !z.adjacentOk && minOf(z) > 46);
-      const freeAround = (i: number) => { const pv = at(D, i, -1), nx = at(D, i, 1); return !hardDay(D[i].d) && !(pv && (hardDay(pv.d) || bigDay(pv.d).big)) && !(nx && (hardDay(nx.d) || eventDay(nx.d))) && !runNear(pv) && !runNear(nx); };
+      // Auftrag 36: nie in die lockeren Tage direkt nach einem Wettkampf (vorher: 10-km-Rennen Sa, Plan ab Mo, Di Schwellen-Intervalle)
+      const afterRaceDay = (date: string) => races.some(rr => { const kk = diffD(rr.date, date); return kk > 0 && kk <= (rr.type ? easyAfterDays(rr.type) : 3); });
+      const freeAround = (i: number) => { const pv = at(D, i, -1), nx = at(D, i, 1); return !afterRaceDay(D[i].d.date) && !hardDay(D[i].d) && !(pv && (hardDay(pv.d) || bigDay(pv.d).big)) && !(nx && (hardDay(nx.d) || eventDay(nx.d))) && !runNear(pv) && !runNear(nx); };
       let placed: { d: any; s: any; nx: any } | null = null;
       // a) lockerer Lauf unter der Woche
       for (const { d, s } of runs) {
@@ -527,7 +555,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       // Auftrag 19: Tempo im langen Lauf nur jede 2. Woche (nicht, wenn die Woche davor oder danach schon Tempo im langen Lauf hat)
       const wi = weeks.indexOf(w); const lqIn = (x: any) => !!x && (x.days || []).some((d: any) => live(d).some((y: any) => y.sport === 'run' && y.spec && y.spec.kind === 'longq' && (!!y.long || /^Lang/.test(y.title || ''))));
       if (!placed && !lqIn(weeks[wi - 1]) && !lqIn(weeks[wi + 1])) for (const { d, s } of runs.filter(({ s }: any) => isLongS(s) && !hardS(s) && s.spec)) {
-        if (!movable(s, d.date)) continue;
+        if (!movable(s, d.date) || afterRaceDay(d.date)) continue;
         const i = idx(d); const pv = at(D, i, -1), nx = at(D, i, 1);
         // harte Einheit einer anderen Sportart am selben Tag (eigene, kein Test): wird locker, der Lauf geht vor
         const hd = live(d).filter((x: any) => x !== s && hardS(x));
@@ -972,7 +1000,9 @@ export function capLongSessions(weeks: any[], p: Profile, o: TOpts = {}): string
   const movable = (s: any, date: string) => !!s && !fixedS(s) && !keep(s) && (!o.from || date >= o.from);
   const races = racesOf(weeks, o.goals || []);
   { let lastLR: number | null = o.prevLongRun ?? null, lastLB: number | null = o.prevLongBike ?? null;
+    let afterAB = false;
     for (const w of weeks) {
+      if (afterAB) { lastLR = null; lastLB = null; } afterAB = abRaceWeek(w);
       for (const d of w.days || []) for (const s of [...live(d)]) {
         if (!isLongS(s) || !s.spec || s.stage || !movable(s, d.date)) continue;
         let lim = Infinity;
@@ -1002,7 +1032,8 @@ export function capLongSessions(weeks: any[], p: Profile, o: TOpts = {}): string
       }
       const own = (w.days || []).flatMap((d: any) => live(d));
       const lr = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && isLongS(s)).map(minOf)), lb = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && isLongS(s)).map(minOf));
-      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race' && !w.entry && !w.reduced) { if (lr && !testIn(w, 'run')) lastLR = Math.max(lr, refOf(w, 'run')); if (lb && !testIn(w, 'bike')) lastLB = Math.max(lb, refOf(w, 'bike')); }
+      if (!w.isRecoveryWeek && w.phase !== 'taper' && w.phase !== 'race' && !w.entry && !plannedReduced(w)) { const lrR = Math.max(0, ...own.filter((s: any) => s.sport === 'run' && longRef(s)).map(origMinOf)), lbR = Math.max(0, ...own.filter((s: any) => s.sport === 'bike' && longRef(s)).map(origMinOf));
+        if (lrR && !testIn(w, 'run')) lastLR = Math.max(lrR, refOfW(w, 'run')); if (lbR && !testIn(w, 'bike')) lastLB = Math.max(lbR, refOfW(w, 'bike')); }
     }
   }
   return fixes;

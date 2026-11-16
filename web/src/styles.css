@@ -388,6 +388,23 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .iv-bar .iv-why { grid-column: 2 / -1; }
 .iv-bar .iv-n { font-weight: 700; color: var(--ink-2); }
 .iv-card .fgrid + .fgrid { border-top: 1px dashed var(--line); padding-top: 6px; }
+/* Auftrag 36: Intervalle nach Sätzen, eine Zeile je Wiederholung, Antippen öffnet die Details */
+.iv-set { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.iv-set-head { flex-wrap: wrap; gap: 2px 8px; }
+.iv-set-t { min-width: 0; overflow-wrap: anywhere; }
+.iv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.iv-row { border-top: 1px solid var(--line); min-width: 0; }
+.iv-row:first-child { border-top: 0; }
+.iv-det > summary.iv-bar { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 0; flex-wrap: wrap; }
+.iv-det > summary.iv-bar::-webkit-details-marker { display: none; }
+.iv-det > summary .iv-n { flex: 0 0 1.6em; font-weight: 700; color: var(--ink-2); }
+.iv-det > summary .iv-main { flex: 1 1 10em; min-width: 8em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.iv-det > summary .pill { flex: 0 0 auto; }
+.iv-det[open] > summary { color: var(--accent); }
+.iv-body { padding: 4px 0 10px; }
+.iv-more > summary { min-height: 40px; }
+.iv-gear { flex-wrap: wrap; overflow-x: visible; }
+
 .ex-row { margin-bottom: 6px; }
 .ex-row .ex-name { flex: 1 1 100%; }
 .ex-row .inp.sm:not(.ex-name) { flex: 1 1 52px; width: 0; }

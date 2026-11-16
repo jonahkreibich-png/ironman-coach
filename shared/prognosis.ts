@@ -51,6 +51,8 @@ export interface Prognosis {
   assumptions?: string[];
   /** fürs Pacing */
   bike?: { watts: number | null; kmh: number; intensity: number } | null;
+  /** Auftrag 36: Abgleich Schwelle gegen VO2max der Uhr (nur mit Hinweis) */
+  sources?: SourceCheck;
 }
 export interface PlanFacts {
   /** längster geplanter Lauf / längste geplante Fahrt bis zum Rennen (min) */
@@ -68,6 +70,48 @@ export interface ProgOpts {
   correction?: Partial<Record<'swim' | 'bike' | 'run', number>> | null;
   /** Auftrag 24: gerade krank (Pause läuft), Beginn der Krankheit */
   ill?: string | boolean | null;
+  /** Auftrag 36: VO2max der Uhr (für den Abgleich mit der Schwelle) */
+  vo2max?: Vo2Source | null;
+}
+/* ---------- Auftrag 36: Werte aus verschiedenen Quellen abgleichen ----------
+   Beispiel (Nutzer 1): Schwellen-Pace 5:39/km aus lockeren Läufen hochgerechnet (≈ VDOT 35), VO2max der Uhr 57,5 (≈ Schwelle 3:55/km).
+   Uhr-VO2max und VDOT liegen bei Freizeitsportlern meist innerhalb von etwa 10 % (Uhren schätzen eher etwas höher). Weichen sie mehr als
+   15 % ab, ist die Lauf-Prognose unsicher: ehrlich sagen, Bereich breiter, einen passenden Test vorschlagen (der Coach baut ihn in den
+   Plan, wenn es passt). Ist die Schwelle nur hochgerechnet (Trend aus lockeren Läufen), sagt die App das auch ohne VO2max. */
+export interface Vo2Source { v: number; date: string | null; from: string }
+export interface SourceCheck { thrSec: number; vdotThr: number; vo2: Vo2Source | null; vo2ThrSec: number | null; diffPct: number | null; extrapolated: boolean; uncertain: boolean; text: string | null; test: string | null }
+/** Schwellen-Geschwindigkeit (m/s), die zu einem VDOT passt (Umkehrung von vdotFromThreshold) */
+export function thrSpeedForVdot(v: number): number {
+  let lo = 1.5, hi = 7;
+  for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (vdotFromThreshold(mid) < v) lo = mid; else hi = mid; }
+  return (lo + hi) / 2;
+}
+/** VO2max der Uhr: neuester Wert aus den Tageswerten (120 Tage), sonst aus dem Profil */
+export function watchVo2max(state: any, profile: any, today: string): Vo2Source | null {
+  const ok = (x: any) => { const n = Number(String(x ?? '').replace(',', '.')); return x != null && x !== '' && Number.isFinite(n) && n >= 20 && n <= 95 ? n : null; };
+  const t = ((state && state.trend) || []).filter((p: any) => p && p.date && p.date <= today && ok(p.vo2max) != null && daysBetween(p.date, today) <= 120).sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
+  if (t) return { v: ok(t.vo2max)!, date: t.date, from: 'Uhr (Tageswerte)' };
+  const th = (profile && profile.thresholds) || {};
+  if (ok(th.vo2max) != null) return { v: ok(th.vo2max)!, date: null, from: 'Profil' };
+  return null;
+}
+export function runSourceCheck(prof: Partial<Profile>, est: Pick<Estimates, 'runThrSpeed'>, vo2: Vo2Source | null): SourceCheck | null {
+  const th: any = prof.thresholds || {};
+  const speed = est.runThrSpeed || (th.thresholdPaceRunSec > 0 ? 1000 / th.thresholdPaceRunSec : null);
+  if (!speed) return null;
+  const thrSec = Math.round(1000 / speed), vdotThr = vdotFromThreshold(speed);
+  const src = String(th.source || '');
+  const tested = /^(Lauftest|Wettkampf|Test|Rennen)/i.test(src) && !(th.estimated || []).includes('thresholdPaceRunSec');
+  const extrapolated = !tested;
+  const vo2ThrSec = vo2 ? Math.round(1000 / thrSpeedForVdot(vo2.v)) : null;
+  const diffPct = vo2 ? Math.round((vo2.v / vdotThr - 1) * 100) : null;
+  const far = diffPct != null && Math.abs(diffPct) > 15;
+  const how = (th.estimated || []).includes('thresholdPaceRunSec') ? 'geschätzt aus dem Profil' : /^Trend/i.test(src) ? 'aus lockeren Läufen hochgerechnet' : src ? 'aus „' + src + '“' : 'ohne Test';
+  const test = 'Ein 30-min-Lauftest (15 min einlaufen, dann 30 min so schnell, wie du es gleichmäßig halten kannst) klärt das.';
+  let text: string | null = null;
+  if (far) text = 'Deine Uhr schätzt VO2max ' + String(vo2!.v).replace('.', ',') + ' – das passt zu einer Schwelle von etwa ' + mmss(vo2ThrSec!) + '/km. Gerechnet wird mit ' + mmss(thrSec) + '/km (' + how + ', etwa VDOT ' + Math.round(vdotThr) + '). Beides liegt weit auseinander, die Lauf-Prognose ist darum unsicher.';
+  else if (extrapolated && /^Trend/i.test(src)) text = 'Die Schwelle ' + mmss(thrSec) + '/km ist ' + how + ', nicht gemessen.';
+  return { thrSec, vdotThr: Math.round(vdotThr * 10) / 10, vo2, vo2ThrSec, diffPct, extrapolated, uncertain: far, text, test: text ? test : null };
 }
 
 const TRANSITIONS: Partial<Record<GoalType, [number, number]>> = {
@@ -419,6 +463,10 @@ export function prognosis(goal: Goal | null, est: Estimates, opts: ProgOpts = {}
   };
   const spreads: Record<string, number> = {};
   (['swim', 'bike', 'run'] as const).forEach(s => { if (need.has(s)) spreads[s] = spreadOf(s); });
+  // Auftrag 36: Schwelle gegen VO2max der Uhr – weit auseinander: ehrlich sagen, Bereich breiter, Test vorschlagen
+  const srcCheck = need.has('run') ? runSourceCheck(prof, est, opts.vo2max || null) : null;
+  if (srcCheck && srcCheck.uncertain) { spreads.run = (spreads.run || 0.06) + 0.06; reasons.unshift('Laufen: Schwelle und VO2max der Uhr passen nicht zusammen'); }
+  if (srcCheck && srcCheck.test) missing.unshift(srcCheck.test);
   const avgSpread = Object.values(spreads).reduce((a, x) => a + x, 0) / Math.max(1, Object.values(spreads).length);
   const confidence: Prognosis['confidence'] = avgSpread <= 0.05 ? 'hoch' : avgSpread <= 0.09 ? 'mittel' : 'niedrig';
 
@@ -521,7 +569,7 @@ export function prognosis(goal: Goal | null, est: Estimates, opts: ProgOpts = {}
   // Laufziele: andere Distanzen mit demselben Ausdauer-Modell
   const runDistances = RUN_DIST.map(d => runPred(d, thrSpeed, sideNow.longRun, sideNow.runDec, spreads.run || 0.06, opts.correction));
   if (W > 0 && g.date) reasons.push(`Wettkampf in ${Math.round(W)} Wochen: bis dahin kann sich viel ändern`);
-  return { ok: true, missing: [...new Set(missing)], confidence, confReasons: reasons, total: nowM.total, parts: nowM.parts, race, runDistances: need.has('run') ? runDistances : undefined, improve, assumptions: nowM.assumptions, bike: nowM.bike };
+  return { ok: true, sources: srcCheck && srcCheck.text ? srcCheck : undefined, missing: [...new Set(missing)], confidence, confReasons: reasons, total: nowM.total, parts: nowM.parts, race, runDistances: need.has('run') ? runDistances : undefined, improve, assumptions: nowM.assumptions, bike: nowM.bike };
 }
 
 /* Persönlicher Korrekturfaktor: Ist-Zeit / Prognose je Disziplin, gleitend über die Rennen (je Rennen halbes Gewicht), 0,85-1,15 */

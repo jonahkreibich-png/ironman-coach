@@ -1,5 +1,5 @@
 import {effectiveCustomBuckets} from './custom-state26';
-import { actualMetrics, crawlOf, actualTitle, actualSport, effectiveSession } from './results';
+import { actualMetrics, crawlOf, actualTitle, actualSport, effectiveSession, withSwimFacts } from './results';
 import { mainPart } from './sections';
 /* Leistungs-Scores je Sportart (Auftrag 12): feste Leistungsskala 0-100 statt „Anteil am Ziel“.
    20 = Einsteiger, 50 = solider Hobbysportler, 70 = stark, 85 = Spitzenamateur, 100 = Elite; alters- und geschlechtsbereinigt, wenn bekannt.
@@ -12,7 +12,8 @@ import { mainPart } from './sections';
    Bedingungen werden herausgerechnet: Hitze über 22 °C, Höhenmeter, Rollentrainer. Werte unter Krankheit zählen weniger. */
 import type { Activity } from './activity/analyze';
 import { intervalsOf, statsOf } from './activity/structure';
-import { rowsToLaps } from './intervals';
+import { rowsToLaps, swimIvFacts, manualIntervals } from './intervals';
+import { exerciseLoad, exerciseKey, STRENGTH_CATS, type StrengthCat, type ExerciseLoad } from './strength';
 import type { Profile } from './profile';
 import { ageOf, ageExact } from './profile';
 import type { Goal } from './goals';
@@ -41,7 +42,8 @@ export interface SportScore {
   parts: ScorePart[]; trend: { date: string; score: number }[]; why: string[]; basis: string;
   counted: Counted[]; gains: Gain[]; stages: Record<string, StageGoal>; reached: { key: string; text: string }[];
 }
-export interface FormScore { ctl: number | null; target: number; score: number; bySport: Partial<Record<ScoreSport, { ctl: number; target: number }>> }
+export interface FormScore { ctl: number | null; target: number; score: number; bySport: Partial<Record<ScoreSport, { ctl: number; target: number }>>;
+  /** Auftrag 36: Frische heute (TSB) – angezeigt, nicht eingerechnet; „Warum?“ in Worten */ tsb?: number | null; why?: string[] }
 export interface ScoreInput {
   today: string;
   activities: Activity[];
@@ -89,7 +91,11 @@ export const SCALES = {
   /* Entkopplung in % (kleiner = besser) */
   dec: [[-2, 100], [0, 98], [1, 92], [3, 80], [5, 65], [7, 50], [10, 30], [15, 10], [20, 0]] as [number, number][],
   strengthWeek: [[0, 0], [0.5, 20], [1, 40], [1.5, 55], [2, 68], [2.5, 78], [3, 86], [4, 95]] as [number, number][],
-  strengthProg: [[-0.2, 10], [0, 40], [0.1, 60], [0.25, 80], [0.5, 95]] as [number, number][]
+  strengthProg: [[-0.2, 10], [0, 40], [0.1, 60], [0.25, 80], [0.5, 95]] as [number, number][],
+  /* Auftrag 36: harte Sätze pro Woche je Bereich, Anzahl abgedeckter Bereiche (von 5), Minuten Kraft pro Woche */
+  strengthSets: [[0, 0], [1, 25], [2, 45], [4, 70], [6, 85], [9, 95]] as [number, number][],
+  strengthCover: [[0, 0], [1, 25], [2, 45], [3, 65], [4, 82], [5, 95]] as [number, number][],
+  strengthMin: [[0, 0], [20, 30], [45, 60], [60, 72], [90, 86], [120, 95]] as [number, number][]
 };
 export function scale(table: [number, number][], x: number): number {
   const t = [...table].sort((a, b) => a[0] - b[0]);
@@ -279,7 +285,11 @@ function bikeObs(c: Ctx, lthr: number, power: boolean, ign: Ignored[] = []): FOb
       if (v20 && !wattsTrusted(a, p)) return;
       if (a.avgHr && a.min <= 75 && a.min >= 20 && a.avgHr >= 0.9 * lthr) {
         const test = TEST_RE.test(a.name || '');
-        add(a.avgPower * 0.95 * lthr / a.avgHr, test ? 'test' : 'effort', test ? 0.025 : 0.04, `${W} W bei Puls ${a.avgHr}`);
+        // Auftrag 36: bei welligen harten Fahrten (Gruppe, Hügel) bildet die normierte Leistung (NP) die Belastung besser ab als der Schnitt;
+        // bei sehr unruhigen Fahrten (NP über 115 % des Schnitts: Antritte, Sprints) sagt auch sie wenig – dann der Schnitt mit mehr Unsicherheit
+        const vi = v20 && a.np && a.np >= a.avgPower ? a.np / a.avgPower : 1;
+        const P = vi > 1.02 && vi <= 1.15 ? a.np! : a.avgPower;
+        add(P * 0.95 * lthr / a.avgHr, test ? 'test' : 'effort', test ? 0.025 : vi > 1.15 ? 0.06 : 0.04, P !== a.avgPower ? `NP ${Math.round(P)} W (Ø ${W} W) bei Puls ${a.avgHr}` : `${W} W bei Puls ${a.avgHr}`);
         return;
       }
       const laps = (a.laps || []).filter(l => l.kind === 'work' && l.sec >= 480 && l.power);
@@ -349,6 +359,8 @@ function swimObs(c: Ctx): FObs[] {
   const v20 = !c.legacy;
   historyActs(c, 'swim').forEach(a => {
     const pc = a.swim && a.swim.pace100; if (!pc || (v20 && !swimPaceEligible(a))) return;
+    // Auftrag 36: Kraul-Wiederholungen sind genauer als die Gesamt-Pace (mit Pausen) – dann zählen sie (unten)
+    if (v20 && a.swim && (a.swim as any).iv && (a.swim as any).iv.crawlPace) return;
     const cont = (v20 ? crawlOf(a) : a.swim?.longestContinuousM) || 0;
     // A session title does not establish the measured 400/200 m protocol; profile test updates handle it.
     const test = !v20 && TEST_RE.test(a.name || '');
@@ -362,6 +374,14 @@ function swimObs(c: Ctx): FObs[] {
     if (test) add(-Math.log(pc), 'test', 0.025, value);
     else if (cont >= 400) add(-Math.log(pc + 3), 'swimset', 0.03 * f, value, ex);
     else add(-Math.log(pc - 4), 'swimpace', 0.05 * f, value, ex);
+  });
+  // Auftrag 36: eingetragene Wiederholungen (≥ 100 m) – Kraul ohne Hilfsmittel wie eine Serie; nur mit Pull Buoy stark abgeschwächt
+  // (der Auftrieb macht etwa 3 s/100 m schneller); Beine/Kickboard zählen nie fürs Kraul-Tempo
+  if (v20) historyActs(c, 'swim').forEach(a => {
+    const fx = a.swim && (a.swim as any).iv; if (!fx || (swimPaceEligible(a) && !fx.crawlPace)) return;
+    const add = adder(c, a, out, false);
+    if (fx.crawlPace) add(-Math.log(fx.crawlPace + 2), 'swimset', fx.crawlPaceM >= 400 ? 0.035 : 0.045, `${mmss(fx.crawlPace)}/100 m Kraul in den Wiederholungen`);
+    else if (fx.pullPace) add(-Math.log(fx.pullPace + 3 + 2), 'swimpace', 0.15, `${mmss(fx.pullPace)}/100 m mit Pull Buoy`, 'mit Pull Buoy, zählt nur abgeschwächt');
   });
   return out;
 }
@@ -398,7 +418,10 @@ function capPts(c: Ctx, sport: ScoreSport, base: number | null): number | null {
   const n = sessionsIn(c, sport);
   if (n >= 40) return null;
   const b = base ?? 45;
-  return n < 15 ? Math.max(50, b + 12) : Math.max(65, b + 25);
+  // Auftrag 36: stufenlos (vorher sprang die Grenze bei der 15. Einheit von 50 auf 65 Punkte und fiel bei der 40. ganz weg –
+  // der Score sprang dann ohne neue Leistung um über 10 Punkte; Simulation)
+  const lo = Math.max(50, b + 12), mid = Math.max(65, b + 25), hi = Math.max(100, b + 60);
+  return n < 15 ? lo + (mid - lo) * n / 15 : mid + (hi - mid) * (n - 15) / 25;
 }
 /* Niveau Laufen aus dem Startwert (Bezug für die Obergrenze im Rad) */
 function runBasePts(c: Ctx): number | null {
@@ -617,8 +640,11 @@ function swimRaw(c: Ctx): Raw {
     const pc = a.swim && a.swim.pace100;
     const cont = (crawlOf(a) || 0);
     const eligible = !v20 || swimPaceEligible(a);
-    if (pc && !eligible) ignored.push({ date: a.date, title: titleOf(a), value: mmss(pc) + '/100 m', why: 'Stil oder Hilfsmittel der Einheit erlauben keine Zuordnung zur Kraul-CSS ohne Hilfsmittel', key: 'swim' });
-    if (pc && eligible) css.push({ v: cont >= 400 ? pc + 3 : pc - 4, w: (cont >= 400 ? 1 : 0.5) * weightOf(a, inp, end), date: a.date });
+    const fx: any = v20 && a.swim ? (a.swim as any).iv : null;
+    if (pc && !eligible) ignored.push({ date: a.date, title: titleOf(a), value: mmss(pc) + '/100 m', why: fx ? (fx.crawlPace ? 'Gesamt-Pace mit Hilfsmitteln oder anderen Lagen gemischt – gezählt werden nur die Kraul-Wiederholungen ohne Hilfsmittel' : fx.pullPace ? 'Kraul nur mit Pull Buoy – zählt nur abgeschwächt, nicht als Kraul ohne Hilfsmittel' : 'Beinarbeit, Technik oder andere Lagen – kein Kraul-Tempo') : 'Stil oder Hilfsmittel der Einheit erlauben keine Zuordnung zur Kraul-CSS ohne Hilfsmittel', key: 'swim' });
+    if (fx && fx.crawlPace) css.push({ v: fx.crawlPace + 2, w: 0.8 * weightOf(a, inp, end), date: a.date });
+    else if (pc && eligible) css.push({ v: cont >= 400 ? pc + 3 : pc - 4, w: (cont >= 400 ? 1 : 0.5) * weightOf(a, inp, end), date: a.date });
+    else if (fx && fx.pullPace) css.push({ v: fx.pullPace + 5, w: 0.2 * weightOf(a, inp, end), date: a.date });
     counted.push({ date: a.date, title: titleOf(a), value: [a.km ? Math.round(a.km * 1000) + ' m' : '', pc ? mmss(pc) + '/100 m' : '', cont ? `${cont} m am Stück` : ''].filter(Boolean).join(', ') || `${a.min} min`, manual: isManual(a) });
   });
   const cssEst = (th.estimated || []).includes('cssSec');
@@ -663,22 +689,78 @@ function capWith(cap: number | null, prior: { z: number; sd: number }, pts: (z: 
   return prior.sd <= 0.07 ? Math.max(cap, pts(prior.z) + 5) : cap;
 }
 
-/* ---------- Kraft: Regelmäßigkeit und Steigerung ---------- */
+/* ---------- Kraft (Auftrag 36): Regelmäßigkeit, Umfang je Bereich, Abdeckung, Steigerung, Dauer ----------
+   Vorher nur Regelmäßigkeit (die Steigerung las ein Feld, das nie gefüllt wurde). Jetzt aus den eingetragenen Übungen (shared/strength):
+   Sätze × Wiederholungen × Gewicht bzw. Haltezeit, Körpergewicht bei Übungen ohne Gewicht; Steigerung je Übung über das geschätzte
+   Maximalgewicht (Epley, bester Satz) im Verhältnis zum Körpergewicht (unter 18 nur aus Sätzen ab 6 Wiederholungen, kein Maximaltest);
+   Umfang je Bereich (harte Sätze pro Woche) und Abdeckung des für Triathlon Wichtigen. Ohne Übungen ehrlich: nur Regelmäßigkeit bekannt. */
+export const STRENGTH_NO_EX_HINT = 'Nur Regelmäßigkeit bekannt: Trag nach dem Training die Übungen ein (Vorlage wählen oder „Wie letztes Mal“, dann nur Gewichte anpassen) – dann zählen Umfang, Abdeckung und Steigerung.';
 function strengthRaw(c: Ctx): Raw {
-  const { end, activities: list } = evidenceActivities(c, 'strength');
-  // Auftrag 21: Einheiten pro Woche gleitend gewichtet (Halbwertszeit 6 Wochen) statt Anzahl in einem harten 6-Wochen-Fenster;
-  // bei gleichmäßigem Training ergibt das dieselbe Zahl wie vorher
+  // Kraft ist Regelmäßigkeit: eine Pause senkt den Wert (Bezug heute), anders als bei Leistungswerten, die bei Pause stehen bleiben
+  // (alle Krafteinheiten des letzten Jahres bis heute; die Auswahl der Leistungswerte endet bei der letzten gemessenen Einheit und ließ
+  // Krafteinheiten ohne Gefühl/Puls weg)
+  const end = c.end; const seenK = new Set<string>();
+  const list = c.inp.activities.filter(a => a.sport === 'strength' && !a.mergedInto && a.date <= end && inWindow(a, end, HORIZON) && (a.min == null || (Number.isFinite(a.min) && a.min >= 0)) && !seenK.has(a.id) && (seenK.add(a.id), true));
+  // Auftrag 21: Einheiten pro Woche gleitend gewichtet (Halbwertszeit 6 Wochen) statt Anzahl in einem harten 6-Wochen-Fenster
   // (Nenner: gewichtete Tage seit der ersten Einheit, mindestens 6 Wochen – wer neu ist, wird nicht schlechter gerechnet)
   const span = Math.max(WINDOW, list.length ? Math.ceil(Math.max(...list.map(a => ageOfDays(end, a.date)))) + 1 : WINDOW);
   let days = 0; for (let d = 0; d < span; d++) days += Math.exp(-Math.LN2 * d / WINDOW);
-  const perWeek = Math.round(list.reduce((n, a) => n + Math.exp(-Math.LN2 * ageOfDays(end, a.date) / WINDOW), 0) / days * 7 * 10) / 10;
-  const weights = list.map(a => (a as any).liftKg).filter((x: any) => typeof x === 'number');
-  const prog = weights.length >= 2 ? (weights[weights.length - 1] - weights[0]) / Math.max(1, weights[0]) : null;
-  const parts: ScorePart[] = [
-    mk('reg', 'Regelmäßigkeit', prog != null ? 0.75 : 1, perWeek, scale(SCALES.strengthWeek, perWeek), de(perWeek) + ' pro Woche'),
-    ...(prog != null ? [mk('prog', 'Steigerung der Gewichte', 0.25, prog, scale(SCALES.strengthProg, prog), (prog >= 0 ? '+' : '') + Math.round(prog * 100) + ' %', { target: '+10 % in 6 Wochen' })] : [])
-  ];
-  return { parts, n: list.length, counted: list.map(a => ({ date: a.date, title: titleOf(a), value: a.min ? a.min + ' min' : 'erledigt', manual: isManual(a) })), latest: list.map(a => a.date).sort().pop() || null, manualShare: 1, levelSource: 'Einheiten', extra: { perWeek } };
+  const wOf = (a: Activity) => Math.exp(-Math.LN2 * ageOfDays(end, a.date) / WINDOW);
+  const perWeek = Math.round(list.reduce((n, a) => n + wOf(a), 0) / days * 7 * 10) / 10;
+  const p = c.inp.profile; const bw = p.weightKg || null;
+  const minor = (ageOf(p as any, end) ?? 30) < 18;
+  const withEx = list.map(a => ({ a, ex: (((a as any).exercises || (a as any).strength?.exercises || []) as any[]).map((e: any) => exerciseLoad(e, bw, minor)).filter(Boolean) as ExerciseLoad[] })).filter(x => x.ex.length);
+  const parts: ScorePart[] = [];
+  const counted: Counted[] = list.map(a => ({ date: a.date, title: titleOf(a), value: a.min ? a.min + ' min' : 'erledigt', manual: isManual(a) }));
+  if (!withEx.length) {
+    parts.push(mk('reg', 'Regelmäßigkeit', 1, perWeek, scale(SCALES.strengthWeek, perWeek), de(perWeek) + ' pro Woche'));
+    return { parts, n: list.length, counted, latest: list.map(a => a.date).sort().pop() || null, manualShare: 1, levelSource: 'Einheiten (nur Regelmäßigkeit bekannt)', extra: { perWeek, onlyReg: true } };
+  }
+  // Umfang je Bereich: harte Sätze pro Woche, gleitend gewichtet wie die Regelmäßigkeit (Halbwertszeit 3 Wochen; vorher ein hartes
+  // 4-Wochen-Fenster – fiel die letzte Einheit heraus, sprang der Score in einer Woche z. B. von 30 auf 2). Halteübungen zählen je Satz.
+  const wS = (a: Activity) => Math.exp(-Math.LN2 * ageOfDays(end, a.date) / RECENT);
+  let daysS = 0; for (let d = 0; d < Math.max(WINDOW, span); d++) daysS += Math.exp(-Math.LN2 * d / RECENT);
+  const setsBy: Record<StrengthCat, number> = { legs: 0, single: 0, core: 0, pull: 0, push: 0 };
+  withEx.forEach(x => x.ex.forEach(e => e.cats.forEach(k => { setsBy[k] += e.sets * wS(x.a) / daysS * 7; })));
+  const cats = STRENGTH_CATS.map(([k]) => k);
+  const volPts = cats.reduce((sum, k) => sum + scale(SCALES.strengthSets, setsBy[k]), 0) / cats.length;
+  const avgSets = Math.round(cats.reduce((sum, k) => sum + setsBy[k], 0) / cats.length * 10) / 10;
+  // abgedeckt: ab etwa 1 Satz pro Woche voll, darunter anteilig (eine einzelne Einheit zählt nicht gleich wie regelmäßiges Training)
+  const coverN = Math.round(cats.reduce((n, k) => n + Math.min(1, setsBy[k]), 0) * 10) / 10;
+  const covered = cats.filter(k => setsBy[k] >= 0.5);
+  const missing = STRENGTH_CATS.filter(([k]) => !covered.includes(k)).map(([, l]) => l);
+  // Steigerung je Übung: bestes geschätztes Maximalgewicht (bzw. längste Haltezeit) jetzt (letzte 3 Wochen) gegen 4–12 Wochen davor
+  const byEx = new Map<string, { date: string; v: number; rel: number | null; name: string }[]>();
+  withEx.forEach(x => x.ex.forEach(e => {
+    const v = e.e1rmKg ?? e.holdBest; if (!v) return;
+    const k = exerciseKey(e.name); const arr = byEx.get(k) || [];
+    arr.push({ date: x.a.date, v, rel: e.e1rmKg && bw ? e.e1rmKg / bw : null, name: e.name }); byEx.set(k, arr);
+  }));
+  const gains: { g: number; name: string; rel: number | null }[] = [];
+  byEx.forEach(arr => {
+    const now = arr.filter(y => ageOfDays(end, y.date) < 21), then = arr.filter(y => ageOfDays(end, y.date) >= 28 && ageOfDays(end, y.date) <= 84);
+    if (!now.length || !then.length) return;
+    const bn = Math.max(...now.map(y => y.v)), bt = Math.max(...then.map(y => y.v));
+    const top = now.find(y => y.v === bn)!;
+    gains.push({ g: (bn - bt) / bt, name: top.name, rel: top.rel });
+  });
+  // Mittel über alle Übungen (je Übung begrenzt), damit eine gesteigerte Hauptübung zählt, eine Ausreißer-Übung aber nicht alles bestimmt
+  const prog = gains.length ? gains.reduce((n, x) => n + Math.max(-0.5, Math.min(1, x.g)), 0) / gains.length : null;
+  const bestRel = gains.filter(g => g.rel != null).sort((x, y) => (y.rel || 0) - (x.rel || 0))[0] || null;
+  const minPerWeek = Math.round(list.reduce((n, a) => n + (a.min || 0) * wOf(a), 0) / days * 7);
+  // Einblenden: erst mit etwa 4 Einheiten mit Übungen (gleitend gezählt) zählen Umfang, Abdeckung, Steigerung und Dauer voll; davor trägt
+  // die Regelmäßigkeit mehr (vorher sprang der Score beim ersten Eintragen von Übungen z. B. von 8 auf 31)
+  const nEx = withEx.reduce((n, x) => n + wS(x.a), 0); const fEx = Math.min(1, nEx / 4);
+  const wx = (w: number) => Math.round(w * fEx * 1000) / 1000;
+  parts.push(
+    mk('reg', 'Regelmäßigkeit', Math.round((0.3 + 0.7 * (1 - fEx)) * 1000) / 1000, perWeek, scale(SCALES.strengthWeek, perWeek), de(perWeek) + ' pro Woche', { target: '2 pro Woche' }),
+    mk('vol', 'Umfang je Bereich', wx(0.2), avgSets, volPts, `Ø ${de(avgSets)} Sätze pro Woche je Bereich`, { target: '4–6 Sätze' }),
+    mk('cover', 'Abdeckung Triathlon', wx(0.15), coverN, scale(SCALES.strengthCover, coverN), `${covered.length} von 5 Bereichen${missing.length ? ` (fehlt: ${missing.join(', ')})` : ''}`, { target: '5 von 5' }),
+    mk('prog', 'Steigerung', wx(0.2), prog, prog != null ? scale(SCALES.strengthProg, prog) : scale(SCALES.strengthProg, 0), prog != null ? `${prog >= 0 ? '+' : ''}${Math.round(prog * 100)} % in 6 Wochen${bestRel ? ` (${bestRel.name} ≈ ${de(bestRel.rel!, 2)}× Körpergewicht)` : ''}` : 'noch zu wenige Wiederholungen derselben Übung', { target: '+5–10 % in 6 Wochen' }),
+    mk('dur', 'Dauer', wx(0.15), minPerWeek, scale(SCALES.strengthMin, minPerWeek), `${minPerWeek} min pro Woche`, { target: '45–90 min' })
+  );
+  withEx.forEach(x => { const cnt = counted.find(y => y.date === x.a.date && y.title === titleOf(x.a)); if (cnt) cnt.value = `${x.ex.length} Übungen, ${x.ex.reduce((n, e) => n + e.sets, 0)} Sätze${x.a.min ? ', ' + x.a.min + ' min' : ''}`; });
+  return { parts, n: list.length, counted, latest: list.map(a => a.date).sort().pop() || null, manualShare: 1, levelSource: 'Einheiten mit Übungen', extra: { perWeek, setsBy, prog, covered: covered.length, minPerWeek, onlyReg: false } };
 }
 
 function rawFor(sport: ScoreSport, c: Ctx): Raw { return sport === 'run' ? runRaw(c) : sport === 'bike' ? bikeRaw(c) : sport === 'swim' ? swimRaw(c) : strengthRaw(c); }
@@ -983,6 +1065,7 @@ export function sportScores(inp: ScoreInput, sports: ScoreSport[] = ['swim', 'bi
     const sw = switchLine(sport, inp, now);
     const rest = whyTexts(sport, now, then, now.score - then.score).filter(x => !steps.length || !/^Zu wenig neue Messungen|^Neue Messungen haben/.test(x));
     const why = [...(sw ? [sw] : []), ...steps, ...rest.slice(0, 3)];
+    if (sport === 'strength' && now.raw.extra && now.raw.extra.onlyReg) why.unshift(STRENGTH_NO_EX_HINT);
     return { sport, score: now.score, measured: now.measured, confidence: now.confidence, confText: confTextOf(sport, now), level: levelLabel(now.score), parts: now.parts, trend,
       range: now.range, rangeText: rangeTextOf(now.range, now.provisional), provisional: now.provisional,
       why, basis: inp.goal ? inp.goal.name : 'allgemeine Fitness', counted, gains: gainsOf(sport, now), stages: marks.stages, reached: marks.reached };
@@ -1002,8 +1085,20 @@ export function formScore(inp: ScoreInput): FormScore {
     const target = (req.ctlBySport as any)[sp];
     if (target) bySport[sp as ScoreSport] = { ctl: ctlOf(loads), target };
   });
-  const total = loadSeriesFromDaily(all, inp.trend, inp.today, inp.settings).at(-1)?.ctl ?? 0;
-  return { ctl: total || null, target: req.ctl, score: clamp(Math.round(total / req.ctl * 100)), bySport };
+  const last = loadSeriesFromDaily(all, inp.trend, inp.today, inp.settings).at(-1);
+  const total = last?.ctl ?? 0; const tsb = last ? last.tsb : null;
+  /* Auftrag 36 (geprüft): Die Gesamt-Form bleibt die Trainingsbelastung im Verhältnis zum Ziel. Frische (TSB) schwankt täglich und ist je
+     Phase gewollt hoch oder niedrig (Aufbau müde, Rennwoche frisch) – eingerechnet würde die Form im Aufbau sinken, obwohl alles richtig
+     läuft. Die Leistungs-Scores stehen getrennt und fließen in die Prognose; eingerechnet würde Leistung doppelt zählen. Beides steht im „Warum?“. */
+  const score = clamp(Math.round(total / req.ctl * 100));
+  const SP: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', strength: 'Kraft' };
+  const parts = Object.entries(bySport).map(([k, v]) => `${SP[k] || k} ${Math.round(v!.ctl)} von ${v!.target}`);
+  const why = [
+    `Zählt: deine Trainingsbelastung der letzten Wochen (Fitness/CTL ${Math.round(total)}) im Vergleich zu dem, was ${inp.goal ? inp.goal.name : 'allgemeine Fitness'} etwa braucht (${req.ctl}) = ${score} von 100.${parts.length ? ' Je Sportart: ' + parts.join(', ') + '.' : ''}`,
+    `Frische (TSB ${tsb == null ? '–' : (tsb > 0 ? '+' : '') + Math.round(tsb)}) zählt nicht mit: Sie schwankt jeden Tag und soll im Aufbau niedrig, vor dem Wettkampf hoch sein. Sie steht bei der Trainingsampel.`,
+    'Die Leistungs-Scores (Tempo, Watt, CSS, Kraft) zählen hier nicht mit: Sie stehen darunter und fließen in die Prognose – sonst würde Leistung doppelt zählen.'
+  ];
+  return { ctl: total || null, target: req.ctl, score, bySport, tsb, why };
 }
 
 /* Auftrag 20: Testteil aus den Testfeldern (Rad: Ø-Puls und Tempo der 20 min, Lauf: Ø-Puls und Pace der 30 min) */
@@ -1068,9 +1163,23 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       laps: [...testLap(sport, m), ...rowsToLaps(Array.isArray(m.intervals) ? m.intervals : [], sport)], intervals: Array.isArray(m.intervals) && m.intervals.length >= 2 ? statsOf(rowsToLaps(m.intervals, sport), sport === 'bike') : null,
       swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), longestCrawlM: num(m.longestCrawl), longestPullM: num(m.longestPull), strokeRate: num(m.rate) } : null,
       rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {}),
+      // Auftrag 36: eingetragene Kraftübungen (für den Kraft-Score)
+      ...(sport === 'strength' && Array.isArray(m.exercises) ? { exercises: m.exercises } : {}),
       // Auftrag 35: Abschnitte von Hand → Hauptteil
       ...((): any => { if (sport !== 'run' && sport !== 'bike' || !Array.isArray(m.sections)) return {}; const mp = mainPart({ sport }, { metrics: m }, null, (profile && profile.thresholds) || {}, sport); return mp ? { main: mp } : {}; })()
     } as Activity);
+    // Auftrag 36: Schwimm-Wiederholungen mit Lage/Hilfsmittel (Kraul ohne Hilfsmittel → Kraul am Stück, Pull Buoy getrennt, Beine nichts davon)
+    if (sport === 'swim') {
+      const own = s && ((s.metricsSrc || {}).intervals === 'manual' || (s.metricsManual || {}).intervals);
+      const fx = own && Array.isArray(m.intervals) ? swimIvFacts(m.intervals) : (m.intervals && manualIntervals(s) ? swimIvFacts(manualIntervals(s)) : null);
+      const a = out[out.length - 1] as any;
+      if (fx && a.swim) {
+        a.swim = withSwimFacts(a.swim, fx);
+        // selbst eingetragene Felder gewinnen (wie actualMetrics)
+        if (fx.crawlMaxM && a.swim.longestCrawlM == null) { a.swim.longestCrawlM = fx.crawlMaxM; a.swim.longestContinuousM = fx.crawlMaxM; }
+        if (fx.pullMaxM && a.swim.longestPullM == null) a.swim.longestPullM = fx.pullMaxM;
+      }
+    }
   };
   planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, actualTitle(s, st), { ...st, zone: effectiveSession(s, st).zone, race: !!s.race }, s.plannedMinutes); }));
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));

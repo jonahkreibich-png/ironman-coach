@@ -187,7 +187,8 @@ export function planUpkeep(baseWeeks: any[], state: any, profile: Profile, goals
   // 2) Erholungswoche: dieselbe Stelle wie der Generator (enforceRecovery), nur für die betroffene Woche und ihre Bezugswoche
   for (const x of issues0.filter(i => i.rule === 'recoveryDepth')) {
     const i = weeks.findIndex((w: any) => w.weekNumber === x.week); if (i < 1) continue;
-    let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || weeks[j].partial || weeks[j].entry || weeks[j].reduced || weeks[j].phase === 'taper' || weeks[j].phase === 'race')) j--;
+    // Auftrag 36: gleiche Bezugswoche wie die Prüfung (eine vom Coach gekürzte Woche zählt mit)
+    let j = i - 1; while (j >= 0 && (weeks[j].isRecoveryWeek || weeks[j].partial || weeks[j].entry || (weeks[j].reduced && !weeks[j].reducedByCoach) || weeks[j].phase === 'taper' || weeks[j].phase === 'race')) j--;
     if (j >= 0) { const b0 = snap(); enforceRecovery([weeks[i]], weeks[j], keepIds, capOf); mark(b0, TRULE_LABEL.recoveryDepth); }
   }
   // 3) lange Einheiten: genau auf die Grenze aus der Prüfung (gleiche Zahlen wie der Daten-Check)

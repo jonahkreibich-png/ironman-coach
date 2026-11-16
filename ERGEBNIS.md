@@ -1,3 +1,90 @@
+# Auftrag 36: Intervalle bearbeiten, Scores, Prognose, große Simulation (16.11.)
+
+**Stand:** Version **3.24.0** – alle Teile getestet (siehe 5), Veröffentlichung siehe unten.
+
+## 1. Intervalle nach dem Training
+- **Vorher:** jede Wiederholung eine große Karte (7 Felder + 5 Knöpfe); Titel, Lage, Hilfsmittel nicht änderbar; „4 × 100 m in 1:55“ ohne Pace bekam kein Urteil.
+- **Jetzt:** Sätze gruppiert („4 × 100 m Kraul · Pull Buoy“), eine Zeile je Wiederholung (Werte + Urteil), Antippen öffnet die Details. „Ganzer Satz gleich“ (Dauer, Pace/Watt, Puls), einzelne Wiederholungen abweichend. Je Satz bzw. Wiederholung: Titel, Lage (Kraul, Brust, Rücken, Delfin, Lagen, Technikübung, Beine), Hilfsmittel (Pull Buoy, Kickboard, Paddles, Flossen, keine), Zone; Laufen/Rad: Art (bergauf, Fahrtspiel, Steigerung …) und Untergrund. Sätze hinzufügen, löschen, verschieben, Wiederholung hinzufügen.
+- **Das Programm versteht es:** Bewertung gegen das tatsächlich Gemachte (Pull-Tempo, Brust-Tempo, andere Zone; bergauf ohne Tempo-Ziel). Kraul mit Pull Buoy zählt nicht als „Kraul am Stück ohne Hilfsmittel“, sondern als „mit Pull Buoy am Stück“ und nur abgeschwächt für die CSS; Kickboard/Beine = Beinarbeit; Flossen nie fürs Kraul-Tempo. Schwimm-Stufen und Bestwerte nutzen das. Coach (Bewertung und KI-Kontext): „Die 4 × 100 m Kraul hast du mit Pull Buoy statt ohne Hilfsmittel geschwommen – zählt nicht als Kraul am Stück …“.
+- **Kraft:** „Wie letztes Mal (Datum: 5 Übungen mit Gewichten)“ übernimmt Übungen und Gewichte; Ändern, Tauschen, Hinzufügen gab es schon.
+
+## 2. Scores
+**Kraft-Score neu** (vorher nur Regelmäßigkeit; die „Steigerung“ las ein Feld, das nie gefüllt wurde): Regelmäßigkeit 30 %, Umfang je Bereich 20 %, Abdeckung Triathlon 15 % (Beine/Hüfte, einbeinig/Stabilität, Rumpf, Zug, Druck), Steigerung 20 % (Epley, bester Satz, Körpergewicht bei Übungen ohne Gewicht, unter 18 nur ab 6 Wdh., kein Maximaltest), Dauer 15 %. Ohne Übungen: „Nur Regelmäßigkeit bekannt“ + Hinweis (Vorlage oder „Wie letztes Mal“).
+
+| Wert | Ergebnis | Grund |
+|---|---|---|
+| Effizienz locker | nicht (bleibt angezeigt, 0 %) | hängt stark an Hitze, Müdigkeit, Strecke, Uhr; fließt schon gedämpft in die Schwellen-Schätzung |
+| Puls-Erholung in Intervallpausen | nicht | hängt an Pausenlänge und Puls-Verzögerung der Uhr; steht in der Bewertung |
+| Umfang/Regelmäßigkeit (Ausdauer) | nicht | steckt in der Gesamt-Form (CTL), sonst doppelt; bei Kraft ja |
+| Schritt-/Trittfrequenz | nicht | Stil, kein Leistungsmaß |
+| Laufleistung (Watt) | nicht | je Uhr/Sensor anders gerechnet, nicht vergleichbar |
+| NP | **aufgenommen** (kein neues Gewicht) | ersetzt Ø-Watt bei harten welligen Fahrten (VI 1,02–1,15) in der FTP-Schätzung; bildet die Belastung besser ab; sehr unruhige Fahrten mit mehr Unsicherheit |
+| Höhenmeter-Leistung | nicht | geländeabhängig; Hügel werden schon herausgerechnet |
+| Schwimmen mit/ohne Hilfsmittel | **aufgenommen** | Kraul ohne Hilfsmittel voll, Pull Buoy abgeschwächt (+5 s, 4-fache Unsicherheit), Beine/Flossen nie |
+| Schwimm-Puls | nicht | Handgelenk-Puls im Wasser unzuverlässig |
+| SWOLF | nicht | Mischung aus Zeit und Zügen, doppelt zu CSS und Meter pro Zug |
+| Freiwasser | nicht im Score | Bedingungen (Strömung, Neo) zu verschieden; in der Prognose ja |
+
+**Gesamt-Form geprüft:** bleibt Trainingsbelastung (CTL) zum Ziel. Frische (TSB) schwankt täglich und ist je Phase gewollt hoch oder niedrig; Leistungs-Scores stehen getrennt und fließen in die Prognose – beides würde täuschen bzw. doppelt zählen. Neu: „Warum?“ mit CTL je Sportart, TSB und dieser Erklärung.
+
+## 3. Prognose
+Geprüft (Test `auftrag36-prognose`, 18 Fälle): Daniels-VDOT-Tabelle (VDOT 30–70, 5 km–Marathon) ±1 %, Riegel 1,06, Schwellen-Pace ≈ T-Pace (±3 %), Rad-Physik (200 W Rennrad 32–35 km/h, 250 W Zeitfahrrad 39–42 km/h), Wechselzeiten, Freiwasser +3 %, Neo −4 bis −6 %, 6 Alters-/Geschlechtsgruppen × 3 Niveaus × 8 Ziele (realistische Bereiche, stärker = schneller, länger = länger). Keine Rechenfehler gefunden. Erklärte Abweichungen:
+- Ohne lange Läufe ist der Marathon > 5 % langsamer als Daniels (Riegel-Exponent bis 1,15) – gewollt, Daniels setzt Ausdauer voraus.
+- Die Schwelle aus VO2max liegt ~3 % schneller als Daniels' T-Pace (App: Tempo für ~60 min) – innerhalb der Unsicherheit.
+- Sprung/Pause/Krankheit: Training mit eigenem Trend ≤ typische Entwicklung < nach 6 Wochen Pause; krank nie schneller; gleiche Werte = gleiche Zeit.
+
+**Dein Fall:** 5:39/km kommt aus lockeren Läufen hochgerechnet („Trend“), nicht gemessen (≈ VDOT 35); VO2max 57 der Uhr passt zu ca. 3:48/km. Jetzt: ehrlicher Hinweis in der Prognose, breiterer Bereich, Lauftest als erster Tipp, und der Coach schlägt vor, eine passende Laufeinheit durch den 30-min-Lauftest zu ersetzen (bei dir: 22.11. statt des langen Laufs). Allgemein für alle Nutzer: über 15 % Abstand oder nur hochgerechnet → Hinweis + Test.
+
+## 4. Plan-Regeln (Daten-Check)
+Die gemeldeten Fälle sind behoben, Ursachen im allgemeinen Code:
+| Fund | Ursache | Fix |
+|---|---|---|
+| „Locker nach dem Wettkampf“ (Nutzer 1, 10.11.) | Neu-Planen nach einem Rennen kannte nur künftige Ziele; „Lauf-Qualität vor dem Laufziel“ setzte Intervalle direkt danach | Rennen der letzten 14 Tage zählen; Qualität nie in die lockeren Tage nach einem Rennen |
+| „Erholungswoche zu niedrig/hoch“ (Nutzer 2, 5) und „lange Einheit +10 min“ | Bezug war eine gekürzte Woche (Coach, Ampel, Tagesanpassung) oder fiel ganz weg → Rückkehr zum Plan = „Sprung“ | Bezug = geplanter Wert; geplante reduzierte Wochen weiter ohne Bezug |
+| Erholungswoche über 78 % | „Stufe wiederholen“ (Kraul lernen) und Schwimm-Stufen-Update setzten in der Erholungswoche wieder die volle Einheit ein | kürzere Dauer bleibt (zwei Stellen) |
+| Erholungswoche „32 %“ nach dem Hauptrennen | Vergleich mit einer Aufbauwoche vor dem Rennen | kein Vergleich über ein A/B-Rennen |
+| Wettkampfwoche: Intervalle am Montag | „Nachholen“ prüfte die Woche nicht | gleiche Sperre wie der Generator |
+| „Nach langem Tag …“, harte Tage | entstanden in der Simulation nur durch eigene Änderungen mit „Trotzdem übernehmen“ | gelten nicht mehr als Plan-Fehler (die Pflege ließ sie schon) |
+
+Echte Daten (Kopie vom 14.11., Stand 16.11.): alle 3 Nutzer laden fehlerfrei, **Daten-Check grün** (0 Befunde). Bei Nutzer 2 meldet die Plan-Pflege 6 Wochen ohne Tempolauf vor dem HM – ehrlich als Lücke markiert (kein freier Lauftag neben Spielen), kein Fehler.
+
+## 5. Großer Test
+Ein Aufruf: `node scripts/grosser-test.mjs` (16 Kerne, alles parallel).
+
+| Teil | Dauer |
+|---|---|
+| Build (einmal) | 0:03 min |
+| Typprüfung | 0:13 min |
+| Unit-Tests (3 Worker) | 11:53 min |
+| Simulation (18 Teile) | 15:07 min |
+| Browser (3 Teile, je eigener Server) | 2:38 / 3:41 / 3:54 min |
+| **Gesamt** | **15:11 min** (Ziel < 45) |
+
+- **Simulation:** 36 erfundene Nutzer (10 Test-Personen + 26 Daten-Fälle: alle Sportarten und Ziele, 16–64 Jahre, w/m, Teamsport, Uhr bzw. Handeingabe, fleißig bis faul), 12–24 Monate = **19 292 Tage, 33 703 Aktionen** (10 678 erledigt, 4 072 ausgelassen, 806 verschoben, 720 umgewandelt, 1 293 gekürzt, 1 148 anders gemacht, 977 Intervall-Einheiten, davon 285 mit Pull Buoy und 337 mit eigenem Titel, 1 056 Krafteinheiten mit Übungen, 641 mit Abschnitten, 152× krank, 73× verletzt, 41 Wettkämpfe, 12 Tests, 3 306 Coach-Fragen). Ergebnis im letzten Lauf: **0 Fehler, Daten-Check jede Nacht grün**.
+- **Browser:** 37 Abläufe × WebKit/iPhone + Chromium (Intervalle mit Pull Buoy/Titel/Satz gleich, Satz hinzufügen/verschieben/löschen, Laufen bergauf, Kraft „Wie letztes Mal“, Kraft-Score, Gesamt-Form „Warum?“, Prognose-Hinweis, Umwandeln, km-Ansicht, Abschnitte, Coach schreiben, Plan bearbeiten, Grundabläufe); 74 Läufe. Im letzten Lauf 2 Zeitüberschreitungen beim Seitenaufruf unter Volllast (app „Einheit abhaken“, Plan-Übersicht 28 px) – einzeln wiederholt grün (34/34). Danach Runner entlastet (Simulation 8 Worker, Zeitlimit 90 s).
+- **KI:** im großen Test keine KI-Aufrufe (eingebaute Coach-Engine + Zahlen-Prüfer auf jeder Antwort). Ein voller KI-Lauf nur bei Coach-Änderung und Schlüssel – lokal kein Schlüssel, darum übersprungen.
+- **Beschleunigt:** Build nur einmal; Simulation in 18 Teilen statt einer Datei (Vitest verteilt nur Dateien); Browser in 3 Teilen mit je eigenem Server statt 1 Worker. Langsamste Teile: Simulation „erfahren-md-marathon“ 460 s (78 Wochen), Unit „longterm30 olympisch-erfahren“ 44 s, Browser „Umwandeln“ 70 s unter Last.
+
+**Gefundene Fehler (vorher → nachher)**, jeder als dauerhafter Test (`auftrag36-regeln`, `auftrag36-kraft`, Simulation):
+| Fund | vorher | nachher |
+|---|---|---|
+| nächtlicher Daten-Check (Simulation, alle Nutzer) | ein Testnutzer allein 95 Befunde/Jahr; erster Gesamtlauf: lange Einheit, Erholungswoche, Wettkampfwoche, harte Einheiten | 0 |
+| Locker nach dem Wettkampf (frischer Plan nach Rennen) | Intervalle 3 Tage nach dem 10-km-Rennen | locker |
+| Nachholen in der Wettkampfwoche | Schwellen-Intervalle am Montag vor dem Sprint | nicht mehr |
+| Erholungswoche durch Lernstufen | 16 → 28 min, 79–82 % | kürzere Dauer bleibt |
+| Kraft-Score | sprang 30 → 2 bzw. 8 → 31 | gleitend, eingeblendet |
+| Kraft-Score ignorierte Einheiten ohne RPE | nur Regelmäßigkeit | zählt |
+| Score-Obergrenze ohne Test | Sprung +13 bei der 15. Einheit | stufenlos |
+| Lauftest-Vorschlag | blockiert durch geplanten Schwimm-Test | nur Lauftest blockiert |
+| Nach dem Verschieben eines Satzes | falscher Satz aufgeklappt | wandert mit |
+| Intervall „4 × 100 m in 1:55“ | kein Urteil (nur mit Pace) | Pace aus Zeit und Strecke |
+
+
+## Tests während der Arbeit
+Neu: `auftrag36-intervalle` (8), `auftrag36-kraft` (4), `auftrag36-prognose` (18), `auftrag36-regeln` (9) Unit-Tests; Browser `auftrag36-intervalle` (5) und `auftrag36-ablaeufe` (5) je WebKit + Chromium; Simulation `tests/sim` (36 Nutzer). Angepasst: `auftrag22.spec` (neue Intervall-Anzeige).
+
+---
+
 # Fix 3.23.1: Heute-Karte zu schmal und riesig hoch (14.11.)
 
 **Stand:** veröffentlicht als 3.23.1 (14.11.): alle Tests grün (750), Sicherungen von Test- und echter App, erst stamio-test, dann echte App; Start-Test im Browser ok, 10 Minuten ohne Startfehler.

@@ -25,7 +25,8 @@ test('Intervalle: Soll als Platzhalter, Eingabe mit Enter weiter, wie vorheriges
   await expect(box).toBeVisible();
   await expect(box.locator('.iv-bar')).toHaveCount(2);
   await expect(box.locator('.iv-bar').first()).toContainText('nicht gemacht');
-  await box.locator('summary', { hasText: 'Intervalle eintragen' }).click();
+  // Auftrag 36: eine Zeile je Wiederholung, Antippen öffnet die Details
+  await box.locator('[data-iv-row="0"] summary.iv-bar').click();
   const sec = page.locator('#iv-0-sec');
   await expect(sec).toHaveValue('');
   await expect(sec).toHaveAttribute('placeholder', '10:00');
@@ -37,6 +38,7 @@ test('Intervalle: Soll als Platzhalter, Eingabe mit Enter weiter, wie vorheriges
   await page.locator('#iv-0-hr').fill('300'); await page.locator('#iv-0-hr').press('Tab');
   await expect(page.locator('#toast')).toContainText('unrealistisch');
   await page.locator('#iv-0-hr').fill('150'); await page.locator('#iv-0-hr').press('Tab');
+  await page.locator('#sheet [data-iv-row="1"] summary.iv-bar').click();
   await page.locator('#sheet [data-act="iv-copy"][data-i="1"]').click();
   await expect(page.locator('#iv-1-power')).toHaveValue('228');
   await expect(page.locator('#sheet [data-iv-sum]')).toContainText('228 W');
@@ -44,9 +46,10 @@ test('Intervalle: Soll als Platzhalter, Eingabe mit Enter weiter, wie vorheriges
   const st = await stored(page);
   expect(st.sessions[sid].metrics.intervals.slice(0, 2)).toEqual([expect.objectContaining({ sec: 600, power: 228, hr: 150 }), expect.objectContaining({ sec: 600, power: 228, hr: 150 })]);
   expect(st.sessions[sid].metricsSrc.intervals).toBe('manual');
-  // Intervall hinzufügen und löschen
+  // Satz hinzufügen und Wiederholung löschen
   await page.locator('#sheet [data-act="iv-add"]').click();
   await expect(page.locator('#sheet .iv-card')).toHaveCount(3);
+  await page.locator('#sheet [data-iv-row="2"] summary.iv-bar').click();
   await page.locator('#sheet [data-act="iv-del"][data-i="2"]').click();
   await expect(page.locator('#sheet .iv-card')).toHaveCount(2);
 });
@@ -67,7 +70,7 @@ async function unnamed(page: Page, scope: string): Promise<string[]> {
 }
 test('VoiceOver: Einheit abhaken, Werte und Intervalle eintragen, Coach – jedes Bedienelement hat einen Namen', async ({ page }) => {
   await sweetSpotToday(page);
-  await page.locator('#sheet summary', { hasText: 'Intervalle eintragen' }).click();
+  await page.locator('#sheet [data-iv-row="0"] summary.iv-bar').click();
   expect(await unnamed(page, '#sheet')).toEqual([]);
   await page.keyboard.press('Escape');
   await open(page, '/?go=heute');
@@ -81,7 +84,7 @@ test('große Schrift (doppelt so groß): nichts ragt seitlich heraus', async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '34px'; }); });
   await sweetSpotToday(page);
-  await page.locator('#sheet summary', { hasText: 'Intervalle eintragen' }).click();
+  await page.locator('#sheet [data-iv-row="0"] summary.iv-bar').click();
   const over = async () => page.evaluate(() => ({ page: document.scrollingElement!.scrollWidth - window.innerWidth, sheet: (() => { const s = document.querySelector('#sheetPanel') as HTMLElement | null; return s ? s.scrollWidth - s.clientWidth : 0; })() }));
   expect(await over()).toEqual({ page: 0, sheet: 0 });
   expect(await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#sheet [data-intervals] .lab') as HTMLElement).fontSize))).toBeGreaterThan(20);

@@ -26,6 +26,8 @@ export interface SwimOut {
   byStroke: Record<string, number>; longestContinuousM: number | null; longestCrawlM?: number | null; strokeRate: number | null;
   /** Auftrag 21: Pace je Lage (s/100 m, aus den Bahnen) und SWOLF (Sekunden + Züge pro Bahn) */
   crawlPace100?: number | null; breastPace100?: number | null; swolf?: number | null;
+  /** Auftrag 36: von Hand eingetragene Wiederholungen mit Lage/Hilfsmittel (SwimIvFacts aus shared/intervals) */
+  iv?: any; gear?: string[];
 }
 export interface Activity {
   id: string;

@@ -1017,12 +1017,15 @@ function generatePlanIn(inp: GenInput): GenResult {
     weeks[0].days.forEach((d: any) => { const f = (inp.frozen || []).find(x => x.date === d.date); d.sessions = d.date < from! && f && f.sessions.length ? f.sessions.map(strip) : d.sessions.map((s: any) => orig[s.id] || s); }); }
   // Auftrag 18: Trainingswissen als feste Regeln (Ruhetage, lange Tage, Wettkampfwoche, nach dem Wettkampf, Lauf-Qualität vor dem Laufziel …),
   // vor und nach der Intensitäts-Korrektur; die Intensität setzt nichts Hartes an Tage, die die Regeln sperren
-  const trOpts = { from: from || start, today, goals: [...goals, ...(inp.pastGoals || []).filter(g => g && g.date && !goals.some(x => x.id === g.id))], goalType: A.type as GoalType, keep: (s: any) => keepIds.has(s.id), runQualityOk: runAllowed && !eff.runEasyOnly && runStage == null,
+  // Auftrag 36: Wettkämpfe kurz vor dem Planbeginn (z. B. Rennen am Sonntag, neuer Plan ab Montag) zählen für „locker nach dem Wettkampf“
+  // und „nach langem Tag“ mit – vorher kannte der Generator nur künftige Ziele und setzte gleich am Tag danach Intervalle (Daten-Check 10.11.)
+  const recentRaces = (inp.goals || []).filter(g => g && g.date && GOALS[g.type] && g.type !== 'fitness' && g.date < today && daysBetween(g.date, start) <= 14 && !goals.some(x => x.id === g.id)).map(g => ({ ...g, result: undefined }));
+  const trOpts = { from: from || start, today, goals: [...goals, ...recentRaces, ...(inp.pastGoals || []).filter(g => g && g.date && !goals.some(x => x.id === g.id) && !recentRaces.some(x => x.id === g.id))], goalType: A.type as GoalType, keep: (s: any) => keepIds.has(s.id), runQualityOk: runAllowed && !eff.runEasyOnly && runStage == null,
     prevLongRun: lastLongRun0, prevLongBike: lastLongBike0, dayCap: (date: string) => Math.min(dayCap(profile, dowOf(date)), dayLimit(rules, date).cap),
     allowed: (s: any, date: string) => !evaluate(rules, { ...s, long: !!s.long, hard: !!s.hard }, date).hard.length && dayLimit(rules, date).cap > 0 && !(s.sport === 'swim' && s.place !== 'outdoor' && !allowedHard(rules, { sport: 'swim', place: 'pool' }, date)) };
   const trainingFixes = repairTrainingRules(weeks, profile, trOpts);
   // Auftrag 14: Plan-Check Intensität mit Korrektur, bevor die Person den Plan sieht
-  const intOpts = { goalType: A.type, runEasyOnly: !!eff.runEasyOnly, runAllowed, from: from || start, minor, longQ: (d: string) => longRunTempoOk(allGoals, mondayOf(d)), blocked: (d: string) => hardBlocked(weeks, d, goals),
+  const intOpts = { goalType: A.type, runEasyOnly: !!eff.runEasyOnly, runAllowed, from: from || start, minor, longQ: (d: string) => longRunTempoOk(allGoals, mondayOf(d)), blocked: (d: string) => hardBlocked(weeks, d, trOpts.goals),
     baseOffset: phases[0] && phases[0].phase === 'base' && cont && cont.weekNo ? Math.min(8, cont.weekNo) : 0, noZ5: (d: string) => { const a = ageOf(profile, d); return a != null && (a < 18 || a >= 60); } };
   const intensityFixes = repairIntensity(weeks, profile, today, intOpts);
   trainingFixes.push(...repairTrainingRules(weeks, profile, trOpts));

@@ -11,7 +11,8 @@ import { sexLine } from './handbook';
 import { mainGoal } from '../goals';
 import { rulesOf, describe as ruleText } from '../constraints';
 import { parseFor } from '../ruleparse';
-import { doneItems, valsOf, isReviewQuestion, norm2 } from './review';
+import { doneItems, valsOf, isReviewQuestion, norm2, ivEvalOf } from './review';
+import { ivDiffNotes } from '../intervals';
 import { mmss } from './texts';
 import { TOOL_DEFS } from './tools';
 import { rulesForAi, KNOWLEDGE } from '../trainingknowledge';
@@ -135,7 +136,10 @@ export function contextParts(ctx: EngineCtx): ContextParts {
     const crawlSoll = d.planned && d.sport === 'swim' ? Math.max(0, ...((d.planned.spec && d.planned.spec.steps) || []).filter((x: any) => x.mode === 'crawl').map((x: any) => x.m || 0)) : 0;
     const swimIst = d.sport === 'swim' ? (v.longest != null ? `, Kraul am Stück ${v.longest} m` : ', Kraul am Stück nicht eingetragen') + (v.longestPull != null ? ', Pull Buoy am Stück '+v.longestPull+' m' : ', Pull Buoy am Stück nicht eingetragen') : '';
     const ex = Array.isArray(v.exercises) && v.exercises.length ? ', Übungen IST: ' + JSON.stringify(v.exercises).slice(0, 300) : '';
-    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}${d.sport === 'strength' ? ', Bereich IST: ' + (AREA[v.area] || v.area || 'unbekannt') + ex : ''}`);
+    // Auftrag 36: tatsächlich gemachte Lage/Hilfsmittel/Zone der Wiederholungen (z. B. mit Pull Buoy statt ohne)
+    const ivx = ['run', 'bike', 'swim'].includes(d.sport) ? ivDiffNotes(ivEvalOf(ctx, d)) : [];
+    const ivTxt = ivx.length ? ', Wiederholungen IST: ' + ivx.join(' ') : '';
+    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}${d.sport === 'strength' ? ', Bereich IST: ' + (AREA[v.area] || v.area || 'unbekannt') + ex : ''}${ivTxt}`);
   });
   days.filter((d: any) => d.date >= from && d.date < today).forEach((d: any) => d.sessions.forEach((s: any) => {
     if (s.sport === 'rest' || s.cancelled || (st[s.id] || {}).completed) return;

@@ -13,7 +13,7 @@ import { toast } from '../toast';
 import { checkTestResult, checkSwimSkill } from '../testupdate';
 import { reviewSoon } from '../review';
 import * as C from '../../../shared/core';
-import { strengthNumber } from '../../../shared/strength';
+import { strengthNumber, lastStrengthExercises } from '../../../shared/strength';
 import { editStrengthTemplate } from './strength';
 import { intervalsBlock, registerIntervalHost, registerPlannedLookup } from './intervalsui';
 import { sectionsBlock, registerSectionHost } from './sectionsui';
@@ -63,13 +63,26 @@ function splitsHtml(tg: Target, list: any[]): string {
     <button class="btn ghost sm" data-act="fd-split-del" data-i="${i}" ${attrs(tg)} aria-label="${esc(t('common.remove'))}">×</button></div>`).join('')}</div>` : ''}
     <button class="btn ghost sm" data-act="fd-split-add" ${attrs(tg)}>+ ${esc(t('fd.splitAdd'))}</button></div>`;
 }
+/* Auftrag 36: frühere Krafteinheiten mit eingetragenen Übungen (geplante und Extra-Einheiten) für „Wie letztes Mal“ */
+function strengthHistory(): { date: string; id: string; exercises: any[] }[] {
+  const out: { date: string; id: string; exercises: any[] }[] = [];
+  for (const d of C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}))) for (const s of d.sessions || []) {
+    if (s.sport !== 'strength') continue; const st = STATE.sessions?.[s.id]; if (!st || !st.completed) continue;
+    out.push({ date: d.date, id: s.id, exercises: (st.metrics || {}).exercises });
+  }
+  for (const [d, list] of Object.entries(STATE.customWorkouts || {}) as [string, any[]][]) for (const w of list || []) if (w && w.sport === 'strength' && w.completed !== false) out.push({ date: d, id: w.id, exercises: (w.metrics || {}).exercises });
+  return out;
+}
+const dmy = (d: string) => `${+d.slice(8, 10)}.${+d.slice(5, 7)}.`;
 function exercisesHtml(tg: Target, list: any, st: any): string {
   const planned = tg.planned?.spec?.exercises || [];
+  const last = lastStrengthExercises(strengthHistory(), tg.date, tg.id);
   const rows: any[] = Array.isArray(list) ? list : planned.map((e: any) => ({ ...e, kg: null }));
   const templates = Object.values(STATE.strengthTemplates || {}) as any[];
   return `<div class="fld wide stack" data-exercises><span class="lab">${esc(t('fd.exercises'))}</span>
     ${rows.map((e, i) => `<div class="card flat stack"><b class="xs">Übung ${i + 1}</b><div class="fgrid">${(['name', 'sets', 'reps', 'kg', 'restSec'] as const).map((f, j) => `<label class="fld ${f === 'name' ? 'wide' : ''}"><span class="lab">${['Übung', 'Sätze', 'Wiederholungen / Dauer', 'Gewicht (kg)', 'Pause (Sekunden)'][j]}</span><input class="inp" aria-label="${['Übung', 'Sätze', 'Wiederholungen / Dauer', 'Gewicht (kg)', 'Pause (Sekunden)'][j]}" data-ch="fd-ex" data-i="${i}" data-f="${f}" ${attrs(tg)} inputmode="${f === 'kg' ? 'decimal' : ['sets', 'restSec'].includes(f) ? 'numeric' : 'text'}" value="${esc(e[f] ?? '')}"></label>`).join('')}</div><div class="row" style="flex-wrap:wrap"><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="-1" ${attrs(tg)} ${i === 0 ? 'disabled' : ''} aria-label="Übung ${i + 1} nach oben">↑</button><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="1" ${attrs(tg)} ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Übung ${i + 1} nach unten">↓</button><button class="btn ghost sm danger" data-act="fd-ex-del" data-i="${i}" ${attrs(tg)}>Übung entfernen</button></div></div>`).join('')}
     <button class="btn ghost sm" data-act="fd-ex-add" ${attrs(tg)}>+ ${esc(t('fd.exAdd'))}</button>
+    ${last ? `<button class="btn ghost sm" data-act="fd-ex-last" ${attrs(tg)}>Wie letztes Mal (${dmy(last.date)}: ${last.exercises.length} Übungen mit Gewichten)</button>` : ''}
     <button class="btn ghost sm" data-act="fd-template-save" ${attrs(tg)}>Als Kraftvorlage speichern</button>
     ${templates.length ? `<label class="fld"><span class="lab">Kraftvorlage</span><select class="inp" data-template-select aria-label="Kraftvorlage"><option value="">Vorlage auswählen</option>${templates.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label><button class="btn ghost sm" data-act="fd-template-apply" ${attrs(tg)}>Übungen durch Vorlage ersetzen</button>` : '<p class="xs muted">Eigene Kraftvorlagen findest du unter Mehr → Trainingsvorlagen.</p>'}
     ${!Array.isArray(list) && planned.length ? `<div class="xs muted">${esc(t('fd.exFromPlan'))}</div>` : ''}</div>`;
@@ -285,6 +298,11 @@ onChange('fd-ex', el => {
 });
 on('fd-ex-del', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st); l.splice(+el.dataset.i!, 1); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
 on('fd-ex-move', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st), i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
+on('fd-ex-last', el => {
+  const tg = tgOf(el), st = rec(tg); if (!st) return;
+  const last = lastStrengthExercises(strengthHistory(), tg.date, tg.id); if (!last) { toast('Noch keine frühere Krafteinheit mit Übungen.'); return; }
+  put(tg, setSessionMetricManual(st, 'exercises', last.exercises)); redraw(); toast(`Übungen und Gewichte vom ${dmy(last.date)} übernommen. Ändere nur, was heute anders war.`);
+});
 on('fd-template-save', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; editStrengthTemplate(st.title || tg.planned?.title || 'Mein Kraftplan', exList(tg, st)); });
 on('fd-template-apply', el => {
   const tg = tgOf(el), st = rec(tg); if (!st) return;

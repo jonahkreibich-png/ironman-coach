@@ -7,7 +7,7 @@ import { todayStr, ymd } from './util';
 import { sleepNeed, isMinor, ageOf, type Profile } from '../../shared/profile';
 import { mainGoal, goalSports, type Goal } from '../../shared/goals';
 import { sportScores, formScore, legacyActivities, namedFromPlan, estimatesAt, rescoreNotes, SCORE_MODEL, type SportSport } from './data-types';
-import { prognosis, correctionFromGoals, planFactsOf, goalPrognoses, goalMismatches, lastMove, trendHistory, type Move, type Prognosis, type PlanFacts, type GoalProg } from '../../shared/prognosis';
+import { prognosis, correctionFromGoals, planFactsOf, goalPrognoses, goalMismatches, lastMove, trendHistory, watchVo2max, type Move, type Prognosis, type PlanFacts, type GoalProg } from '../../shared/prognosis';
 import { raceModeGoal, recentRace } from '../../shared/race';
 import type { EngineCtx } from '../../shared/coach/engine';
 import type { Activity } from '../../shared/activity/analyze';
@@ -137,9 +137,11 @@ function compute(): Derived {
   try {
     // Auftrag 24: Trend aus mehreren Ständen (12, 8, 5 Wochen zurück), nur wo es damals eigene Daten gab; krank = Pause läuft
     const est = estimatesAt(inp, today), history = trendHistory(x => estimatesAt(inp, x), today), correction = correctionFromGoals(gl);
-    progs = goalPrognoses(gl, PLAN.meta || {}, today, est, { profile: prof, history, correction, ill: ill ? ill.start : null, planFor: g => planFacts(g, today) });
+    // Auftrag 36: VO2max der Uhr für den Abgleich mit der Schwelle
+    const vo2max = watchVo2max(STATE, prof, today);
+    progs = goalPrognoses(gl, PLAN.meta || {}, today, est, { profile: prof, history, correction, ill: ill ? ill.start : null, vo2max, planFor: g => planFacts(g, today) });
     const own = goal && progs.find(x => x.goal.id === goal.id);
-    prog = own ? own.p : goal ? prognosis(goal, est, { profile: prof, today, history, plan: planFacts(goal, today), correction, ill: ill ? ill.start : null }) : null;
+    prog = own ? own.p : goal ? prognosis(goal, est, { profile: prof, today, history, plan: planFacts(goal, today), correction, ill: ill ? ill.start : null, vo2max }) : null;
   } catch (e) { prog = null; }
   const state = { ...STATE, profile: prof, settings: { ...STATE.settings, readiness: fallback } };
   return {

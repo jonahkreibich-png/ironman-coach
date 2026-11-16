@@ -16,6 +16,7 @@ import { doneItems } from './review';
 import { actualMetrics, evidenceSignature, changeText } from '../results';
 import { valueStory, storyText, shownNewBest, STORY_METRICS, type Pt, type Story } from '../valuestory';
 import { valsOf } from './review';
+import { runSourceCheck, watchVo2max } from '../prognosis';
 
 export type Trigger = 'morning' | 'activity' | 'weekly' | 'view';
 export interface Insight { id: string; kind: 'load' | 'recovery' | 'trend' | 'technique' | 'consistency' | 'illness'; tone: 'good' | 'info' | 'warn' | 'bad'; score: number; title: string; why: string; tip: string;
@@ -229,6 +230,24 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const testPlanned = C.planDays(weeks).some((d: any) => d.date >= today && d.date <= C.addDays(today, 28) && d.sessions.some((s: any) => /test/i.test(s.title || '') && !s.cancelled));
   // nur, wer läuft (Auftrag 15: Mama ohne Laufen bekam „Deine Laufzonen sind geschätzt“)
   if (!testPlanned && !ill && (prof.sports || []).includes('run') && (est.includes('lthrRun') || est.includes('thresholdPaceRunSec'))) add({ id: 'test-needed', kind: 'trend', tone: 'info', score: 40, title: 'Deine Laufzonen sind geschätzt', why: 'Schwellenpuls und Schwellen-Pace kommen noch aus einer Schätzung, nicht aus einem Test.', tip: ((prof.skills || {}).runContinuousMin ?? 99) < 30 || !(prof.sports || []).includes('run') ? 'Für den Anfang reicht das. Sobald du 30 min am Stück laufen kannst, macht ein Lauftest die Zonen genau.' : 'Ein 30-min-Lauftest macht alle Zonen genau. Schreib „Plan einen Lauftest ein“.' });
+
+  // Auftrag 36: Schwelle und VO2max der Uhr weit auseinander (oder Schwelle nur hochgerechnet) und kein Test geplant →
+  // ehrlich sagen und einen Lauftest anbieten, der eine passende Laufeinheit der nächsten 3 Wochen ersetzt (nicht Erholungs-/Rennwoche)
+  // nur ein geplanter Lauftest zählt (ein Schwimm-Test in 3 Wochen klärt die Lauf-Schwelle nicht)
+  const runTestPlanned = C.planDays(weeks).some((d: any) => d.date >= today && d.date <= C.addDays(today, 28) && d.sessions.some((s: any) => s.sport === 'run' && /test/i.test(s.title || '') && !s.cancelled));
+  const srcCk = !runTestPlanned && !ill && (prof.sports || []).includes('run') ? runSourceCheck(prof, { runThrSpeed: null }, watchVo2max(st, prof, today)) : null;
+  if (srcCk && srcCk.uncertain && ((prof.skills || {}).runContinuousMin ?? 99) >= 45) {
+    add({ id: 'test-sources', kind: 'trend', tone: 'info', score: 45, title: 'Lauf-Schwelle unsicher', why: srcCk.text!, tip: srcCk.test! });
+    const wk = (d: string) => weeks.find((w: any) => w.days.some((x: any) => x.date === d));
+    const cand = C.planDays(weeks).filter((d: any) => d.date > today && d.date <= C.addDays(today, 21) && !(wk(d.date) || {}).isRecoveryWeek && !['race', 'taper'].includes((wk(d.date) || {}).phase))
+      .flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.cancelled && !s.race && !s.stage && !s.fixed && !s.pinned && (s.plannedMinutes || 0) >= 40 && !(st.sessions || {})[s.id]).map((s: any) => ({ d, s })))
+      .sort((a: any, b: any) => (C.isHard(b.s) ? 1 : 0) - (C.isHard(a.s) ? 1 : 0) || a.d.date.localeCompare(b.d.date))[0];
+    if (cand) {
+      const b = W.build(W.runTest({ ...((cand.s.spec && cand.s.spec.ctx) || {}), runThrSec: srcCk.thrSec, lthrRun: prof.thresholds.lthrRun || null }));
+      const a = { id: `test-src-${cand.s.id}`, type: 'modify', sessionId: cand.s.id, set: { title: b.title, description: b.description, spec: b.spec, plannedMinutes: b.plannedMinutes, ...(b.zone ? { zone: b.zone } : {}), hard: true }, what: `${cand.s.title} → ${b.title}`, reason: 'Schwelle und VO2max der Uhr passen nicht zusammen', date: today };
+      proposals.push({ id: 'test-sources', title: `Vorschlag: Lauftest am ${+cand.d.date.slice(8, 10)}.${+cand.d.date.slice(5, 7)}.`, text: `${srcCk.text} Ich würde „${cand.s.title}“ durch einen 30-min-Lauftest ersetzen. Danach rechnen Zonen, Plan und Prognose mit dem gemessenen Wert.`, changes: [{ kind: 'adjust', key: a.id, data: a }] });
+    }
+  }
 
   /* ---------- Reihenfolge, Top 3 (verschiedene Arten bevorzugt) ---------- */
   ins.sort((a, b) => b.score - a.score);
