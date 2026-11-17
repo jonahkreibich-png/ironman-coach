@@ -1,6 +1,6 @@
 # Auftrag 36: Intervalle bearbeiten, Scores, Prognose, große Simulation (16.11.)
 
-**Stand:** Version **3.24.0** – alle Teile getestet (siehe 5), Veröffentlichung siehe unten.
+**Stand:** Version **3.24.0**, **veröffentlicht am 16.11.** (alle Tests grün; erst Test-App, dann echte App; beide vorher gesichert; alle 3 Nutzer starten fehlerfrei, auch vom alten Stand aus). Beobachtung danach am 17.11. nachgeholt: keine Startfehler seit dem Hochladen (ganze Nacht). Beim 1. Release-Lauf gefunden und behoben: „zusätzlich“ fehlte in der Intervall-Liste, Enter verlor unter Last den Fokus (Nr. 589).
 
 ## 1. Intervalle nach dem Training
 - **Vorher:** jede Wiederholung eine große Karte (7 Felder + 5 Knöpfe); Titel, Lage, Hilfsmittel nicht änderbar; „4 × 100 m in 1:55“ ohne Pace bekam kein Urteil.
