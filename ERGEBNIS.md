@@ -1,6 +1,6 @@
 # Auftrag 37: Einheiten übersichtlich – ein Ablauf, Bearbeiten im Fenster, Nachtragen mit Datum (17.11.)
 
-**Stand:** Version **3.25.0**, Tests grün, Veröffentlichung läuft (Test-App, dann echte App, beide vorher gesichert).
+**Stand:** Version **3.25.0**, **veröffentlicht am 18.11.** (alle Tests grün: 3.316 Unit, 796 Browser; erst Test-App, dann echte App; beide vorher gesichert; alle 3 Nutzer laden und starten fehlerfrei; 10 Minuten ohne Startfehler). Beim 1. Release-Lauf gefunden und behoben: Die Uhr meldete eine Schwimm-Bahn mit 0 m als Wiederholung, jetzt zählt sie als Pause (Nr. 599). Die Daten auf dem Server sind dabei unverändert geblieben.
 
 ## Was war vorhanden, was war falsch
 - Zwei Listen für dasselbe: „Abschnitte“ (Auftrag 35) und „Intervalle“ (Auftrag 36), dazu oben noch einmal die Schritte. Bearbeiten in drei Ebenen (Wiederholung → „Lage, Hilfsmittel …“ → „Satz bearbeiten“).
