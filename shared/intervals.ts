@@ -338,7 +338,7 @@ export function detectedSegments(a: any): { segs: Seg[]; from: IvSource } {
     let k: Seg[] = laps;
     if (sport === 'swim') {
       // Schwimmen: jede geschwommene Runde ist eine Serie (die Uhr setzt pro Serie eine Runde), Pausen-Runden trennen
-      k = laps.map(l => (l.kind === 'steady' || l.kind === 'warmup' || l.kind === 'cooldown' ? { ...l, kind: 'work' as const } : l));
+      k = laps.map(l => (l.m === 0 ? { ...l, kind: 'rest' as const } : l.kind === 'steady' || l.kind === 'warmup' || l.kind === 'cooldown' ? { ...l, kind: 'work' as const } : l)); // 0 m = Pause (Auftrag 37)
       if (k.some(l => l.kind === 'work')) return { segs: k, from: a.source === 'intervals' ? 'icu' : 'watch' };
     }
     if (!k.some(l => l.kind === 'work') && (sport === 'run' || sport === 'bike')) {
@@ -412,7 +412,27 @@ export function alignRows(targets: IvTarget[], rows: IvRow[], sport: string): { 
 /* ---------- Welche Ist-Werte gelten? ---------- */
 const hasIst = (r: IvRow | null | undefined) => !!r && ['sec', 'm', 'hr', 'maxHr', 'pace', 'power', 'speed', 'pace100', 'cad', 'spl', 'rpe'].some(k => (r as any)[k] != null && (r as any)[k] !== '');
 /** Liste von Hand (metrics.intervals mit Quelle „von Hand“) oder automatisch aus der Aufzeichnung bzw. von intervals.icu. */
-export function actualRows(st: any, act: any): { rows: IvRow[]; source: IvSource; aligned: boolean } {
+/** Auftrag 37 (Release-Fund): Zeile mit 0 m ist keine geschwommene Wiederholung. Die Uhr meldet Bahnen ohne Strecke (Abstoßen, Stehen am
+   Rand) manchmal als aktiv; solche Zeilen zählen beim Schwimmen zur Pause der Wiederholung davor. Bei Laufen/Rad heißt 0 m „nicht gemessen“.
+   Gilt beim Lesen, gespeicherte Daten bleiben unverändert (beim nächsten Speichern im Ablauf sind sie sauber). */
+export function cleanIvRows(rows: IvRow[], sport?: string | null): IvRow[] {
+  if (!Array.isArray(rows) || !rows.some(r => r && r.m === 0 && !(r as any).plan)) return rows;
+  const out: IvRow[] = [];
+  for (const r of rows) {
+    if (!r || r.m !== 0 || (r as any).plan) { out.push(r); continue; }
+    if (sport !== 'swim') { out.push({ ...r, m: null }); continue; }
+    const prev = out[out.length - 1];
+    const add = (num(r.sec) || 0) + (num(r.restSec) || 0);
+    if (prev && add > 0) out[out.length - 1] = { ...prev, restSec: Math.round((num(prev.restSec) || 0) + add), restHr: prev.restHr ?? (r.restHr ?? r.hr ?? null) };
+  }
+  return out;
+}
+export function actualRows(st: any, act: any, sportIn?: string | null): { rows: IvRow[]; source: IvSource; aligned: boolean } {
+  const sport = sportIn || (act && act.sport) || (st && st.sport) || null;
+  const r = actualRowsRaw(st, act);
+  return { ...r, rows: cleanIvRows(r.rows, sport) };
+}
+function actualRowsRaw(st: any, act: any): { rows: IvRow[]; source: IvSource; aligned: boolean } {
   const m = (st && st.metrics) || {};
   const manual = !!(st && ((st.metricsSrc || {}).intervals === 'manual' || (st.metricsManual || {}).intervals));
   if (manual) return { rows: Array.isArray(m.intervals) ? m.intervals : [], source: 'manual', aligned: true };
@@ -477,7 +497,7 @@ export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresh
   const sport = (sportIn || (session && session.sport) || (act && act.sport)) as IvSport;
   if (sport !== 'run' && sport !== 'bike' && sport !== 'swim') return null;
   const targets = plannedIntervals(session, thr);
-  const ar = actualRows(st, act);
+  const ar = actualRows(st, act, sport);
   if (!targets.length && !ar.rows.some(hasIst)) return null;
   // ohne Plan zählen Abschnitte aus dem Verlauf nur bei erkanntem Intervalltraining (sonst z. B. zwei Stopps an der Ampel)
   if (!targets.length && ar.source === 'stream' && !(act && act.pattern && ['intervals', 'fartlek', 'hills'].includes(act.pattern.type))) return null;

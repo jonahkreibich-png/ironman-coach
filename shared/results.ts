@@ -1,5 +1,5 @@
 import {effectiveCustomBuckets} from './custom-state26';
-import { manualIntervals, rowsToLaps, swimIvFacts, type SwimIvFacts } from './intervals';
+import { manualIntervals, rowsToLaps, swimIvFacts, cleanIvRows, type SwimIvFacts } from './intervals';
 import { statsOf } from './activity/structure';
 import { checkField } from './validate';
 /* Tatsächliche Ergebnisse, ohne Planwerte. Eine manuelle Korrektur (auch ein bewusst
@@ -70,6 +70,8 @@ export function actualMetrics(st: any = {}, a: any = null): Record<string, any> 
     if (fx && fx.crawlMaxM && !own('longestCrawl') && !((resultNumber(m.longestCrawl) || 0) >= fx.crawlMaxM)) m.longestCrawl = fx.crawlMaxM;
     if (fx && fx.pullMaxM && !own('longestPull') && !((resultNumber(m.longestPull) || 0) >= fx.pullMaxM)) m.longestPull = fx.pullMaxM;
   }
+  // Auftrag 37: Zeilen mit 0 m (Bahn ohne Strecke) wie in actualRows – nur mit bekannter Sportart
+  if (sport && Array.isArray(m.intervals)) m.intervals = cleanIvRows(m.intervals, sport);
   m._issues = [];
   const longest = resultNumber(m.longestCrawl), meters = resultNumber(m.meters);
   if (longest != null && meters != null && longest > meters) {

@@ -226,7 +226,8 @@ function lapsBase(raw: RawActivity, L: RawActivity['laps'], usePower: boolean): 
   if (L.length < 2) return L.map((l, i) => lapOut(l, i, 'steady'));
   const fromWatch = L.some(l => l.intensity && l.intensity !== 'active');
   if (fromWatch) {
-    return L.map((l, i) => lapOut(l, i, l.intensity === 'rest' || l.intensity === 'recovery' ? 'rest' : l.intensity === 'warmup' ? 'warmup' : l.intensity === 'cooldown' ? 'cooldown' : 'work'));
+    // Schwimmen: Bahn ohne Strecke (0 m) ist eine Pause, auch wenn die Uhr sie als aktiv meldet (Auftrag 37)
+    return L.map((l, i) => lapOut(l, i, l.intensity === 'rest' || l.intensity === 'recovery' || (raw.sport === 'swim' && l.dist === 0) ? 'rest' : l.intensity === 'warmup' ? 'warmup' : l.intensity === 'cooldown' ? 'cooldown' : 'work'));
   }
   if (raw.sport !== 'swim') return lapKinds(L.map((l, i) => lapOut(l, i, 'steady')), usePower);
   // Schwimmen ohne Angabe: deutlich schneller oder höherer Puls als der Median = Belastung, deutlich langsamer = Pause

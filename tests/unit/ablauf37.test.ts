@@ -3,7 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import * as W from '../../shared/workouts';
 import { buildAblauf, fillAsPlanned, diffText, partsShown } from '../../shared/ablauf';
-import { evaluateIntervals, swimIvFacts, rowsToLaps, actualRows } from '../../shared/intervals';
+import { evaluateIntervals, swimIvFacts, rowsToLaps, actualRows, detectedSegments, cleanIvRows } from '../../shared/intervals';
+import { dataCheck } from '../../shared/datacheck';
 import { sectionsOf, totalsFromSections, mainPart, applySections } from '../../shared/sections';
 
 const CTX: W.PaceCtx = { runThrSec: 300, lthrRun: 170, lthrBike: 160, css: 120, breast100: 165, bikeKmh: 30, pool: 25 };
@@ -101,5 +102,35 @@ describe('Ablauf', () => {
     const b = buildAblauf(k, st2, null, THR, 'strength', { done: true });
     expect((b.items[0] as any).ist).toContain('10 kg');
     expect((b.items[0] as any).verdict.word).toBe('✓');
+  });
+});
+
+describe('Release-Fund 3.25.0: Bahn ohne Strecke (0 m) beim Schwimmen', () => {
+  // wie bei Nutzer 1 am 17.11.: die Uhr meldet eine 11-s-Bahn mit 0 m als aktiv
+  it('Uhr-Runde mit 0 m ist Pause, keine Wiederholung', () => {
+    const act = { sport: 'swim', source: 'healthfit', laps: [
+      { n: 1, sec: 165, m: 100, avgHr: 111, maxHr: 127, speed: 0.6, power: null, kind: 'work' },
+      { n: 2, sec: 60, m: 0, avgHr: 100, maxHr: 110, speed: 0, power: null, kind: 'rest' },
+      { n: 3, sec: 38, m: 25, avgHr: 139, maxHr: 142, speed: 0.66, power: null, kind: 'work' },
+      { n: 4, sec: 11, m: 0, avgHr: 140, maxHr: 142, speed: 0, power: null, kind: 'work' },
+      { n: 5, sec: 42, m: 25, avgHr: 134, maxHr: 137, speed: 0.6, power: null, kind: 'work' }] };
+    const d = detectedSegments(act);
+    expect(d.segs[3].kind).toBe('rest');
+    const r = actualRows({}, act, 'swim').rows;
+    expect(r.map(x => x.m)).toEqual([100, 25, 25]);
+    expect(r[1].restSec).toBe(11);
+  });
+  it('schon gespeicherte 0-m-Zeilen zählen zur Pause davor; Daten-Check meldet nichts mehr', () => {
+    const rows: any[] = [{ sec: 165, m: 100, restSec: 124, ti: 0 }, { sec: 11, m: 0, hr: 140, ti: 1 }, { sec: 176, m: 100, ti: 2 }];
+    const c = cleanIvRows(rows, 'swim');
+    expect(c.map(x => x.m)).toEqual([100, 100]);
+    expect(c[0].restSec).toBe(135);
+    expect(rows).toHaveLength(3); // gespeicherte Daten bleiben unverändert
+    expect(cleanIvRows([{ sec: 600, m: 0 }] as any, 'run')[0].m).toBeNull(); // Laufen: 0 m = nicht gemessen
+    const st = { completed: true, metrics: { intervals: rows }, metricsSrc: { intervals: 'manual' } };
+    expect(actualRows(st, null, 'swim').rows).toHaveLength(2);
+    const day = { date: '2026-11-17', sessions: [{ id: 's1', sport: 'swim', title: 'Schwimmen', ...swim }] };
+    const r = dataCheck({ state: { sessions: { s1: st } }, baseWeeks: [{ days: [day] }], profile: {}, goals: [], today: '2026-11-18' } as any);
+    expect(r.findings.filter(x => x.group === 'values')).toEqual([]);
   });
 });

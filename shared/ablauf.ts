@@ -37,7 +37,7 @@ export function ivRowsFor(planned: any, st: any, act: any, thr: IvThresholds, sp
   const targets = ['run', 'bike', 'swim'].includes(sport) ? plannedIntervals(planned, thr) : [];
   if (!['run', 'bike', 'swim'].includes(sport)) return { rows: [], targets, e: null };
   const e = evaluateIntervals(planned || { sport }, st || {}, act, thr, sport);
-  const ar = actualRows(st || {}, act);
+  const ar = actualRows(st || {}, act, sport);
   let rows: IvRow[];
   if (ar.source === 'manual' || ar.source === 'plan') rows = ar.rows.map(r => ({ ...r }));
   else if (!e) rows = targets.map(() => ({}));
@@ -170,7 +170,7 @@ export function buildAblauf(planned: any, st: any, act: any, thr: IvThresholds, 
   const { targets, e } = r0; let rows = r0.rows;
   // andere Intervalle als geplant: eigene Liste ohne Soll, gleich mit einer leeren Zeile
   if (o.free && !rows.length) rows = [{ ti: null }];
-  const ar = actualRows(st || {}, act);
+  const ar = actualRows(st || {}, act, sport);
   const own = ar.source === 'manual' || ar.source === 'plan';
   const sec = sectionsOf(planned || { sport }, st || {}, act, thr, sport);
   const hasSets = !o.none && (rows.length > 0 || targets.length > 0 || !!o.free);
@@ -220,7 +220,7 @@ export function fillAsPlanned(planned: any, st0: any, act: any, thr: IvThreshold
   }
   if (!['run', 'bike', 'swim'].includes(sport)) return st;
   const { rows, targets } = ivRowsFor(planned, st, act, thr, sport);
-  const ar = actualRows(st, act);
+  const ar = actualRows(st, act, sport);
   const watchIv = ar.source !== 'manual' && ar.source !== 'plan' && ar.source !== 'none';
   let ivRows: IvRow[] | null = null;
   if (!watchIv && rows.length) {

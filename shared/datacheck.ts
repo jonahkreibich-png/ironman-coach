@@ -6,7 +6,7 @@
 import * as C from './core';
 import { actualMetrics } from './results';
 import { checkField, crossCheck } from './validate';
-import { IV_LIMITS, ivLimit } from './intervals';
+import { IV_LIMITS, ivLimit, cleanIvRows } from './intervals';
 import { duplicateMsgIds } from './coach/feed';
 import { checkTrainingRules, TRULE_LABEL } from './trainingrules';
 import { mainGoal } from './goals';
@@ -57,7 +57,7 @@ export function dataCheck(inp: DCInput): DCResult {
     const bad: string[] = [];
     for (const [k, v] of Object.entries(m)) { if (k.startsWith('_') || v == null || v === '' || typeof v === 'object') continue; const c = checkField(it.sport, k, v); if (!c.ok) bad.push(FIELD_WORD[k] || k); }
     for (const d of crossCheck(it.sport, m)) if (d.severe) bad.push(DOUBT_WORD[d.key] || d.key);
-    const rows = Array.isArray(m.intervals) ? m.intervals : [];
+    const rows = Array.isArray(m.intervals) ? cleanIvRows(m.intervals, it.sport) : [];
     rows.forEach((r: any) => { for (const k of Object.keys(IV_LIMITS)) { const lim = ivLimit(k, it.sport)!; const v = r && r[k]; if (typeof v === 'number' && (v < lim[0] || v > lim[1])) { bad.push('Intervall: ' + (FIELD_WORD[k] || k)); break; } } if (r && r.hr && r.maxHr && r.maxHr < r.hr) bad.push('Intervall: Ø Puls über max. Puls'); });
     if (it.st.completed && it.st.skipped) bad.push('erledigt und ausgelassen zugleich');
     if (bad.length) findings.push({ group: 'values', key: 'values:' + it.key, date: it.date, text: `${DC_LABEL.values}: ${[...new Set(bad)].join(', ')} (${it.sport}, ${dm(it.date)})` });
