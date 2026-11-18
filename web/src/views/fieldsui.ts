@@ -5,7 +5,7 @@ import {customDraft} from './custom-draft27';
 import { findCustomRecord, STATE, BASE_WEEKS, saveSoon, saveState, profile } from '../store';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, secToMmss, termLink } from '../kit';
+import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, secToMmss, termLink, ic } from '../kit';
 import { SPORT_FIELDS, FEEL, zoneVerdict, loadOn, type FieldDef } from '../../../shared/fields';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
@@ -15,9 +15,12 @@ import { reviewSoon } from '../review';
 import * as C from '../../../shared/core';
 import { strengthNumber, lastStrengthExercises } from '../../../shared/strength';
 import { editStrengthTemplate } from './strength';
-import { intervalsBlock, registerIntervalHost, registerPlannedLookup } from './intervalsui';
-import { sectionsBlock, registerSectionHost } from './sectionsui';
-import { plannedIntervals } from '../../../shared/intervals';
+import './intervalsui';
+import './sectionsui';
+import { ablaufBlock } from './ablaufui';
+import { registerAbHost, UIH, SUB, setSubKey } from './ablaufstate';
+import { registerUndoHost } from '../undo';
+import { fillAsPlanned } from '../../../shared/ablauf';
 import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay } from '../../../shared/validate';
 import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, CHANGE_ZONES, changedOf, changeZone, changeParts, intervalsMode, omitOptions, placeLabel } from '../../../shared/results';
 
@@ -53,7 +56,7 @@ function oneField(tg: Target, f: FieldDef, st: any): string {
   if (f.kind === 'select') return `<div class="fld"><label for="${id}">${lab}</label><select class="inp" id="${id}" data-ch="fd" data-k="${f.key}" ${attrs(tg)}>${(f.options || []).map(([v, l]) => `<option value="${esc(v)}" ${String(m[f.key] ?? '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
   if (f.kind === 'text') return `<div class="fld wide"><label for="${id}">${lab}</label><input class="inp" id="${id}" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(m[f.key] ?? '')}" placeholder="${esc(f.ph || '')}"></div>`;
   if (f.kind === 'splits') return splitsHtml(tg, m.splits || []);
-  if (f.kind === 'exercises') return exercisesHtml(tg, m.exercises, st);
+  if (f.kind === 'exercises') return '';
   return `<div class="fld"><label for="${id}">${lab}</label><input class="inp" id="${id}" type="text" inputmode="decimal" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(inputDisplay(tg.sport, f.key, m[f.key]))}" placeholder="${esc(inputDisplay(tg.sport, f.key, (st.metricsAuto || {})[f.key]))}"></div>`;
 }
 function splitsHtml(tg: Target, list: any[]): string {
@@ -74,64 +77,81 @@ function strengthHistory(): { date: string; id: string; exercises: any[] }[] {
   return out;
 }
 const dmy = (d: string) => `${+d.slice(8, 10)}.${+d.slice(5, 7)}.`;
-function exercisesHtml(tg: Target, list: any, st: any): string {
+function strengthExtras(tg: Target, st: any): string {
+  const list = (st.metrics || {}).exercises;
   const planned = tg.planned?.spec?.exercises || [];
   const last = lastStrengthExercises(strengthHistory(), tg.date, tg.id);
-  const rows: any[] = Array.isArray(list) ? list : planned.map((e: any) => ({ ...e, kg: null }));
   const templates = Object.values(STATE.strengthTemplates || {}) as any[];
-  return `<div class="fld wide stack" data-exercises><span class="lab">${esc(t('fd.exercises'))}</span>
-    ${rows.map((e, i) => `<div class="card flat stack"><b class="xs">Übung ${i + 1}</b><div class="fgrid">${(['name', 'sets', 'reps', 'kg', 'restSec'] as const).map((f, j) => `<label class="fld ${f === 'name' ? 'wide' : ''}"><span class="lab">${['Übung', 'Sätze', 'Wiederholungen / Dauer', 'Gewicht (kg)', 'Pause (Sekunden)'][j]}</span><input class="inp" aria-label="${['Übung', 'Sätze', 'Wiederholungen / Dauer', 'Gewicht (kg)', 'Pause (Sekunden)'][j]}" data-ch="fd-ex" data-i="${i}" data-f="${f}" ${attrs(tg)} inputmode="${f === 'kg' ? 'decimal' : ['sets', 'restSec'].includes(f) ? 'numeric' : 'text'}" value="${esc(e[f] ?? '')}"></label>`).join('')}</div><div class="row" style="flex-wrap:wrap"><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="-1" ${attrs(tg)} ${i === 0 ? 'disabled' : ''} aria-label="Übung ${i + 1} nach oben">↑</button><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="1" ${attrs(tg)} ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Übung ${i + 1} nach unten">↓</button><button class="btn ghost sm danger" data-act="fd-ex-del" data-i="${i}" ${attrs(tg)}>Übung entfernen</button></div></div>`).join('')}
-    <button class="btn ghost sm" data-act="fd-ex-add" ${attrs(tg)}>+ ${esc(t('fd.exAdd'))}</button>
+  /* Auftrag 37: die Übungen selbst stehen als Zeilen im Ablauf (Antippen → Fenster); hier nur „Wie letztes Mal“ und Vorlagen */
+  return `<div class="stack" data-strength-extra>
     ${last ? `<button class="btn ghost sm" data-act="fd-ex-last" ${attrs(tg)}>Wie letztes Mal (${dmy(last.date)}: ${last.exercises.length} Übungen mit Gewichten)</button>` : ''}
     <button class="btn ghost sm" data-act="fd-template-save" ${attrs(tg)}>Als Kraftvorlage speichern</button>
     ${templates.length ? `<label class="fld"><span class="lab">Kraftvorlage</span><select class="inp" data-template-select aria-label="Kraftvorlage"><option value="">Vorlage auswählen</option>${templates.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label><button class="btn ghost sm" data-act="fd-template-apply" ${attrs(tg)}>Übungen durch Vorlage ersetzen</button>` : '<p class="xs muted">Eigene Kraftvorlagen findest du unter Mehr → Trainingsvorlagen.</p>'}
     ${!Array.isArray(list) && planned.length ? `<div class="xs muted">${esc(t('fd.exFromPlan'))}</div>` : ''}</div>`;
 }
 
-/* Der ganze Block: Werte je Sportart, berechnete Angaben, RPE, Gefühl, Abweichung, Notiz */
-export function fieldsBlock(tg: Target): string {
-  const st = rec(tg) || {};
-  // Testfelder nur bei Tests (Lauftest, Radtest, Schwimmtest)
+/* Auftrag 37: die Einheit in Bausteinen, in der Reihenfolge der Seite: „Wie lief es?“ (Kopf) → Ablauf → Gesamtwerte → Gefühl/Notiz.
+   session.ts setzt sie für geplante Einheiten zusammen, fieldsBlock (Extra-Einheiten) ebenso. Keine Angabe steht doppelt. */
+function defsOf(tg: Target, st: any): FieldDef[] {
+  // Testfelder nur bei Tests (Lauftest, Radtest, Schwimmtest); Übungen stehen im Ablauf
   const isTest = /test/i.test(String((tg.planned && tg.planned.title) || ''));
-  const defs = (SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }]).filter(f => (!f.test || isTest) && (f.key !== 'np' || realWatts(st)));
+  return (SPORT_FIELDS[tg.sport] || [{ key: 'min', label: t('m.min'), unit: 'min', kind: 'num' as const }]).filter(f => (!f.test || isTest) && (f.key !== 'np' || realWatts(st)) && f.kind !== 'exercises');
+}
+/** Urteil zur Pulszone der Einheit (für den Kopf) */
+export function zonePill(tg: Target): string {
+  const st = rec(tg) || {}; const prof = profile();
+  const actZ = st.activityId ? (STATE.activities || {})[st.activityId] : null;
+  const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds, actZ) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds, actZ);
+  return zv ? `<span class="pill ${zv.over ? 'warn' : 'good'}" data-zone>${esc(t('fd.zone'))}: ${esc(zv.text)}</span>` : '';
+}
+/** „Wie lief es? Wie geplant gemacht / Anders gemacht“ mit den Angaben dazu und Rückfragen bei widersprüchlichen Werten */
+export function changeBlock(tg: Target): string {
+  const st = rec(tg) || {};
+  const moved = tg.kind === 'session' && tg.planned ? movedKeys(st) : [];
+  return `${tg.kind === 'session' && tg.planned ? changeHtml(tg, st, defsOf(tg, st).filter(f => moved.includes(f.key))) : ''}${doubtsHtml(tg, st)}`;
+}
+/** Ablauf (Abschnitte, Sätze, Wiederholungen bzw. Übungen) */
+export function ablaufPart(tg: Target, editable = true): string {
+  const st = rec(tg) || {};
+  return ablaufBlock(tg, { editable, extra: tg.sport === 'strength' && editable ? strengthExtras(tg, st) : '' });
+}
+/** Gesamtwerte: eingeklappt, wenn sie von der Uhr kommen (dann stimmen sie meist); selten genutzte unter „Weitere Werte“ */
+export function totalsBlock(tg: Target, after = ''): string {
+  const st = rec(tg) || {};
+  const defs = defsOf(tg, st);
   // Auftrag 30: Dauer/Distanz stehen bei „kürzer/länger/abgebrochen“ oben im Änderungs-Block (dieselben Felder, keine doppelten)
   const moved = tg.kind === 'session' && tg.planned ? movedKeys(st) : [];
   const main = defs.filter(f => !f.more && !moved.includes(f.key)), extra = defs.filter(f => f.more && !moved.includes(f.key));
-  const prof = profile();
-  const actZ = st.activityId ? (STATE.activities || {})[st.activityId] : null;
-  const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds, actZ) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds, actZ);
   const ld = loadOn(STATE, C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), tg.date);
-  const auto = [zv ? `<span class="pill ${zv.over ? 'warn' : 'good'}" data-zone>${esc(t('fd.zone'))}: ${esc(zv.text)}</span>` : '', ld ? `<span class="pill" data-load>CTL ${ld.ctl} · ATL ${ld.atl} · TSB ${ld.tsb > 0 ? '+' : ''}${ld.tsb}</span>` : ''].filter(Boolean).join(' ');
   const srcs = [...new Set(Object.values(st.metricsSrc || {}).filter(Boolean))] as string[];
   const hasOrig = st.metricsAuto && Object.keys(st.metricsAuto).length && Object.keys(st.metricsManual || {}).length;
-  return `<div class="card flat tight stack" data-fields="${tg.sport}">
-    <div class="spread"><div class="lbl">${esc(t('fd.values'))} ${srcs.map(s => srcBadge(s)).join(' ')}</div>${hasOrig ? `<button class="link" data-act="fd-reset" ${attrs(tg)}>${esc(t('common.resetOriginal'))}</button>` : ''}</div>
-    ${auto ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-auto>${auto}</div>` : ''}
-    ${tg.kind === 'session' && tg.planned ? changeHtml(tg, st, defs.filter(f => moved.includes(f.key))) : ''}
-    ${doubtsHtml(tg, st)}
+  const watch = !!(st.activityId || (st.metricsAuto && Object.keys(st.metricsAuto).length));
+  const m = st.metrics || {};
+  const sum = [m.min ? `${String(m.min).replace('.', ',')} min` : '', tg.sport === 'swim' && m.meters ? `${m.meters} m` : m.km ? `${String(m.km).replace('.', ',')} km` : '', m.hr ? `Ø Puls ${m.hr}` : ''].filter(Boolean).join(' · ');
+  const body = `<div class="stack">${hasOrig ? `<button class="link" data-act="fd-reset" ${attrs(tg)}>${esc(t('common.resetOriginal'))}</button>` : ''}
     <div class="fgrid">${main.map(f => oneField(tg, f, st)).join('')}</div>
-    ${secHtml(tg, st)}
-    ${ivHtml(tg, st)}
-    ${extra.length ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}
+    ${extra.length || ld ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>${ld ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-auto><span class="pill" data-load>CTL ${ld.ctl} · ATL ${ld.atl} · TSB ${ld.tsb > 0 ? '+' : ''}${ld.tsb}</span></div>` : ''}`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}${after}</div>`;
+  return `<details class="card flat tight totals" data-fields="${tg.sport}" data-key="totals-${esc(tg.id)}" ${watch ? '' : 'open'}><summary class="spread"><span class="lbl">Gesamtwerte ${srcs.map(x => srcBadge(x)).join(' ')}</span><span class="small muted num" data-totals-sum>${esc(sum)}</span><span class="chev">${ic('down')}</span></summary>${body}</details>`;
+}
+/** Gefühl und Notiz: RPE, Gefühl, (alte) Abweichung, Notiz */
+export function feelBlock(tg: Target): string {
+  const st = rec(tg) || {};
+  return `<div class="card flat tight stack" data-feel>
     <div class="fld wide"><span class="lab">${esc(t('fd.rpe'))}</span><div class="rpe-row" role="group" aria-label="${esc(t('fd.rpe'))}">${Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button class="chip ${String(st.rpe ?? '') === String(n) ? 'on' : ''}" aria-pressed="${String(st.rpe ?? '') === String(n)}" data-act="fd-rpe" data-v="${n}" ${attrs(tg)}>${n}</button>`).join('')}</div><div class="xs muted">${esc(t('fd.rpeHint'))}</div></div>
     <div class="fld wide"><span class="lab">${esc(t('fd.feel'))}</span><div class="chips" style="flex-wrap:wrap">${FEEL.map(([v, l]) => `<button class="chip ${String(st.feel ?? '') === v ? 'on' : ''}" aria-pressed="${String(st.feel ?? '') === v}" data-act="fd-feel" data-v="${v}" ${attrs(tg)}>${esc(l)}</button>`).join('')}</div></div>
     ${/* Auftrag 30: altes Freitextfeld „Abweichung“ ist doppelt zu „Anders gemacht“ – nur noch sichtbar, wenn dort schon etwas steht */ (st.deviation || '').trim() ? `<div class="fld wide"><label for="fd-dev">${esc(t('fd.deviation'))}</label><input class="inp" id="fd-dev" data-ch="fd-top" data-k="deviation" ${attrs(tg)} value="${esc(st.deviation || '')}" placeholder="${esc(t('fd.deviationPh'))}"></div>` : ''}
-    ${more(t('fd.note'), `<textarea class="inp" id="fd-notes" rows="3" data-ch="fd-top" data-k="${tg.kind === 'custom' ? 'description' : 'notes'}" ${attrs(tg)} placeholder="${esc(t('sess.notesPh'))}">${esc((tg.kind === 'custom' ? st.description : st.notes) || '')}</textarea>`, !!((tg.kind === 'custom' ? st.description : st.notes) || '').trim())}
+    <div class="fld wide"><label for="fd-notes">${esc(t('fd.note'))}</label><textarea class="inp" id="fd-notes" rows="2" data-ch="fd-top" data-k="${tg.kind === 'custom' ? 'description' : 'notes'}" ${attrs(tg)} placeholder="${esc(t('sess.notesPh'))}">${esc((tg.kind === 'custom' ? st.description : st.notes) || '')}</textarea></div>
   </div>`;
+}
+/** Extra-Einheiten: Ablauf → Gesamtwerte → Gefühl/Notiz (dieselben Bausteine wie die geplante Einheit) */
+export function fieldsBlock(tg: Target): string {
+  return `<div class="stack" data-fields-block>${changeBlock(tg)}${ablaufPart(tg)}${totalsBlock(tg)}${feelBlock(tg)}</div>`;
 }
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
 /* Auftrag 29/30: „So wie geplant / Anders gemacht“ – je Art die passenden Felder, optional der Grund */
 const DUR_KINDS = ['shorter', 'longer', 'aborted'];
 function movedKeys(st: any): string[] { const c = changedOf(st); return c && DUR_KINDS.includes(c.kind) ? ['min', 'km', 'meters'] : []; }
-/* Auftrag 35: Abschnitte (Aufwärmen, Hauptteil, Ausklang) – bei geplanten Einheiten die tatsächliche Sportart (anders gemacht) */
-function secHtml(tg: Target, st: any): string { return sectionsBlock(tg, st, attrs(tg)); }
-function ivHtml(tg: Target, st: any): string {
-  const mode = tg.kind === 'session' ? intervalsMode(st) : 'planned';
-  if (mode === 'none') return '';
-  if (mode === 'free') return intervalsBlock({ ...tg, planned: tg.planned ? { ...tg.planned, spec: null } : null }, st, attrs(tg), true);
-  return intervalsBlock(tg, st, attrs(tg));
-}
 function changeHtml(tg: Target, st: any, durDefs: FieldDef[]): string {
   const c = st.changed || {}; const other = st.asPlanned === false; const s = tg.planned;
   const chip = (act: string, v: string, label: string, on: boolean) => `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="${act}" data-v="${esc(v)}" ${attrs(tg)}>${esc(label)}</button>`;
@@ -150,15 +170,26 @@ function changeHtml(tg: Target, st: any, durDefs: FieldDef[]): string {
       <button class="btn ghost sm" data-act="fd-chg-part-add" ${attrs(tg)}>+ Teil</button>${sum ? `<div class="xs muted" data-parts-sum>Zusammen ${Math.round(sum)} min</div>` : ''}</div>`;
   }
   else if (c.kind === 'omit') detail = `<span class="lab">Was hast du weggelassen?</span><div class="chips" style="flex-wrap:wrap" data-change-omit>${omitOptions(s).map(([k, l]) => chip('fd-chg-omit', k, l, c.omit === k)).join('')}</div>`;
-  else if (c.kind === 'otherIntervals') detail = '<div class="xs muted">Trag unten in der Intervall-Liste ein, was du gemacht hast.</div>';
-  return `<div class="fld wide" data-as-planned><span class="lab">Wie lief es?</span><div class="chips" role="group" aria-label="Wie lief es?" style="flex-wrap:wrap">${chip('fd-asplanned', '1', 'So wie geplant', st.asPlanned === true)}${chip('fd-asplanned', '0', 'Anders gemacht', other)}</div>
+  else if (c.kind === 'otherIntervals') detail = '<div class="xs muted">Trag unten im Ablauf ein, was du gemacht hast (+ Satz hinzufügen).</div>';
+  return `<div class="fld wide" data-as-planned><span class="lab">Wie lief es?</span><div class="chips" role="group" aria-label="Wie lief es?" style="flex-wrap:wrap">${chip('fd-asplanned', '1', 'Wie geplant gemacht', st.asPlanned === true)}${chip('fd-asplanned', '0', 'Anders gemacht', other)}</div>
     ${other ? `<span class="lab">Was hast du gemacht?</span><div class="chips" style="flex-wrap:wrap" data-change-kind>${kinds.map(([k, l]) => chip('fd-chg-kind', k, l, c.kind === k)).join('')}</div>
       ${detail ? `<div class="stack" data-change-detail="${esc(c.kind)}">${detail}</div>` : ''}
       <span class="lab">Grund (optional)</span><div class="chips" style="flex-wrap:wrap" data-change-reason>${CHANGE_REASONS.map(([k, l]) => chip('fd-chg-reason', k, l, c.reason === k)).join('')}</div>` : ''}</div>`;
 }
 function setChange(tg: Target, f: (st: any) => void) { const st = rec(tg); if (!st) return; f(st); if (st.asPlanned === false && !st.changed) st.changed = {}; redraw(); rev(tg); }
 const indoorPlanned = (s: any) => !!s && (s.indoor === true || /rolle|indoor|drinnen|laufband|halle/i.test(String(s.title || '')));
-on('fd-asplanned', el => setChange(tg0(el), st => { st.asPlanned = el.dataset.v === '1'; if (st.asPlanned) delete st.changed; }));
+/* Auftrag 37: „Wie geplant gemacht“ füllt den ganzen Ablauf mit dem Soll (als „wie geplant“ markiert, nicht als gemessen) und hakt die
+   Einheit ab. Uhrdaten und eigene Einträge bleiben (Vorrang). Danach ändert man nur, was anders war. */
+on('fd-asplanned', el => {
+  const tg = tg0(el);
+  if (el.dataset.v !== '1') { setChange(tg, st => { st.asPlanned = false; }); return; }
+  const st0 = rec(tg); if (!st0) return;
+  const planned = plannedFor(tg); const act = st0.activityId ? (STATE.activities || {})[st0.activityId] : null;
+  const next = fillAsPlanned(planned && planned.sport === tg.sport ? planned : null, { ...st0, asPlanned: true, changed: undefined }, act, ivThr(), tg.sport);
+  delete next.changed; next.asPlanned = true;
+  if (tg.kind === 'session' && !next.completed) { next.completed = true; next.skipped = false; }
+  put(tg, next); saveState(); redraw(); rev(tg);
+});
 on('fd-chg-kind', el => {
   const tg = tg0(el); const planned = plannedFor(tg);
   setChange(tg, st => {
@@ -205,15 +236,14 @@ on('fd-doubt', el => {
   for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (!k.startsWith('_') && before[k] !== after[k]) st = setSessionMetricManual(st, k, after[k] ?? '');
   put(tg, st); redraw(); rev(tg);
 });
-// Auftrag 22: Intervall-Liste nutzt denselben Datensatz, dieselbe Speicherung und dieselbe Neubewertung wie die übrigen Werte
-registerIntervalHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {},
-  thresholds: () => { const p = profile(); const th: any = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; } });
-// Auftrag 35: Abschnitte nutzen denselben Datensatz und dieselbe Neubewertung
+/* Auftrag 22/35/37: Ablauf (Abschnitte, Sätze, Wiederholungen, Übungen) nutzt denselben Datensatz, dieselbe Speicherung und dieselbe
+   Neubewertung wie die übrigen Werte – ein Host statt vorher drei (Intervalle, Abschnitte, Plan-Suche). */
 const ivThr = () => { const p = profile(); const th: any = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; };
-registerSectionHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {}, thresholds: ivThr,
+registerAbHost({ rec, put, redraw, rev: (tg: Target) => rev(tg), activities: () => STATE.activities || {}, thresholds: ivThr,
   planned: (tg: Target) => (tg.kind === 'session' ? plannedFor(tg) : null),
-  hasIntervals: (tg: Target, st: any) => { const m = tg.kind === 'session' ? intervalsMode(st) : 'planned'; if (m === 'free') return true; if (m === 'none') return false; return plannedIntervals(tg.planned, ivThr()).length > 0 || (Array.isArray((st.metrics || {}).intervals) && st.metrics.intervals.length > 0); } });
-registerPlannedLookup((id, date) => { const s = plannedFor({ kind: 'session', id, date, sport: '' }); return s && intervalsMode(STATE.sessions[id]) === 'free' ? { ...s, spec: null } : s; });
+  mode: (tg: Target) => (tg.kind === 'session' ? intervalsMode(rec(tg)) : 'planned') });
+/* Auftrag 37: Rückgängig – Stand der Einheit zurückschreiben, speichern, neu bewerten */
+registerUndoHost({ rec: (tg: any) => rec(tg), put: (tg: any, next: any) => put(tg, next), after: (tg: any) => { saveState(); refreshSheet(); nav.rerender(); rev(tg); } });
 /* Bewertung aktualisieren, wenn die Einheit erledigt ist (Auftrag 12) */
 const rev = (tg: Target) => { if(customDraft(tg.id))return; const st = rec(tg); if (st && (tg.kind === 'custom' ? st.completed !== false : st.completed)) reviewSoon(tg.id, tg.date); };
 // Beim Tippen sichern, ohne Formular/Fokus neu aufzubauen. Fachliche
@@ -282,7 +312,7 @@ onChange('fd-split', el => {
   put(tg, setSessionMetricManual(st, 'splits', l)); saveSoon();
 });
 /* Übungen */
-on('fd-ex-add', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); l.push({ name: '', sets: null, reps: '', kg: null }); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
+on('fd-ex-add', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); l.push({ name: '', sets: null, reps: '', kg: null }); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); UIH.open({ ...tg, planned: plannedFor(tg) }, 'ex:' + (l.length - 1)); });
 function exList(tg: Target, st: any): any[] {
   const own = listOf(st, 'exercises'); if (Array.isArray(st.metrics?.exercises)) return own;
   const day = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((d: any) => d.date === tg.date);
@@ -292,12 +322,13 @@ function exList(tg: Target, st: any): any[] {
 onChange('fd-ex', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); const i = +el.dataset.i!; if (!l[i]) return;
   const v = (el as HTMLInputElement).value.trim(); const f = el.dataset.f!;
+  delete l[i].plan; // Auftrag 37: eigener Wert statt „wie geplant“
   try { l[i][f] = ['sets', 'kg', 'restSec'].includes(f) ? strengthNumber(v, f === 'sets' ? 'Sätze' : f === 'kg' ? 'Gewicht' : 'Pause', f !== 'kg', f === 'sets') : v; }
   catch (error) { toast((error as Error).message); (el as HTMLInputElement).value = String(l[i][f] ?? ''); return; }
   put(tg, setSessionMetricManual(st, 'exercises', l)); saveSoon();
 });
-on('fd-ex-del', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st); l.splice(+el.dataset.i!, 1); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
-on('fd-ex-move', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st), i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
+on('fd-ex-del', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st); l.splice(+el.dataset.i!, 1); setSubKey(''); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
+on('fd-ex-move', el => { const tg = tgOf(el), st = rec(tg); if (!st) return; const l = exList(tg, st), i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; if (SUB.key === 'ex:' + i) setSubKey('ex:' + j); put(tg, setSessionMetricManual(st, 'exercises', l)); redraw(); });
 on('fd-ex-last', el => {
   const tg = tgOf(el), st = rec(tg); if (!st) return;
   const last = lastStrengthExercises(strengthHistory(), tg.date, tg.id); if (!last) { toast('Noch keine frühere Krafteinheit mit Übungen.'); return; }

@@ -1,21 +1,24 @@
-/* Auftrag 22: Bereich „Intervalle“ unter den Werten einer Einheit (Laufen, Rad, Schwimmen, Koppel).
-   Auftrag 36: übersichtlich nach Sätzen gruppiert („4 × 100 m Kraul · Pull Buoy“). Eine kurze Zeile je Wiederholung mit den wichtigsten
-   Werten und dem Urteil; Antippen öffnet die Details (alle Felder, Pause, Lage/Hilfsmittel/Zone bzw. Art/Untergrund, Titel, Knöpfe).
-   Je Satz: Titel, Lage bzw. Art, Hilfsmittel, Zone, Untergrund für alle Wiederholungen; „ganzer Satz gleich“ (z. B. alle 4 × 100 m in 2:30),
-   einzelne Wiederholungen weichen über ihre Details ab; Satz hinzufügen, löschen, verschieben, Wiederholung hinzufügen.
+/* Auftrag 22/36/37: Sätze und Wiederholungen (Laufen, Rad, Schwimmen, Koppel).
+   Auftrag 37: angezeigt werden sie im „Ablauf“ der Einheit (ablaufui.ts) – eine Zeile je Wiederholung, ein Kopf je Satz. Antippen öffnet ein
+   Fenster nur für diesen Teil; hier stehen die Inhalte dieser Fenster:
+   - Satz: „ganzer Satz gleich“ (z. B. alle 3 × 100 m in 1:50), Titel, Lage bzw. Art, Hilfsmittel, Zone, Untergrund für alle,
+     Wiederholung hinzufügen bzw. löschen, Satz verschieben bzw. löschen.
+   - Wiederholung: nur diese eine (z. B. die 2. von 3 × 100 m Kraul statt Brust): Werte, Pause, Titel, Lage, Hilfsmittel, Zone,
+     Art/Untergrund, „wie vorheriges“, „abgebrochen“, verschieben, löschen.
+   Vorher klappten in der Liste drei Ebenen ineinander auf (Wiederholung → „Lage, Hilfsmittel …“ → „Satz bearbeiten“); nach einer Änderung
+   klappten alle gleich lautenden Bereiche auf (kit.ts refreshSheet merkte sich den Überschrift-Text). Das gibt es nicht mehr.
    Soll-Werte nur als Platzhalter. Werte der Uhr stehen drin (mit Quelle); wer etwas ändert, bekommt eine eigene Liste (Hand gewinnt),
-   „Uhrwerte verwenden“ holt sie zurück. Enter springt zum nächsten Feld (öffnet die nächste Wiederholung). */
+   „Uhrwerte verwenden“ holt sie zurück. Enter springt zum nächsten Feld im Fenster. */
 import { esc } from '../util';
-import { on, onChange, srcBadge, armed } from '../kit';
+import { on, onChange } from '../kit';
 import { toast } from '../toast';
-import { evaluateIntervals, plannedIntervals, actualRows, paceToSec, secToPace, IV_LIMITS, ivLimit, ivGroups, ivAttrs, stampRows, targetOfRow, rowHasValues,
-  IV_STROKES, IV_GEAR, IV_TYPES, IV_TERRAIN, type IvRow, type IvEval, type IvTarget, type IvThresholds, type IvLine } from '../../../shared/intervals';
+import { plannedIntervals, paceToSec, secToPace, IV_LIMITS, ivLimit, ivGroups, ivAttrs, stampRows, targetOfRow,
+  IV_STROKES, IV_GEAR, IV_TYPES, IV_TERRAIN, type IvRow, type IvTarget } from '../../../shared/intervals';
+import { applyTotals } from '../../../shared/sections';
+import { ivRowsFor, buildAblauf, repSoll, type AbSet, type AbRep } from '../../../shared/ablauf';
 import { setSessionMetricManual } from '../../../shared/activity/merge';
 import { parseInput } from '../../../shared/validate';
-
-export interface IvHost { rec: (tg: any) => any; put: (tg: any, next: any) => void; redraw: () => void; rev: (tg: any) => void; activities: () => Record<string, any>; thresholds: () => IvThresholds }
-let HOST: IvHost | null = null;
-export function registerIntervalHost(h: IvHost) { HOST = h; }
+import { HOST, tgOf, plannedIv, actOf, SUB, setSubKey, UIH, type Tg } from './ablaufstate';
 
 type F = { k: keyof IvRow; label: string; unit?: string; kind: 'clock' | 'num' | 'pace' | 'text'; mode?: string };
 const COMMON_END: F[] = [{ k: 'rpe', label: 'RPE', kind: 'num' }, { k: 'note', label: 'Notiz', kind: 'text' }];
@@ -27,11 +30,11 @@ export const IV_FIELDS: Record<string, F[]> = {
 /* „ganzer Satz gleich“: die wichtigsten Werte je Sportart */
 const SAME: Record<string, (keyof IvRow)[]> = { run: ['sec', 'pace', 'hr'], bike: ['sec', 'power', 'hr'], swim: ['sec', 'pace100', 'hr'] };
 const REST: F[] = [{ k: 'restSec', label: 'Pause', unit: 'min:s', kind: 'clock' }, { k: 'restHr', label: 'Puls am Ende der Pause', kind: 'num' }];
-const SRC: Record<string, string> = { manual: 'manual', watch: 'file', laps: 'file', stream: 'file', icu: 'intervals' };
-const VERDICT: Record<string, [string, string]> = { ok: ['im Ziel', 'good'], hard: ['zu hart', 'bad'], easy: ['zu locker', 'warn'], short: ['kürzer/abgebrochen', 'warn'], missing: ['nicht gemacht', ''] };
+const VALUE_KEYS = new Set(['sec', 'm', 'pace', 'hr', 'maxHr', 'cad', 'power', 'speed', 'pace100', 'spl', 'rpe']);
 
 /* Eingaben: „4:45“, „4.45“, „4,45“ oder „445“; Dauer auch „4“ (Minuten) */
 export function parseClock(v: string, kind: 'clock' | 'pace'): number | null | typeof NaN {
+  void kind;
   const s = String(v || '').trim(); if (!s) return null;
   let m = /^(\d{1,3})[:.,](\d{1,2})$/.exec(s);
   if (m) { if (+m[2] > 59 || m[2].length !== 2) return NaN; return +m[1] * 60 + +m[2]; }
@@ -57,67 +60,10 @@ function ph(f: { k: keyof IvRow }, t: IvTarget | null, sport: string): string {
     default: return '';
   }
 }
-const valOf = (f: F, r: IvRow | null) => { const v = r ? (r as any)[f.k] : null; if (v == null || v === '') return ''; return f.kind === 'clock' ? fmtClock(v) : String(v).replace(/^(\d+)\.(\d)$/, '$1,$2'); };
+const valOf = (f: F, r: IvRow | null) => { const v = r ? (r as any)[f.k] : null; if (v == null || v === '' || (r && r.plan && VALUE_KEYS.has(String(f.k)) && f.k !== 'm' && f.k !== 'sec')) return ''; return f.kind === 'clock' ? fmtClock(v) : String(v).replace(/^(\d+)\.(\d)$/, '$1,$2'); };
 
-export function ivContext(tg: any, st: any): { e: IvEval | null; targets: IvTarget[] } {
-  if (!HOST || !['run', 'bike', 'swim'].includes(tg.sport)) return { e: null, targets: [] };
-  const act = st && st.activityId ? HOST.activities()[st.activityId] || null : null;
-  const thr = HOST.thresholds();
-  const targets = plannedIntervals(tg.planned, thr);
-  return { e: evaluateIntervals(tg.planned || { sport: tg.sport }, st, act, thr, tg.sport), targets };
-}
-/* Liste zum Bearbeiten: von Hand wie gespeichert, sonst die zugeordneten Werte der Uhr in Reihenfolge des Plans, dann zusätzliche */
-export function editableRows(tg: any, st: any): IvRow[] {
-  const ar = actualRows(st, st && st.activityId && HOST ? HOST.activities()[st.activityId] : null);
-  if (ar.source === 'manual') return ar.rows.map(r => ({ ...r }));
-  const { e, targets } = ivContext(tg, st);
-  if (!e) return targets.map(() => ({}));
-  const matched = e.lines.filter(l => !l.extra).map(l => (l.row ? { ...l.row } : {}));
-  return [...matched, ...e.lines.filter(l => l.extra).map(l => ({ ...l.row! }))];
-}
-
-/* geöffnete Wiederholungen bzw. Sätze bleiben nach dem Neuzeichnen offen */
-const OPEN = new Set<string>();
-const okey = (tg: any, k: string) => `${tg.id}|${tg.date}|${k}`;
-/* nach Verschieben, Löschen, Einfügen: offene Wiederholungen (r/a + Index) und Sätze (s + Index) wandern mit */
-function remapOpen(tg: any, rowMap: (i: number) => number | null, setMap: (g: number) => number | null = g => g) {
-  const pre = okey(tg, ''); const next: string[] = [];
-  for (const k of [...OPEN]) {
-    if (!k.startsWith(pre)) continue;
-    OPEN.delete(k);
-    const kind = k.charAt(pre.length), n = +k.slice(pre.length + 1);
-    const m = kind === 's' ? setMap(n) : rowMap(n);
-    if (m != null && m >= 0) next.push(pre + kind + m);
-  }
-  next.forEach(k => OPEN.add(k));
-}
-/* Urteil zu Zeile i: von Hand über die Zeile selbst (gleiche Reihenfolge), sonst die zugeordnete Zeile */
-function lineOf(lines: IvLine[], rows: IvRow[], i: number, manual: boolean, nTargets: number): IvLine | undefined {
-  if (manual) { const r = rows[i]; return lines.find(l => l.row === r); }
-  return lines.filter(l => !l.extra)[i] || lines.filter(l => l.extra)[i - nTargets];
-}
-/* kurze Zeile: die wichtigsten Werte (oder das Soll grau) */
-function mainText(r: IvRow, t: IvTarget | null, sport: string): { txt: string; soll: boolean } {
-  const has = rowHasValues(r);
-  const bits: string[] = [];
-  if (sport === 'swim') {
-    const m = r.m || (has && t ? t.m : null); const p = r.pace100 || (r.sec && m ? secToPace(r.sec / (m / 100)) : '');
-    if (m) bits.push(`${m} m`); if (r.sec) bits.push(fmtClock(r.sec)); if (p) bits.push(`${p}/100 m`);
-  } else {
-    if (r.sec) bits.push(fmtClock(r.sec) + ' min'); else if (r.m) bits.push(`${r.m} m`);
-    if (sport === 'run' && (r.pace || (r.sec && r.m))) bits.push(`${r.pace || secToPace(r.sec! / (r.m! / 1000))}/km`);
-    if (sport === 'bike' && r.power) bits.push(`${r.power} W`); else if (sport === 'bike' && r.speed) bits.push(`${String(r.speed).replace('.', ',')} km/h`);
-  }
-  if (r.hr) bits.push(`Puls ${r.hr}`);
-  if (!bits.length && r.rpe) bits.push(`RPE ${r.rpe}`);
-  if (bits.length) return { txt: bits.join(' · '), soll: false };
-  if (!t) return { txt: 'noch nichts eingetragen', soll: true };
-  const sz = sport === 'swim' ? (t.m ? `${t.m} m` : '') : t.sec ? `${fmtClock(t.sec)} min` : '';
-  const perf = sport === 'swim' && t.pace100 ? `${secToPace(t.pace100[0])}-${secToPace(t.pace100[1])}/100 m` : sport === 'run' && t.pace ? `${secToPace(t.pace[0])}-${secToPace(t.pace[1])}/km` : sport === 'bike' && t.power ? `${t.power[0]}-${t.power[1]} W` : t.hr ? `Puls ${t.hr[0]}${t.hr[1] ? '-' + t.hr[1] : '+'}` : '';
-  return { txt: ['Soll', sz, perf].filter(Boolean).join(' '), soll: true };
-}
-/* Auswahl für Lage/Zone/Art/Untergrund und Hilfsmittel (für eine Wiederholung oder den ganzen Satz) */
-function attrControls(sport: string, idx: number[], a: { stroke: string | null; gear: string[]; zone: number | null; type: string | null; terrain: string | null; title: string; ownTitle: boolean }, attrs: string, scope: string, mixed: Record<string, boolean> = {}): string {
+/* Auswahl für Lage/Zone/Art/Untergrund und Hilfsmittel (für eine Wiederholung oder den ganzen Satz) – im Fenster immer sichtbar */
+function attrControls(sport: string, idx: number[], a: { stroke: string | null; gear: string[]; zone: number | null; type: string | null; terrain: string | null; title: string; ownTitle: boolean }, attrs: string, scope: 'row' | 'set', mixed: Record<string, boolean> = {}): string {
   const ids = idx.join(',');
   const id = (f: string) => `iv-${scope}-${idx[0]}-${f}`;
   const sel = (f: string, label: string, opts: [string, string][], cur: string | null) => `<label class="fld" for="${id(f)}"><span class="lab">${esc(label)}</span><select class="inp" id="${id(f)}" data-ch="iv-attr" data-idx="${ids}" data-f="${f}" ${attrs} aria-label="${esc(label)}${scope === 'set' ? ' (ganzer Satz)' : ''}">${mixed[f] ? '<option value="" selected>unterschiedlich</option>' : f === 'zone' || f === 'stroke' ? '' : '<option value="">–</option>'}${opts.map(([k, l]) => `<option value="${esc(k)}" ${!mixed[f] && String(cur ?? '') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
@@ -126,7 +72,7 @@ function attrControls(sport: string, idx: number[], a: { stroke: string | null; 
   if (sport === 'swim') {
     out.push(sel('stroke', 'Lage bzw. Art', IV_STROKES, a.stroke));
     const none = !a.gear.length && !mixed.gear;
-    out.push(`<div class="fld wide"><span class="lab">Hilfsmittel</span><div class="chips iv-gear" role="group" aria-label="Hilfsmittel${scope === 'set' ? ' (ganzer Satz)' : ''}">${IV_GEAR.map(([k, l]) => `<button type="button" class="chip ${!mixed.gear && a.gear.includes(k) ? 'on' : ''}" data-act="iv-gear" data-g="${k}" data-idx="${ids}" ${attrs} aria-pressed="${!mixed.gear && a.gear.includes(k)}">${esc(l)}</button>`).join('')}<button type="button" class="chip ${none ? 'on' : ''}" data-act="iv-gear" data-g="" data-idx="${ids}" ${attrs} aria-pressed="${none}">keine</button></div></div>`);
+    out.push(`<div class="fld wide"><span class="lab">Hilfsmittel${scope === 'set' ? ' (ganzer Satz)' : ''}</span><div class="chips iv-gear" role="group" aria-label="Hilfsmittel${scope === 'set' ? ' (ganzer Satz)' : ''}">${IV_GEAR.map(([k, l]) => `<button type="button" class="chip ${!mixed.gear && a.gear.includes(k) ? 'on' : ''}" data-act="iv-gear" data-g="${k}" data-idx="${ids}" ${attrs} aria-pressed="${!mixed.gear && a.gear.includes(k)}">${esc(l)}</button>`).join('')}<button type="button" class="chip ${none ? 'on' : ''}" data-act="iv-gear" data-g="" data-idx="${ids}" ${attrs} aria-pressed="${none}">keine</button></div></div>`);
   } else {
     out.push(sel('type', 'Art', IV_TYPES[sport as 'run' | 'bike'], a.type));
     out.push(sel('terrain', sport === 'run' ? 'Untergrund' : 'Gelände', IV_TERRAIN[sport as 'run' | 'bike'], a.terrain));
@@ -135,96 +81,81 @@ function attrControls(sport: string, idx: number[], a: { stroke: string | null; 
   return `<div class="fgrid iv-attrs">${out.join('')}</div>`;
 }
 
-/* free (Auftrag 30, „andere Intervalle“/„härter“): eigene Liste ohne Soll, gleich offen mit einer leeren Zeile */
-export function intervalsBlock(tg: any, st: any, attrs: string, free = false): string {
-  const { e, targets } = ivContext(tg, st);
-  if (!e && !targets.length && !free) return '';
-  const sport = tg.sport; const fields = IV_FIELDS[sport];
-  const manual = !!(e && e.source === 'manual');
-  const act = st && st.activityId && HOST ? HOST.activities()[st.activityId] : null;
-  const autoAvail = !!act && manual && actualRows({}, act).rows.length > 0;
-  let rows = editableRows(tg, st);
-  if (!rows.length && free) rows = [{}];
-  rows = stampRows(rows, targets, sport);
-  const srcName = e && e.source !== 'none' ? SRC[e.source] : null;
-  // von Hand: mit den vervollständigten Zeilen bewerten (gleiche Objekte → Urteil je Zeile eindeutig)
-  const e2 = manual && HOST ? evaluateIntervals(tg.planned || { sport }, { ...st, metrics: { ...(st.metrics || {}), intervals: rows } }, act, HOST.thresholds(), sport) : e;
-  const lines = e2 ? e2.lines : [];
-  // Zusammenfassung: Ø nur der harten Teile und der Pausen
-  const sum: string[] = [];
-  if (e && e.done + e.extra) {
-    const w = e.work;
-    const perf = sport === 'run' && w.paceSec ? `${secToPace(w.paceSec)}/km` : sport === 'bike' && w.power ? `${w.power} W` : sport === 'bike' && w.speed ? `${String(w.speed).replace('.', ',')} km/h` : sport === 'swim' && w.pace100 ? `${secToPace(w.pace100)}/100 m` : '';
-    sum.push(`Ø Intervalle: ${[perf, w.hr ? `Puls ${w.hr}` : '', w.rpe ? `RPE ${String(w.rpe).replace('.', ',')}` : ''].filter(Boolean).join(' · ') || '–'}`);
-    if (e.rest.sec || e.rest.hr) sum.push(`Ø Pausen: ${[e.rest.sec ? fmtClock(e.rest.sec) + ' min' : '', e.rest.hr ? `Puls ${e.rest.hr} am Ende` : ''].filter(Boolean).join(' · ')}`);
-    const cnt = [`${e.done} von ${e.planned || e.done} gemacht`, e.extra ? `${e.extra} zusätzlich` : '', e.inTarget ? `${e.inTarget} im Ziel` : '', e.tooHard ? `${e.tooHard} zu hart` : '', e.tooEasy ? `${e.tooEasy} zu locker` : '', e.short ? `${e.short} kürzer` : ''].filter(Boolean);
-    sum.push(cnt.join(', '));
-  }
-  const inp = (i: number, f: F, r: IvRow | null, t: IvTarget | null) => {
+/* ---------- Daten eines Satzes bzw. einer Wiederholung ---------- */
+function ctxOf(tg: Tg) {
+  const st = HOST!.rec(tg) || {}; const act = actOf(st); const thr = HOST!.thresholds();
+  const ab = buildAblauf(plannedIv(tg), st, act, thr, tg.sport, { done: !!st.completed, free: false });
+  return { st, ab };
+}
+const verdictPill = (v: { word: string; cls: string } | null) => (v ? `<span class="pill ${v.cls}">${esc(v.word)}</span>` : '');
+/** eine Zeile der Liste (auch im Satz-Fenster): Nummer · Ist fett · Soll grau · Urteil */
+export function repLine(r: AbRep, attrs: string, editable: boolean): string {
+  const inner = `<span class="ab-n">${r.n}</span><span class="ab-txt">${r.ist ? `<b class="ab-ist">${esc(r.ist)}</b>` : ''}<span class="ab-soll">${esc(r.ist ? r.soll : r.soll === 'ohne Soll' ? 'noch nichts eingetragen' : 'Soll ' + r.soll)}</span></span>${verdictPill(r.verdict)}`;
+  const label = `Wiederholung ${r.n}: ${r.ist || 'Soll ' + r.soll}${r.verdict ? ', ' + r.verdict.word : ''}`;
+  return editable ? `<button type="button" class="ab-row ab-rep iv-row" data-act="ab-open" data-key="${r.key}" data-iv-row="${r.i}" ${attrs} aria-label="${esc(label)}">${inner}</button>` : `<div class="ab-row ab-rep iv-row" data-iv-row="${r.i}">${inner}</div>`;
+}
+
+/* ---------- Fenster: eine Wiederholung ---------- */
+export function repTitle(tg: Tg, i: number): string {
+  if (!HOST) return ''; const { ab } = ctxOf(tg);
+  const set = ab.items.find(x => x.kind === 'set' && x.idx.includes(i)) as AbSet | undefined; if (!set) return 'Wiederholung';
+  const r = set.reps.find(x => x.i === i)!;
+  return set.reps.length > 1 ? `${r.n}. von ${set.label}` : set.label;
+}
+export function repSheet(tg: Tg, i: number, attrs: string): string {
+  if (!HOST) return '';
+  const { ab } = ctxOf(tg); const rows = ab.rows; const targets = ab.targets;
+  if (!rows[i]) return '';
+  const set = ab.items.find(x => x.kind === 'set' && x.idx.includes(i)) as AbSet | undefined;
+  const rep = set ? set.reps.find(x => x.i === i)! : null;
+  const r = rows[i]; const t = targetOfRow(rows, targets, i); const l = rep ? rep.line : null;
+  const sport = tg.sport; const fields = IV_FIELDS[sport]; const n = rows.length;
+  const inp = (f: F) => {
     const id = `iv-${i}-${String(f.k)}`;
-    return `<label class="fld ${f.kind === 'text' ? 'wide' : ''}" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv" data-iv-in data-i="${i}" data-f="${String(f.k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="${f.kind === 'text' ? 'text' : 'decimal'}" enterkeyhint="next" autocomplete="off" aria-label="Intervall ${i + 1}: ${esc(f.label)}" value="${esc(valOf(f, r))}" placeholder="${esc(ph(f, t, sport))}"></label>`;
+    return `<label class="fld ${f.kind === 'text' ? 'wide' : ''}" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv" data-iv-in data-i="${i}" data-f="${String(f.k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="${f.kind === 'text' ? 'text' : 'decimal'}" enterkeyhint="next" autocomplete="off" aria-label="Wiederholung ${rep ? rep.n : i + 1}: ${esc(f.label)}" value="${esc(valOf(f, r))}" placeholder="${esc(ph(f, t, sport))}"></label>`;
   };
-  const groups = ivGroups(rows, targets, sport);
-  const n = rows.length;
-  const setsHtml = groups.map((g, gi) => {
-    const t0 = g.target;
-    const gl = g.idx.map(i => lineOf(lines, rows, i, manual, targets.length));
-    const judged = gl.filter(l => l && ['ok', 'hard', 'easy'].includes(l.verdict || '')).length, ok = gl.filter(l => l && l.verdict === 'ok').length, done = g.idx.filter(i => rowHasValues(rows[i])).length;
-    const head = done ? `${done} von ${g.reps} eingetragen${judged ? `, ${ok} im Ziel` : ''}` : t0 ? 'noch nichts eingetragen' : '';
-    // gemischte Angaben im Satz („unterschiedlich“)
-    const at = g.idx.map(i => ivAttrs(rows[i], targetOfRow(rows, targets, i), sport));
-    const mixed: Record<string, boolean> = { stroke: new Set(at.map(a => a.stroke)).size > 1, gear: new Set(at.map(a => [...a.gear].sort().join(','))).size > 1, zone: new Set(at.map(a => a.zone)).size > 1, type: new Set(at.map(a => a.type)).size > 1, terrain: new Set(at.map(a => a.terrain)).size > 1, title: new Set(at.map(a => a.ownTitle ? a.title : '')).size > 1 };
-    const rowsHtml = g.idx.map((i, k) => {
-      const r = rows[i] || {}; const t = targetOfRow(rows, targets, i); const l = gl[k];
-      const [word, cls] = l && l.extra ? ['zusätzlich', 'info'] : l ? VERDICT[l.verdict || ''] || ['ohne Ziel', ''] : t ? VERDICT.missing : ['zusätzlich', 'info'];
-      const a = ivAttrs(r, t, sport); const g0 = g.attrs;
-      const own = [a.stroke !== g0.stroke ? a.title : '', a.gear.join() !== g0.gear.join() ? (a.gear.length ? 'mit Hilfsmittel' : 'ohne Hilfsmittel') : '', a.zone !== g0.zone ? `Zone ${a.zone}` : '', a.ownTitle && a.title !== g0.title ? a.title : ''].filter(Boolean);
-      const mt = mainText(r, t, sport);
-      const k0 = okey(tg, 'r' + i);
-      const isOpen = OPEN.has(k0) || (free && n === 1 && !rowHasValues(r));
-      return `<li class="iv-card iv-row" data-iv-row="${i}"><details class="iv-det" data-ivk="${esc(k0)}" ${isOpen ? 'open' : ''}><summary class="iv-bar" aria-label="Wiederholung ${i + 1}: ${esc(mt.txt)}${word ? ', ' + esc(word) : ''}"><span class="iv-n">${i + 1}</span><span class="iv-main ${mt.soll ? 'muted' : ''}">${esc(mt.txt)}${own.length ? `<span class="xs muted iv-own"> · ${esc(own.join(', '))}</span>` : ''}</span>${word ? `<span class="pill ${cls}">${esc(word)}</span>` : ''}</summary>
-        <div class="iv-body stack">${l && l.why ? `<div class="xs muted">${esc(l.why)}</div>` : ''}${l && l.diff && l.diff.length ? `<div class="xs">${esc('Anders als geplant: ' + l.diff.join(', '))}</div>` : ''}
-          <div class="fgrid">${fields.map(f => inp(i, f, r, t)).join('')}</div>
-          <div class="fgrid">${REST.map(f => inp(i, f, r, t)).join('')}</div>
-          ${more2('Lage, Hilfsmittel, Zone, Titel dieser Wiederholung', attrControls(sport, [i], a, attrs, 'row'), okey(tg, 'a' + i))}
-          <div class="row" style="flex-wrap:wrap;gap:6px">${i > 0 ? `<button class="btn ghost sm" data-act="iv-copy" data-i="${i}" ${attrs}>wie vorheriges</button>` : ''}<button class="btn ghost sm" data-act="iv-abort" data-i="${i}" ${attrs} aria-pressed="${!!r.aborted}">${r.aborted ? 'abgebrochen ✓' : 'abgebrochen'}</button><button class="btn ghost sm" data-act="iv-move" data-i="${i}" data-dir="-1" ${attrs} ${i === 0 ? 'disabled' : ''} aria-label="Wiederholung ${i + 1} nach oben">↑</button><button class="btn ghost sm" data-act="iv-move" data-i="${i}" data-dir="1" ${attrs} ${i >= n - 1 ? 'disabled' : ''} aria-label="Wiederholung ${i + 1} nach unten">↓</button><button class="btn ghost sm danger" data-act="iv-del" data-i="${i}" ${attrs} aria-label="Wiederholung ${i + 1} löschen">löschen</button></div>
-        </div></details></li>`;
-    }).join('');
-    const ids = g.idx.join(',');
-    const same = SAME[sport].map(k => { const f = fields.find(x => x.k === k)!; const id = `iv-same-${g.idx[0]}-${String(k)}`; const vals = new Set(g.idx.map(i => valOf(f, rows[i]))); const v = vals.size === 1 ? [...vals][0] : '';
-      return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv-same" data-idx="${ids}" data-f="${String(k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="decimal" autocomplete="off" aria-label="Ganzer Satz ${gi + 1}: ${esc(f.label)}" value="${esc(v)}" placeholder="${esc(ph(f, t0, sport))}"></label>`; }).join('');
-    const edit = `${g.reps > 1 ? `<div class="stack"><span class="lab">Ganzer Satz gleich</span><div class="fgrid">${same}</div><div class="xs muted">Gilt für alle ${g.reps} Wiederholungen. Weicht eine ab, tippe sie oben an und ändere nur sie.</div></div>` : ''}
-      ${attrControls(sport, g.idx, { ...g.attrs, ownTitle: g.attrs.ownTitle }, attrs, 'set', mixed)}
-      <div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn ghost sm" data-act="iv-rep-add" data-idx="${ids}" ${attrs}>+ Wiederholung</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="-1" ${attrs} ${gi === 0 ? 'disabled' : ''} aria-label="Satz ${gi + 1} nach oben">Satz ↑</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="1" ${attrs} ${gi >= groups.length - 1 ? 'disabled' : ''} aria-label="Satz ${gi + 1} nach unten">Satz ↓</button><button class="btn ghost sm danger" data-act="iv-set-del" data-idx="${ids}" ${attrs} aria-label="Satz ${gi + 1} löschen">Satz löschen</button></div>`;
-    return `<section class="iv-set" data-iv-set="${gi}"><div class="spread iv-set-head"><b class="iv-set-t">${esc(g.label)}</b>${head ? `<span class="xs muted">${esc(head)}</span>` : ''}</div>
-      <ol class="iv-rows" aria-label="${esc(g.label)}">${rowsHtml}</ol>
-      ${more2('Satz bearbeiten', edit, okey(tg, 's' + gi))}</section>`;
-  }).join('');
-  return `<div class="fld wide stack" data-intervals="${esc(sport)}"><div class="spread"><span class="lab">Intervalle ${srcName ? srcBadge(srcName) : ''}</span>${autoAvail ? `<button class="link" data-act="iv-reset" ${attrs}>Uhrwerte verwenden</button>` : ''}</div>
-    ${sum.length ? `<div class="xs" data-iv-sum>${sum.map(x => `<div>${esc(x)}</div>`).join('')}</div>` : `<div class="xs muted">${free ? 'Trag ein, was du gemacht hast (Dauer oder Strecke, dazu Puls, Tempo oder Leistung).' : 'Tippe eine Wiederholung an, um Werte einzutragen. Geplante Werte stehen grau im Feld; sie zählen erst, wenn du etwas einträgst oder die Uhr es misst.'}</div>`}
-    <div class="iv-sets stack">${setsHtml}</div>
-    <button class="btn ghost sm" data-act="iv-add" ${attrs}>+ Satz hinzufügen</button></div>`;
+  return `<div class="stack ab-sheet" data-ab-sheet="rep" data-iv-row="${i}">
+    <div class="spread ab-sheet-head"><span class="small muted">Soll: ${esc(repSoll(t, sport))}</span>${rep ? verdictPill(rep.verdict) : ''}</div>
+    ${r.plan ? '<div class="hint" data-plan-hint>Wie geplant eingetragen (nicht gemessen). Trag ein, was anders war – nur diese Werte zählen dann als gemessen.</div>' : ''}
+    ${l && l.why && !r.plan ? `<div class="xs muted iv-why">${esc(l.why)}</div>` : ''}${l && l.diff && l.diff.length ? `<div class="xs">${esc('Anders als geplant: ' + l.diff.join(', '))}</div>` : ''}
+    <div class="fgrid">${fields.map(inp).join('')}</div>
+    <div class="fgrid">${REST.map(inp).join('')}</div>
+    ${attrControls(sport, [i], ivAttrs(r, t, sport), attrs, 'row')}
+    <div class="row ab-btns">${i > 0 ? `<button class="btn ghost sm" data-act="iv-copy" data-i="${i}" ${attrs}>wie vorheriges</button>` : ''}<button class="btn ghost sm" data-act="iv-abort" data-i="${i}" ${attrs} aria-pressed="${!!r.aborted}">${r.aborted ? 'abgebrochen ✓' : 'abgebrochen'}</button><button class="btn ghost sm" data-act="iv-move" data-i="${i}" data-dir="-1" ${attrs} ${i === 0 ? 'disabled' : ''} aria-label="Wiederholung nach oben">↑</button><button class="btn ghost sm" data-act="iv-move" data-i="${i}" data-dir="1" ${attrs} ${i >= n - 1 ? 'disabled' : ''} aria-label="Wiederholung nach unten">↓</button><button class="btn ghost sm danger" data-act="iv-del" data-i="${i}" ${attrs} aria-label="Wiederholung löschen">löschen</button></div>
+    <button class="btn block" data-act="sub-close">Speichern</button></div>`;
 }
-/* aufklappbarer Bereich, der nach dem Neuzeichnen offen bleibt */
-function more2(summary: string, body: string, key: string): string {
-  return `<details class="more iv-more" data-ivk="${esc(key)}" ${OPEN.has(key) ? 'open' : ''}><summary>${esc(summary)}</summary><div class="body">${body}</div></details>`;
+
+/* ---------- Fenster: ein Satz ---------- */
+export function setTitle(tg: Tg, gi: number): string { if (!HOST) return ''; const set = ctxOf(tg).ab.items.filter(x => x.kind === 'set')[gi] as AbSet | undefined; return set ? set.label : 'Satz'; }
+export function setSheet(tg: Tg, gi: number, attrs: string): string {
+  if (!HOST) return '';
+  const { ab } = ctxOf(tg); const rows = ab.rows; const targets = ab.targets; const sport = tg.sport; const fields = IV_FIELDS[sport];
+  const sets = ab.items.filter(x => x.kind === 'set') as AbSet[]; const g = sets[gi]; if (!g) return '';
+  const groups = ivGroups(rows, targets, sport); const grp = groups[gi]; if (!grp) return '';
+  const ids = g.idx.join(','); const t0 = grp.target;
+  const at = g.idx.map(i => ivAttrs(rows[i], targetOfRow(rows, targets, i), sport));
+  const mixed: Record<string, boolean> = { stroke: new Set(at.map(a => a.stroke)).size > 1, gear: new Set(at.map(a => [...a.gear].sort().join(','))).size > 1, zone: new Set(at.map(a => a.zone)).size > 1, type: new Set(at.map(a => a.type)).size > 1, terrain: new Set(at.map(a => a.terrain)).size > 1, title: new Set(at.map(a => a.ownTitle ? a.title : '')).size > 1 };
+  const same = SAME[sport].map(k => { const f = fields.find(x => x.k === k)!; const id = `iv-same-${g.idx[0]}-${String(k)}`; const vals = new Set(g.idx.map(i => valOf(f, rows[i]))); const v = vals.size === 1 ? [...vals][0] : '';
+    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv-same" data-idx="${ids}" data-f="${String(k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Ganzer Satz: ${esc(f.label)}" value="${esc(v)}" placeholder="${esc(ph(f, t0, sport))}"></label>`; }).join('');
+  return `<div class="stack ab-sheet" data-ab-sheet="set" data-iv-set="${gi}">
+    ${g.count ? `<div class="small muted" data-set-count>${esc(g.count)}</div>` : ''}
+    ${g.reps.length > 1 ? `<div class="stack"><span class="lab">Ganzer Satz gleich</span><div class="fgrid">${same}</div><div class="xs muted">Gilt für alle ${g.reps.length} Wiederholungen. Weicht eine ab, tippe sie unten an und ändere nur sie.</div></div>` : `<div class="fgrid">${same}</div>`}
+    ${attrControls(sport, g.idx, { ...grp.attrs }, attrs, 'set', mixed)}
+    <div class="stack"><span class="lab">Wiederholungen</span><div class="ab-reps">${g.reps.map(r => `<div class="ab-rep-wrap">${repLine(r, attrs, true)}<button class="icon-btn sm danger" data-act="iv-del" data-i="${r.i}" ${attrs} aria-label="Wiederholung ${r.n} löschen">×</button></div>`).join('')}</div></div>
+    <div class="row ab-btns"><button class="btn ghost sm" data-act="iv-rep-add" data-idx="${ids}" ${attrs}>+ Wiederholung</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="-1" ${attrs} ${gi === 0 ? 'disabled' : ''} aria-label="Satz nach oben">Satz ↑</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="1" ${attrs} ${gi >= sets.length - 1 ? 'disabled' : ''} aria-label="Satz nach unten">Satz ↓</button><button class="btn ghost sm danger" data-act="iv-set-del" data-idx="${ids}" ${attrs}>Satz löschen</button></div>
+    <button class="btn block" data-act="sub-close">Speichern</button></div>`;
 }
-if (typeof document !== 'undefined') document.addEventListener('toggle', ev => {
-  const d = ev.target as HTMLElement | null; const k = d && d.getAttribute && d.getAttribute('data-ivk'); if (!k) return;
-  if ((d as HTMLDetailsElement).open) OPEN.add(k); else OPEN.delete(k);
-}, true);
 
 /* ---------- Ändern ---------- */
-function save(tg: any, rows: IvRow[]) {
+function save(tg: Tg, rows: IvRow[]) {
   if (!HOST) return; const st = HOST.rec(tg); if (!st) return;
-  const targets = plannedIntervals(tg.planned, HOST.thresholds());
-  HOST.put(tg, setSessionMetricManual(st, 'intervals', stampRows(rows, targets, tg.sport)));
+  const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
+  const stamped = stampRows(rows, targets, tg.sport);
+  // Auftrag 37: die Gesamtwerte passen zum Ablauf (Abschnitte + Wiederholungen), solange sie nicht selbst eingetragen bzw. gemessen sind
+  HOST.put(tg, applyTotals(setSessionMetricManual(st, 'intervals', stamped), tg.sport, stamped, targets));
 }
-const tgOf = (el: HTMLElement) => ({ kind: el.dataset.tk as any, id: el.dataset.tid!, date: el.dataset.tdate!, sport: el.dataset.tsport!, planned: plannedOf(el) });
-let plannedLookup: (id: string, date: string) => any = () => null;
-export function registerPlannedLookup(fn: (id: string, date: string) => any) { plannedLookup = fn; }
-const plannedOf = (el: HTMLElement) => (el.dataset.tk === 'session' ? plannedLookup(el.dataset.tid!, el.dataset.tdate!) : null);
-const rowsFor = (tg: any) => { const st = HOST!.rec(tg) || {}; const targets = plannedIntervals(tg.planned, HOST!.thresholds()); const r = editableRows(tg, st); return stampRows(r.length ? r : [], targets, tg.sport); };
+const done = (tg: Tg) => { HOST!.rev(tg); HOST!.redraw(); };
+const rowsFor = (tg: Tg) => { const st = HOST!.rec(tg) || {}; return ivRowsFor(plannedIv(tg), st, actOf(st), HOST!.thresholds(), tg.sport).rows; };
 const idxOf = (el: HTMLElement) => String(el.dataset.idx || '').split(',').filter(x => x !== '').map(Number);
 /* Wert einer Zeile prüfen: freundlich ablehnen, sinnvolle Grenzen; null = leer, undefined = ungültig */
 export function readIvValue(f: string, kind: string, raw: string, sport: string): { ok: true; v: any } | { ok: false; msg: string } {
@@ -260,25 +191,31 @@ export function readIvAttr(f: string, raw: string, sport: string): { ok: true; v
   const list: [string, string][] = f === 'stroke' ? IV_STROKES : f === 'type' ? (IV_TYPES as any)[sport] || [] : f === 'terrain' ? (IV_TERRAIN as any)[sport] || [] : [];
   return list.some(x => x[0] === v) ? { ok: true, v } : { ok: false, msg: 'Bitte aus der Liste wählen.' };
 }
-function setVal(r: IvRow, f: string, v: any) { (r as any)[f] = v; if (v == null) delete (r as any)[f]; }
+function setVal(r: IvRow, f: string, v: any) {
+  (r as any)[f] = v; if (v == null) delete (r as any)[f];
+  // Auftrag 37: ein eigener Messwert ersetzt „wie geplant“ in dieser Wiederholung
+  if (VALUE_KEYS.has(f) && r.plan) delete r.plan;
+}
 onChange('iv', el => {
   if (!HOST) return; const tg = tgOf(el); const i = +el.dataset.i!; const f = el.dataset.f!;
   const res = readIvValue(f, el.dataset.kind || 'num', (el as HTMLInputElement).value, tg.sport);
-  if (res.ok === false) { toast(res.msg); return; }
+  if (res.ok === false) { el.setAttribute('aria-invalid', 'true'); toast(res.msg); return; }
+  el.removeAttribute('aria-invalid');
   const rows = rowsFor(tg); while (rows.length <= i) rows.push({ ti: null });
   setVal(rows[i], f, res.v);
   // Rückfrage bei widersprüchlichen Werten (max. Puls unter Ø Puls)
   const r = rows[i]; if (r.hr != null && r.maxHr != null && r.maxHr < r.hr) toast(`Max. Puls ${r.maxHr} liegt unter dem Ø Puls ${r.hr}. Bitte prüfen.`);
-  save(tg, rows); HOST.rev(tg); HOST.redraw();
+  save(tg, rows); done(tg);
 });
 /* ganzer Satz gleich: ein Wert für alle Wiederholungen des Satzes */
 onChange('iv-same', el => {
   if (!HOST) return; const tg = tgOf(el); const f = el.dataset.f!;
   const res = readIvValue(f, el.dataset.kind || 'num', (el as HTMLInputElement).value, tg.sport);
-  if (res.ok === false) { toast(res.msg); return; }
+  if (res.ok === false) { el.setAttribute('aria-invalid', 'true'); toast(res.msg); return; }
+  el.removeAttribute('aria-invalid');
   const rows = rowsFor(tg); const idx = idxOf(el);
   idx.forEach(i => { if (rows[i]) setVal(rows[i], f, res.v); });
-  save(tg, rows); HOST.rev(tg); HOST.redraw();
+  save(tg, rows); done(tg);
 });
 onChange('iv-attr', el => {
   if (!HOST) return; const tg = tgOf(el); const f = el.dataset.f!;
@@ -287,75 +224,75 @@ onChange('iv-attr', el => {
   const rows = rowsFor(tg); const idx = idxOf(el);
   // „unterschiedlich“ gewählt: nichts ändern
   if (res.v == null && f !== 'title' && (el as HTMLSelectElement).tagName === 'SELECT' && /unterschiedlich/.test((el as HTMLSelectElement).selectedOptions?.[0]?.textContent || '')) return;
-  idx.forEach(i => { if (rows[i]) setVal(rows[i], f, res.v); });
-  save(tg, rows); HOST.rev(tg); HOST.redraw();
+  idx.forEach(i => { if (rows[i]) { (rows[i] as any)[f] = res.v; if (res.v == null) delete (rows[i] as any)[f]; } });
+  save(tg, rows); done(tg);
 });
 on('iv-gear', el => {
   if (!HOST) return; const tg = tgOf(el); const g = el.dataset.g || ''; const rows = rowsFor(tg); const idx = idxOf(el);
-  const targets = plannedIntervals(tg.planned, HOST.thresholds());
+  const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
   const cur = idx.map(i => ivAttrs(rows[i], targetOfRow(rows, targets, i), tg.sport).gear);
   const all = g && cur.every(x => x.includes(g));
   idx.forEach((i, k) => { if (!rows[i]) return; rows[i].gear = !g ? [] : all ? cur[k].filter(x => x !== g) : [...new Set([...cur[k], g])]; if (!rows[i].stroke && tg.sport === 'swim') rows[i].stroke = ivAttrs(rows[i], targetOfRow(rows, targets, i), 'swim').stroke || 'crawl'; });
-  save(tg, rows); HOST.rev(tg); HOST.redraw();
+  save(tg, rows); done(tg);
 });
-/* Wiederholung bzw. Satz hinzufügen: neuer Satz mit einer Wiederholung (Lage wie der letzte Satz), zusätzlich zum Plan */
+/* Satz hinzufügen: neuer Satz mit einer Wiederholung (Lage wie der letzte Satz), zusätzlich zum Plan; das Fenster zeigt den neuen Satz */
 on('iv-add', el => {
   if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg);
   const key = Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1));
   const last = rows[rows.length - 1] || {};
   rows.push({ set: key, ti: null, ...(tg.sport === 'swim' ? { stroke: last.stroke || 'crawl', gear: [] } : {}) });
-  save(tg, rows); HOST.redraw();
+  save(tg, rows);
+  const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
+  const gi = ivGroups(stampRows(rows, targets, tg.sport), targets, tg.sport).length - 1;
+  HOST.redraw(); UIH.open(tg, 'set:' + gi);
 });
 on('iv-rep-add', el => {
   if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const idx = idxOf(el); if (!idx.length) return;
   const last = rows[idx[idx.length - 1]] || {};
   const { title, stroke, gear, zone, type, terrain, set } = last as any;
-  const at = idx[idx.length - 1] + 1; remapOpen(tg, i => (i >= at ? i + 1 : i));
+  const at = idx[idx.length - 1] + 1;
   rows.splice(at, 0, JSON.parse(JSON.stringify({ title, stroke, gear, zone, type, terrain, set: set ?? Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1)), ti: null })));
-  if (last.set == null) rows[idx[idx.length - 1]].set = rows[idx[idx.length - 1] + 1].set;
+  if (last.set == null) rows[idx[idx.length - 1]].set = rows[at].set;
   save(tg, rows); HOST.redraw();
 });
 on('iv-set-del', el => {
-  if (!HOST) return; if (!armed(el, 'Satz wirklich löschen?')) return;
+  if (!HOST) return;
   const tg = tgOf(el); const rows = rowsFor(tg); const idx = new Set(idxOf(el));
-  const keep = rows.map((_, i) => i).filter(i => !idx.has(i));
-  const g0 = ivGroups(rows, plannedIntervals(tg.planned, HOST.thresholds()), tg.sport).findIndex(g => g.idx.some(i => idx.has(i)));
-  remapOpen(tg, i => (idx.has(i) ? null : keep.indexOf(i)), g => (g === g0 ? null : g > g0 ? g - 1 : g));
-  save(tg, rows.filter((_, i) => !idx.has(i))); HOST.rev(tg); HOST.redraw();
+  setSubKey(''); save(tg, rows.filter((_, i) => !idx.has(i))); done(tg);
 });
 on('iv-set-move', el => {
   if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg);
-  const targets = plannedIntervals(tg.planned, HOST.thresholds());
+  const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
   const groups = ivGroups(rows, targets, tg.sport); const gi = +el.dataset.g!, gj = gi + +el.dataset.dir!;
   if (gj < 0 || gj >= groups.length) return;
   // Satz-Kennung festhalten, damit die Gruppen nach dem Verschieben gleich bleiben
   groups.forEach((g, k) => g.idx.forEach(i => { if (rows[i].set == null) rows[i].set = 2000 + k; }));
   const order = groups.map(g => g.idx.map(i => rows[i]));
-  const orderIdx = groups.map(g => g.idx);
   [order[gi], order[gj]] = [order[gj], order[gi]];
-  [orderIdx[gi], orderIdx[gj]] = [orderIdx[gj], orderIdx[gi]];
-  const flatIdx = orderIdx.flat();
-  remapOpen(tg, i => flatIdx.indexOf(i), g => (g === gi ? gj : g === gj ? gi : g));
-  save(tg, order.flat()); HOST.rev(tg); HOST.redraw();
+  if (SUB.key === 'set:' + gi) setSubKey('set:' + gj);
+  save(tg, order.flat()); done(tg);
 });
-on('iv-del', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const d = +el.dataset.i!; remapOpen(tg, i => (i === d ? null : i > d ? i - 1 : i)); rows.splice(d, 1); save(tg, rows); HOST.rev(tg); HOST.redraw(); });
-on('iv-move', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= rows.length) return; [rows[i], rows[j]] = [rows[j], rows[i]]; remapOpen(tg, k => (k === i ? j : k === j ? i : k)); save(tg, rows); HOST.rev(tg); HOST.redraw(); });
-on('iv-copy', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!; if (!rows[i - 1]) return; const { note, aborted, ti, set, title, ...prev } = rows[i - 1]; rows[i] = { ...rows[i], ...prev }; save(tg, rows); HOST.rev(tg); HOST.redraw(); });
-on('iv-abort', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!; if (!rows[i]) return; rows[i] = { ...rows[i], aborted: !rows[i].aborted }; if (!rows[i].aborted) delete rows[i].aborted; save(tg, rows); HOST.rev(tg); HOST.redraw(); });
-on('iv-reset', el => { if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return; const next = setSessionMetricManual(st, 'intervals', ''); delete next.metricsManual.intervals; HOST.put(tg, next); HOST.rev(tg); HOST.redraw(); toast('Werte der Uhr gelten wieder.'); });
-/* Enter springt zum nächsten Feld der Intervall-Liste (die nächste Wiederholung klappt dafür auf) */
+on('iv-del', el => {
+  if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const d = +el.dataset.i!;
+  if (SUB.key === 'rep:' + d) setSubKey(''); else if (SUB.key.startsWith('rep:') && +SUB.key.slice(4) > d) setSubKey('rep:' + (+SUB.key.slice(4) - 1));
+  rows.splice(d, 1); save(tg, rows); done(tg);
+});
+on('iv-move', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= rows.length) return; [rows[i], rows[j]] = [rows[j], rows[i]]; if (SUB.key === 'rep:' + i) setSubKey('rep:' + j); save(tg, rows); done(tg); });
+on('iv-copy', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!; if (!rows[i - 1]) return; const { note, aborted, ti, set, title, ...prev } = rows[i - 1]; void note; void aborted; void ti; void set; void title; rows[i] = { ...rows[i], ...prev }; save(tg, rows); done(tg); });
+on('iv-abort', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!; if (!rows[i]) return; rows[i] = { ...rows[i], aborted: !rows[i].aborted }; if (!rows[i].aborted) delete rows[i].aborted; else delete rows[i].plan; save(tg, rows); done(tg); });
+on('iv-reset', el => { if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return; const next = setSessionMetricManual(st, 'intervals', ''); delete next.metricsManual.intervals; HOST.put(tg, applyTotals(next, tg.sport, undefined, plannedIntervals(plannedIv(tg), HOST.thresholds()))); done(tg); toast('Werte der Uhr gelten wieder.'); });
+/* Enter springt zum nächsten Feld der Wiederholung (im Fenster) */
 if (typeof document !== 'undefined') document.addEventListener('keydown', e => {
   const el = e.target as HTMLElement | null;
   if (e.key !== 'Enter' || !el || !el.hasAttribute || !el.hasAttribute('data-iv-in')) return;
   e.preventDefault();
-  const all = Array.from(document.querySelectorAll<HTMLInputElement>('[data-iv-in]'));
-  const i = all.indexOf(el as HTMLInputElement);
-  const nx0 = all[i + 1];
-  if (nx0) { const det = nx0.closest('details.iv-det') as HTMLDetailsElement | null; if (det && !det.open) { det.open = true; const k = det.getAttribute('data-ivk'); if (k) OPEN.add(k); } }
+  const scope = el.closest('.sheet') || document;
+  const all = Array.from(scope.querySelectorAll<HTMLInputElement>('[data-iv-in]'));
+  const nx0 = all[all.indexOf(el as HTMLInputElement) + 1];
   (el as HTMLInputElement).dispatchEvent(new Event('change', { bubbles: true }));
   const id = nx0 && nx0.id;
-  if (!id) return;
-  // Speichern zeichnet das Blatt neu (auch etwas später, z. B. unter Last): Fokus dann erneut setzen, solange niemand sonst ihn hat
+  if (!id) { (el as HTMLInputElement).blur(); return; }
+  // Speichern zeichnet das Fenster neu (auch etwas später, z. B. unter Last): Fokus dann erneut setzen, solange niemand sonst ihn hat
   const put = (first: boolean) => { const nx = document.getElementById(id) as HTMLInputElement | null; if (!nx || document.activeElement === nx) return; const a = document.activeElement as HTMLElement | null; if (!first && a && a !== document.body && a.isConnected) return; nx.focus(); nx.select && nx.select(); };
   setTimeout(() => put(true), 0); [80, 250, 600].forEach(ms => setTimeout(() => put(false), ms));
 });

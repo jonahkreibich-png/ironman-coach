@@ -382,27 +382,44 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .split-row, .ex-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
 .split-row .inp.sm { flex: 1 1 70px; width: 0; }
 .split-row b { flex: 0 0 3em; }
-/* Auftrag 22: Intervalle – Balken Soll gegen Ist */
-.iv-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.iv-bar { display: grid; grid-template-columns: 1.6em minmax(4.5em, auto) minmax(40px, 1fr) auto; align-items: center; gap: 6px; min-width: 0; font-size: var(--t-sm); }
-.iv-bar .iv-why { grid-column: 2 / -1; }
-.iv-bar .iv-n { font-weight: 700; color: var(--ink-2); }
-.iv-card .fgrid + .fgrid { border-top: 1px dashed var(--line); padding-top: 6px; }
-/* Auftrag 36: Intervalle nach Sätzen, eine Zeile je Wiederholung, Antippen öffnet die Details */
-.iv-set { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.iv-set-head { flex-wrap: wrap; gap: 2px 8px; }
-.iv-set-t { min-width: 0; overflow-wrap: anywhere; }
-.iv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.iv-row { border-top: 1px solid var(--line); min-width: 0; }
-.iv-row:first-child { border-top: 0; }
-.iv-det > summary.iv-bar { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 0; flex-wrap: wrap; }
-.iv-det > summary.iv-bar::-webkit-details-marker { display: none; }
-.iv-det > summary .iv-n { flex: 0 0 1.6em; font-weight: 700; color: var(--ink-2); }
-.iv-det > summary .iv-main { flex: 1 1 10em; min-width: 8em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.iv-det > summary .pill { flex: 0 0 auto; }
-.iv-det[open] > summary { color: var(--accent); }
-.iv-body { padding: 4px 0 10px; }
-.iv-more > summary { min-height: 40px; }
+/* Auftrag 37: Ablauf – eine Liste (Abschnitte, Sätze mit Wiederholungen, Übungen). Ist fett, Soll grau, Urteil rechts; Antippen öffnet ein Fenster. */
+.ablauf .ab-head { flex-wrap: wrap; gap: 4px 8px; }
+.ab-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ab-item { min-width: 0; }
+.ab-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; width: 100%; min-height: 48px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; text-align: left; font: inherit; min-width: 0; }
+button.ab-row { cursor: pointer; }
+button.ab-row:active, button.ab-set-h:active { background: var(--surface-2); }
+.ab-n { flex: 0 0 1.6em; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ab-n-part { flex-basis: 4px; align-self: stretch; border-radius: 2px; background: var(--c, var(--accent)); opacity: .5; }
+.ab-txt { flex: 1 1 9em; min-width: 7em; display: flex; flex-direction: column; gap: 1px; overflow-wrap: anywhere; }
+.ab-lab { font-size: var(--t-xs, .75rem); font-weight: 700; color: var(--ink-2); text-transform: none; }
+.ab-ist { font-weight: 700; font-variant-numeric: tabular-nums; }
+.ab-soll { font-size: var(--t-sm); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ab-row .pill { flex: 0 0 auto; }
+.pill.plan { background: var(--surface-2); color: var(--ink); border: 1px dashed var(--line); }
+.ab-set { border: 1px solid var(--line); border-radius: 12px; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.ab-set-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; width: 100%; min-height: 44px; padding: 6px 6px; border: 0; background: none; color: inherit; text-align: left; font: inherit; border-radius: 8px; cursor: pointer; }
+div.ab-set-h { cursor: default; }
+.ab-set-t { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.ab-reps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ab-set .ab-row { border-color: transparent; background: var(--surface-2); }
+.ab-rep-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ab-rep-wrap .ab-row { flex: 1 1 auto; }
+.ab-sheet .ab-btns { flex-wrap: wrap; gap: 6px; }
+.ab-sheet-head { flex-wrap: wrap; gap: 4px 8px; }
+.wo-diagram-wrap[data-diagram-tap] .dia-hit { cursor: pointer; }
+.sub-wrap { z-index: 55; }
+.sub-sheet { max-height: 86%; }
+.sess-kopf .pills { gap: 6px; flex-wrap: wrap; }
+.sess-actions { flex-wrap: wrap; }
+.totals > summary { list-style: none; cursor: pointer; min-height: 44px; flex-wrap: wrap; gap: 4px 8px; }
+.totals > summary::-webkit-details-marker { display: none; }
+.totals[open] > summary .chev { transform: rotate(180deg); }
+.coach-review > summary { list-style: none; cursor: pointer; min-height: 40px; }
+.coach-review > summary::-webkit-details-marker { display: none; }
+.missed-row { flex-direction: column; align-items: stretch; gap: 6px; }
+.missed-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.missed-btns { flex-wrap: wrap; gap: 6px; }
 .iv-gear { flex-wrap: wrap; overflow-x: visible; }
 
 .ex-row { margin-bottom: 6px; }

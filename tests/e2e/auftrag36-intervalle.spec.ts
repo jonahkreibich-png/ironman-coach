@@ -1,4 +1,5 @@
-/* Auftrag 36, Punkt 1: Intervalle nach dem Training bearbeiten – wie ein Mensch, per Klick und Eingabe.
+/* Auftrag 36/37, Punkt 1: Intervalle nach dem Training bearbeiten – wie ein Mensch, per Klick und Eingabe.
+   Auftrag 37: Sätze und Wiederholungen stehen im Ablauf; Antippen öffnet ein Fenster nur für diesen Teil.
    Schwimmen: Sätze gruppiert, „ganzer Satz gleich“, Pull Buoy für den Satz, eigener Titel, eine Wiederholung abweichend, neu laden,
    gespeicherter Wert = Anzeige = Coach-Kontext (Kraul am Stück, Pull Buoy, Coach-Text „mit Pull Buoy“), ungültige Eingabe, Satz
    hinzufügen/verschieben/löschen. Laufen: Art „bergauf“ und Untergrund für den Satz. Überlauf: 320 px und große Schrift. */
@@ -22,11 +23,13 @@ async function seedIv(page: Page) {
   } });
 }
 const sheet = (page: Page) => page.locator('#sheetPanel');
+const sub = (page: Page) => page.locator('#subPanel');
 const box = (page: Page) => sheet(page).locator('[data-intervals]');
 const set = (page: Page, i: number) => box(page).locator(`[data-iv-set="${i}"]`);
-/* Bearbeiten des ganzen Satzes (nicht die Details einer Wiederholung) */
-const edit = (page: Page, i: number) => set(page, i).locator(':scope > details.iv-more');
-async function human(page: Page, sel: string, raw: string) { const el = sheet(page).locator(sel); await el.click(); await el.fill(''); await el.pressSequentially(raw, { delay: 5 }); await el.blur(); }
+const openSet = async (page: Page, i: number) => { await set(page, i).locator('.ab-set-h').click(); await expect(sub(page).locator('[data-ab-sheet="set"]')).toBeVisible(); };
+const openRep = async (page: Page, i: number) => { await box(page).locator(`.ab-rep[data-iv-row="${i}"]`).click(); await expect(sub(page).locator(`[data-ab-sheet="rep"][data-iv-row="${i}"]`)).toBeVisible(); };
+const done = async (page: Page) => { await sub(page).locator('[data-act="sub-close"].btn').click(); await expect(page.locator('#sub')).toBeHidden(); };
+async function human(page: Page, sel: string, raw: string) { const el = sub(page).locator(sel); await el.click(); await el.fill(''); await el.pressSequentially(raw, { delay: 5 }); await el.blur(); }
 const ctxOf = (state: any, plan: any) => ({ today: TODAY, now: Date.now(), state, baseWeeks: plan.weeks, planMeta: plan.meta || {}, profile: state.profile, goals: [] } as any);
 
 test('Schwimmen: Satz gleich, Pull Buoy, Titel, eine Wiederholung abweichend – neu laden, überall gleich, Coach sagt „mit Pull Buoy“', async ({ page }) => {
@@ -36,43 +39,44 @@ test('Schwimmen: Satz gleich, Pull Buoy, Titel, eine Wiederholung abweichend –
   await expect(box(page)).toBeVisible();
   await expect(set(page, 0).locator('.iv-set-t')).toHaveText('4 × 100 m Kraul');
   await expect(set(page, 1).locator('.iv-set-t')).toHaveText('4 × 50 m Kraul · Pull Buoy');
-  // kompakt: 8 Zeilen, Details zu
+  // kompakt: 8 Zeilen, keine Felder in der Liste
   await expect(box(page).locator('.iv-row')).toHaveCount(8);
-  await expect(box(page).locator('#iv-0-sec')).toBeHidden();
+  await expect(page.locator('#iv-0-sec')).toHaveCount(0);
   // ganzer Satz gleich: alle 4 × 100 m in 1:55
-  await set(page, 0).locator('summary', { hasText: 'Satz bearbeiten' }).click();
+  await openSet(page, 0);
   await human(page, '#iv-same-0-sec', '1:55');
-  await expect(set(page, 0).locator('.iv-row .iv-main').first()).toContainText('1:55');
-  await expect(set(page, 0).locator('.iv-row .iv-main').nth(3)).toContainText('1:55');
+  await expect(sub(page).locator('.ab-rep').first()).toContainText('1:55');
+  await expect(sub(page).locator('.ab-rep').nth(3)).toContainText('1:55');
   // Pull Buoy für den ganzen Satz, eigener Titel
-  await edit(page, 0).locator('[data-act="iv-gear"][data-g="buoy"]').click();
-  await expect(set(page, 0).locator('.iv-set-t')).toHaveText('4 × 100 m Kraul · Pull Buoy');
+  await sub(page).locator('[data-act="iv-gear"][data-g="buoy"]').click();
   await human(page, '#iv-set-0-title', 'Hauptserie');
+  await done(page);
   await expect(set(page, 0).locator('.iv-set-t')).toHaveText('Hauptserie (4 × 100 m)');
   // eine Wiederholung abweichend: Nr. 2 in 2:05
-  await set(page, 0).locator('[data-iv-row="1"] summary.iv-bar').click();
+  await openRep(page, 1);
   await human(page, '#iv-1-sec', '2:05');
-  await expect(set(page, 0).locator('[data-iv-row="1"] .iv-main')).toContainText('2:05');
   // ungültig: Meldung, alter Wert bleibt
   await human(page, '#iv-1-sec', '9:99');
   await expect(page.locator('#toast')).toContainText('Minuten:Sekunden');
+  await done(page);
+  await expect(set(page, 0).locator('[data-iv-row="1"]')).toContainText('2:05');
   // neu laden: alles noch da
   await expect.poll(async () => (await stored(page)).sessions['iv-swim']?.metrics?.intervals?.[1]?.sec).toBe(125);
   await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
   await openPlanSession(page, 'iv-swim');
   await expect(set(page, 0).locator('.iv-set-t')).toHaveText('Hauptserie (4 × 100 m)');
-  await expect(set(page, 0).locator('[data-iv-row="1"] .iv-main')).toContainText('2:05');
-  await expect(set(page, 0).locator('[data-iv-row="0"] .iv-main')).toContainText('1:55');
+  await expect(set(page, 0).locator('[data-iv-row="1"]')).toContainText('2:05');
+  await expect(set(page, 0).locator('[data-iv-row="0"]')).toContainText('1:55');
   // gespeichert = Anzeige = Coach-Kontext
   const st = await stored(page); const plan = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_plan') || '{}'));
   const rows = st.sessions['iv-swim'].metrics.intervals;
   expect(rows.slice(0, 4).map((r: any) => r.sec)).toEqual([115, 125, 115, 115]);
   expect(rows[0]).toMatchObject({ m: 100, stroke: 'crawl', gear: ['buoy'], title: 'Hauptserie', ti: 0 });
-  const done = doneItems(ctxOf(st, plan), TODAY, TODAY).find(d => d.key === 'iv-swim')!;
-  const v = valsOf(done);
+  const done0 = doneItems(ctxOf(st, plan), TODAY, TODAY).find(d => d.key === 'iv-swim')!;
+  const v = valsOf(done0);
   expect(v.longest ?? null).toBeNull();
   expect(v.longestPull).toBe(100);
-  const notes = ivDiffNotes(ivEvalOf(ctxOf(st, plan), done));
+  const notes = ivDiffNotes(ivEvalOf(ctxOf(st, plan), done0));
   expect(notes[0]).toContain('mit Pull Buoy statt ohne Hilfsmittel');
   expect(notes.join(' ')).not.toMatch(/ohne Pull Buoy/);
 });
@@ -81,29 +85,33 @@ test('Schwimmen: Satz hinzufügen (Brust), verschieben, löschen; Lage einer Wie
   test.setTimeout(90000);
   await seedIv(page); await open(page, '/?go=plan');
   await openPlanSession(page, 'iv-swim');
-  await box(page).locator('[data-act="iv-add"]').click();
+  await sheet(page).locator('[data-act="ab-add"]').click();
+  await sub(page).locator('[data-act="iv-add"]').click();
+  // das Fenster zeigt gleich den neuen Satz
+  await expect(sub(page).locator('[data-ab-sheet="set"][data-iv-set="2"]')).toBeVisible();
   await expect(box(page).locator('.iv-set')).toHaveCount(3);
-  await set(page, 2).locator('summary', { hasText: 'Satz bearbeiten' }).click();
-  await set(page, 2).locator('#iv-set-8-stroke').selectOption('breast');
-  await set(page, 2).locator('[data-iv-row="8"] summary.iv-bar').click();
+  await sub(page).locator('#iv-set-8-stroke').selectOption('breast');
+  await sub(page).locator('.ab-rep[data-iv-row="8"]').click();
   await human(page, '#iv-8-m', '50');
   await human(page, '#iv-8-sec', '0:58');
+  await done(page);
   await expect(set(page, 2).locator('.iv-set-t')).toContainText('Brust');
-  // nach oben schieben: wird Satz 2
-  await edit(page, 2).locator('[data-act="iv-set-move"][data-dir="-1"]').click();
+  // nach oben schieben: wird Satz 2 (das Fenster bleibt beim verschobenen Satz)
+  await openSet(page, 2);
+  await sub(page).locator('[data-act="iv-set-move"][data-dir="-1"]').click();
   await expect(set(page, 1).locator('.iv-set-t')).toContainText('Brust');
-  // Lage einer einzelnen Wiederholung im ersten Satz: Rücken
-  await set(page, 0).locator('[data-iv-row="0"] summary.iv-bar').click();
-  await set(page, 0).locator('[data-iv-row="0"] .iv-more summary').click();
-  await set(page, 0).locator('#iv-row-0-stroke').selectOption('back');
-  await human(page, '#iv-0-sec', '2:10');
-  await expect(set(page, 0).locator('[data-iv-row="0"] .iv-main')).toContainText('Rücken');
-  // Satz löschen (zweimal tippen: Sicherheitsfrage)
-  // der verschobene Satz behält seinen offenen Bearbeiten-Bereich
-  await expect(edit(page, 1)).toHaveAttribute('open', '');
-  const del = edit(page, 1).locator('[data-act="iv-set-del"]');
-  await del.click(); await del.click();
+  await expect(sub(page).locator('[data-ab-sheet="set"][data-iv-set="1"]')).toBeVisible();
+  // Satz löschen (Rückgängig statt Sicherheitsfrage)
+  await sub(page).locator('[data-act="iv-set-del"]').click();
+  await expect(page.locator('#sub')).toBeHidden();
   await expect(box(page).locator('.iv-set-t', { hasText: 'Brust' })).toHaveCount(0);
+  await expect(page.locator('#toast')).toContainText('Satz gelöscht');
+  // Lage einer einzelnen Wiederholung im ersten Satz: Rücken
+  await openRep(page, 0);
+  await sub(page).locator('#iv-row-0-stroke').selectOption('back');
+  await human(page, '#iv-0-sec', '2:10');
+  await done(page);
+  await expect(set(page, 0).locator('[data-iv-row="0"]')).toContainText('Rücken (statt Kraul)');
   const st = await stored(page);
   expect(st.sessions['iv-swim'].metrics.intervals[0]).toMatchObject({ stroke: 'back', sec: 130 });
   expect(st.sessions['iv-swim'].metrics.intervals.some((r: any) => r.stroke === 'breast')).toBe(false);
@@ -114,30 +122,30 @@ test('Laufen: Art bergauf und Untergrund für den Satz, Titel; Bewertung über P
   await seedIv(page); await open(page, '/?go=plan');
   await openPlanSession(page, 'iv-run');
   await expect(set(page, 0).locator('.iv-set-t')).toHaveText('5 × 4 min Zone 4');
-  await set(page, 0).locator('summary', { hasText: 'Satz bearbeiten' }).click();
-  await set(page, 0).locator('#iv-set-0-type').selectOption('hill');
-  await set(page, 0).locator('#iv-set-0-terrain').selectOption('trail');
+  await openSet(page, 0);
+  await sub(page).locator('#iv-set-0-type').selectOption('hill');
+  await sub(page).locator('#iv-set-0-terrain').selectOption('trail');
   await human(page, '#iv-same-0-hr', '166');
   await human(page, '#iv-same-0-sec', '4:00');
+  await done(page);
   await expect(set(page, 0).locator('.iv-set-t')).toHaveText('5 × 4 min bergauf · Zone 4');
   const st = await stored(page);
   expect(st.sessions['iv-run'].metrics.intervals[4]).toMatchObject({ type: 'hill', terrain: 'trail', hr: 166, sec: 240 });
-  await set(page, 0).locator('[data-iv-row="0"] summary.iv-bar').click();
-  await expect(set(page, 0).locator('[data-iv-row="0"] .iv-body')).toContainText('Puls 166');
+  await openRep(page, 0);
+  await expect(sub(page).locator('.iv-why')).toContainText('Puls 166');
 });
 
-for (const w of [320, 390]) test(`Überlauf ${w} px, große Schrift: Intervall-Sätze und Details ragen nicht heraus, kein zu schmaler Text`, async ({ page }) => {
+for (const w of [320, 390]) test(`Überlauf ${w} px, große Schrift: Intervall-Sätze und Fenster ragen nicht heraus, kein zu schmaler Text`, async ({ page }) => {
   test.setTimeout(90000);
   await page.setViewportSize({ width: w, height: 800 });
   await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '22px'; }); });
   await seedIv(page); await open(page, '/?go=plan');
   await openPlanSession(page, 'iv-swim');
-  await set(page, 0).locator('summary', { hasText: 'Satz bearbeiten' }).click();
-  await edit(page, 0).locator('[data-act="iv-gear"][data-g="buoy"]').click();
+  await openSet(page, 0);
+  await sub(page).locator('[data-act="iv-gear"][data-g="buoy"]').click();
   await human(page, '#iv-set-0-title', 'Sehr lange Hauptserie mit Pull Buoy und Paddles');
-  await set(page, 0).locator('[data-iv-row="0"] summary.iv-bar').click();
-  await set(page, 0).locator('[data-iv-row="0"] .iv-more summary').click();
-  const over = await page.evaluate(() => { const s = document.querySelector('#sheetPanel') as HTMLElement; return { page: document.scrollingElement!.scrollWidth - window.innerWidth, sheet: s.scrollWidth - s.clientWidth }; });
-  expect(over).toEqual({ page: 0, sheet: 0 });
+  await sub(page).locator('.ab-rep[data-iv-row="0"]').click();
+  const over = await page.evaluate(() => { const s = document.querySelector('#sheetPanel') as HTMLElement; const u = document.querySelector('#subPanel') as HTMLElement; return { page: document.scrollingElement!.scrollWidth - window.innerWidth, sheet: s.scrollWidth - s.clientWidth, sub: u.scrollWidth - u.clientWidth }; });
+  expect(over).toEqual({ page: 0, sheet: 0, sub: 0 });
   expect(await narrowText(page)).toEqual([]);
 });

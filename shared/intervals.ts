@@ -31,6 +31,8 @@ export interface IvRow {
      set: Satz-Kennung (zusammengehörende Wiederholungen); ti: Index des Soll-Intervalls (null = zusätzlich). Fehlt ti, gilt die Reihenfolge. */
   title?: string | null; stroke?: IvStroke | null; gear?: string[] | null; zone?: number | null; type?: string | null; terrain?: string | null;
   set?: number | null; ti?: number | null;
+  /** Auftrag 37: mit „Wie geplant gemacht“ aus dem Soll gefüllt (nicht gemessen) – zählt als gemacht, aber nie als Messwert für Tempo/Scores */
+  plan?: boolean;
 }
 export type IvStroke = 'crawl' | 'breast' | 'back' | 'fly' | 'im' | 'drill' | 'kick';
 export const IV_STROKES: [IvStroke, string][] = [['crawl', 'Kraul'], ['breast', 'Brust'], ['back', 'Rücken'], ['fly', 'Delfin'], ['im', 'Lagen'], ['drill', 'Technikübung'], ['kick', 'Beine']];
@@ -57,14 +59,15 @@ export interface IvTarget {
   /** RPE-Ziel */ rpe: [number, number];
   /** Auftrag 36: geplante Lage und Hilfsmittel (Schwimmen) */ stroke?: IvStroke | null; gear?: string[];
 }
-export type IvVerdict = 'ok' | 'hard' | 'easy' | 'short' | 'missing' | null;
+export type IvVerdict = 'ok' | 'hard' | 'easy' | 'short' | 'missing' | 'plan' | null;
 export interface IvLine { target: IvTarget | null; row: IvRow | null; verdict: IvVerdict; why: string; extra: boolean; done: boolean;
   /** Tempo/Watt außerhalb des Ziels, Puls aber im Ziel: eher stimmen die Zonen nicht (faster = schneller als geplant) */ zone?: 'faster' | 'slower';
   /** Auftrag 36: tatsächlich gemacht (Lage, Hilfsmittel, Zone, Art, Titel) und was davon vom Plan abweicht */ attrs?: IvAttrs; diff?: string[] }
-export type IvSource = 'manual' | 'watch' | 'laps' | 'stream' | 'icu' | 'none';
+export type IvSource = 'manual' | 'plan' | 'watch' | 'laps' | 'stream' | 'icu' | 'none';
 export interface IvEval {
   sport: IvSport; source: IvSource; planned: number; done: number; extra: number; missing: number; short: number;
   inTarget: number; tooHard: number; tooEasy: number; judged: number;
+  /** Auftrag 37: „wie geplant“ eingetragen (ohne Messwerte) */ asPlanned: number;
   /** Intervalle mit Tempo/Watt neben dem Ziel bei passendem Puls */ zoneFaster: number; zoneSlower: number;
   lines: IvLine[];
   /** Ø nur über die harten Teile */ work: { sec: number | null; hr: number | null; maxHr: number | null; paceSec: number | null; power: number | null; speed: number | null; pace100: number | null; cad: number | null; rpe: number | null };
@@ -265,7 +268,7 @@ export function swimIvFacts(rows: IvRow[] | null | undefined, targets: IvTarget[
     out.byStroke[key] = (out.byStroke[key] || 0) + m;
     a.gear.forEach(g => { if (!out.gear.includes(g)) out.gear.push(g); });
     if (a.gear.length) out.aided = true;
-    const p = paceToSec(r.pace100) ?? (num(r.sec) && m ? num(r.sec)! / (m / 100) : null);
+    const p = r.plan ? null : paceToSec(r.pace100) ?? (num(r.sec) && m ? num(r.sec)! / (m / 100) : null);
     if (kick) { out.kickM += m; return; }
     if (a.stroke !== 'crawl') return;
     if (!a.gear.length) { out.crawlMaxM = Math.max(out.crawlMaxM || 0, m); if (p && m >= 100) cp.push({ v: p, w: m }); }
@@ -417,6 +420,8 @@ export function actualRows(st: any, act: any): { rows: IvRow[]; source: IvSource
     const d = detectedSegments(act);
     if (d.segs.length) return { rows: rowsFromSegments(d.segs, act.sport), source: d.from, aligned: false };
   }
+  // Auftrag 37: „wie geplant“ – nur solange die Uhr nichts gemessen hat (Uhrdaten haben Vorrang)
+  if (((st && st.metricsSrc) || {}).intervals === 'plan' && Array.isArray(m.intervals)) return { rows: m.intervals, source: 'plan', aligned: true };
   if (Array.isArray(m.intervals) && m.intervals.length) return { rows: m.intervals, source: (st.metricsSrc || {}).intervals === 'intervals' ? 'icu' : 'watch', aligned: false };
   return { rows: [], source: 'none', aligned: true };
 }
@@ -481,7 +486,8 @@ export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresh
   const pctx = ivPaceCtx(session, thr);
   const doneLine = (t: IvTarget | null, r: IvRow): IvLine => {
     const a = ivAttrs(r, t, sport); const diff = ivDiff(a, t, sport);
-    const j = judge(t ? retarget(t, a, sport, pctx) : null, r, sport);
+    // Auftrag 37: „wie geplant“ eingetragen – kein Messwert, also kein Urteil über Tempo oder Puls
+    const j: { v: IvVerdict; why: string; zone?: 'faster' | 'slower' } = r.plan ? { v: t ? 'plan' : null, why: 'wie geplant eingetragen (nicht gemessen)' } : judge(t ? retarget(t, a, sport, pctx) : null, r, sport);
     return { target: t, row: r, verdict: j.v, why: j.why, extra: !t, done: true, ...(j.zone ? { zone: j.zone } : {}), attrs: a, ...(diff.length ? { diff } : {}) };
   };
   if (ar.aligned && ar.rows.some(r => r && r.ti != null)) {
@@ -517,21 +523,23 @@ export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresh
     items.sort((a, b) => a.at - b.at).forEach(x => lines.push(x.line));
   }
   const doneLines = lines.filter(l => l.done && l.row);
-  const full = doneLines.filter(l => l.verdict !== 'short');
-  const work = doneLines.map(l => l.row!);
+  // Auftrag 37: Durchschnitte und Verlauf nur aus echten Werten (nicht aus „wie geplant“)
+  const measured = doneLines.filter(l => !l.row!.plan);
+  const full = measured.filter(l => l.verdict !== 'short');
+  const work = measured.map(l => l.row!);
   const w = (k: keyof IvRow) => r1(wavg(work.map(r => ({ v: num(r[k]), w: num(r.sec) || num(r.m) || 1 }))));
   const paces = work.map(r => ({ v: paceToSec(r.pace) ?? (r.m && r.sec && sport === 'run' ? r.sec / (r.m / 1000) : null), w: num(r.sec) || 1 }));
   const p100 = work.map(r => ({ v: paceToSec(r.pace100) ?? (r.m && r.sec && sport === 'swim' ? r.sec / (r.m / 100) : null), w: num(r.m) || 1 }));
   const perfs = full.map(l => perf(l.row!, sport));
   const p1 = perfs.find(x => x != null) ?? null, pN = [...perfs].reverse().find(x => x != null) ?? null;
   const hrs = full.map(l => num(l.row!.hr)).filter((x): x is number => x != null);
-  const rec = doneLines.map(l => { const r = l.row!; const top = num(r.maxHr) ?? num(r.hr); return top != null && num(r.restHr) != null && r.restSec ? top - num(r.restHr)! : null; }).filter((x): x is number => x != null);
+  const rec = measured.map(l => { const r = l.row!; const top = num(r.maxHr) ?? num(r.hr); return top != null && num(r.restHr) != null && r.restSec ? top - num(r.restHr)! : null; }).filter((x): x is number => x != null);
   const restRows = work.filter(r => num(r.restSec));
   return {
     sport, source: ar.source, planned: targets.length, done: doneLines.filter(l => !l.extra).length, extra: lines.filter(l => l.extra).length,
     missing: lines.filter(l => l.verdict === 'missing').length, short: lines.filter(l => l.verdict === 'short').length,
     inTarget: lines.filter(l => l.verdict === 'ok').length, tooHard: lines.filter(l => l.verdict === 'hard').length, tooEasy: lines.filter(l => l.verdict === 'easy').length,
-    judged: lines.filter(l => l.verdict === 'ok' || l.verdict === 'hard' || l.verdict === 'easy').length,
+    judged: lines.filter(l => l.verdict === 'ok' || l.verdict === 'hard' || l.verdict === 'easy').length, asPlanned: lines.filter(l => l.verdict === 'plan').length,
     zoneFaster: lines.filter(l => l.zone === 'faster').length, zoneSlower: lines.filter(l => l.zone === 'slower').length,
     lines,
     work: { sec: r0(avg(work.map(r => num(r.sec)))), hr: r0(w('hr')), maxHr: r0(avg(work.map(r => num(r.maxHr)))), paceSec: r0(wavg(paces)), power: r0(w('power')), speed: w('speed'), pace100: r0(wavg(p100)), cad: r0(w('cad')), rpe: r1(avg(work.map(r => num(r.rpe)))) },
@@ -546,7 +554,7 @@ export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresh
 export function rowsToLaps(rows: IvRow[], sport: string): LapOut[] {
   const out: LapOut[] = []; let n = 1;
   for (const r of rows || []) {
-    if (!hasIst(r)) continue;
+    if (!hasIst(r) || r.plan) continue;
     const sec = num(r.sec), m = num(r.m);
     let speed: number | null = null;
     if (sport === 'run') { const p = paceToSec(r.pace); speed = p ? 1000 / p : m && sec ? m / sec : null; }
@@ -561,7 +569,7 @@ export function rowsToLaps(rows: IvRow[], sport: string): LapOut[] {
 /** Kurzform (wie IntervalOut aus der Aufzeichnung) für Stellen, die nur die Zusammenfassung brauchen */
 export function evalToIntervalOut(e: IvEval | null): IntervalOut | null {
   if (!e || e.done + e.extra < 1) return null;
-  const work = e.lines.filter(l => l.done && l.row);
+  const work = e.lines.filter(l => l.done && l.row && !l.row.plan); if (!work.length) return null;
   const hr1 = num(work[0]?.row?.hr), hrN = num(work[work.length - 1]?.row?.hr);
   return { count: work.length, workSec: Math.round(work.reduce((a, l) => a + (num(l.row!.sec) || 0), 0)), avgHrWork: e.work.hr, hrDriftPct: hr1 && hrN && work.length >= 2 ? r1((hrN / hr1 - 1) * 100) : null, dropPct: e.fadePct, recoveryHrDrop: e.recovery, lapsHr: work.map(l => num(l.row!.hr)) };
 }

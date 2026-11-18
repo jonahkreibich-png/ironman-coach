@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.25.0', items: [
+    'Einheiten übersichtlich: ein „Ablauf“ von oben nach unten (Aufwärmen → Sätze → Ausklang; Kraft: Übungen), je Zeile Soll, Ist und Urteil. Antippen öffnet ein Fenster nur für diesen Teil – auch über das Bild oben. Nichts klappt mehr auf.',
+    "„Wie geplant gemacht“ füllt den ganzen Ablauf, danach änderst du nur, was anders war. Nach Löschen oder Ändern kannst du alles rückgängig machen, auch mehrere Schritte.",
+    'Nachtragen mit Datum: offene Einheiten mit Wochentag und Datum, je Einheit „Nachtragen“ oder „Nicht gemacht“.'
+  ] },
   { version: '3.24.0', items: [
     'Intervalle nach Sätzen: „4 × 100 m Kraul“ als kurze Liste, eine Zeile je Wiederholung, Antippen öffnet die Details. „Ganzer Satz gleich“ (z. B. alle in 1:55), einzelne Wiederholungen abweichend. Je Satz: Titel, Lage, Hilfsmittel (Pull Buoy, Kickboard, Paddles, Flossen), Zone; Laufen/Rad: Art (bergauf, Fahrtspiel …) und Untergrund. Coach, Kraul am Stück und Scores nutzen, was du wirklich gemacht hast.',
     'Kraft: „Wie letztes Mal“ übernimmt Übungen und Gewichte. Der Kraft-Score zählt jetzt auch Umfang je Bereich, Abdeckung (Beine, einbeinig, Rumpf, Zug, Druck) und Steigerung der Gewichte.',

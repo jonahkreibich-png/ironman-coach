@@ -7,7 +7,8 @@ import { generateKeyPairSync } from 'node:crypto';
 const PORT = Number(process.env.PW_PORT || 4181);
 const TEST_VAPID = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ format: 'jwk' }));
 export const GROSS_FLOWS = [
-  'auftrag36-intervalle', 'auftrag36-ablaeufe', 'auftrag35-umwandeln', 'auftrag35-km', 'auftrag35-abschnitte', 'auftrag31-coach', 'auftrag30-plan', 'app', 'strength-templates'
+  // Auftrag 37: Ablauf, Fenster, wie geplant, Rückgängig, Nachtragen (alle Sportarten) und die Intervall-Eingabe mit Enter
+  'auftrag37', 'auftrag22', 'dashboard-extra27', 'auftrag36-intervalle', 'auftrag36-ablaeufe', 'auftrag35-umwandeln', 'auftrag35-km', 'auftrag35-abschnitte', 'auftrag31-coach', 'auftrag30-plan', 'app', 'strength-templates'
 ];
 export default defineConfig({
   testDir: 'tests/e2e',

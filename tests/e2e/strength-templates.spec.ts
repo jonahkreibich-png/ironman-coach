@@ -38,8 +38,11 @@ test('Kraftvorlage erstellen, bearbeiten, starten und unabhängig abschließen',
   state = await stored(page);
   const workoutId = state.customWorkouts[TODAY].find((x: any) => x.strengthTemplateId === id).id;
   expect(state.customWorkouts[TODAY].find((x: any) => x.id === workoutId).completed).toBe(false);
-  await page.locator('[data-ch="fd-ex"][data-i="0"][data-f="kg"]').fill('25');
-  await page.locator('[data-ch="fd-ex"][data-i="0"][data-f="kg"]').blur();
+  // Auftrag 37: Übungen stehen im Ablauf; Antippen öffnet das Fenster der Übung
+  await page.locator('#sheetPanel .ab-ex[data-ex="0"] .ab-row').click();
+  await page.locator('#subPanel #ex-0-kg').fill('25');
+  await page.locator('#subPanel #ex-0-kg').blur();
+  await page.locator('#sub [data-act="sub-close"].btn').click();
   await page.locator('[data-act="custom-complete"]').click();
   await expect.poll(async () => (await stored(page)).customWorkouts[TODAY].find((x: any) => x.id === workoutId).completed).toBe(true);
   state = await stored(page);
@@ -62,7 +65,8 @@ test('Vorlage validieren und in geplanter Krafteinheit übernehmen und speichern
   await openPlanSession(page, target.sid);
   await page.selectOption('[data-template-select]', 't1');
   await page.locator('[data-act="fd-template-apply"]').click();
-  await expect(page.locator('[data-ch="fd-ex"][data-f="name"]').first()).toHaveValue('Bankdrücken');
+  await expect(page.locator('#sheetPanel .ab-ex').first()).toContainText('Bankdrücken');
+  await expect(page.locator('#sheetPanel .ab-ex').first()).toContainText('3 × 8 · 40 kg');
   await page.locator('[data-act="fd-template-save"]').click();
   await page.fill('#strength-name', 'Aus meinem Plan');
   await page.locator('[data-act="strength-save"]').click();

@@ -600,7 +600,7 @@ export function intervalReview(ctx: EngineCtx, d: Done): { good: string[]; bette
   const e = ivEvalOf(ctx, d); out.e = e;
   if (!e || !e.planned || e.done + e.extra < 1) return out;
   const n = e.planned, sp = d.sport;
-  const quality = e.source === 'manual' ? ' (eingetragen)' : '';
+  const quality = e.source === 'manual' || e.source === 'plan' ? ' (eingetragen)' : '';
   // ein Satz für das Wichtigste: im Ziel, gleichmäßig, Erholung
   const parts: string[] = [];
   if (e.judged) {
@@ -622,6 +622,8 @@ export function intervalReview(ctx: EngineCtx, d: Done): { good: string[]; bette
   if (parts.length) { const t = parts.join(', '); out.lead = t.charAt(0).toUpperCase() + t.slice(1) + quality + '.'; }
   // Auftrag 36: anders gemacht als geplant (Lage, Hilfsmittel, Zone, bergauf) – so sagen, wie es war
   out.good.unshift(...ivDiffNotes(e));
+  // Auftrag 37: „wie geplant“ eingetragen – gemacht, aber ohne Messwerte (kein Urteil über Tempo oder Puls)
+  if (e.asPlanned) out.good.push(`${e.asPlanned === e.done ? (e.done === 1 ? 'Das Intervall' : `Alle ${e.done} Intervalle`) : `${e.asPlanned} Intervall${e.asPlanned > 1 ? 'e' : ''}`} „wie geplant“ eingetragen – ohne Messwerte kann ich zu Tempo und Puls dort nichts sagen.`);
   if (e.extra) out.good.push(`${e.extra} Intervall${e.extra > 1 ? 'e' : ''} mehr als geplant – zählt mit, die nächste Stufe richtet sich nach den geplanten.`);
   if (e.short) out.better.push(`${e.short} Intervall${e.short > 1 ? 'e' : ''} abgebrochen oder deutlich kürzer. Lieber alle etwas ruhiger als das letzte abbrechen.`);
   else if (e.done < n) out.better.push(`${e.done} von ${n} Intervallen gemacht${quality}.`);

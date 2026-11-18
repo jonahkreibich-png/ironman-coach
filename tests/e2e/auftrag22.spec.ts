@@ -23,10 +23,10 @@ test('Intervalle: Soll als Platzhalter, Eingabe mit Enter weiter, wie vorheriges
   const sid = await sweetSpotToday(page);
   const box = page.locator('#sheet [data-intervals]');
   await expect(box).toBeVisible();
-  await expect(box.locator('.iv-bar')).toHaveCount(2);
-  await expect(box.locator('.iv-bar').first()).toContainText('nicht gemacht');
-  // Auftrag 36: eine Zeile je Wiederholung, Antippen öffnet die Details
-  await box.locator('[data-iv-row="0"] summary.iv-bar').click();
+  await expect(box.locator('.ab-rep')).toHaveCount(2);
+  await expect(box.locator('.ab-rep').first()).toContainText('nicht gemacht');
+  // Auftrag 37: eine Zeile je Wiederholung im Ablauf, Antippen öffnet das Fenster dieser Wiederholung
+  await box.locator('.ab-rep[data-iv-row="0"]').click();
   const sec = page.locator('#iv-0-sec');
   await expect(sec).toHaveValue('');
   await expect(sec).toHaveAttribute('placeholder', '10:00');
@@ -38,20 +38,23 @@ test('Intervalle: Soll als Platzhalter, Eingabe mit Enter weiter, wie vorheriges
   await page.locator('#iv-0-hr').fill('300'); await page.locator('#iv-0-hr').press('Tab');
   await expect(page.locator('#toast')).toContainText('unrealistisch');
   await page.locator('#iv-0-hr').fill('150'); await page.locator('#iv-0-hr').press('Tab');
-  await page.locator('#sheet [data-iv-row="1"] summary.iv-bar').click();
-  await page.locator('#sheet [data-act="iv-copy"][data-i="1"]').click();
+  await page.locator('#sub [data-act="sub-close"].btn').click();
+  await box.locator('.ab-rep[data-iv-row="1"]').click();
+  await page.locator('#sub [data-act="iv-copy"][data-i="1"]').click();
   await expect(page.locator('#iv-1-power')).toHaveValue('228');
+  await page.locator('#sub [data-act="sub-close"].btn').click();
   await expect(page.locator('#sheet [data-iv-sum]')).toContainText('228 W');
   await expect(page.locator('#sheet [data-iv-sum]')).toContainText('2 von 2 gemacht');
   const st = await stored(page);
   expect(st.sessions[sid].metrics.intervals.slice(0, 2)).toEqual([expect.objectContaining({ sec: 600, power: 228, hr: 150 }), expect.objectContaining({ sec: 600, power: 228, hr: 150 })]);
   expect(st.sessions[sid].metricsSrc.intervals).toBe('manual');
-  // Satz hinzufügen und Wiederholung löschen
-  await page.locator('#sheet [data-act="iv-add"]').click();
-  await expect(page.locator('#sheet .iv-card')).toHaveCount(3);
-  await page.locator('#sheet [data-iv-row="2"] summary.iv-bar').click();
-  await page.locator('#sheet [data-act="iv-del"][data-i="2"]').click();
-  await expect(page.locator('#sheet .iv-card')).toHaveCount(2);
+  // Satz hinzufügen (öffnet gleich den neuen Satz) und die Wiederholung wieder löschen
+  await page.locator('#sheet [data-act="ab-add"]').click();
+  await page.locator('#sub [data-act="iv-add"]').click();
+  await expect(page.locator('#sub [data-ab-sheet="set"]')).toBeVisible();
+  await expect(page.locator('#sheet .ab-rep')).toHaveCount(3);
+  await page.locator('#sub [data-act="iv-del"][data-i="2"]').click();
+  await expect(page.locator('#sheet .ab-rep')).toHaveCount(2);
 });
 
 /* Alle sichtbaren Bedienelemente haben einen Namen für VoiceOver (Beschriftung, aria-label oder Text) */
@@ -70,9 +73,10 @@ async function unnamed(page: Page, scope: string): Promise<string[]> {
 }
 test('VoiceOver: Einheit abhaken, Werte und Intervalle eintragen, Coach – jedes Bedienelement hat einen Namen', async ({ page }) => {
   await sweetSpotToday(page);
-  await page.locator('#sheet [data-iv-row="0"] summary.iv-bar').click();
   expect(await unnamed(page, '#sheet')).toEqual([]);
-  await page.keyboard.press('Escape');
+  await page.locator('#sheet .ab-rep[data-iv-row="0"]').click();
+  expect(await unnamed(page, '#sub')).toEqual([]);
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await open(page, '/?go=heute');
   expect(await unnamed(page, '#app')).toEqual([]);
   await open(page, '/?go=coach');
@@ -84,11 +88,11 @@ test('große Schrift (doppelt so groß): nichts ragt seitlich heraus', async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '34px'; }); });
   await sweetSpotToday(page);
-  await page.locator('#sheet [data-iv-row="0"] summary.iv-bar').click();
-  const over = async () => page.evaluate(() => ({ page: document.scrollingElement!.scrollWidth - window.innerWidth, sheet: (() => { const s = document.querySelector('#sheetPanel') as HTMLElement | null; return s ? s.scrollWidth - s.clientWidth : 0; })() }));
-  expect(await over()).toEqual({ page: 0, sheet: 0 });
-  expect(await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#sheet [data-intervals] .lab') as HTMLElement).fontSize))).toBeGreaterThan(20);
-  await page.keyboard.press('Escape');
+  await page.locator('#sheet .ab-rep[data-iv-row="0"]').click();
+  const over = async () => page.evaluate(() => ({ page: document.scrollingElement!.scrollWidth - window.innerWidth, sheet: (() => { const s = document.querySelector('#sheetPanel') as HTMLElement | null; return s ? s.scrollWidth - s.clientWidth : 0; })(), sub: (() => { const s = document.querySelector('#subPanel') as HTMLElement | null; return s ? s.scrollWidth - s.clientWidth : 0; })() }));
+  expect(await over()).toEqual({ page: 0, sheet: 0, sub: 0 });
+  expect(await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#sub [data-ab-sheet] .lab') as HTMLElement).fontSize))).toBeGreaterThan(20);
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   for (const tab of ['heute', 'plan', 'coach', 'fortschritt', 'mehr']) { await open(page, '/?go=' + tab); const o = (await over()).page; const who = o > 0 ? await page.evaluate(() => { const W = document.documentElement.clientWidth; return Array.from(document.querySelectorAll('body *')).filter((el: any) => { const r = el.getBoundingClientRect(); return r.right > W + 1 || (el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).overflowX === 'visible' && el.clientWidth > 0); }).slice(-8).map((el: any) => el.tagName + '.' + el.className + ':' + Math.round(el.getBoundingClientRect().right) + '/' + el.scrollWidth + '>' + el.clientWidth + ' ' + (el.textContent || '').slice(0, 30)).join(' | '); }) : ''; expect(o, tab + ' ' + who).toBeLessThanOrEqual(0); }
 });
 

@@ -37,13 +37,24 @@ async function noOverflow(page: any, sel: string) {
 }
 
 const sheet = (page: Page) => page.locator('#sheetPanel');
+/* Auftrag 37: Abschnitte stehen im Ablauf; Antippen öffnet das Fenster des Abschnitts (dieselben Felder) */
 async function openSec(page: Page, sid: string) {
   await openPlanSession(page, sid);
   await expect(sheet(page).locator('[data-sections]')).toBeVisible();
-  await page.evaluate(() => document.querySelectorAll('#sheetPanel [data-sections] details').forEach(d => { (d as HTMLDetailsElement).open = true; }));
 }
+async function partSheet(page: Page, part: string) {
+  if (await page.locator(`#subPanel [data-ab-sheet="sec"][data-sec-part="${part}"]`).isVisible()) return;
+  if (await page.locator('#sub').isVisible()) await page.locator('#sub [data-act="sub-close"].btn').click();
+  await sheet(page).locator(`button[data-key="sec:${part}"]`).click();
+  await expect(page.locator(`#subPanel [data-ab-sheet="sec"][data-sec-part="${part}"]`)).toBeVisible();
+}
+const closeSub = async (page: Page) => { if (await page.locator('#sub').isVisible()) await page.locator('#sub [data-act="sub-close"].btn').click(); };
 async function markDone(page: Page, sid: string) { await openPlanSession(page, sid); await page.keyboard.press('Escape'); await page.locator(`[data-act="sess-toggle"][data-sid="${sid}"]`).first().click(); }
-async function typeIn(page: Page, id: string, raw: string) { const el = sheet(page).locator('#' + id); await el.click(); await el.fill(''); await el.pressSequentially(raw, { delay: 5 }); await el.blur(); }
+async function typeIn(page: Page, id: string, raw: string) {
+  const part = /^sec-b-/.test(id) ? null : id.split('-')[1];
+  if (part) await partSheet(page, part); else if (!(await page.locator('#subPanel #' + id).isVisible())) await partSheet(page, 'main');
+  const el = page.locator('#subPanel #' + id); await el.click(); await el.fill(''); await el.pressSequentially(raw, { delay: 5 }); await el.blur();
+}
 const ctxOf = (state: any, plan: any) => ({ today: TODAY, now: Date.now(), state, baseWeeks: plan.weeks, planMeta: plan.meta || {}, profile: state.profile, goals: [] } as any);
 
 test('Abschnitte von Hand: eintippen, neu laden, Gesamtwerte, Zone im Hauptteil, Coach bewertet nur den Hauptteil', async ({ page }) => {
@@ -52,7 +63,8 @@ test('Abschnitte von Hand: eintippen, neu laden, Gesamtwerte, Zone im Hauptteil,
   await markDone(page, 's35-run');
   await openSec(page, 's35-run');
   // geplante Minuten stehen grau im Feld
-  await expect(sheet(page).locator('#sec-warm-min')).toHaveAttribute('placeholder', '10');
+  await partSheet(page, 'warm');
+  await expect(page.locator('#subPanel #sec-warm-min')).toHaveAttribute('placeholder', '10');
   await typeIn(page, 'sec-warm-min', '10'); await typeIn(page, 'sec-warm-hr', '118');
   await typeIn(page, 'sec-main-min', '45 min'); await typeIn(page, 'sec-main-km', '7,5 km'); await typeIn(page, 'sec-main-hr', '147 bpm'); await typeIn(page, 'sec-main-maxHr', '158');
   await typeIn(page, 'sec-cool-min', '5'); await typeIn(page, 'sec-cool-hr', '124');
@@ -61,10 +73,14 @@ test('Abschnitte von Hand: eintippen, neu laden, Gesamtwerte, Zone im Hauptteil,
   await expect(page.locator('.toast').last()).toContainText(/Puls/);
   await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
   await openSec(page, 's35-run');
-  await expect(sheet(page).locator('#sec-main-hr')).toHaveValue('147');
-  await expect(sheet(page).locator('#sec-main-km')).toHaveValue('7,5');
-  await expect(sheet(page).locator('#sec-main-min')).toHaveValue('45');
+  await partSheet(page, 'main');
+  await expect(page.locator('#subPanel #sec-main-hr')).toHaveValue('147');
+  await expect(page.locator('#subPanel #sec-main-km')).toHaveValue('7,5');
+  await expect(page.locator('#subPanel #sec-main-min')).toHaveValue('45');
+  await noOverflow(page, '#subPanel');
+  await closeSub(page);
   await noOverflow(page, '#sheetPanel');
+  await expect(sheet(page).locator('button[data-key="sec:main"]')).toContainText('45 min · 7,5 km · Puls 147');
   await expect(sheet(page).locator('[data-sec-main]')).toHaveText('Hauptteil 45 min, Ø Puls 147 (Zone 2)');
   // Gesamtwerte aus den Abschnitten: 60 min, Ø Puls zeitgewichtet
   await expect(sheet(page).locator('#fd-min')).toHaveValue('60');
@@ -88,15 +104,21 @@ test('Schwimmen: vier Abschnitte; Intervalle: nur Aufwärmen und Ausklang zusät
   await seedIt(page); await open(page, '/?go=plan');
   await markDone(page, 's35-swim');
   await openSec(page, 's35-swim');
-  await expect(sheet(page).locator('[data-sec-part]')).toHaveCount(4);
+  // Auftrag 37: Einschwimmen → Technik → Satz (die Hauptserie) → Ausschwimmen in einer Liste
+  await expect(sheet(page).locator('.ab-item')).toHaveCount(4);
+  await expect(sheet(page).locator('.ab-sec[data-sec-part]')).toHaveCount(3);
   await expect(sheet(page).locator('[data-sec-part="tech"]')).toContainText('Technik');
-  await expect(sheet(page).locator('#sec-warm-meters')).toHaveAttribute('placeholder', '200');
-  await typeIn(page, 'sec-main-meters', '400 m'); await typeIn(page, 'sec-main-min', '9'); await typeIn(page, 'sec-main-pace100', '2:15');
-  await expect(sheet(page).locator('#sec-main-pace100')).toHaveValue('2:15');
+  await expect(sheet(page).locator('.ab-item').nth(2)).toContainText('4 × 100 m Kraul');
+  await partSheet(page, 'warm');
+  await expect(page.locator('#subPanel #sec-warm-meters')).toHaveAttribute('placeholder', '200');
+  await typeIn(page, 'sec-tech-meters', '200 m'); await typeIn(page, 'sec-tech-min', '6'); await typeIn(page, 'sec-tech-pace100', '2:55');
+  await expect(page.locator('#subPanel #sec-tech-pace100')).toHaveValue('2:55');
+  await closeSub(page);
+  await expect(sheet(page).locator('button[data-key="sec:tech"]')).toContainText('200 m');
   await page.keyboard.press('Escape');
   await markDone(page, 's35-iv');
   await openSec(page, 's35-iv');
-  await expect(sheet(page).locator('[data-sec-part]')).toHaveCount(2);
+  await expect(sheet(page).locator('.ab-sec[data-sec-part]')).toHaveCount(2);
   await expect(sheet(page).locator('[data-sec-part="main"]')).toHaveCount(0);
   await expect(sheet(page).locator('[data-intervals]')).toBeVisible();
 });
@@ -106,14 +128,16 @@ test('Uhrdaten: Hauptteil automatisch erkannt, Grenze korrigieren und zurückset
   await seedIt(page, true); await open(page, '/?go=plan');
   await openSec(page, 's35-run');
   await expect(sheet(page).locator('[data-sec-main]')).toContainText(/^Hauptteil 4\d min, Ø Puls 14\d \(Zone 2\), 100 % der Zeit in Zone 2$/);
-  await expect(sheet(page).locator('[data-sec-bounds]')).toContainText('Aufwärmen bis Minute 10');
-  await expect(sheet(page).locator('[data-sec-bounds]')).toContainText('Ausklang ab Minute 55');
+  await partSheet(page, 'main');
+  await expect(page.locator('#subPanel [data-sec-bounds]')).toContainText('Aufwärmen bis Minute 10');
+  await expect(page.locator('#subPanel [data-sec-bounds]')).toContainText('Ausklang ab Minute 55');
   await typeIn(page, 'sec-b-warm', '15');
   await expect(sheet(page).locator('[data-sec-main]')).toContainText('Hauptteil 40 min');
   expect((await stored(page)).sessions['s35-run'].metrics.sectionBounds).toEqual({ warm: 15, cool: null });
   await typeIn(page, 'sec-b-cool', '5');
   await expect(page.locator('.toast').last()).toContainText('nach dem Aufwärmen');
-  await sheet(page).locator('[data-act="sec-bound-reset"]').click();
+  await page.locator('#subPanel [data-act="sec-bound-reset"]').click();
+  await closeSub(page);
   await expect(sheet(page).locator('[data-sec-main]')).toContainText(/Hauptteil 4[45] min/);
   // Gesamtwerte der Uhr bleiben unverändert (nur der Hauptteil wird anders bewertet)
   await expect(sheet(page).locator('#fd-hr')).toHaveValue('139');

@@ -10,7 +10,8 @@ import { D1Shim } from '../server/test/d1-shim.mjs';
 const port = +(process.argv[2] || 4180);
 const ROOT0 = path.resolve(process.env.DIST_DIR || 'dist');
 let root = ROOT0; // Auftrag 28: ältere Builds (Start-Test mit Vorversion), umschaltbar über /__dist
-const out = path.resolve('node_modules/.cache/worker-test.mjs');
+// Auftrag 37: je Port eine eigene Datei – mehrere Server gleichzeitig (Teile des Testlaufs) schrieben sonst dieselbe Datei
+const out = path.resolve(`node_modules/.cache/worker-test-${port}.mjs`);
 await build({ entryPoints: ['server/src/index.ts'], bundle: true, format: 'esm', platform: 'neutral', outfile: out, logLevel: 'error', mainFields: ['module', 'main'], external: ['node:*'], conditions: ['workerd', 'worker', 'import'] });
 const worker = (await import('file://' + out.replace(/\\/g, '/') + '?t=' + Date.now())).default;
 

@@ -39,12 +39,14 @@ test('Minuten oder km: umschalten auf Heute, gilt in Plan und Einheit, bleibt na
   await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
   // Einheit geöffnet: Intervalle in Metern mit Zeit pro Stück und Zieltempo, Gesamtzeile mit derselben Strecke
   await open(page, '/?go=plan'); await openPlanSession(page, 'k35-iv');
+  // Auftrag 37: die Schritte in Worten stehen unter „Mehr: Anleitung“, der Umschalter im Kopf
+  await sheet(page).locator('details.sess-more > summary').click();
   const st = sheet(page).locator('[data-structure]');
   await expect(st).toHaveAttribute('data-view', 'km');
   await expect(st.locator('[data-part="main"]')).toContainText(/4 × 600 m an der Schwelle in ca\. \d:\d\d \(\d:\d\d–\d:\d\d\/km\), dazwischen 300 m traben/);
   await expect(st.locator('[data-total]')).toContainText(`Gesamt: ${kmMin} km, ca.`);
   // zurück auf Minuten: gleiche Strecke in der Gesamtzeile
-  await st.locator('[data-act="plan-view"][data-v="min"]').click();
+  await sheet(page).locator('[data-kopf] [data-act="plan-view"][data-v="min"]').click();
   await expect(sheet(page).locator('[data-structure]')).toHaveAttribute('data-view', 'min');
   await expect(sheet(page).locator('[data-total]')).toContainText(`Gesamt: 49 min, ca. ${kmMin} km`);
   await expect(sheet(page).locator('[data-structure] [data-part="main"]')).toContainText('4×3 min');

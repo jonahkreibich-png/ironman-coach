@@ -41,7 +41,7 @@ async function measure(page: Page, px: number): Promise<string[]> {
     const maxH = new Function('return ' + maxFn)() as (l: number, w: number, px: number) => number;
     const vis = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     for (const tg of Array.from(document.querySelectorAll('[data-plan-view]')).filter(vis)) {
-      const card = tg.closest('.session-hero, .pr-what, [data-structure]') as HTMLElement | null;
+      const card = tg.closest('.session-hero, .pr-what, [data-structure], [data-kopf]') as HTMLElement | null; // Auftrag 37: Einheit = Kopf
       if (!card) { out.push('Umschalter ohne bekannte Karte'); continue; }
       const cr = card.getBoundingClientRect();
       const name = card.classList.contains('session-hero') ? 'Heute' : card.classList.contains('pr-what') ? 'Plan' : 'Einheit';
@@ -54,7 +54,7 @@ async function measure(page: Page, px: number): Promise<string[]> {
         const cs = getComputedStyle(card); const w = cr.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         area = new DOMRect(cr.left, cr.top, w, cr.height);
         const row = card.previousElementSibling; if (row) { ref = row.getBoundingClientRect().width; const t = row.querySelector('.pr-t'); if (t && t.getBoundingClientRect().width < 0.6 * ref) out.push(`Plan-Titel nur ${Math.round(t.getBoundingClientRect().width)} von ${Math.round(ref)} px breit`); }
-      } else area = card.querySelector('.steps')!.getBoundingClientRect();
+      } else area = (card.querySelector('.steps') || card.querySelector('.grow'))!.getBoundingClientRect();
       if (area.width < 0.6 * ref) out.push(`${label}: Textbereich nur ${Math.round(area.width)} von ${Math.round(ref)} px breit`);
       if (name === 'Heute') {
         const title = (card.querySelector('.t')!.textContent || '').trim();
@@ -91,7 +91,7 @@ for (const px of [17, 23]) for (const w of [320, 375, 390]) {
       await expect(page.locator('[data-what] [data-plan-view]').first()).toBeVisible();
       (await measure(page, px)).forEach(p => problems.push(`${view} Plan: ${p}`));
       await openPlanSession(page, 'b-ss');
-      await expect(page.locator('#sheetPanel [data-structure] [data-plan-view]')).toBeVisible();
+      await expect(page.locator('#sheetPanel [data-kopf] [data-plan-view]')).toBeVisible(); // Auftrag 37: Umschalter im Kopf der Einheit
       (await measure(page, px)).forEach(p => problems.push(`${view} Einheit: ${p}`));
       await page.keyboard.press('Escape');
     }

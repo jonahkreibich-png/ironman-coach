@@ -50,6 +50,10 @@ try { var th = localStorage.getItem('theme_pref'); if (th) document.documentElem
   <div class="sheet-bg" data-act="sheet-close"></div>
   <div class="sheet" role="dialog" aria-modal="true" id="sheetPanel"></div>
 </div>
+<div id="sub" class="sheet-wrap sub-wrap" hidden>
+  <div class="sheet-bg" data-act="sub-close"></div>
+  <div class="sheet sub-sheet" role="dialog" aria-modal="true" id="subPanel"></div>
+</div>
 <div id="toast" class="toast" role="status" hidden></div>
 <noscript><p style="padding:16px">%APP_NAME% braucht JavaScript.</p></noscript>
 <script type="module" src="/src/bootstrap.ts"></script>

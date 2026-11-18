@@ -7,11 +7,11 @@ import { activeInjury } from '../../../shared/coach/ops';
 import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
 import { t, tn, num, duration } from '../../../shared/i18n';
 import { D, RETURN_STAGES, coachText } from '../data';
-import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed, safeBlock } from '../kit';
+import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed, safeBlock, refreshSheet } from '../kit';
 import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '../domain';
 import { saveState } from '../store';
 import { toast } from '../toast';
-import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml } from './session';
+import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml, openSession } from './session';
 import { viewToggle } from '../planview';
 import { changedOf } from '../../../shared/results';
 import { openCheckin } from './werte';
@@ -189,14 +189,24 @@ on('plan-day', el => { UI.planDate = el.dataset.date; nav.go('plan'); });
 on('checkin-open', () => openCheckin(D().today));
 void duration;
 
-/* Offene (vergessene) Einheiten: einzeln abhaken/öffnen oder alle als ausgefallen markieren */
+/* Offene (vergessene) Einheiten. Auftrag 37: je Einheit Wochentag + Datum („Mi, 11.11. · Lockerer Lauf 40 min“), nach Datum sortiert;
+   „Nachtragen“ öffnet die Einheit dieses Tages, „Nicht gemacht“ markiert nur diese; „Alle als nicht gemacht“ bleibt. */
+export function missedLabel(s: any): string {
+  const title = String(s.title || '');
+  const min = s.plannedMinutes && !/\bmin\b/.test(title) ? ` ${s.plannedMinutes} min` : '';
+  return `${dowShort(s.date)}, ${fmtDate(s.date)} · ${title}${min}`;
+}
 function missedSheet(): string {
-  const list = forgottenSessions();
+  const list = forgottenSessions().slice().sort((a: any, b: any) => a.date.localeCompare(b.date) || String(a.slot || '').localeCompare(String(b.slot || '')));
   if (!list.length) return `<div class="empty">${esc(t('heute.missedNone'))}</div>`;
-  return `<div class="stack"><div class="hint">${esc(t('heute.missedHint'))}</div><div class="list">${list.map((s: any) => sessionRow(s)).join('')}</div>
+  return `<div class="stack"><div class="hint">${esc(t('heute.missedHint'))}</div><div class="list" data-missed-list>${list.map((s: any) => `<div class="li missed-row" data-missed="${esc(s.id)}" data-date="${esc(s.date)}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">
+      <div class="missed-main">${sportIc(s.sport)}<span class="grow"><span class="t" data-missed-label>${esc(missedLabel(s))}</span><br><span class="s">${esc(metaLine(s))}</span></span></div>
+      <div class="row missed-btns"><button class="btn sm" data-act="missed-enter" data-sid="${esc(s.id)}">Nachtragen</button><button class="btn ghost sm" data-act="missed-skip" data-tk="session" data-tid="${esc(s.id)}" data-tdate="${esc(s.date)}" data-tsport="${esc(s.sport)}">Nicht gemacht</button></div></div>`).join('')}</div>
     <button class="btn ghost" data-act="missed-skip-all">${esc(t('heute.missedSkipAll'))}</button></div>`;
 }
 on('missed-open', () => openSheet(t('heute.missedTitle'), missedSheet));
+on('missed-enter', el => openSession(el.dataset.sid!));
+on('missed-skip', el => { const st = ensureSess(el.dataset.tid!); st.skipped = true; st.completed = false; saveState(); nav.rerender(); refreshSheet(); });
 on('missed-skip-all', el => {
   if (!armed(el, t('common.sure'))) return;
   const list = forgottenSessions(); list.forEach((s: any) => { const st = ensureSess(s.id); st.skipped = true; st.completed = false; });

@@ -28,7 +28,7 @@ export const FIELD_GROUP: Record<string, MetricGroup> = {
 };
 export const SOURCE_LABEL: Record<string, string> = {
   healthfit: 'HealthFit', file: 'Datei', shortcut: 'Kurzbefehl', intervals: 'intervals.icu', oura: 'Oura', whoop: 'WHOOP', polar: 'Polar',
-  withings: 'Withings', fitbit: 'Fitbit', suunto: 'Suunto', coros: 'COROS', wahoo: 'Wahoo', zepp: 'Zepp', healthkit: 'Apple Health', manual: 'von Hand', note: 'aus deiner Notiz', sections: 'aus den Abschnitten berechnet'
+  withings: 'Withings', fitbit: 'Fitbit', suunto: 'Suunto', coros: 'COROS', wahoo: 'Wahoo', zepp: 'Zepp', healthkit: 'Apple Health', manual: 'von Hand', note: 'aus deiner Notiz', sections: 'aus dem Ablauf berechnet'
 };
 
 export function priorityOf(settings: any, group: MetricGroup): Source[] {

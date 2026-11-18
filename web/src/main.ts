@@ -6,7 +6,8 @@ import { morph } from './morph';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace, dataVersion } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
-import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, safeBlock, safeRun } from './kit';
+import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, subOpen, closeSub, safeBlock, safeRun, refreshSheet, onSheetClose } from './kit';
+import { undoBegin, undoEnd, undoToast, undoCount, clearUndo, updateUndoSlots, type UTg, type UToken } from './undo';
 import { icFill } from './icons';
 import { CHARTS, chartTap } from './charts';
 import { effStatus } from './domain';
@@ -283,6 +284,38 @@ on('ill-reopen', () => healthAction([{ op: 'illness-reopen' }], t('ill.reopened'
 on('inj-end', () => healthAction([{ op: 'injury-end' }], t('inj.ended')));
 on('reload', () => location.reload());
 
+/* ---------- Auftrag 37: Rückgängig für jede Änderung an einer Einheit ----------
+   Vor dem Handler den Stand der Einheit merken (Knöpfe/Felder mit data-tk/data-tid bzw. data-sid), danach vergleichen. Beim Tippen gilt der
+   Stand vor dem ersten Zeichen (Werte werden schon beim Tippen gesichert). Löschen und „Wie geplant gemacht“: sofort Hinweis mit
+   „Rückgängig“; im Fenster eines Teils: ein Hinweis beim Schließen (ablaufui.ts); sonst „Geändert“ bzw. die Meldung des Handlers mit „Rückgängig“. */
+const NO_UNDO = new Set(['undo-one', 'sess-open', 'fetch-now', 'ab-open', 'ab-add', 'sub-close', 'sheet-close', 'missed-open', 'plan-view', 'lex']);
+const UNDO_LABEL: Record<string, string> = { 'iv-del': 'Wiederholung gelöscht', 'iv-set-del': 'Satz gelöscht', 'sec-del': 'Abschnitt gelöscht', 'fd-ex-del': 'Übung gelöscht', 'fd-split-del': 'Split gelöscht', 'fd-asplanned': 'Wie geplant eingetragen', 'iv-reset': 'Uhrwerte verwendet', 'fd-reset': 'Original zurückgesetzt', 'fd-ex-last': 'Übungen übernommen', 'fd-template-apply': 'Vorlage übernommen', 'sess-toggle': 'Abhaken geändert', 'sess-skip': 'Ausgefallen geändert', 'iv-add': 'Satz hinzugefügt', 'sec-add': 'Abschnitt hinzugefügt', 'fd-ex-add': 'Übung hinzugefügt', 'missed-skip': 'Als nicht gemacht markiert' };
+const UNDO_NOW = /-del$|^missed-skip$|^fd-asplanned$|^iv-reset$|^fd-reset$|^fd-ex-last$|^fd-template-apply$|^sess-skip$|^sess-toggle$/;
+function undoTarget(el: HTMLElement, name: string): UTg | null {
+  if (NO_UNDO.has(name)) return null;
+  const ds = el.dataset || {};
+  if (ds.tk && ds.tid) return { kind: ds.tk as any, id: ds.tid };
+  if (ds.sid && (name.startsWith('sess-') || ds.sm || ds.sf)) return { kind: 'session', id: ds.sid };
+  return null;
+}
+const PENDING = new WeakMap<HTMLElement, UToken>();
+async function withUndo(el: HTMLElement, name: string, run: () => any, pending?: UToken | null) {
+  const tg = undoTarget(el, name); if (!tg) return run();
+  const tok = pending || undoBegin(tg);
+  const tEl = document.getElementById('toast'); const before = tEl ? (tEl.hidden ? '' : tEl.textContent || '') : '';
+  const had = undoCount(tg);
+  try { await run(); }
+  finally {
+    const label = UNDO_LABEL[name] || 'Geändert';
+    if (undoEnd(tok, label)) {
+      const shown = tEl && !tEl.hidden ? tEl.textContent || '' : '';
+      const own = shown && shown !== before && !tEl!.querySelector('.toast-act') ? shown : '';
+      if (UNDO_NOW.test(name)) undoToast(tg, own || label);
+      else if (!subOpen()) undoToast(tg, own || label);
+      void had; updateUndoSlots(); // „↶ Rückgängig“ oben in der Einheit
+    }
+  }
+}
 document.addEventListener('click', async e => {
   if (chartTap(e)) return;
   const el = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
@@ -290,12 +323,14 @@ document.addEventListener('click', async e => {
   const fn = ACTIONS[el.dataset.act!];
   if (!fn) return;
   if (el.tagName === 'A') e.preventDefault();
-  try { await fn(el, e); } catch (err: any) { toast(err && err.message ? err.message : String(err)); throw err; }
+  try { await withUndo(el, el.dataset.act!, () => fn(el, e)); } catch (err: any) { toast(err && err.message ? err.message : String(err)); throw err; }
 });
 document.addEventListener('input', async e => {
   const el = e.target as HTMLElement, ds = el.dataset || {};
   const name = ds.ch || (ds.sm ? 'sess-metric' : ds.sf ? 'sess-field' : '');
   if (!name || !INPUT[name]) return;
+  // Stand vor dem ersten Zeichen merken (Rückgängig nach dem Verlassen des Felds)
+  if (!PENDING.has(el)) { const tg = undoTarget(el, name); const tok = tg ? undoBegin(tg) : null; if (tok) PENDING.set(el, tok); }
   try { await INPUT[name](el, e); } catch (err: any) { toast(err?.message || String(err)); }
 });
 
@@ -304,9 +339,10 @@ document.addEventListener('change', async e => {
   const ds = el.dataset || ({} as DOMStringMap);
   const name = ds.ch || (ds.sm ? 'sess-metric' : ds.sf ? 'sess-field' : '');
   if (!name || !CHANGE[name]) return;
-  try { await CHANGE[name](el, e); } catch (err: any) { toast(err && err.message ? err.message : String(err)); throw err; }
+  const pend = PENDING.get(el) || null; PENDING.delete(el);
+  try { await withUndo(el, name, () => CHANGE[name](el, e), pend); } catch (err: any) { toast(err && err.message ? err.message : String(err)); throw err; }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetOpen()) closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (subOpen()) closeSub(); else if (sheetOpen()) closeSheet(); });
 let lastW = window.innerWidth;
 window.addEventListener('resize', () => { clearTimeout((window as any).__rz); (window as any).__rz = setTimeout(() => { if (Math.abs(window.innerWidth - lastW) > 40) { lastW = window.innerWidth; rerender(); } }, 250); });
 
@@ -384,3 +420,6 @@ void checkForUpdate;
 on('template-add',el=>openTemplatePicker({date:el.dataset.date||todayStr()}));
 on('template-insert',el=>openTemplatePicker({date:el.dataset.date!,sessionId:el.dataset.sid!}));
 on('template-edit',el=>openSessionPrescriptionEditor(el.dataset.sid!,el.dataset.date!));
+
+// Auftrag 37: Rückgängig gilt, solange die Einheit offen ist
+onSheetClose(() => clearUndo());

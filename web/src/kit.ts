@@ -151,23 +151,74 @@ export function openSheet(title: string, render: () => string): void {
   $('#sheetPanel').innerHTML = sheetRender();
   $('#sheet').hidden = false; document.body.style.overflow = 'hidden';
 }
-export function refreshSheet(): void {
-  if (sheetRender && !$('#sheet').hidden) {
-    const p = $('#sheetPanel'); const y = p.scrollTop;
-    // Auftrag 29: aufgeklappte Abschnitte („Weitere Werte“, Notiz …) bleiben beim Neuzeichnen offen (vorher klappten sie nach jeder Eingabe zu)
-    const key = (d: Element) => (d.querySelector(':scope > summary')?.textContent || '').trim();
-    const open = new Set(Array.from(p.querySelectorAll('details[open]')).map(key));
-    // Auftrag 29: tippt man schon im nächsten Feld, bleiben Fokus und angefangene Eingabe erhalten (vorher ersetzte das Neuzeichnen das Feld)
-    const act = document.activeElement as HTMLInputElement | null;
-    const keep = act && act.id && p.contains(act) && /^(INPUT|TEXTAREA)$/.test(act.tagName) ? { id: act.id, value: act.value, typed: act.value !== act.defaultValue, sel: (() => { try { return act.selectionStart; } catch (e) { return null; } })() } : null;
-    p.innerHTML = sheetRender();
-    p.querySelectorAll('details').forEach(d => { if (open.has(key(d))) (d as HTMLDetailsElement).open = true; });
-    if (keep) { const el = document.getElementById(keep.id) as HTMLInputElement | null; if (el && p.contains(el)) { if (keep.typed) el.value = keep.value; el.focus({ preventScroll: true }); try { if (keep.sel != null) el.setSelectionRange(keep.sel, keep.sel); } catch (e) { /* Feldart ohne Auswahl */ } } }
-    p.scrollTop = y;
-  }
+/* Auftrag 37: aufgeklappte Bereiche nach dem Neuzeichnen wiederfinden. Vorher über den Text der Überschrift – gleich lautende Bereiche
+   („Satz bearbeiten“, „Lage, Hilfsmittel …“) klappten dann alle auf, sobald man in einem etwas änderte. Jetzt über eine feste Kennung
+   (data-key, data-fold, id); der Text gilt nur noch, wenn er im Fenster eindeutig ist. */
+const ownKey = (d: Element) => d.getAttribute('data-key') || d.getAttribute('data-fold') || d.getAttribute('data-ivk') || d.id || '';
+const sumText = (d: Element) => (d.querySelector(':scope > summary')?.textContent || '').trim();
+function detailsKeys(list: Element[]): (string | null)[] {
+  const cnt = new Map<string, number>();
+  list.forEach(d => { if (!ownKey(d)) { const t0 = sumText(d); cnt.set(t0, (cnt.get(t0) || 0) + 1); } });
+  return list.map(d => { const k = ownKey(d); if (k) return 'k:' + k; const t0 = sumText(d); return t0 && cnt.get(t0) === 1 ? 't:' + t0 : null; });
 }
-export function closeSheet(): void { sheetRender = null; $('#sheet').hidden = true; $('#sheetPanel').innerHTML = ''; document.body.style.overflow = ''; }
+function redrawPanel(p: HTMLElement, html: string): void {
+  const y = p.scrollTop;
+  // Auftrag 29: aufgeklappte Abschnitte („Weitere Werte“, Notiz …) bleiben beim Neuzeichnen offen (vorher klappten sie nach jeder Eingabe zu)
+  const before = Array.from(p.querySelectorAll('details')); const bk = detailsKeys(before);
+  const open = new Set(before.map((d, i) => ((d as HTMLDetailsElement).open ? bk[i] : null)).filter(Boolean) as string[]);
+  // Auftrag 29: tippt man schon im nächsten Feld, bleiben Fokus und angefangene Eingabe erhalten (vorher ersetzte das Neuzeichnen das Feld)
+  const act = document.activeElement as HTMLInputElement | null;
+  const keep = act && act.id && p.contains(act) && /^(INPUT|TEXTAREA)$/.test(act.tagName) ? { id: act.id, value: act.value, typed: act.value !== act.defaultValue, sel: (() => { try { return act.selectionStart; } catch (e) { return null; } })() } : null;
+  p.innerHTML = html;
+  const after = Array.from(p.querySelectorAll('details')); const ak = detailsKeys(after);
+  after.forEach((d, i) => { if (ak[i] && open.has(ak[i]!)) (d as HTMLDetailsElement).open = true; });
+  if (keep) { const el = document.getElementById(keep.id) as HTMLInputElement | null; if (el && p.contains(el)) { if (keep.typed) el.value = keep.value; el.focus({ preventScroll: true }); try { if (keep.sel != null) el.setSelectionRange(keep.sel, keep.sel); } catch (e) { /* Feldart ohne Auswahl */ } } }
+  p.scrollTop = y;
+}
+export function refreshSheet(): void {
+  if (sheetRender && !$('#sheet').hidden) redrawPanel($('#sheetPanel'), sheetRender());
+  refreshSub();
+}
+const closeHooks: (() => void)[] = [];
+export function onSheetClose(fn: () => void): void { closeHooks.push(fn); }
+export function closeSheet(): void { closeSub(true); closeHooks.forEach(f => { try { f(); } catch (e) { /* nie scheitern */ } }); sheetRender = null; $('#sheet').hidden = true; $('#sheetPanel').innerHTML = ''; document.body.style.overflow = ''; }
 export function sheetOpen(): boolean { return !$('#sheet').hidden; }
+
+/* ---------- Auftrag 37: Fenster über dem Fenster – ein Teil der Einheit (Aufwärmen, Satz, Wiederholung, Übung) ----------
+   render liefert '' → den Teil gibt es nicht mehr (z. B. gelöscht oder rückgängig gemacht): das Fenster schließt sich. */
+let subRender: (() => string) | null = null;
+let subTitle: () => string = () => '';
+let subClosed: (() => void) | null = null;
+const subEl = () => document.getElementById('sub');
+function subHtml(): string {
+  const body = subRender ? subRender() : ''; if (!body) return '';
+  return `<div class="sheet-grip"></div><div class="sheet-h"><h2>${esc(subTitle())}</h2><button class="icon-btn" data-act="sub-close" aria-label="${esc(t('common.close'))}">${ic('close')}</button></div>${body}`;
+}
+export function openSub(title: string | (() => string), render: () => string, onClose?: () => void): void {
+  const el = subEl(); if (!el) return;
+  if (subRender) closeSub(true); // Wechsel zu einem anderen Teil: ohne Schließen-Hinweis
+  subTitle = typeof title === 'function' ? title : () => title; subRender = render; subClosed = onClose || null;
+  const html = subHtml(); if (!html) { subRender = null; subClosed = null; return; }
+  $('#subPanel').innerHTML = html; el.hidden = false; document.body.style.overflow = 'hidden'; $('#subPanel').scrollTop = 0;
+}
+export function refreshSub(): void {
+  const el = subEl(); if (!subRender || !el || el.hidden) return;
+  const html = subHtml(); if (!html) { closeSub(); return; }
+  redrawPanel($('#subPanel'), html);
+}
+export function closeSub(silent = false): void {
+  const el = subEl();
+  if (!el || el.hidden) { subRender = null; subClosed = null; return; }
+  // offenes Feld noch übernehmen (iPhone: „Fertig“ tippen, ohne das Feld vorher zu verlassen)
+  const a = document.activeElement as HTMLElement | null;
+  if (a && $('#subPanel').contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) a.blur();
+  if (el.hidden) return; // das Verlassen des Felds hat das Fenster schon geschlossen
+  const cb = subClosed; subRender = null; subClosed = null; el.hidden = true; $('#subPanel').innerHTML = '';
+  document.body.style.overflow = sheetOpen() ? 'hidden' : '';
+  if (cb && !silent) { try { cb(); } catch (e) { /* nie scheitern */ } }
+}
+export function subOpen(): boolean { const el = subEl(); return !!el && !el.hidden; }
+on('sub-close', () => closeSub());
 on('sheet-close', () => closeSheet());
 
 /* Zweistufige Bestätigung für gefährliche Knöpfe */

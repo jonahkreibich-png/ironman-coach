@@ -5,26 +5,28 @@ import * as W from './workouts';
 import { LIB } from './workoutlib';
 import { runQualitySpec, runEasyForm, bikeQualitySpec, bikeEasyForm, longFinish, bikeLongBlocks, swimQuality } from './workoutbuild';
 
-interface Bar { w: number; z: number }
+/** si = Schritt der Einheit, k = Wiederholung darin, rest = Pause danach (Auftrag 37: zum Antippen einem Teil des Ablaufs zuordnen) */
+interface Bar { w: number; z: number; si: number; k: number; rest?: boolean }
 export function barsOf(spec: W.Spec): Bar[] {
   const out: Bar[] = [];
   const swim = spec.sport === 'swim';
-  for (const s of spec.steps) {
+  spec.steps.forEach((s, si) => {
     const reps = Math.max(1, s.reps || 1);
     for (let k = 0; k < reps; k++) {
       const work = swim ? (s.m || 0) / 50 : (s.min || 0);
-      if (work > 0) out.push({ w: work, z: s.zone || 2 });
+      if (work > 0) out.push({ w: work, z: s.zone || 2, si, k });
       const rest = swim ? 0 : k < reps - 1 ? (s.restMin || 0) + (s.walkMin || 0) : 0;
-      if (rest > 0) out.push({ w: rest, z: 1 });
+      if (rest > 0) out.push({ w: rest, z: 1, si, k, rest: true });
     }
-  }
+  });
   return out;
 }
-export function diagramSvg(spec: W.Spec, o: { width?: number; height?: number; label?: string } = {}): string {
+/** keyOf (Auftrag 37): Teil des Ablaufs zu einem Balken – dann ist jeder Balken antippbar und öffnet dasselbe Fenster wie die Liste */
+export function diagramSvg(spec: W.Spec, o: { width?: number; height?: number; label?: string; keyOf?: (si: number, k: number, rest: boolean) => string | null; attrs?: string } = {}): string {
   const W0 = o.width || 300, H = o.height || 56;
   const bars = barsOf(spec); const total = bars.reduce((a, b) => a + b.w, 0) || 1;
   let x = 0; const gap = bars.length > 60 ? 0 : 0.6;
-  const rects = bars.map(b => { const w = Math.max(0.8, b.w / total * W0 - gap); const h = Math.round(H * (0.18 + 0.82 * (b.z / 5))); const r = `<rect x="${x.toFixed(1)}" y="${H - h}" width="${w.toFixed(1)}" height="${h}" rx="1.5" fill="currentColor" opacity="${(0.22 + 0.15 * b.z).toFixed(2)}"/>`; x += b.w / total * W0; return r; }).join('');
+  const rects = bars.map(b => { const w = Math.max(0.8, b.w / total * W0 - gap); const h = Math.round(H * (0.18 + 0.82 * (b.z / 5))); const key = o.keyOf ? o.keyOf(b.si, b.k, !!b.rest) : null; const r = `<rect x="${x.toFixed(1)}" y="${H - h}" width="${w.toFixed(1)}" height="${h}" rx="1.5" fill="currentColor" opacity="${(0.22 + 0.15 * b.z).toFixed(2)}"/>${key ? `<rect class="dia-hit" x="${x.toFixed(1)}" y="0" width="${Math.max(w, 0.8).toFixed(1)}" height="${H}" fill="transparent" data-act="ab-open" data-key="${key}" ${o.attrs || ''}/>` : ''}`; x += b.w / total * W0; return r; }).join('');
   return `<svg class="wo-diagram" viewBox="0 0 ${W0} ${H}" width="100%" height="${H}" role="img" aria-label="${(o.label || 'Ablauf der Einheit').replace(/"/g, '')}" preserveAspectRatio="none">${rects}</svg>`;
 }
 /* Beispiel-Einheit einer Form (für das Lexikon): Stufe 2 der Leiter, typische Dauer */

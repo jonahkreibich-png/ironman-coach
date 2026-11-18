@@ -28,6 +28,9 @@ test('Plan: Einheit zeigt den Ablauf in Schritten (Aufwärmen, Hauptteil, Auskla
   await seed(page);
   await open(page, '/?go=plan');
   await page.locator('[data-act="sess-open"]').first().click();
+  // Auftrag 37: oben steht der Ablauf (eine Liste); die Schritte in Worten stehen unter „Mehr: Anleitung“
+  await expect(page.locator('#sheetPanel .ablauf .ab-item').first()).toBeVisible();
+  await page.locator('#sheetPanel details.sess-more > summary').click();
   const st = page.locator('#sheetPanel [data-structure]');
   await expect(st).toBeVisible();
   await expect(st.locator('[data-part="main"]')).toBeVisible();

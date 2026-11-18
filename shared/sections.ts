@@ -15,10 +15,11 @@ import type { RawActivity } from './activity/types';
 export type SecPart = 'warm' | 'tech' | 'main' | 'cool';
 export type SecSport = 'run' | 'bike' | 'swim';
 /** Ein Abschnitt; Werte wie die Felder der Einheit (Strings von Hand, Zahlen aus der Uhr) */
-export interface SecRow { part: SecPart; min?: any; km?: any; meters?: any; hr?: any; maxHr?: any; pace?: any; power?: any; speed?: any; pace100?: any }
+export interface SecRow { part: SecPart; min?: any; km?: any; meters?: any; hr?: any; maxHr?: any; pace?: any; power?: any; speed?: any; pace100?: any;
+  /** Auftrag 37: aus dem Soll gefüllt („Wie geplant gemacht“, nicht gemessen) bzw. vom Nutzer gelöscht (nicht gemacht) */ plan?: boolean; off?: boolean; /** von Hand hinzugefügt (noch ohne Werte) */ added?: boolean }
 export interface Unit { sec: number; m: number | null; hr: number | null; hx: number | null; w: number | null }
 export interface MinuteSeries { step: number; hr: (number | null)[]; hx: (number | null)[]; m: (number | null)[]; w?: (number | null)[] }
-export type SecSource = 'manual' | 'watch' | 'series' | 'splits' | 'none';
+export type SecSource = 'manual' | 'plan' | 'watch' | 'series' | 'splits' | 'none';
 export interface SecResult {
   rows: SecRow[]; source: SecSource;
   /** Grenzen in Minuten ab Start (nur bei automatischer Erkennung) */ warmEnd?: number | null; coolStart?: number | null; totalMin?: number | null;
@@ -170,15 +171,19 @@ export function plannedShape(planned: any): { zone: number | null; warm: number 
 export function sectionsOf(planned: any, st: any, act: any, thr: { lthrRun?: number | null; lthrBike?: number | null } = {}, sport?: string): SecResult {
   const sp = sport || (planned && planned.sport) || (act && act.sport) || 'run';
   const m = (st && st.metrics) || {};
-  if (Array.isArray(m.sections) && m.sections.some((r: any) => r && Object.keys(r).some(k => k !== 'part' && r[k] != null && r[k] !== ''))) return { rows: m.sections.map((r: any) => ({ ...r })), source: 'manual' };
-  if (sp === 'swim' || !act) return { rows: [], source: 'none' };
+  const own = Array.isArray(m.sections) && m.sections.some((r: any) => r && Object.keys(r).some(k => k !== 'part' && r[k] != null && r[k] !== ''));
+  // Auftrag 37: „wie geplant“ gilt nur, solange die Uhr keine Abschnitte liefert (Uhrdaten haben Vorrang)
+  const planOnly = own && ((st && st.metricsSrc) || {}).sections === 'plan';
+  const planRows = (): SecResult => ({ rows: m.sections.map((r: any) => ({ ...r })), source: 'plan' });
+  if (own && !planOnly) return { rows: m.sections.map((r: any) => ({ ...r })), source: 'manual' };
+  if (sp === 'swim' || !act) return planOnly ? planRows() : { rows: [], source: 'none' };
   const bounds = m.sectionBounds && typeof m.sectionBounds === 'object' ? m.sectionBounds : null;
   if (!bounds) { const wl = fromWatchLaps(act, sp); if (wl && wl.length) return { rows: wl, source: 'watch' }; }
-  const u = unitsOf(act); if (!u) return { rows: [], source: 'none' };
+  const u = unitsOf(act); if (!u) return planOnly ? planRows() : { rows: [], source: 'none' };
   const shape = plannedShape(planned);
   const lthr = sp === 'bike' ? thr.lthrBike : thr.lthrRun;
   const cut = splitUnits(u.units, { sport: sp, lthr, zone: shape.zone, plannedWarm: shape.warm, plannedCool: shape.cool, bounds });
-  if (!cut) return { rows: [], source: 'none' };
+  if (!cut) return planOnly ? planRows() : { rows: [], source: 'none' };
   const minAt = (i: number) => r1(u.units.slice(0, i).reduce((a, x) => a + x.sec, 0) / 60);
   const rows = [agg(u.units.slice(0, cut.w), 'warm', sp), agg(u.units.slice(cut.w, cut.c), 'main', sp), agg(u.units.slice(cut.c), 'cool', sp)].filter((x): x is SecRow => !!x);
   return { rows, source: u.source, warmEnd: cut.w ? minAt(cut.w) : 0, coolStart: cut.c < u.units.length ? minAt(cut.c) : null, totalMin: minAt(u.units.length), corrected: !!bounds };
@@ -188,8 +193,8 @@ export function sectionsOf(planned: any, st: any, act: any, thr: { lthrRun?: num
 export function mainPart(planned: any, st: any, act: any, thr: { lthrRun?: number | null; lthrBike?: number | null } = {}, sport?: string): MainPart | null {
   const sp = sport || (planned && planned.sport) || (act && act.sport) || 'run';
   const r = sectionsOf(planned, st, act, thr, sp);
-  const main = r.rows.find(x => x.part === 'main'); if (!main) return null;
-  const others = r.rows.filter(x => x.part !== 'main');
+  const main = r.rows.find(x => x.part === 'main' && !x.off && !x.plan); if (!main) return null;
+  const others = r.rows.filter(x => x.part !== 'main' && !x.off);
   if (!others.length && r.source !== 'manual') return null;
   const sec = Math.round((num(main.min) || 0) * 60); if (sec < 300) return null;
   const km = num(main.km), meters = num(main.meters);
@@ -222,31 +227,67 @@ export function mainText(mp: MainPart | null, lthr: number | null | undefined, s
   return parts.join(', ');
 }
 
-/** Gesamtwerte aus Abschnitten (Dauer, Strecke, Ø Puls zeitgewichtet, max. Puls). Nur Felder mit Werten in allen nötigen Abschnitten. */
-export function totalsFromSections(rows: SecRow[], sport: string): Record<string, string> {
-  const R = rows.filter(r => r && Object.keys(r).some(k => k !== 'part' && r[k as keyof SecRow] != null && r[k as keyof SecRow] !== ''));
+/** Kennzeichen eines Abschnitts (keine Werte) */
+const META = new Set(['part', 'plan', 'off', 'added']);
+/** Auftrag 37: Wiederholungen eines Satzes als Stücke für die Gesamtwerte (Belastung + Pause danach). Pausen zählen bei Dauer und
+    Strecke mit, beim Ø Puls nicht (kein Pulswert der Pause). Nicht eingetragene Wiederholungen bleiben leer → dann keine Gesamtdauer. */
+export function ivUnits(ivRows: any[], sport: string, targets?: any[] | null): (SecRow & { _rest?: boolean })[] {
+  const out: (SecRow & { _rest?: boolean })[] = [];
+  const owned = (ivRows || []).some(x => x && x.ti != null);
+  (ivRows || []).forEach((r: any, i: number) => {
+    if (!r) return;
+    // Pause: eingetragen, sonst die geplante (wer nichts anderes sagt, hat die Pause wie geplant gemacht)
+    const t = targets ? (r.ti != null ? targets[r.ti] : owned ? null : targets[i]) : null;
+    const rest = num(r.restSec) ?? (t && t.restSec ? t.restSec : null);
+    const sec = num(r.sec), m = num(r.m);
+    const u: any = { part: 'main', min: sec != null ? sec / 60 : null, hr: r.hr ?? null, maxHr: r.maxHr ?? null, power: r.power ?? null, speed: r.speed ?? null, pace: r.pace ?? null, pace100: r.pace100 ?? null };
+    if (sport === 'swim') u.meters = m; else u.km = m != null ? m / 1000 : null;
+    if (sport === 'swim' && u.min == null && m && paceSec(r.pace100)) u.min = paceSec(r.pace100)! * m / 100 / 60;
+    out.push(u);
+    if (rest) out.push({ part: 'main', min: rest / 60, _rest: true, ...(sport === 'swim' ? { meters: 0 } : {}) } as any);
+  });
+  return out;
+}
+/** Gesamtwerte aus Abschnitten (Dauer, Strecke, Ø Puls zeitgewichtet, max. Puls). Nur Felder mit Werten in allen nötigen Abschnitten.
+    Auftrag 37: mit den Wiederholungen der Sätze (ivRows) – die Gesamtwerte passen dann zum ganzen Ablauf, nicht nur zu Aufwärmen/Ausklang. */
+export function totalsFromSections(rows: SecRow[], sport: string, ivRows?: any[] | null, targets?: any[] | null): Record<string, string> {
+  const own = rows.filter(r => r && !r.off && Object.keys(r).some(k => !META.has(k) && r[k as keyof SecRow] != null && r[k as keyof SecRow] !== ''));
+  const R: (SecRow & { _rest?: boolean })[] = [...own, ...(ivRows && ivRows.length ? ivUnits(ivRows, sport, targets) : [])];
   if (!R.length) return {};
+  // Pausen: zählen bei Dauer (und Strecke, falls bekannt), nicht beim Ø Puls
+  const restOk = (r: any) => r._rest;
   const out: Record<string, string> = {};
   const mins = R.map(r => num(r.min));
   const de = (x: number, d = 1) => String(Math.round(x * 10 ** d) / 10 ** d);
   if (mins.every(x => x != null)) out.min = de(mins.reduce((a, b) => a! + b!, 0)!);
   const dk = sport === 'swim' ? 'meters' : 'km';
+  // Pausen ohne bekannte Strecke (Traben, Rollen): dann keine Gesamtstrecke – sie wäre zu kurz
   const ds = R.map(r => num((r as any)[dk]) ?? (sport === 'run' && num(r.min) && paceSec(r.pace) ? num(r.min)! * 60 / paceSec(r.pace)! : sport === 'bike' && num(r.min) && num(r.speed) ? num(r.min)! / 60 * num(r.speed)! : null));
   if (ds.every(x => x != null)) out[dk] = sport === 'swim' ? String(Math.round(ds.reduce((a, b) => a! + b!, 0)!)) : de(ds.reduce((a, b) => a! + b!, 0)!, 2);
-  const hrRows = R.filter(r => num(r.hr) != null && num(r.min) != null);
-  if (hrRows.length && hrRows.length === R.length) { const t = hrRows.reduce((a, r) => a + num(r.min)!, 0); if (t) out.hr = String(Math.round(hrRows.reduce((a, r) => a + num(r.hr)! * num(r.min)!, 0) / t)); }
+  const hrNeed = R.filter(r => !restOk(r));
+  const hrRows = hrNeed.filter(r => num(r.hr) != null && num(r.min) != null);
+  if (hrRows.length && hrRows.length === hrNeed.length) { const t = hrRows.reduce((a, r) => a + num(r.min)!, 0); if (t) out.hr = String(Math.round(hrRows.reduce((a, r) => a + num(r.hr)! * num(r.min)!, 0) / t)); }
   const mx = R.map(r => num(r.maxHr) ?? num(r.hr)).filter((x): x is number => x != null); if (mx.length && R.some(r => num(r.maxHr) != null)) out.maxHr = String(Math.max(...mx));
-  if (sport === 'bike') { const pw = R.filter(r => num(r.power) != null && num(r.min) != null); if (pw.length === R.length) { const t = pw.reduce((a, r) => a + num(r.min)!, 0); if (t) out.power = String(Math.round(pw.reduce((a, r) => a + num(r.power)! * num(r.min)!, 0) / t)); } }
+  if (sport === 'bike') { const pw = hrNeed.filter(r => num(r.power) != null && num(r.min) != null); if (pw.length && pw.length === hrNeed.length) { const t = pw.reduce((a, r) => a + num(r.min)!, 0); if (t) out.power = String(Math.round(pw.reduce((a, r) => a + num(r.power)! * num(r.min)!, 0) / t)); } }
   return out;
 }
 /** Abschnitte von Hand speichern: Gesamtwerte nachziehen, solange sie nicht selbst eingetragen wurden (Quelle „sections“ oder leer) */
-export function applySections(st: any, rows: SecRow[], sport: string): any {
+export function applySections(st: any, rows: SecRow[], sport: string, ivRows?: any[] | null, src: 'manual' | 'plan' = 'manual', targets?: any[] | null): any {
   const out = { ...st, metrics: { ...(st.metrics || {}) }, metricsSrc: { ...(st.metricsSrc || {}) }, metricsManual: { ...(st.metricsManual || {}) } };
   const clean = rows.map(r => Object.fromEntries(Object.entries(r).filter(([, v]) => v != null && v !== ''))) as SecRow[];
   const any = clean.some(r => Object.keys(r).length > 1);
-  if (any) { out.metrics.sections = clean; out.metricsSrc.sections = 'manual'; if (out.metricsAuto) out.metricsManual.sections = true; }
+  if (any) { out.metrics.sections = clean; out.metricsSrc.sections = src; if (out.metricsAuto && src === 'manual') out.metricsManual.sections = true; }
   else { delete out.metrics.sections; delete out.metricsSrc.sections; delete out.metricsManual.sections; }
-  const tot = any ? totalsFromSections(clean, sport) : {};
+  return applyTotals(out, sport, ivRows, targets);
+}
+/** Auftrag 37: Gesamtwerte der Einheit aus dem ganzen Ablauf (eingetragene Abschnitte + Wiederholungen von Hand bzw. „wie geplant“),
+    solange sie nicht selbst eingetragen oder von der Uhr gemessen wurden (Quelle „sections“ oder leer). */
+export function applyTotals(st: any, sport: string, ivRows?: any[] | null, targets?: any[] | null): any {
+  const out = { ...st, metrics: { ...(st.metrics || {}) }, metricsSrc: { ...(st.metricsSrc || {}) } };
+  const secs: SecRow[] = Array.isArray(out.metrics.sections) && ['manual', 'plan'].includes(out.metricsSrc.sections) ? out.metrics.sections : [];
+  const iv = ivRows !== undefined ? ivRows : Array.isArray(out.metrics.intervals) && ['manual', 'plan'].includes(out.metricsSrc.intervals) ? out.metrics.intervals : null;
+  const any = secs.some(r => r && !r.off && Object.keys(r).some(k => !META.has(k) && (r as any)[k] != null && (r as any)[k] !== '')) || !!(iv && iv.length);
+  const tot = any ? totalsFromSections(secs, sport, iv, targets) : {};
   for (const k of ['min', 'km', 'meters', 'hr', 'maxHr', 'power']) {
     const own = out.metricsSrc[k] === 'sections';
     const empty = out.metrics[k] == null || out.metrics[k] === '';

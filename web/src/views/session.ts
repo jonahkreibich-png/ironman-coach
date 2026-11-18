@@ -15,7 +15,9 @@ import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { diagramSvg } from '../../../shared/workoutdiagram';
 import { nav } from '../nav';
-import { fieldsBlock } from './fieldsui';
+import { changeBlock, ablaufPart, totalsBlock, feelBlock, zonePill } from './fieldsui';
+import { attrsOf } from './ablaufstate';
+import { undoButton } from '../undo';
 import { checkTestResult, checkSwimSkill } from '../testupdate';
 import { structureOf } from '../../../shared/coach/explain';
 import { toast } from '../toast';
@@ -89,17 +91,28 @@ export function openSession(id: string): void {
   const s = SESS_BY_ID[id]; if (!s) return;
   openSheet(sessionTitle(s), () => sessionSheet(id));
 }
+/* Auftrag 37: aufgeräumte Einheiten-Seite in fester Reihenfolge:
+   Kopf (Wochentag + Datum, Geplant vs. Gemacht, Urteil, abhaken, „Wie lief es?“) → Ablauf → Gesamtwerte (eingeklappt, wenn von der Uhr) →
+   Coach-Bewertung → Gefühl und Notiz → „mehr“ (Anleitung, Uhrzeit, Vorlage, Umwandeln). Keine Angabe steht doppelt: der Ablauf ersetzt die
+   Schrittliste und das Bild oben, die Intervall-Liste und die Abschnitte unten. */
 function sessionSheet(id: string): string {
   const s = SESS_BY_ID[id]; if (!s) return '';
   const st = sessState(id);
   const status = effStatus(s);
   const act = st.activityId ? (STATE.activities || {})[st.activityId] : null;
-  const man = st.metricsManual || {};
-  const auto = st.metricsAuto || {};
-  const fields = FIELDS[s.sport] || [['min', 'm.min']];
-  let h = `<div class="stack">
-    <div class="row">${sportIc(s.sport)}<div class="grow"><div class="lbl">${esc(sportLabel(s.sport))} · ${dowShort(s.date)} ${fmtDate(s.date)}</div><div class="small muted">${esc(metaLine(s))}</div>${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
-    ${s.sport === 'strength' && st.completed ? `<p class="xs muted">Geplant: ${esc(s.title)}. Die folgenden Trainingsvorgaben sind kein Leistungsnachweis; tatsächliche Übungen stehen in den Ergebnisfeldern.</p>` : ''}${structureHtml(s)}${templateButtons(s, !!st.completed)}${convertBlock(s, !!st.completed)}`;
+  const real = s.sport !== 'rest';
+  const editable = real && status !== 'cancelled' && status !== 'sick';
+  const tg = { kind: 'session' as const, id, date: s.date, sport: actualSport(s, st), planned: s };
+  const done = st.completed ? doneLine(s) : '';
+  const changed = st.completed && changedOf(st);
+  const urteil = [st.completed ? (changed ? pill('anders gemacht', 'warn') : st.asPlanned ? pill('wie geplant', 'good') : '') : '', st.completed ? zonePill(tg) : ''].filter(Boolean).join(' ');
+  // Kopf
+  let h = `<div class="stack sess-page">
+    <div class="stack sess-kopf" data-kopf>
+      <div class="row">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<div class="grow"><div class="lbl" data-kopf-date>${esc(dowShort(s.date))}, ${fmtDate(s.date)} · ${esc(sportLabel(s.sport))}</div>
+        <div class="small" data-kopf-plan><span class="muted">Geplant:</span> ${esc(metaLine(s) || s.title)}</div>
+        ${done ? `<div class="small" data-kopf-done><span class="muted">Gemacht:</span> <b>${esc(done)}</b></div>` : ''}${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
+      ${urteil ? `<div class="row pills" data-urteil>${urteil}</div>` : ''}${viewToggle(s)}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
     const o = s._orig || {};
@@ -107,36 +120,59 @@ function sessionSheet(id: string): string {
     const why = [...new Set(list.map((a: any) => String(a.reason || '').trim()).filter(Boolean))].join('; ');
     const was = [o.title, o.plannedMinutes ? o.plannedMinutes + ' min' : null, o.zone].filter(Boolean).join(' · ');
     const now = [s.title, s.plannedMinutes ? s.plannedMinutes + ' min' : null, s.zone].filter(Boolean).join(' · ');
-    h += `<details class="adj-info card flat tight" data-adj-info><summary><span class="pill warn">${esc(s.movedFrom ? t('st.moved') : t('st.adjusted'))}</span> <span class="small">${esc(why || list.map((a: any) => a.what || '').join('; '))}</span><span class="chev">${ic('down')}</span></summary><div class="body small">${o.title ? `<div data-adj-before><span class="muted">vorher:</span> ${esc(was)}</div><div data-adj-after><span class="muted">nachher:</span> ${esc(now)}</div>` : ''}${list.map((a: any) => `<div class="muted">${esc(a.what || '')}</div>`).join('')}</div></details>`;
+    h += `<details class="adj-info card flat tight" data-adj-info data-key="adj-info"><summary><span class="pill warn">${esc(s.movedFrom ? t('st.moved') : t('st.adjusted'))}</span> <span class="small">${esc(why || list.map((a: any) => a.what || '').join('; '))}</span><span class="chev">${ic('down')}</span></summary><div class="body small">${o.title ? `<div data-adj-before><span class="muted">vorher:</span> ${esc(was)}</div><div data-adj-after><span class="muted">nachher:</span> ${esc(now)}</div>` : ''}${list.map((a: any) => `<div class="muted">${esc(a.what || '')}</div>`).join('')}</div></details>`;
   }
-  if (s.sport !== 'rest' && status !== 'cancelled') {
-    h += `<div class="row">
+  if (real && status !== 'cancelled') {
+    h += `<div class="row sess-actions">
       <button class="btn ${st.completed ? '' : 'ghost'} grow" data-act="sess-toggle" data-sid="${esc(id)}">${ic('check')} ${esc(st.completed ? t('sess.isDone') : t('sess.markDone'))}</button>
       <button class="btn ghost" data-act="sess-skip" data-sid="${esc(id)}" aria-pressed="${!!st.skipped}">${esc(st.skipped ? t('sess.unskip') : t('sess.skip'))}</button></div>`;
   }
+  h += `<div data-undo-slot data-tk="session" data-tid="${esc(id)}" data-attrs="${esc(attrsOf(tg))}">${undoButton(tg, attrsOf(tg))}</div>`;
   if (st.skipped) h += field('f-skipReason', t('sess.skipReason'), st.skipReason || '', { data: `data-sf="skipReason" data-sid="${esc(id)}"`, wide: true });
-  // Felder statt Notizfeld (Auftrag 7): Werte je Sportart mit Quelle, RPE, Gefühl, Abweichung, optionale Notiz
-  if (s.sport !== 'rest' && (st.completed || status === 'missed' || status === 'open' || status === 'skipped')) h += fieldsBlock({ kind: 'session', id, date: s.date, sport: actualSport(s, st), planned: s });
-  if (act) h += activityDetails(act);
-  // Auftrag 21: „Jetzt abrufen“ in jeder Einheit (heute oder früher, noch ohne Aufzeichnung): holt neue Daten aller Quellen und ordnet sie zu
-  if (s.sport !== 'rest' && isSyncOn() && s.date <= todayStr() && !st.activityId) h += `<div class="stack" data-fetch-now><button class="btn ghost block" data-act="fetch-now" data-sid="${esc(id)}" data-sport="${esc(s.sport)}">${ic('sync')} ${esc(t('conn.syncNow'))}</button>${FETCH_TEXT[id] ? `<div class="hint" data-fetch-status>${esc(FETCH_TEXT[id])}</div>` : `<div class="xs muted">${esc('Holt neue Aufzeichnungen von deiner Uhr bzw. deinen Verbindungen und trägt sie hier ein.')}</div>`}</div>`;
-  if (s.sport !== 'rest') h += more(t('sess.time'), `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>`);
+  if (editable) h += changeBlock(tg);
+  h += '</div>';
+  // vor dem Training: „Lieber kürzer / Lieber Intervalle …“ sichtbar (nach dem Abhaken leer)
+  h += convertBlock(s, !!st.completed);
+  // Ablauf (geplante Trainingsvorlage: Inhalt als Text, darunter die eingetragenen Teile)
+  if (Array.isArray(s.trainingBlocks)) h += structureHtml(s);
+  if (real) h += ablaufPart(tg, editable);
+  // Gesamtwerte (mit Aufzeichnung und „Jetzt abrufen“)
+  if (editable) {
+    // Auftrag 21: „Jetzt abrufen“ in jeder Einheit (heute oder früher, noch ohne Aufzeichnung): holt neue Daten aller Quellen und ordnet sie zu
+    const fetch = isSyncOn() && s.date <= todayStr() && !st.activityId ? `<div class="stack" data-fetch-now><button class="btn ghost block" data-act="fetch-now" data-sid="${esc(id)}" data-sport="${esc(s.sport)}">${ic('sync')} ${esc(t('conn.syncNow'))}</button>${FETCH_TEXT[id] ? `<div class="hint" data-fetch-status>${esc(FETCH_TEXT[id])}</div>` : `<div class="xs muted">${esc('Holt neue Aufzeichnungen von deiner Uhr bzw. deinen Verbindungen und trägt sie hier ein.')}</div>`}</div>` : '';
+    h += totalsBlock(tg, (act ? activityDetails(act) : '') + fetch);
+  }
+  // Coach-Bewertung
+  h += coachReview(id);
+  // Gefühl und Notiz
+  if (editable) h += feelBlock(tg);
+  // mehr: Anleitung (geplante Schritte in Worten, Tipps), Uhrzeit, Vorlage, Umwandeln
+  const guide = !Array.isArray(s.trainingBlocks) ? structureHtml(s, { noDiagram: true, noToggle: true }) : '';
+  const extra = [guide ? `<div data-guide>${guide}</div>` : '', templateButtons(s, !!st.completed), real ? `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>` : ''].filter(Boolean).join('');
+  if (extra) h += `<details class="more sess-more" data-key="sess-more"><summary>Mehr: Anleitung, Uhrzeit, Vorlage<span class="chev">${ic('down')}</span></summary><div class="body stack">${extra}</div></details>`;
   return h + '</div>';
 }
+/** Auftrag 37: die Bewertung des Coachs zu dieser Einheit (dieselbe Nachricht wie im Coach-Tab) */
+function coachReview(id: string): string {
+  const m: any = Object.values(STATE.coachMsgs || {}).filter((x: any) => x && !x.deleted && x.kind === 'session' && x.refs && x.refs.sessionId === id).sort((p: any, q: any) => (q.at || 0) - (p.at || 0))[0];
+  if (!m) return '';
+  const txt = String(m.resultText || m.text || '').trim(); if (!txt) return '';
+  return `<details class="card flat tight coach-review" data-coach-review data-key="coach-review" open><summary class="spread"><span class="lbl">Coach-Bewertung</span><span class="chev">${ic('down')}</span></summary><div class="small" style="white-space:pre-line">${esc(txt)}</div></details>`;
+}
 /* Ablauf der Einheit in Schritten (Auftrag 7): Ein-/Aufwärmen, Hauptteil mit Wiederholungen, Pausen und Zonen, Ausklang */
-export function structureHtml(s: any): string {
+export function structureHtml(s: any, o: { noDiagram?: boolean; noToggle?: boolean } = {}): string {
   if (Array.isArray(s.trainingBlocks)) return '<div class="card flat tight structure" data-training-blocks><b>Geplanter Trainingsinhalt</b><p style="white-space:pre-line">'+esc([s.trainingTemplateSnapshot?.description,describeTrainingBlocks(s.trainingBlocks,0,s.sport)].filter(Boolean).join('\n'))+'</p></div>';
 
   const x = s.sport !== 'rest' ? structureOf(s, profile(), todayStr()) : null;
   if (!x || !x.parts.length) return s.description ? `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>` : '';
   const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
   // Auftrag 19: Ablaufbild aus den Bausteinen (Höhe = Anstrengung)
-  const dia = s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length > 1 && s.sport !== 'strength' ? `<div class="wo-diagram-wrap" data-diagram>${diagramSvg(s.spec, { label: t('sess.diagram') })}</div>` : '';
+  const dia = !o.noDiagram && s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length > 1 && s.sport !== 'strength' ? `<div class="wo-diagram-wrap" data-diagram>${diagramSvg(s.spec, { label: t('sess.diagram') })}</div>` : '';
   // Auftrag 35: in km – Strecke je Stück, Zieltempo und Zeit pro Wiederholung (shared/kmview)
   const km = planView() === 'km' ? kmOf(s) : null;
   const lines = (p: any) => km ? km.lines.filter(l => l.part === p.part).map(l => l.text) : p.lines;
   const tot = totalOf(s);
-  return `<div class="card flat tight structure" data-structure data-view="${km ? 'km' : 'min'}">${viewToggle(s)}${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${lines(p).map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>${tot ? `<div class="small" data-total><b>Gesamt: ${esc(tot)}</b></div>` : ''}
+  return `<div class="card flat tight structure" data-structure data-view="${km ? 'km' : 'min'}">${o.noToggle ? '' : viewToggle(s)}${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${lines(p).map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>${tot ? `<div class="small" data-total><b>Gesamt: ${esc(tot)}</b></div>` : ''}
     ${x.drills && x.drills.length ? `<div class="small" data-drills><b>${esc(t('sess.drills'))}:</b><ul>${x.drills.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : ''}${x.sum ? `<div class="small" data-swimsum><b>${esc(x.sum)}</b></div>` : ''}
     ${x.how ? `<div class="small"><b>${esc(t('sess.how'))}:</b> ${esc(x.how)}</div>` : ''}${x.tip ? `<div class="small"><b>${esc(t('sess.tip'))}:</b> ${esc(x.tip)}</div>` : ''}${x.why ? `<div class="small muted"><b>${esc(t('sess.why'))}:</b> ${esc(x.why)}</div>` : ''}
     ${x.derived && s.description ? more(t('sess.original'), `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>`) : ''}</div>`;

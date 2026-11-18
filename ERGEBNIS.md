@@ -1,3 +1,36 @@
+# Auftrag 37: Einheiten übersichtlich – ein Ablauf, Bearbeiten im Fenster, Nachtragen mit Datum (17.11.)
+
+**Stand:** Version **3.25.0**, Tests grün, Veröffentlichung läuft (Test-App, dann echte App, beide vorher gesichert).
+
+## Was war vorhanden, was war falsch
+- Zwei Listen für dasselbe: „Abschnitte“ (Auftrag 35) und „Intervalle“ (Auftrag 36), dazu oben noch einmal die Schritte. Bearbeiten in drei Ebenen (Wiederholung → „Lage, Hilfsmittel …“ → „Satz bearbeiten“).
+- **Fehler „alles klappt auf“, Ursache gefunden:** `refreshSheet` (kit.ts) merkte sich offene Bereiche über den Text der Überschrift. Alle gleich lautenden Bereiche gingen nach jeder Änderung auf (nachgestellt: 7 statt 3 offen). Behoben über feste Kennungen – gilt für alle Fenster der App.
+- Nachtragen-Liste ohne Datum. Gesamtwerte bei Intervall-Einheiten nur aus Aufwärmen + Ausklang.
+
+## Jetzt
+- **Ein Ablauf** je Einheit (alle Sportarten): Aufwärmen → Sätze mit Wiederholungen → Ausklang; Schwimmen mit Einschwimmen/Technik/Ausschwimmen; Kraft: Übungen. Jede Zeile: Ist fett, Soll grau, Urteil (✓, zu hart, zu locker, kürzer, anders, wie geplant). Abweichung sichtbar: „1:41 · 1:41/100 m · Kraul (statt Brust)“, Satz-Kopf „3 × 100 m (2 Brust, 1 Kraul) · 2/3 im Ziel“.
+- **Antippen → Fenster nur für diesen Teil** (Satz, Wiederholung, Abschnitt, Übung) mit allen Feldern und Knöpfen; in der Liste klappt nichts mehr auf. Das Diagramm oben öffnet dasselbe Fenster. „+ Abschnitt / Satz hinzufügen“; Aufwärmen/Ausklang ändern, löschen, wieder hinzufügen.
+- **Wie geplant gemacht:** füllt den ganzen Ablauf (markiert „wie geplant“, nicht gemessen – zählt nie für Tempo, Scores, Kraul-Tempo). Uhrdaten haben Vorrang.
+- **Rückgängig:** nach Löschen, „wie geplant“ und jedem Fenster ein Hinweis mit „Rückgängig“; mehrere Schritte nacheinander (auch „↶ Rückgängig (n)“ oben).
+- **Seite:** Kopf (Wochentag + Datum, Geplant/Gemacht, Urteil) → Ablauf → Gesamtwerte (eingeklappt bei Uhr-Daten, jetzt aus dem ganzen Ablauf) → Coach-Bewertung → Gefühl/Notiz → „Mehr“.
+- **Nachtragen:** „Mo, 12.10. · Rad locker 60 min“, nach Datum sortiert, je Einheit „Nachtragen“ oder „Nicht gemacht“.
+- Gespeichert wird in den bisherigen Feldern: keine Umstellung deiner Daten (Entscheidungen 590–598).
+
+## Bilder (Schwimm-Einheit, iPhone-Breite)
+| Vorher (3.24.0) | Nachher (3.25.0) | Fenster einer Wiederholung |
+|---|---|---|
+| ![vorher](docs/auftrag37-vorher.png) | ![nachher](docs/auftrag37-nachher.png) | ![Fenster](docs/auftrag37-fenster.png) |
+
+## Tests
+- **Fehler nachgestellt, bevor er behoben wurde:** 1 Wiederholung geändert → 7 Bereiche offen statt 3. Jetzt prüft der Test, dass beim Ändern nichts aufklappt.
+- **Neuer Test `auftrag37`** (WebKit iPhone + Chromium, echte Eingabe): Schwimmen 3 × 100 m Brust → 2. auf Kraul → Bewertung gegen das Kraul-Ziel; Pull Buoy und Titel für den Satz; Einschwimmen/Ausschwimmen ändern, löschen, wieder hinzufügen; Gesamtwerte passen zum Ablauf; „Wie geplant gemacht“ + eine Abweichung; Rückgängig (einzeln und mehrere Schritte); Diagramm öffnet dasselbe Fenster; Nachtragen zeigt Datum und öffnet den richtigen Tag; dasselbe für Laufen, Rad, Koppel (Rad + Lauf) und Kraft; Überlauf 320/375/430 px mit großer Schrift für Liste und Fenster.
+- **Unit-Tests `ablauf37`** (7): Reihenfolge, Soll/Ist/Urteil, wie geplant zählt nie als Messwert, Uhr hat Vorrang, Gesamtwerte mit Pause, Löschen/Hinzufügen, Kraft.
+- **Alte Tests angepasst statt doppelt:** Intervalle (22, 36), Abschnitte (35), km-Ansicht, Kraft, Vorlagen, Extra-Einheiten – gleiche Prüfungen, neuer Weg über das Fenster.
+- **Alle Browser-Tests** (~940, beide Browser): grün. 4 Teile parallel (50 min); 69 dort rote Tests waren Überlast bzw. fest eingestellter Port – die 25 Dateien nacheinander wiederholt: 442 grün (28 min).
+- **Großer Test: 18:26 min** (Ziel unter 45 min). Simulation 36 Nutzer, 19.292 Tage, 33.703 Aktionen, 0 Fehler; 134 Browser-Abläufe; Typprüfung; alle Unit-Tests. Rot nur unter Last: 3 Push-Server-Tests und 2 WebKit-Starts – einzeln wiederholt grün.
+
+---
+
 # Auftrag 36: Intervalle bearbeiten, Scores, Prognose, große Simulation (16.11.)
 
 **Stand:** Version **3.24.0**, **veröffentlicht am 16.11.** (alle Tests grün; erst Test-App, dann echte App; beide vorher gesichert; alle 3 Nutzer starten fehlerfrei, auch vom alten Stand aus). Beobachtung danach am 17.11. nachgeholt: keine Startfehler seit dem Hochladen (ganze Nacht). Beim 1. Release-Lauf gefunden und behoben: „zusätzlich“ fehlte in der Intervall-Liste, Enter verlor unter Last den Fokus (Nr. 589).

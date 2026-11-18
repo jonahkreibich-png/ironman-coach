@@ -24,14 +24,18 @@ test('Kraft: „Wie letztes Mal“ übernimmt Übungen und Gewichte, ein Gewicht
   await expect(btn).toContainText('Wie letztes Mal (13.10.: 5 Übungen mit Gewichten)');
   await btn.click();
   await expect(page.locator('#toast')).toContainText('vom 13.10. übernommen');
-  const kg = sheet(page).locator('[data-exercises] input[data-f="kg"]').first();
+  // Auftrag 37: Übungen als Liste im Ablauf, Antippen öffnet das Fenster der Übung
+  await expect(sheet(page).locator('.ab-ex').first()).toContainText('40 kg');
+  await sheet(page).locator('.ab-ex').first().locator('.ab-row').click();
+  const kg = page.locator('#subPanel #ex-0-kg');
   await expect(kg).toHaveValue('40');
   await kg.fill('42,5'); await kg.blur();
+  await page.locator('#sub [data-act="sub-close"].btn').click();
   await expect.poll(async () => (await stored(page)).sessions['k-heute']?.metrics?.exercises?.[0]?.kg).toBe(42.5);
   await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
   await openPlanSession(page, 'k-heute');
-  await expect(sheet(page).locator('[data-exercises] input[data-f="name"]').nth(4)).toHaveValue('Liegestütz');
-  await expect(sheet(page).locator('[data-exercises] input[data-f="kg"]').first()).toHaveValue('42.5');
+  await expect(sheet(page).locator('.ab-ex').nth(4)).toContainText('Liegestütz');
+  await expect(sheet(page).locator('.ab-ex').first()).toContainText('42,5 kg');
 });
 
 test('Kraft-Score: mit Übungen Umfang, Abdeckung und Steigerung; ohne Übungen ehrlich „nur Regelmäßigkeit bekannt“', async ({ page }) => {
