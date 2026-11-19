@@ -21,6 +21,7 @@ import { de, mmss, dowName, joinDe } from './texts';
 import { patternOf, intervalsOf, type Pattern } from '../activity/structure';
 import { evaluateIntervals, plannedIntervals, evalToIntervalOut, ivDiffNotes, type IvEval, type IvThresholds } from '../intervals';
 import { mainPart, type MainPart } from '../sections';
+import { doneSummary, doneSentence, type DoneSummary } from '../ablauf';
 
 export interface ReviewOpt { label: string; say: string; go?: string }
 export interface Review { intent: 'review'; text: string; options: ReviewOpt[]; good: string[]; better: string[]; next: string[]; missing: string[]; items: number }
@@ -34,7 +35,8 @@ export function withWeeks<T extends EngineCtx>(ctx: T): T { return (ctx as any).
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 
 /* ---------- Erledigte Einheiten finden ---------- */
-export interface Done { key: string; date: string; sport: string; title: string; planned: any | null; st: any; act: any | null; custom: boolean; /** Auftrag 34: false = Watt ohne Messgerät (geschätzt) */ powerOk?: boolean; /** Auftrag 29: anders gemacht – die geplante Einheit und die Art der Änderung */ changedFrom?: any; change?: any }
+export interface Done { key: string; date: string; sport: string; title: string; planned: any | null; st: any; act: any | null; custom: boolean; /** Auftrag 34: false = Watt ohne Messgerät (geschätzt) */ powerOk?: boolean; /** Auftrag 29: anders gemacht – die geplante Einheit und die Art der Änderung */ changedFrom?: any; change?: any;
+  /** Auftrag 38: was laut Ablauf wirklich gemacht wurde (Titel, Änderungen gegenüber dem Plan) */ done?: DoneSummary | null }
 export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
   const out: Done[] = []; const usedActs = new Set<string>();
   const acts: Record<string, any> = ctx.state.activities || {};
@@ -47,7 +49,10 @@ export function doneItems(ctx: EngineCtx, from: string, to: string): Done[] {
     // Auftrag 29: anders gemacht → bewertet wird das Gemachte (Sportart, Titel); die geplante Härte zählt dann nicht als Vorgabe
     const ch = changedOf(st);
     if (ch) { const dropped = plannedLoadDropped(st); out.push({ key: s.id, date: d.date, sport: actualSport(s, st), title: actualTitle(s, st, act), planned: dropped ? null : intervalsMode(st) !== 'planned' ? { ...s, spec: null, ...(ch.kind === 'harder' ? { zone: 'Zone ' + changeZone(st, s), hard: true } : {}) } : s, st, act, custom: false, changedFrom: s, change: ch }); return; }
-    out.push({ key: s.id, date: d.date, sport: s.sport, title: s.sport === 'strength' ? actualStrength(st, act).title : s.title, planned: s, st, act, custom: false });
+    // Auftrag 38: der Ablauf sagt, was gemacht wurde (z. B. 3 × 10 statt 2 × 8 min) – Titel und Bewertung nennen das Gemachte
+    let ds: DoneSummary | null = null;
+    try { ds = ['run', 'bike', 'swim'].includes(s.sport) ? doneSummary(s, st, act, ivThr(ctx.profile), s.sport) : null; } catch (e) { ds = null; }
+    out.push({ key: s.id, date: d.date, sport: s.sport, title: s.sport === 'strength' ? actualStrength(st, act).title : ds && ds.changed ? ds.title : s.title, planned: s, st, act, custom: false, done: ds });
   }));
   Object.entries(effectiveCustomBuckets(ctx.state) || {}).forEach(([d, l]: any) => (l || []).forEach((w: any) => {
     if (d < from || d > to || w.completed === false) return;
@@ -140,6 +145,8 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   if (v.pace) facts.push(`${mmss(v.pace)}/km`); if (v.speed && d.sport === 'bike') facts.push(`${de(v.speed)} km/h`); if (v.power) facts.push(`${Math.round(v.power)} W`); else if (v.powerEst) facts.push(`ca. ${Math.round(v.powerEst)} W (geschätzt, ohne Wattmessung)`);
   if (v.hr && d.sport !== 'strength') facts.push(`Puls ${Math.round(v.hr)}`);
   const head = `${d.sport === 'strength' && !d.change ? actualStrength(d.st, d.act).title : d.title} (${fmtD(d.date)})${facts.length ? ': ' + facts.join(', ') : ''}.`;
+  // Auftrag 38: anders gemacht laut Ablauf („3 × 10 min statt 2 × 8 min – mehr Sweet-Spot-Zeit, gut“)
+  if (d.done && d.done.changed) good.push(doneSentence(d.done));
   // Auftrag 29: kurz einordnen, was die Änderung bedeutet (die geplante Einheit wird nicht gegen das Gemachte bewertet)
   if (d.change && d.changedFrom) {
     const was = String(d.changedFrom.title || 'die geplante Einheit'); const why = d.change.reason;
@@ -624,7 +631,7 @@ export function intervalReview(ctx: EngineCtx, d: Done): { good: string[]; bette
   out.good.unshift(...ivDiffNotes(e));
   // Auftrag 37: „wie geplant“ eingetragen – gemacht, aber ohne Messwerte (kein Urteil über Tempo oder Puls)
   if (e.asPlanned) out.good.push(`${e.asPlanned === e.done ? (e.done === 1 ? 'Das Intervall' : `Alle ${e.done} Intervalle`) : `${e.asPlanned} Intervall${e.asPlanned > 1 ? 'e' : ''}`} „wie geplant“ eingetragen – ohne Messwerte kann ich zu Tempo und Puls dort nichts sagen.`);
-  if (e.extra) out.good.push(`${e.extra} Intervall${e.extra > 1 ? 'e' : ''} mehr als geplant – zählt mit, die nächste Stufe richtet sich nach den geplanten.`);
+  if (e.extra && !(d.done && d.done.changed)) out.good.push(`${e.extra} Intervall${e.extra > 1 ? 'e' : ''} mehr als geplant – zählt mit, die nächste Stufe richtet sich nach den geplanten.`);
   if (e.short) out.better.push(`${e.short} Intervall${e.short > 1 ? 'e' : ''} abgebrochen oder deutlich kürzer. Lieber alle etwas ruhiger als das letzte abbrechen.`);
   else if (e.done < n) out.better.push(`${e.done} von ${n} Intervallen gemacht${quality}.`);
   // Vergleich mit derselben Einheit vor 2-4 Wochen

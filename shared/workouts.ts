@@ -200,24 +200,75 @@ function hrRange(lthr: number, zone: number): string {
   if (z.high >= 999) return `Puls über ${Math.round(lthr * z.low / 100)}`;
   return `Puls ${Math.round(lthr * z.low / 100)}–${Math.round(lthr * z.high / 100)}`;
 }
-export function intensity(spec: Spec, zone: number, mode?: StrokeMode): string {
-  const c = spec.ctx;
+/** Auftrag 38: o.noHr = kurze Wiederholung (unter 1 min, der Puls reagiert nicht so schnell), o.noPace = bergauf (Tempo sagt nichts) */
+export function intensityParts(spec: Spec, zone: number, mode?: StrokeMode, o: { noHr?: boolean; noPace?: boolean } = {}): string[] {
+  const c = spec.ctx || {};
   const parts: string[] = [];
   if (spec.sport === 'run') {
     const thr = c.runThrSec || 390; const f = RUN_F[zone] || RUN_F[2];
-    parts.push(`${mmss(thr * f[0])}–${mmss(thr * f[1])}/km`);
-    if (c.lthrRun) parts.push(hrRange(c.lthrRun, zone));
+    if (!o.noPace) parts.push(`${mmss(thr * f[0])}–${mmss(thr * f[1])}/km`);
+    if (c.lthrRun && !o.noHr) parts.push(hrRange(c.lthrRun, zone));
   } else if (spec.sport === 'bike') {
     if (c.ftp) { const z = POWER_ZONES[zone - 1]; parts.push(`${Math.round(c.ftp * z.low / 100)}–${z.high >= 999 ? Math.round(c.ftp * 1.2) : Math.round(c.ftp * z.high / 100)} W`); }
-    if (c.lthrBike) parts.push(hrRange(c.lthrBike, zone));
+    if (c.lthrBike && !o.noHr) parts.push(hrRange(c.lthrBike, zone));
     // Auftrag 12: Tempo als Anhalt (flach, ohne Wind), drinnen die virtuelle Geschwindigkeit; Puls und Watt bleiben die Vorgabe
-    if (c.bikeKmh && c.speedZones !== false && !c.indoor) parts.push(`ca. ${speedRange(c.bikeKmh, zone)} flach`);
+    if (c.bikeKmh && c.speedZones !== false && !c.indoor && !o.noPace) parts.push(`ca. ${speedRange(c.bikeKmh, zone)} flach`);
     // Auftrag 21: drinnen ohne Watt (einfache Rolle): nur Puls und Gefühl (RPE 1-10)
-    if (c.indoor && !c.ftp) parts.push(`Gefühl ${RPE_OF[zone] || '3-4'}/10`);
+    if (c.indoor && !c.ftp && !o.noHr) parts.push(`Gefühl ${RPE_OF[zone] || '3-4'}/10`);
   } else if (spec.sport === 'swim') {
     parts.push(`etwa ${mmss(swimPace(c, zone, mode))}/100 m`);
   }
+  return parts;
+}
+export function intensity(spec: Spec, zone: number, mode?: StrokeMode, o: { noHr?: boolean; noPace?: boolean } = {}): string {
+  const parts = intensityParts(spec, zone, mode, o);
   return `Z${zone}${parts.length ? ': ' + parts.join(', ') : ''}`;
+}
+/* Auftrag 38: kurze Wiederholungen (Sprints, Steigerungen, Hügelsprints unter 1 min) ohne Puls-Ziel – der Puls reagiert in 10-30 s nicht;
+   bergauf ohne Tempo-Ziel – am Hang sagt die Pace nichts. Stattdessen Gefühl bzw. Ausführung (repCue). Gilt für Text, Ziele und Bewertung. */
+const HILL_RE = /hügel|bergauf|\bberg\b|anstieg|steigung/i;
+export function isHillStep(spec: Pick<Spec, 'sport' | 'kind'>, s: Step): boolean {
+  if ((spec.sport !== 'run' && spec.sport !== 'bike') || s.part !== 'main' || s.walkOnly) return false;
+  return (spec.kind === 'hills' && (s.zone || 2) >= 3) || HILL_RE.test(s.note || '');
+}
+export function isShortRep(spec: Pick<Spec, 'sport'>, s: Step): boolean {
+  return (spec.sport === 'run' || spec.sport === 'bike') && s.part === 'main' && !s.walkOnly && (s.min || 0) > 0 && (s.min || 0) < 1 && (s.zone || 2) >= 3;
+}
+/** Ausführung statt Zahlen („kräftig, fast maximal (Gefühl 9/10), langsam zurückgehen“); null bei normalen Stücken */
+export function repCue(spec: Pick<Spec, 'sport' | 'kind'>, s: Step): string | null {
+  const hill = isHillStep(spec, s), short = isShortRep(spec, s);
+  if (!hill && !short) return null;
+  const z = s.zone || 2; const sec = Math.round((s.min || 0) * 60);
+  const back = spec.sport === 'run' ? 'langsam zurückgehen' : 'locker rollen';
+  if (hill && short) return sec <= 20 || spec.kind === 'hills' ? `kräftig, fast maximal (Gefühl 9/10), ${back}` : `kräftig bergauf (Gefühl 8-9/10), ${back}`;
+  if (hill) return z >= 5 ? `hart bergauf, gleichmäßig (Gefühl 8-9/10), ${spec.sport === 'run' ? 'im Traben zurück' : 'locker rollen'}` : z === 4 ? 'gleichmäßig bergauf knapp unter der Schwelle (Gefühl 7-8/10)' : 'zügig bergauf (Gefühl 6-7/10)';
+  return z >= 5 ? 'schnell, fast maximal (Gefühl 9/10), danach locker' : 'zügig und locker, kontrolliert schnell (Gefühl 7-8/10)';
+}
+/** Gefühl-Ziel (RPE) einer kurzen bzw. Berg-Wiederholung, passend zu repCue */
+export function repCueRpe(spec: Pick<Spec, 'sport' | 'kind'>, s: Step): [number, number] | null {
+  const hill = isHillStep(spec, s), short = isShortRep(spec, s);
+  if (!hill && !short) return null;
+  const z = s.zone || 2; const sec = Math.round((s.min || 0) * 60);
+  if (hill && short) return sec <= 20 || spec.kind === 'hills' ? [8, 10] : [8, 9];
+  if (hill) return z >= 5 ? [8, 9] : z === 4 ? [7, 8] : [6, 7];
+  return z >= 5 ? [8, 10] : [7, 8];
+}
+/* Auftrag 38: ungefähre Strecke eines Stücks (Laufen/Rad), damit Minuten und km zusammen stehen („4×3 min (ca. 600 m)“) */
+export function roundKm(sport: string, km: number): number {
+  if (km <= 0) return 0;
+  if (sport === 'bike') return km < 5 ? Math.max(0.5, Math.round(km * 2) / 2) : Math.round(km);
+  if (km < 0.4) return Math.max(0.05, Math.round(km * 20) / 20);
+  if (km < 2) return Math.round(km * 10) / 10;
+  return Math.round(km * 2) / 2;
+}
+export const distTxt = (km: number) => (km < 1 ? `${Math.round(km * 1000)} m` : `${String(Math.round(km * (km < 10 ? 10 : 1)) / (km < 10 ? 10 : 1)).replace('.', ',')} km`);
+/** Strecke eines Stücks (null: drinnen, ohne Strecke, bergauf, Gehen) */
+export function pieceKm(spec: Spec, s: Step): number | null {
+  if ((spec.sport !== 'run' && spec.sport !== 'bike') || spec.noDistance || s.walkOnly || s.walkMin || !s.min || isHillStep(spec, s)) return null;
+  if (spec.sport === 'bike' && (!spec.ctx || spec.ctx.indoor || !spec.ctx.bikeKmh)) return null;
+  const z = s.zone || 2;
+  const km = spec.sport === 'run' ? s.min * 60 / runPace(spec.ctx || {}, z) : s.min / 60 * bikeKmh(spec.ctx || {}, z);
+  return roundKm(spec.sport, km);
 }
 const STROKE: Record<StrokeMode, string> = { crawl: 'Kraul', breast: 'Brust', drill: 'Kraul-Technik', kick: 'Kraul-Beinschlag', mixed: 'Lage nach Wahl', easy: 'locker, Lage nach Wahl', pull: 'Kraul mit Pull Buoy' };
 export const GEAR_TXT: Record<string, string> = { board: 'Kickbrett', buoy: 'Pull Buoy', fins: 'Flossen', paddles: 'Paddles', snorkel: 'Frontschnorchel' };
@@ -256,7 +307,11 @@ export function stepText(spec: Spec, s: Step): string {
   if (s.walkMin) return `${reps}× (${s.min} min locker laufen + ${s.walkMin} min zügig gehen), laufen ${intensity(spec, z)}${s.note ? ', ' + s.note : ''}`;
   const len = `${reps > 1 ? `${reps}×${minTxt(s.min)}` : minTxt(s.min)}`;
   const rest = reps > 1 && s.restMin ? `, dazwischen ${minTxt(s.restMin)} ${spec.sport === 'run' ? (s.restMin < 1 ? 'locker zurück' : 'locker traben') : 'locker rollen'}` : '';
-  return `${len} ${ZNAME[z]} (${intensity(spec, z)})${rest}${s.note ? ', ' + s.note : ''}`;
+  // Auftrag 38: Minuten und km zusammen; kurze Stücke ohne Puls, bergauf ohne Tempo, dafür die Ausführung
+  const pk = pieceKm(spec, s); const piece = pk ? ` (ca. ${distTxt(pk)})` : '';
+  const cue = repCue(spec, s);
+  if (cue) { const p = intensityParts(spec, z, undefined, { noHr: isShortRep(spec, s), noPace: isHillStep(spec, s) }); return `${len}${piece} ${isHillStep(spec, s) ? 'bergauf' : ZNAME[z]} (${[cue, ...p].join('; ')})${rest}${s.note ? ', ' + s.note : ''}`; }
+  return `${len}${piece} ${ZNAME[z]} (${intensity(spec, z)})${rest}${s.note ? ', ' + s.note : ''}`;
 }
 /* Teile einer Schwimmeinheit: Technik = Übungen und Beinschlag im Hauptteil (auch Wassergewöhnung) */
 export function swimParts(spec: Spec): { part: 'warm' | 'tech' | 'main' | 'cool'; label: string; steps: Step[] }[] {

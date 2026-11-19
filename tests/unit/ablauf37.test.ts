@@ -76,8 +76,9 @@ describe('Ablauf', () => {
     expect(t.min).toBe(String(10 + 3 + 2 + 3 + 5));
     expect(t.km).toBeUndefined(); // Pause ohne Strecke → keine Gesamtstrecke (ehrlich statt zu kurz)
     expect(t.hr).toBe(String(Math.round((10 * 120 + 3 * 165 + 3 * 167 + 5 * 125) / 21)));
-    // nicht eingetragene Wiederholung → keine Gesamtdauer
-    expect(totalsFromSections(rows as any, 'run', [...iv, { ti: 2 }], targets).min).toBeUndefined();
+    // Auftrag 38: leere Zeile ohne Soll zählt nicht; leere Wiederholung mit Soll zählt wie geplant (Summe = Einheit)
+    expect(totalsFromSections(rows as any, 'run', [...iv, { ti: 2 }], targets).min).toBe(String(10 + 3 + 2 + 3 + 5));
+    expect(totalsFromSections(rows as any, 'run', [iv[0], { ti: 1 }], [{ restSec: 120 }, { restSec: null, sec: 180 }]).min).toBe(String(10 + 3 + 2 + 3 + 5));
   });
   it('Abschnitt löschen (off) und wieder hinzufügen (added); gelöschte zählen nirgends', () => {
     let st: any = applySections({ completed: true, metrics: {} }, [{ part: 'warm', off: true }, { part: 'main', min: '45', hr: '147' }, { part: 'cool', min: '5', hr: '120' }] as any, 'run');

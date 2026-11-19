@@ -288,7 +288,7 @@ on('reload', () => location.reload());
    Vor dem Handler den Stand der Einheit merken (Knöpfe/Felder mit data-tk/data-tid bzw. data-sid), danach vergleichen. Beim Tippen gilt der
    Stand vor dem ersten Zeichen (Werte werden schon beim Tippen gesichert). Löschen und „Wie geplant gemacht“: sofort Hinweis mit
    „Rückgängig“; im Fenster eines Teils: ein Hinweis beim Schließen (ablaufui.ts); sonst „Geändert“ bzw. die Meldung des Handlers mit „Rückgängig“. */
-const NO_UNDO = new Set(['undo-one', 'sess-open', 'fetch-now', 'ab-open', 'ab-add', 'sub-close', 'sheet-close', 'missed-open', 'plan-view', 'lex']);
+const NO_UNDO = new Set(['undo-one', 'sess-open', 'fetch-now', 'ab-open', 'ab-add', 'sub-close', 'sheet-close', 'missed-open', 'lex']);
 const UNDO_LABEL: Record<string, string> = { 'iv-del': 'Wiederholung gelöscht', 'iv-set-del': 'Satz gelöscht', 'sec-del': 'Abschnitt gelöscht', 'fd-ex-del': 'Übung gelöscht', 'fd-split-del': 'Split gelöscht', 'fd-asplanned': 'Wie geplant eingetragen', 'iv-reset': 'Uhrwerte verwendet', 'fd-reset': 'Original zurückgesetzt', 'fd-ex-last': 'Übungen übernommen', 'fd-template-apply': 'Vorlage übernommen', 'sess-toggle': 'Abhaken geändert', 'sess-skip': 'Ausgefallen geändert', 'iv-add': 'Satz hinzugefügt', 'sec-add': 'Abschnitt hinzugefügt', 'fd-ex-add': 'Übung hinzugefügt', 'missed-skip': 'Als nicht gemacht markiert' };
 const UNDO_NOW = /-del$|^missed-skip$|^fd-asplanned$|^iv-reset$|^fd-reset$|^fd-ex-last$|^fd-template-apply$|^sess-skip$|^sess-toggle$/;
 function undoTarget(el: HTMLElement, name: string): UTg | null {

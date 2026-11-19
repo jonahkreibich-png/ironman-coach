@@ -8,7 +8,7 @@ import { metaLine, statusIcon, sessionTitle, plannedHtml } from './session';
 import { editBar, editing, canUndoGroups } from './planedit';
 import { sportIc, gearChips } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
-import { whatText, viewToggle } from '../planview';
+import { whatText } from '../planview';
 import { duration } from '../../../shared/i18n';
 import { isHardSession, isTestSession, sessionMarks, intensityBand, weekLine, MARKS, type Mark } from '../../../shared/intensity';
 import { changedOf, effectiveSession, actualSport } from '../../../shared/results';
@@ -54,7 +54,9 @@ function planRow(s: any): string {
   // erledigt und anders gemacht: Symbole und Intensität des Gemachten
   const eff = st.completed && changedOf(st) ? effectiveSession(s, st) : s;
   const marks = sessionMarks(eff); const band = intensityBand(eff);
-  const dur = s.plannedMinutes && !new RegExp('\\b' + s.plannedMinutes + ' min').test(s.title || '') ? duration(s.plannedMinutes) : '';
+  // Auftrag 38: erledigt → die gemachte Dauer (aus dem Ablauf bzw. eingetragen), sonst die geplante
+  const doneMin = st.completed ? parseFloat(String((st.metrics || {}).min ?? '').replace(',', '.')) : NaN;
+  const dur = Number.isFinite(doneMin) && doneMin > 0 ? duration(Math.round(doneMin)) : s.plannedMinutes && !new RegExp('\\b' + s.plannedMinutes + ' min').test(s.title || '') ? duration(s.plannedMinutes) : '';
   const check = status === 'done' || status === 'open' || status === 'missed'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   const test = marks.includes('test') && !st.completed && status !== 'cancelled';
@@ -134,8 +136,7 @@ function dayRows(x: DayInfo, _today: string): string {
 /* kurz, was man tun soll (aus dem Aufbau der Einheit; Teamsport und Wettkampf ohne) */
 function whatLine(s: any): string {
   const w = s.spec && !s.race && !s.cancelled ? whatText(s) : '';
-  // Auftrag 35: Lauf/Rad umschaltbar zwischen Minuten und km
-  return w ? `<div class="pr-what" data-what>${esc(w)}${viewToggle(s, 'inline')}</div>` : '';
+  return w ? `<div class="pr-what" data-what>${esc(w)}</div>` : '';
 }
 const restRow = (x: DayInfo) => `<div class="pr pr-rest" data-rest-day><span class="ic" style="--c:var(--rest)">${ic('moon')}</span><span class="pr-t muted">${esc(x.before ? t('plan.beforeStart') : t('plan.restDay'))}</span></div>`;
 /* aufgeklappter Tag: angetippt, sonst heute (in anderen Wochen keiner) */

@@ -1,13 +1,16 @@
 /* Auftrag 37: der „Ablauf“ einer Einheit – eine Liste von oben nach unten (Aufwärmen → Sätze mit Wiederholungen → Ausklang; Kraft: Übungen).
    Jede Zeile: Ist fett, Soll grau, kurzes Urteil. Antippen öffnet ein Fenster von unten nur für diesen Teil (sectionsui.ts, intervalsui.ts,
    Übung hier). In der Liste klappt nichts auf. Das Diagramm oben dient der Übersicht; Antippen öffnet dasselbe Fenster (kein zweiter Weg).
-   „Wie geplant gemacht“ füllt den ganzen Ablauf mit dem Soll (shared/ablauf fillAsPlanned), „+ Abschnitt / Satz hinzufügen“ am Ende. */
+   „+ Abschnitt / Satz hinzufügen“ am Ende. Auftrag 38: der Ablauf ist der einzige Ort für das Gemachte (keine Knöpfe „Wie geplant“ /
+   „Anders gemacht“ mehr); er enthält die ganze Einheit, darunter die Summe geplant / gemacht. */
 import { esc } from '../util';
 import { on, openSub, srcBadge } from '../kit';
 import { buildAblauf, type Ablauf, type AbSec, type AbSet, type AbEx } from '../../../shared/ablauf';
 import { mainPart, mainText, plannedShape, partLabel } from '../../../shared/sections';
 import { secToPace } from '../../../shared/intervals';
 import { diagramSvg } from '../../../shared/workoutdiagram';
+import { totals as specTotals } from '../../../shared/workouts';
+import { actualMetrics } from '../../../shared/results';
 import { HOST, attrsOf, tgOf, actOf, SUB, setSubKey, UIH, type Tg } from './ablaufstate';
 import { subOpen } from '../kit';
 import { repLine, repSheet, repTitle, setSheet, setTitle } from './intervalsui';
@@ -81,6 +84,16 @@ export function ablaufBlock(tg: Tg, o: AbOpts): string {
   const srcIv = ab.ivSource !== 'none' && hasSets ? SRC[ab.ivSource] : null, srcSec = ab.secSource !== 'none' ? SRC[ab.secSource] : null;
   const autoAvail = !!act && ab.ivSource === 'manual' && hasSets;
   const when = planned && planned.spec && planned.spec.when ? `<div class="xs muted">${esc(planned.spec.when)}</div>` : '';
+  // Auftrag 38: Summe des Ablaufs = Dauer bzw. Strecke der Einheit (geplant und gemacht)
+  const sumLine = (() => {
+    if (!planned || !planned.spec || tg.sport === 'strength') return '';
+    const pt = specTotals(planned.spec); const m = actualMetrics(st, act);
+    const swim = tg.sport === 'swim'; const pv = swim ? Math.round((pt.km || 0) * 1000) : planned.plannedMinutes || pt.min;
+    const dv = swim ? (m.meters != null && m.meters !== '' ? Math.round(+String(m.meters).replace(',', '.')) : null) : m.min != null && m.min !== '' ? Math.round(+String(m.min).replace(',', '.')) : null;
+    const u = swim ? ' m' : ' min';
+    const done = st.completed ? (dv != null ? `${dv}${u}` : `${pv}${u} (wie geplant)`) : dv != null ? `${dv}${u}` : '';
+    return `<div class="xs ab-sum" data-ab-sum><span class="muted">Summe:</span> geplant <b data-sum-plan>${pv}${u}</b>${done ? ` · gemacht <b data-sum-done>${esc(done)}</b>` : ''}</div>`;
+  })();
   const list = ab.items.map(it => it.kind === 'sec' ? secRow(it, attrs, o.editable) : it.kind === 'set' ? setRow(it, attrs, o.editable) : exRow(it as AbEx, attrs, o.editable)).join('');
   const empty = !ab.items.length ? `<div class="xs muted" data-ab-empty>${tg.sport === 'strength' ? 'Noch keine Übungen. Füge die erste hinzu.' : 'Noch nichts eingetragen.'}</div>` : '';
   const canAdd = o.editable && (tg.sport === 'strength' || (mode !== 'none' && ['run', 'bike', 'swim'].includes(tg.sport)) || ab.missingParts.length > 0);
@@ -91,6 +104,7 @@ export function ablaufBlock(tg: Tg, o: AbOpts): string {
     ${mp ? `<div class="small" data-sec-main><b>${esc(mainText(mp, tg.sport === 'swim' ? null : lthr, tg.sport, plannedShape(planned).zone))}</b></div>` : ''}
     ${sum.length ? `<div class="xs" data-iv-sum>${sum.map(x => `<div>${esc(x)}</div>`).join('')}</div>` : ''}
     ${list ? `<ol class="ab-list">${list}</ol>` : empty}
+    ${sumLine}
     ${o.extra || ''}
     ${addBtn}</div>`;
 }

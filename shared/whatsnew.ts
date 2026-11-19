@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.26.0', items: [
+    'Der Ablauf zeigt jetzt die ganze Einheit, auch lockere Teile (z. B. 20 min locker vor den Hügelsprints), mit Summe geplant und gemacht. Was du einträgst (z. B. 3 × 10 statt 2 × 8 min), steht danach überall: Titel, Coach, Belastung, Woche.',
+    'Einfacher eintragen: im Satz oben Wiederholungen [−] [+], Dauer und Pause. Gleicher Satz neu? Die App fragt „Zu Satz 1 hinzufügen?“. Abgehakt ohne Werte gilt wie geplant. Minuten und km stehen jetzt immer zusammen.',
+    'Kurze Sprints und Hügel: Gefühl statt Puls bzw. Tempo. Umwandeln zeigt vorher eine Vorschau (Vorher → Nachher, Woche) und andere Vorschläge; „Original wiederherstellen“ geht auch später.'
+  ] },
   { version: '3.25.0', items: [
     'Einheiten übersichtlich: ein „Ablauf“ von oben nach unten (Aufwärmen → Sätze → Ausklang; Kraft: Übungen), je Zeile Soll, Ist und Urteil. Antippen öffnet ein Fenster nur für diesen Teil – auch über das Bild oben. Nichts klappt mehr auf.',
     "„Wie geplant gemacht“ füllt den ganzen Ablauf, danach änderst du nur, was anders war. Nach Löschen oder Ändern kannst du alles rückgängig machen, auch mehrere Schritte.",

@@ -4,9 +4,11 @@
    Ein Modell für Anzeige und Bearbeiten: jede Zeile hat Soll (grau), Ist (fett) und ein kurzes Urteil (✓, zu hart, zu locker, anders …).
    Gespeichert wird weiter in den bestehenden Feldern (metrics.sections, metrics.intervals, metrics.exercises), damit vorhandene Daten,
    Coach, Scores, Schwimm-Stufen und Sync unverändert weiterlaufen (siehe ENTSCHEIDUNGEN.md). */
-import { plannedIntervals, evaluateIntervals, actualRows, stampRows, ivGroups, ivAttrs, ivDiff, targetOfRow, rowHasValues, secToPace, strokeLabel,
+import { plannedIntervals, evaluateIntervals, actualRows, stampRows, ivGroups, ivAttrs, ivDiff, targetOfRow, rowHasValues, secToPace, strokeLabel, stepOrder,
   type IvRow, type IvTarget, type IvThresholds, type IvLine, type IvEval } from './intervals';
-import { sectionsOf, SEC_PARTS, plannedShape, zoneOfHr, applyTotals, type SecRow, type SecPart, type SecResult } from './sections';
+import { sectionsOf, SEC_PARTS, plannedShape, zoneOfHr, applyTotals, plannedPart, type SecRow, type SecPart, type SecResult } from './sections';
+export { plannedPart };
+import { changedOf, actualTitle } from './results';
 
 export type AbSport = 'run' | 'bike' | 'swim' | 'strength';
 export interface AbVerdict { word: string; cls: '' | 'good' | 'bad' | 'warn' | 'info' | 'plan' }
@@ -39,10 +41,28 @@ export function ivRowsFor(planned: any, st: any, act: any, thr: IvThresholds, sp
   const e = evaluateIntervals(planned || { sport }, st || {}, act, thr, sport);
   const ar = actualRows(st || {}, act, sport);
   let rows: IvRow[];
-  if (ar.source === 'manual' || ar.source === 'plan') rows = ar.rows.map(r => ({ ...r }));
-  else if (!e) rows = targets.map(() => ({}));
-  else rows = [...e.lines.filter(l => !l.extra).map(l => (l.row ? { ...l.row } : {})), ...e.lines.filter(l => l.extra).map(l => ({ ...l.row! }))];
+  if (ar.source === 'manual' || ar.source === 'plan') {
+    rows = ar.rows.map(r => ({ ...r }));
+    // Auftrag 38: Listen von vor 3.26 kennen die lockeren Teile des Hauptteils nicht – an ihrer Stelle (leer, also „wie geplant“) einfügen
+    if (!rows.some(r => r && r.full) && targets.some(t => t.steady)) rows = withSteady(stampRows(rows, targets, sport), targets);
+  }
+  else if (!e) rows = stepOrder(targets).map(t => ({ ti: t.i }));
+  else rows = [...e.lines.filter(l => !l.extra).map(l => (l.row ? { ...l.row, ti: l.target ? l.target.i : null } : { ti: l.target ? l.target.i : null })), ...e.lines.filter(l => l.extra).map(l => ({ ...l.row!, ti: null }))];
   return { rows: stampRows(rows, targets, sport), targets, e };
+}
+/** fehlende lockere Teile an ihrer Stelle einfügen (Reihenfolge der Einheit) */
+function withSteady(rows: IvRow[], targets: IvTarget[]): IvRow[] {
+  const ord = stepOrder(targets); const pos = new Map(ord.map((t, k) => [t.i, k]));
+  const used = new Set(rows.filter(r => r && r.ti != null).map(r => r.ti!));
+  const out = [...rows];
+  for (const t of ord) {
+    if (!t.steady || used.has(t.i)) continue;
+    const p = pos.get(t.i)!;
+    let at = out.length; let cur = -1;
+    for (let k = 0; k < out.length; k++) { const r = out[k]; if (r && r.ti != null && pos.has(r.ti)) cur = pos.get(r.ti)!; if (cur > p) { at = k; break; } }
+    out.splice(at, 0, { ti: t.i, set: t.set, steady: true });
+  }
+  return out;
 }
 /** Urteil zu Zeile i: von Hand über die Zeile selbst, sonst die zugeordnete Zeile */
 function lineOf(e: IvEval | null, rows: IvRow[], i: number, own: boolean, nTargets: number): IvLine | null {
@@ -54,9 +74,10 @@ function lineOf(e: IvEval | null, rows: IvRow[], i: number, own: boolean, nTarge
 export function repSoll(t: IvTarget | null, sport: string): string {
   if (!t) return 'ohne Soll';
   const size = sport === 'swim' ? (t.m ? `${t.m} m` : t.label) : t.sec ? minTxt(t.sec) : t.label;
-  const what = sport === 'swim' ? [strokeLabel(t.stroke), (t.gear || []).length ? `mit ${t.gear!.map(g => g === 'buoy' ? 'Pull Buoy' : g === 'board' ? 'Kickboard' : g === 'paddles' ? 'Paddles' : g === 'fins' ? 'Flossen' : g).join(' und ')}` : ''].filter(Boolean).join(' ') : `Zone ${t.zone}`;
+  const what = sport === 'swim' ? [strokeLabel(t.stroke), (t.gear || []).length ? `mit ${t.gear!.map(g => g === 'buoy' ? 'Pull Buoy' : g === 'board' ? 'Kickboard' : g === 'paddles' ? 'Paddles' : g === 'fins' ? 'Flossen' : g).join(' und ')}` : ''].filter(Boolean).join(' ') : t.title ? t.title : t.hill ? 'bergauf' : `Zone ${t.zone}`;
   const perf = sport === 'swim' && t.pace100 ? `${clock(t.pace100[0])}-${clock(t.pace100[1])}/100 m` : sport === 'run' && t.pace ? `${clock(t.pace[0])}-${clock(t.pace[1])}/km` : sport === 'bike' && t.power ? `${t.power[0]}-${t.power[1]} W` : t.hr ? `Puls ${t.hr[0]}${t.hr[1] ? '-' + t.hr[1] : '+'}` : '';
-  return [[size, what].filter(Boolean).join(' '), perf].filter(Boolean).join(' · ');
+  // Auftrag 38: kurze bzw. Berg-Wiederholungen: Ausführung statt Puls bzw. Tempo
+  return [[size, what].filter(Boolean).join(' '), t.cue || '', perf].filter(Boolean).join(' · ');
 }
 /** Ist einer Wiederholung („1:41 · 1:41/100 m · Puls 150“); Strecke bzw. Dauer nur, wenn anders als geplant */
 export function repIst(r: IvRow, t: IvTarget | null, sport: string): string {
@@ -79,10 +100,11 @@ export function repIst(r: IvRow, t: IvTarget | null, sport: string): string {
   if (r.aborted) bits.push('abgebrochen');
   return bits.join(' · ');
 }
-function repVerdict(l: IvLine | null, r: IvRow, t: IvTarget | null, done: boolean): AbVerdict | null {
+function repVerdict(l: IvLine | null, r: IvRow, t: IvTarget | null, done: boolean, watch = false): AbVerdict | null {
   const diff = l && l.diff && l.diff.length;
   if (l && l.extra) return VERDICT.extra;
-  if (!rowHasValues(r)) return t && done ? VERDICT.missing : t ? null : VERDICT.extra;
+  // Auftrag 38: nicht eingetragen in einer erledigten Einheit = wie geplant (nicht gemessen); nur aus der Uhr heißt „nicht gefunden“ nicht gemacht
+  if (!rowHasValues(r)) return t && done ? (watch ? (t.steady ? null : VERDICT.missing) : VERDICT.plan) : t ? null : VERDICT.extra;
   if (!t) return VERDICT.extra;
   const v = l ? l.verdict : null;
   if (v === 'plan') return diff ? VERDICT.other : VERDICT.plan;
@@ -91,14 +113,6 @@ function repVerdict(l: IvLine | null, r: IvRow, t: IvTarget | null, done: boolea
 }
 
 /* ---------- Abschnitte ---------- */
-/** geplante Minuten (Schwimmen: Meter) eines Abschnitts (vorher plannedMin in web/src/views/sectionsui.ts) */
-export function plannedPart(planned: any, part: SecPart): number | null {
-  const steps: any[] = (planned && planned.spec && planned.spec.steps) || [];
-  if (part === 'tech') { const t = steps.filter(s => s.part === 'main' && ['drill', 'kick'].includes(s.mode)); return t.length ? t.reduce((a, s) => a + (s.reps || 1) * (s.m || 0), 0) : null; }
-  const ss = steps.filter(s => s.part === part && (part !== 'main' || !['drill', 'kick'].includes(s.mode)));
-  if (!ss.length) return null;
-  return planned.sport === 'swim' ? ss.reduce((a, s) => a + (s.reps || 1) * (s.m || 0), 0) : ss.reduce((a, s) => a + (s.reps || 1) * (s.min || 0) + Math.max(0, (s.reps || 1) - 1) * (s.restMin || 0), 0);
-}
 /** Welche Abschnitte zeigt der Ablauf? Alle der Sportart; mit Sätzen kein „Hauptteil“ (die Sätze sind der Hauptteil);
     Schwimm-Technik nur, wenn geplant oder eingetragen; gelöschte (off) nicht. */
 export function partsShown(sport: string, planned: any, secRows: SecRow[], hasSets: boolean): { shown: SecPart[]; missing: SecPart[] } {
@@ -131,8 +145,9 @@ export function secIst(r: SecRow | null, sport: string): string {
   if (num(r.hr) != null) bits.push(`Puls ${Math.round(num(r.hr)!)}`);
   return bits.join(' · ');
 }
-function secVerdict(r: SecRow | null, part: SecPart, planned: any, sport: string, lthr: number | null | undefined): AbVerdict | null {
-  if (!r || r.off || !secIst(r, sport)) return null;
+function secVerdict(r: SecRow | null, part: SecPart, planned: any, sport: string, lthr: number | null | undefined, done = false, watch = false): AbVerdict | null {
+  // Auftrag 38: abgehakt ohne Werte = wie geplant (nicht gemessen); aus der Uhr ohne Abschnitt kein Urteil
+  if (!r || r.off || !secIst(r, sport)) return done && !watch && !(r && r.off) && plannedPart(planned, part) != null ? VERDICT.plan : null;
   if (r.plan) return VERDICT.plan;
   const z = part === 'main' ? plannedShape(planned).zone : null;
   if (z && lthr && num(r.hr) != null && sport !== 'swim') { const got = zoneOfHr(num(r.hr)!, lthr); return got > z ? VERDICT.hard : got < z - 1 ? VERDICT.easy : VERDICT.ok; }
@@ -159,7 +174,8 @@ export function buildAblauf(planned: any, st: any, act: any, thr: IvThresholds, 
     list.forEach((e, i) => {
       const p = soll.find(x => x.name === e.name) || null;
       const ist = own ? exTxt(e) : '';
-      const v = !own ? null : e.plan ? VERDICT.plan : !p ? VERDICT.extra : String(p.sets) === String(e.sets) && String(p.reps) === String(e.reps) ? VERDICT.ok : VERDICT.other;
+      // Auftrag 38: abgehakt ohne eigene Übungen = wie geplant (nicht gemessen)
+      const v = !own ? (o.done ? VERDICT.plan : null) : e.plan ? VERDICT.plan : !p ? VERDICT.extra : String(p.sets) === String(e.sets) && String(p.reps) === String(e.reps) ? VERDICT.ok : VERDICT.other;
       items.push({ kind: 'ex', key: 'ex:' + i, i, label: e.name || `Übung ${i + 1}`, soll: p ? exTxt(p) : own ? '' : exTxt(e), ist: e.plan ? 'wie geplant' : ist, verdict: v, plan: !!e.plan });
     });
     return { sport, items, e: null, targets: [], rows: [], sec: null, missingParts: [], ivSource: 'none', secSource: 'none' };
@@ -180,7 +196,7 @@ export function buildAblauf(planned: any, st: any, act: any, thr: IvThresholds, 
   const e2 = own ? evaluateIntervals(pl || { sport }, { ...(st || {}), metrics: { ...((st && st.metrics) || {}), intervals: rows }, metricsSrc: { ...((st && st.metricsSrc) || {}), intervals: 'manual' } }, act, thr, sport) : e;
   const secItem = (p: SecPart): AbSec => {
     const r = sec.rows.find(x => x.part === p) || null;
-    return { kind: 'sec', key: 'sec:' + p, part: p, label: ((SEC_PARTS as any)[sport] as [SecPart, string][]).find(x => x[0] === p)![1], soll: secSoll(planned, p, sport), ist: secIst(r, sport), verdict: secVerdict(r, p, planned, sport, lthr), plan: !!(r && r.plan), row: r };
+    return { kind: 'sec', key: 'sec:' + p, part: p, label: ((SEC_PARTS as any)[sport] as [SecPart, string][]).find(x => x[0] === p)![1], soll: secSoll(planned, p, sport), ist: secIst(r, sport), verdict: secVerdict(r, p, planned, sport, lthr, !!o.done, !['manual', 'plan', 'none'].includes(sec.source)), plan: !!(r && r.plan), row: r };
   };
   const before = shown.filter(p => p === 'warm' || p === 'tech'), after = shown.filter(p => p === 'main' || p === 'cool');
   before.forEach(p => items.push(secItem(p)));
@@ -190,7 +206,7 @@ export function buildAblauf(planned: any, st: any, act: any, thr: IvThresholds, 
         const r = rows[i] || {}; const t = targetOfRow(rows, targets, i); const l = lineOf(e2, rows, i, own, targets.length);
         const d = l && l.diff && l.diff.length ? l.diff : rowHasValues(r) ? ivDiff(ivAttrs(r, t, sport), t, sport) : [];
         const ist = [repIst(r, t, sport), d.length ? diffText(d) : ''].filter(Boolean).join(' · ');
-        return { kind: 'rep', key: 'rep:' + i, i, n: k + 1, soll: repSoll(t, sport), ist, verdict: repVerdict(l, r, t, !!o.done), plan: !!r.plan, line: l };
+        return { kind: 'rep', key: 'rep:' + i, i, n: k + 1, soll: repSoll(t, sport), ist, verdict: repVerdict(l, r, t, !!o.done, !own && ar.source !== 'none'), plan: !!r.plan, line: l };
       });
       // Satz-Kopf: „3 × 100 m Brust · 2/3 im Ziel“ bzw. bei gemischten Lagen „3 × 100 m (2 Brust, 1 Kraul)“
       let label = g.label;
@@ -252,5 +268,98 @@ export function fillAsPlanned(planned: any, st0: any, act: any, thr: IvThreshold
       if (sec.source !== 'manual') delete st.metricsManual.sections;
     }
   }
-  return applyTotals(st, sport, ivRows ?? undefined, targets);
+  return applyTotals(st, sport, ivRows ?? undefined, targets, planned);
+}
+
+/* ---------- Auftrag 38: „Gemacht gilt überall“ ----------
+   Aus dem eingetragenen Ablauf entsteht, was wirklich gemacht wurde: Titel („Rad 3 × 10 min Sweet Spot, statt 2 × 8 min“), die Änderungen
+   in Worten („3 × 10 min statt 2 × 8 min“, „Aufwärmen 10 statt 15 min“) und ob es mehr oder weniger Belastungszeit war. Vorher wurden die
+   Zahlen übernommen, Titel, Beschreibung und Coach blieben aber beim Plan. Eine Stelle für Einheit, Listen, Coach (Bewertung, Chat,
+   KI-Kontext); Belastung, Scores, Woche und Trends lesen die Gesamtwerte, die applyTotals aus demselben Ablauf rechnet.
+   Werte der Uhr (Runden) ändern den Titel nicht – dort ist das Gemessene ohnehin das Gemachte. */
+export interface DoneSummary { changed: boolean; title: string; planTitle: string; changes: string[]; /** nur Sätze/Wiederholungen */ setChanges: string[]; short: string;
+  /** Belastungszeit der harten Sätze in Minuten (Schwimmen: Meter): geplant / gemacht */ workPlan: number; workDone: number; more: 'more' | 'less' | null;
+  /** Wort der Belastung („Sweet Spot“, „Schwelle“, „Zone 3“) */ word: string }
+const SPN: Record<string, string> = { run: 'Lauf', bike: 'Rad', swim: 'Schwimmen' };
+const ZW: Record<number, string> = { 1: 'ganz locker', 2: 'locker', 3: 'zügig', 4: 'Schwelle', 5: 'sehr hart' };
+function wordOf(planned: any, t: IvTarget | null, zone: number | null, sport: string): string {
+  if (t && t.title) return t.title;
+  if (t && t.hill) return 'bergauf';
+  if (sport === 'swim') return t && t.stroke ? strokeLabel(t.stroke) : '';
+  const z = zone ?? (t ? t.zone : null);
+  if (planned && planned.spec && planned.spec.kind === 'sweetspot' && z === 3) return 'Sweet Spot';
+  return z ? ZW[z] || `Zone ${z}` : '';
+}
+const sizeT = (v: number | null, sport: string) => (v == null ? '' : sport === 'swim' ? `${Math.round(v)} m` : minTxt(v));
+const descT = (n: number, size: number | null, sport: string) => `${n > 1 ? `${n} × ` : ''}${sizeT(size, sport)}`.trim();
+const mode = (a: number[]) => { const c = new Map<number, number>(); a.forEach(x => c.set(x, (c.get(x) || 0) + 1)); return [...c.entries()].sort((p, q) => q[1] - p[1])[0]?.[0] ?? null; };
+export function doneSummary(planned: any, st: any, act: any, thr: IvThresholds, sport: string): DoneSummary | null {
+  if (!planned || !planned.spec || planned.sport !== sport || !['run', 'bike', 'swim'].includes(sport)) return null;
+  const ab = buildAblauf(planned, st, act, thr, sport, { done: true });
+  const own = ab.ivSource === 'manual' || ab.ivSource === 'plan';
+  const swim = sport === 'swim';
+  const changes: string[] = [];
+  const targets = ab.targets; const rows = ab.rows;
+  const byStep = new Map<number, IvTarget[]>(); stepOrder(targets).forEach(t => { const l = byStep.get(t.set) || []; l.push(t); byStep.set(t.set, l); });
+  const sizeOfT = (t: IvTarget | null) => (t ? (swim ? t.m : t.sec) : null);
+  let workPlan = 0, workDone = 0; const hardPlan: string[] = [], hardDone: string[] = []; let word = ''; let hardChanged = false;
+  byStep.forEach(ts => { if (!ts[0].steady) { workPlan += ts.reduce((a, t) => a + (sizeOfT(t) || 0), 0); hardPlan.push(descT(ts.length, sizeOfT(ts[0]), sport)); if (!word) word = wordOf(planned, ts[0], null, sport); } });
+  if (own) {
+    const groups = ivGroups(rows, targets, sport);
+    const seen = new Set<number>();
+    groups.forEach(g => {
+      const m = /^[sp](\d+)$/.exec(g.key); const si = m ? +m[1] : null;
+      const ts = si != null ? byStep.get(si) || null : null;
+      const t0 = ts ? ts[0] : g.target;
+      const sizes = g.idx.map(i => { const r = rows[i] || {}; const v = swim ? num(r.m) : num(r.sec); return v ?? sizeOfT(targetOfRow(rows, targets, i)); }).filter((x): x is number => x != null);
+      const size = mode(sizes);
+      const zone = g.attrs ? g.attrs.zone : null;
+      const steady = t0 ? !!t0.steady && !(zone != null && zone >= 3) : zone != null && zone <= 2;
+      const dDesc = descT(g.reps, size, sport);
+      const w = wordOf(planned, t0, zone, sport);
+      if (!steady) { workDone += sizes.reduce((a, x) => a + x, 0); hardDone.push(dDesc); }
+      if (!ts) { changes.push(`zusätzlich ${[dDesc, w].filter(Boolean).join(' ')}`); if (!steady) hardChanged = true; return; }
+      seen.add(si!);
+      const pDesc = descT(ts.length, sizeOfT(ts[0]), sport);
+      const sizeDiff = size != null && sizeOfT(ts[0]) != null && Math.abs(size - sizeOfT(ts[0])!) > (swim ? 0 : 2);
+      if (g.reps !== ts.length || sizeDiff) { changes.push(`${dDesc} statt ${pDesc}`); if (!ts[0].steady || !steady) hardChanged = true; }
+      if (zone != null && zone !== ts[0].zone) { changes.push(`${dDesc} in Zone ${zone} statt ${ts[0].zone}`); if (!ts[0].steady) hardChanged = true; }
+    });
+    byStep.forEach((ts, si) => { if (!seen.has(si) && rows.length) { changes.push(`ohne ${[descT(ts.length, sizeOfT(ts[0]), sport), wordOf(planned, ts[0], null, sport)].filter(Boolean).join(' ')}`); if (!ts[0].steady) hardChanged = true; } });
+  } else workDone = workPlan;
+  const setChanges = [...changes];
+  // Abschnitte (Aufwärmen, Technik, Ausklang): eigene Werte gegen das Soll
+  ab.items.forEach(it => {
+    if (it.kind !== 'sec') return;
+    const pm = plannedPart(planned, it.part); if (!pm) return;
+    const r = it.row; if (!r || r.plan || !(ab.secSource === 'manual')) return;
+    const got = swim ? num(r.meters) : num(r.min); if (got == null) return;
+    if (Math.abs(got - pm) >= (swim ? 25 : 1) && Math.abs(got - pm) / pm >= 0.1) changes.push(`${it.label} ${String(Math.round(got * 10) / 10).replace('.', ',')} statt ${pm}${swim ? ' m' : ' min'}`);
+  });
+  const secs = ab.sec ? ab.sec.rows : [];
+  secs.filter(r => r.off).forEach(r => { const pm = plannedPart(planned, r.part); if (pm) changes.push(`ohne ${((SEC_PARTS as any)[sport] as [SecPart, string][]).find(x => x[0] === r.part)![1]}`); });
+  const planTitle = String(planned.title || '');
+  const more = !own || !workPlan ? null : workDone > workPlan * 1.02 ? 'more' : workDone < workPlan * 0.98 ? 'less' : null;
+  const title = hardChanged && hardDone.length ? `${SPN[sport]} ${hardDone.join(' + ')}${word ? ' ' + word : ''}${hardPlan.length ? `, statt ${hardPlan.join(' + ')}` : ''}` : planTitle;
+  return { changed: changes.length > 0, title, planTitle, changes, setChanges, short: changes.join('; '), workPlan, workDone, more, word };
+}
+/** Satz für den Coach („3 × 10 min statt 2 × 8 min – mehr Sweet-Spot-Zeit (30 statt 16 min), gut.“) */
+export function doneSentence(d: DoneSummary | null): string {
+  if (!d || !d.changed) return '';
+  const unit = d.title.startsWith('Schwimmen') ? 'm' : 'min';
+  const fmt = (x: number) => unit === 'm' ? `${Math.round(x)} m` : `${Math.round(x / 60)} min`;
+  const w = d.word && !/locker/.test(d.word) ? `${d.word.replace(/ /g, '-')}-Zeit` : 'Belastungszeit';
+  const head = (d.setChanges.length ? d.setChanges : d.changes).slice(0, 3).join(', ');
+  const rest = d.setChanges.length ? d.changes.filter(x => !d.setChanges.includes(x)).slice(0, 2) : [];
+  const tail = rest.length ? ` ${rest.join(', ').replace(/^./, c => c.toUpperCase())}.` : '';
+  if (d.more === 'more') return `${head} – mehr ${w} (${fmt(d.workDone)} statt ${fmt(d.workPlan)})${d.workDone > d.workPlan * 2 ? ', deutlich mehr als geplant: das kostet mehr Erholung, morgen locker' : ', gut'}.${tail}`;
+  if (d.more === 'less') return `${head} – weniger ${w} als geplant (${fmt(d.workDone)} statt ${fmt(d.workPlan)}); gezählt wird, was du gemacht hast.${tail}`;
+  return `${head} – gezählt wird das Gemachte.${tail}`;
+}
+/** Titel des Gemachten für alle Stellen (frühere Änderung „anders gemacht“ zuerst, sonst der Ablauf, sonst der Plan) */
+export function doneTitle(s: any, st: any, act: any, thr: IvThresholds): string {
+  if (!s) return '';
+  if (changedOf(st)) return actualTitle(s, st, act);
+  if (!st || !st.completed) return s.title;
+  try { const d = doneSummary(s, st, act, thr, s.sport); return d && d.changed ? d.title : s.title; } catch (_) { return s.title; }
 }

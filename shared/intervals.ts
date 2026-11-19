@@ -33,6 +33,9 @@ export interface IvRow {
   set?: number | null; ti?: number | null;
   /** Auftrag 37: mit „Wie geplant gemacht“ aus dem Soll gefüllt (nicht gemessen) – zählt als gemacht, aber nie als Messwert für Tempo/Scores */
   plan?: boolean;
+  /** Auftrag 38: lockerer Teil (aus einem lockeren Hauptteil-Schritt, kein Intervall); full = Liste enthält die ganze Einheit (ab 3.26, auch die lockeren Teile);
+      sep = eigener Satz (Frage „Zu Satz X hinzufügen?“ mit Nein beantwortet) */
+  steady?: boolean; full?: boolean; sep?: boolean;
 }
 export type IvStroke = 'crawl' | 'breast' | 'back' | 'fly' | 'im' | 'drill' | 'kick';
 export const IV_STROKES: [IvStroke, string][] = [['crawl', 'Kraul'], ['breast', 'Brust'], ['back', 'Rücken'], ['fly', 'Delfin'], ['im', 'Lagen'], ['drill', 'Technikübung'], ['kick', 'Beine']];
@@ -58,6 +61,8 @@ export interface IvTarget {
   pace?: [number, number] | null; power?: [number, number] | null; speed?: [number, number] | null; pace100?: [number, number] | null; hr?: [number, number | null] | null;
   /** RPE-Ziel */ rpe: [number, number];
   /** Auftrag 36: geplante Lage und Hilfsmittel (Schwimmen) */ stroke?: IvStroke | null; gear?: string[];
+  /** Auftrag 38: lockerer Teil des Hauptteils (kein Intervall), Ausführung statt Zahlen (kurz/bergauf), bergauf, eigener Titel */
+  steady?: boolean; cue?: string; hill?: boolean; title?: string;
 }
 export type IvVerdict = 'ok' | 'hard' | 'easy' | 'short' | 'missing' | 'plan' | null;
 export interface IvLine { target: IvTarget | null; row: IvRow | null; verdict: IvVerdict; why: string; extra: boolean; done: boolean;
@@ -97,6 +102,28 @@ function isIvStep(spec: W.Spec, s: W.Step): boolean {
   if (spec.sport !== 'run' && spec.sport !== 'bike') return false;
   return !!s.min && (s.zone || 2) >= 3;
 }
+/* Auftrag 38: „Ablauf enthält die ganze Einheit“. Vorher fehlten lockere Hauptteile (z. B. „20 min locker Z2“ vor den Hügelsprints) im
+   Ablauf, weil nur Schritte ab Zone 3 Intervalle wurden – die Summe stimmte nicht. Jetzt wird jeder Hauptteil-Schritt ein Ziel, sobald der
+   Hauptteil aus mehr als einem Schritt besteht (gleichmäßige Einheiten mit genau einem Hauptteil bleiben der Abschnitt „Hauptteil“ mit der
+   Erkennung aus der Uhr). Lockere Teile tragen steady: true – sie werden gegen ihre eigene Zone bewertet, zählen aber nicht als „Intervall“
+   (Ø der Intervalle, Abfall, Anzahl im Ziel, Scores). Schwimm-Technik (Übungen, Beine) bleibt im Abschnitt „Technik“.
+   Damit gespeicherte Zuordnungen (ti) gültig bleiben, stehen die neuen lockeren Ziele HINTER den bisherigen; die Reihenfolge der Einheit
+   liefert stepOrder(). */
+function isSteadyStep(spec: W.Spec, s: W.Step): boolean {
+  if (s.part !== 'main' || s.walkOnly || s.walkMin || isIvStep(spec, s)) return false;
+  if (spec.sport === 'swim') return !!s.m && (SWIM_SET_MODES.has(s.mode || 'crawl') || s.mode === 'easy');
+  return (spec.sport === 'run' || spec.sport === 'bike') && !!s.min;
+}
+/** Ziele in der Reihenfolge der Einheit (Schritt, dann Wiederholung) */
+export function stepOrder(targets: IvTarget[]): IvTarget[] { return [...targets].sort((a, b) => a.set - b.set || a.rep - b.rep); }
+/** nur die harten Wiederholungen (Intervalle im engeren Sinn) */
+export const hardTargets = (targets: IvTarget[]) => targets.filter(t => !t.steady);
+/** Titel eines lockeren Teils aus der Notiz („Lauf-ABC“) */
+function steadyTitle(s: W.Step): string | null {
+  const n = String(s.note || '');
+  if (/^lauf-abc/i.test(n)) return 'Lauf-ABC';
+  return null;
+}
 export function plannedIntervals(session: any, thr: IvThresholds = {}): IvTarget[] {
   const spec: W.Spec | null = session && session.spec;
   if (!spec || !Array.isArray(spec.steps) || !(spec.sport === 'run' || spec.sport === 'bike' || spec.sport === 'swim')) return [];
@@ -107,24 +134,29 @@ export function plannedIntervals(session: any, thr: IvThresholds = {}): IvTarget
   if (thr.runThrSec) ctx.runThrSec = thr.runThrSec;
   if (thr.css) ctx.css = thr.css;
   const out: IvTarget[] = [];
-  spec.steps.forEach((s, si) => {
-    if (!isIvStep(spec, s)) return;
-    const zone = Math.max(1, Math.min(5, s.zone || 3));
+  // Hauptteil aus mehreren Schritten (ohne Schwimm-Technik): dann gehören auch die lockeren Schritte in den Ablauf
+  const withSteady = spec.steps.filter(s => isIvStep(spec, s) || isSteadyStep(spec, s)).length >= 2;
+  const mk = (s: W.Step, si: number, steady: boolean) => {
+    const zone = Math.max(1, Math.min(5, s.zone || (steady ? 2 : 3)));
     const reps = Math.max(1, s.reps || 1);
     const hrZ = HR_ZONES[zone - 1];
-    const hr: [number, number | null] | null = lthr && spec.sport !== 'swim' ? [Math.round(lthr * hrZ.low / 100), hrZ.high >= 999 ? null : Math.round(lthr * hrZ.high / 100)] : null;
+    // Auftrag 38: kurze Wiederholungen ohne Puls-Ziel, bergauf ohne Tempo-Ziel, dafür Ausführung und Gefühl
+    const short = W.isShortRep(spec, s), hill = W.isHillStep(spec, s);
+    const cue = W.repCue(spec, s); const cueRpe = W.repCueRpe(spec, s); const ttl = steadyTitle(s);
+    const hr: [number, number | null] | null = lthr && spec.sport !== 'swim' && !short ? [Math.round(lthr * hrZ.low / 100), hrZ.high >= 999 ? null : Math.round(lthr * hrZ.high / 100)] : null;
     let pace: [number, number] | null = null, power: [number, number] | null = null, speed: [number, number] | null = null, pace100: [number, number] | null = null;
-    if (spec.sport === 'run' && ctx.runThrSec) pace = W.runPaceRange(ctx, zone);
+    if (spec.sport === 'run' && ctx.runThrSec && !hill) pace = W.runPaceRange(ctx, zone);
     if (spec.sport === 'bike') {
       if (ftp) {
         if (spec.kind === 'sweetspot' && zone === 3) power = [Math.round(ftp * 0.88), Math.round(ftp * 0.94)];
         else { const pz = POWER_ZONES[zone - 1]; power = [Math.round(ftp * pz.low / 100), Math.round(ftp * (pz.high >= 999 ? 130 : pz.high) / 100)]; }
       }
-      if (ctx.bikeKmh && !ctx.indoor) { const v = W.bikeKmh(ctx, zone); speed = [Math.round(v * 0.95 * 10) / 10, Math.round(v * 1.05 * 10) / 10]; }
+      if (ctx.bikeKmh && !ctx.indoor && !hill) { const v = W.bikeKmh(ctx, zone); speed = [Math.round(v * 0.95 * 10) / 10, Math.round(v * 1.05 * 10) / 10]; }
     }
-    if (spec.sport === 'swim') { const p = W.swimPace(ctx, zone, (s.mode || 'crawl') as W.StrokeMode, s.gear || []); pace100 = [p - 4, p + 4]; }
+    if (spec.sport === 'swim') { const p = W.swimPace(ctx, zone, (s.mode === 'easy' ? 'crawl' : s.mode || 'crawl') as W.StrokeMode, s.gear || []); pace100 = [p - 4, p + 4]; }
     const gearP = spec.sport === 'swim' ? [...new Set([...(s.gear || []), ...(s.mode === 'pull' ? ['buoy'] : [])])] : [];
-    const base = { set: si, zone, mode: s.mode || null, pace, power, speed, pace100, hr, rpe: RPE_ZONE[zone], ...(spec.sport === 'swim' ? { stroke: modeToStroke(s.mode), gear: gearP } : {}) };
+    const base = { set: si, zone, mode: s.mode || null, pace, power, speed, pace100, hr, rpe: cueRpe || RPE_ZONE[zone], ...(spec.sport === 'swim' ? { stroke: modeToStroke(s.mode), gear: gearP } : {}),
+      ...(steady ? { steady: true } : {}), ...(cue ? { cue } : {}), ...(hill ? { hill: true } : {}), ...(ttl ? { title: ttl } : {}) };
     // viele sehr kurze Stücke (30/15, 20×25 m): ein Block statt vieler Zeilen
     const micro = spec.sport === 'swim' ? reps > 10 && (s.m || 0) <= 50 : reps > 8 && (s.min || 0) < 1;
     if (micro) {
@@ -139,8 +171,11 @@ export function plannedIntervals(session: any, thr: IvThresholds = {}): IvTarget
       out.push({ ...base, i: out.length, rep: k, reps, sec: spec.sport === 'swim' ? null : Math.round((s.min || 0) * 60), m: spec.sport === 'swim' ? s.m || null : null, restSec,
         label: spec.sport === 'swim' ? `${s.m} m${s.mode === 'pull' ? ' Pull Buoy' : s.mode === 'breast' ? ' Brust' : ''}` : minTxt((s.min || 0) * 60) });
     }
-  });
-  return out.slice(0, 40);
+  };
+  spec.steps.forEach((s, si) => { if (isIvStep(spec, s)) mk(s, si, false); });
+  if (out.length > 40) out.length = 40;
+  if (withSteady) spec.steps.forEach((s, si) => { if (isSteadyStep(spec, s)) mk(s, si, true); });
+  return out;
 }
 
 /* ---------- Auftrag 36: tatsächlich gemachte Art, Lage, Hilfsmittel ---------- */
@@ -161,11 +196,11 @@ export function ivAttrs(row: IvRow | null | undefined, t: IvTarget | null | unde
   const stroke = swim ? ((r.stroke as IvStroke) || (t && t.stroke) || null) : null;
   const gear = swim ? (Array.isArray(r.gear) ? r.gear.filter(Boolean) : (t && t.gear) || []) : [];
   const zone = r.zone != null && r.zone >= 1 && r.zone <= 5 ? r.zone : t ? t.zone : null;
-  const type = !swim ? (r.type || null) : null, terrain = !swim ? (r.terrain || null) : null;
+  const type = !swim ? (r.type || (t && t.hill ? "hill" : null)) : null, terrain = !swim ? (r.terrain || null) : null;
   const known = !swim || !!stroke;
   const size = sizeTxt(swim ? (r.m ? r : t) : (r.sec || r.m ? r : t), swim);
   const auto = swim ? [size, strokeLabel(stroke), gear.length ? 'mit ' + gear.map(gearLabel).join(' und ') : ''].filter(Boolean).join(' ')
-    : [size, type && type !== 'flat' ? typeLabel(sport, type) : '', zone ? 'Zone ' + zone : ''].filter(Boolean).join(' ');
+    : [size, t && t.title && !r.type && (r.zone == null || r.zone === t.zone) ? t.title : '', type && type !== 'flat' ? typeLabel(sport, type) : '', zone ? 'Zone ' + zone : ''].filter(Boolean).join(' ');
   const own = !!(r.title && String(r.title).trim());
   return { title: own ? String(r.title).trim() : auto || (t ? t.label : ''), stroke, gear, zone, type, terrain, known, ownTitle: own };
 }
@@ -179,7 +214,7 @@ export function ivDiff(a: IvAttrs, t: IvTarget | null, sport: string): string[] 
     if (g0 !== g1) out.push(a.gear.length ? `mit ${a.gear.map(gearLabel).join(' und ')}${t.gear && t.gear.length ? ` statt ${t.gear.map(gearLabel).join(' und ')}` : ' statt ohne Hilfsmittel'}` : `ohne Hilfsmittel statt mit ${(t.gear || []).map(gearLabel).join(' und ')}`);
   }
   if (a.zone && a.zone !== t.zone) out.push(`Zone ${a.zone} statt ${t.zone}`);
-  if (a.type && a.type !== 'flat') out.push(typeLabel(sport, a.type) || a.type);
+  if (a.type && a.type !== 'flat' && !(t.hill && a.type === 'hill')) out.push(typeLabel(sport, a.type) || a.type);
   if (a.terrain && sport !== 'swim') out.push(terrainLabel(sport, a.terrain) || a.terrain);
   return out;
 }
@@ -224,7 +259,7 @@ function groupLabel(n: number, a: IvAttrs, r: IvRow, t: IvTarget | null, sport: 
   const swim = sport === 'swim';
   const size = sizeTxt(swim ? (r.m ? r : t) : (r.sec || r.m ? r : t), swim);
   const what = swim ? [strokeLabel(a.stroke), a.gear.length ? a.gear.map(gearLabel).join(' + ') : ''].filter(Boolean).join(' · ')
-    : [a.type && a.type !== 'flat' ? typeLabel(sport, a.type) : '', a.zone ? 'Zone ' + a.zone : ''].filter(Boolean).join(' · ');
+    : [t && t.title && !a.ownTitle && a.zone === t.zone ? t.title : '', a.type && a.type !== 'flat' ? typeLabel(sport, a.type) : '', a.zone && !(t && (t.hill || t.title) && a.zone === t.zone) ? 'Zone ' + a.zone : ''].filter(Boolean).join(' · ');
   const base = `${n > 1 ? n + ' × ' : ''}${size || 'Intervall'}`;
   if (a.ownTitle) return /\d\s*[×x]\s*\d/.test(a.title) || n < 2 ? a.title : `${a.title} (${base})`;
   return [base, what].filter(Boolean).join(' ');
@@ -318,6 +353,9 @@ export function stampRows(rows: IvRow[], targets: IvTarget[], sport: string): Iv
     const r: IvRow = { ...(r0 || {}) }; const t = targetOfRow(rows, targets, i);
     if (r.ti === undefined) r.ti = rows.some(x => x && x.ti != null) ? null : (targets[i] ? i : null);
     if (r.set == null && t) r.set = t.set;
+    // Auftrag 38: lockere Teile kennzeichnen (Scores/Trends zählen sie nicht als Intervall), Liste enthält ab jetzt die ganze Einheit
+    if (t && t.steady) r.steady = true; else if (t) delete r.steady;
+    r.full = true;
     if (hasIst(r) && t) {
       if (sport === 'swim') { if (r.m == null && t.m) r.m = t.m; if (!r.stroke && t.stroke) r.stroke = t.stroke; if (!Array.isArray(r.gear)) r.gear = [...(t.gear || [])]; }
       else if (r.sec == null && r.m == null && t.sec) r.sec = t.sec;
@@ -492,6 +530,9 @@ function perf(r: IvRow, sport: IvSport): number | null {
   const p = paceToSec(r.pace100) ?? (r.m && r.sec ? r.sec / (r.m / 100) : null); return p ? 100 / p : null;
 }
 
+/** Auftrag 38: lockerer Teil statt Intervall (Ziel steady bzw. ohne Ziel in Zone 1-2) */
+export const steadyRow = (r: IvRow | null | undefined) => !!r && (!!r.steady || (r.zone != null && r.zone <= 2));
+const steadyLine = (l: IvLine) => (l.target ? !!l.target.steady && !(l.row && l.row.zone != null && l.row.zone >= 3) : steadyRow(l.row));
 /* ---------- Alles zusammen ---------- */
 export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresholds = {}, sportIn?: string): IvEval | null {
   const sport = (sportIn || (session && session.sport) || (act && act.sport)) as IvSport;
@@ -510,39 +551,48 @@ export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresh
     const j: { v: IvVerdict; why: string; zone?: 'faster' | 'slower' } = r.plan ? { v: t ? 'plan' : null, why: 'wie geplant eingetragen (nicht gemessen)' } : judge(t ? retarget(t, a, sport, pctx) : null, r, sport);
     return { target: t, row: r, verdict: j.v, why: j.why, extra: !t, done: true, ...(j.zone ? { zone: j.zone } : {}), attrs: a, ...(diff.length ? { diff } : {}) };
   };
+  // Auftrag 38: Reihenfolge der Einheit (lockere Teile stehen in targets hinten, im Ablauf an ihrer Stelle)
+  const ord = stepOrder(targets); const posOf = new Map(ord.map((t, k) => [t.i, k]));
   if (ar.aligned && ar.rows.some(r => r && r.ti != null)) {
     // von Hand mit Zuordnung (ti): Reihenfolge der Liste, nicht eingetragene Soll-Intervalle an ihrer Stelle
     const used = new Set(ar.rows.filter(r => r && hasIst(r) && r.ti != null).map(r => r.ti!));
     let next = 0;
-    const flush = (upto: number) => { for (; next < upto; next++) if (!used.has(next)) lines.push({ target: targets[next], row: null, verdict: 'missing', why: 'nicht eingetragen', extra: false, done: false }); };
+    const flush = (upto: number) => { for (; next < upto; next++) { const t = ord[next]; if (!used.has(t.i)) lines.push({ target: t, row: null, verdict: 'missing', why: 'nicht eingetragen', extra: false, done: false }); } };
     ar.rows.forEach(r => {
       if (!r || !hasIst(r)) return;
       const t = r.ti != null ? targets[r.ti] || null : null;
-      if (t) flush(r.ti!);
+      if (t) { const p = posOf.get(t.i)!; flush(p); if (next <= p) next = p + 1; }
       lines.push(doneLine(t, r));
     });
-    flush(targets.length);
+    flush(ord.length);
   } else if (ar.aligned) {
-    // von Hand (ältere Listen): Zeile i gehört zu Soll i, weitere Zeilen sind zusätzlich
-    const n = Math.max(targets.length, ar.rows.length);
-    for (let i = 0; i < n; i++) {
-      const t = targets[i] || null, r = ar.rows[i] || null;
+    // von Hand (ältere Listen ohne Zuordnung): Zeile i gehört zum i-ten Intervall, weitere Zeilen sind zusätzlich
+    const hard = hardTargets(targets); const hIdx = new Map(hard.map((t, k) => [t.i, k]));
+    ord.forEach(t => {
+      const r = t.steady ? null : ar.rows[hIdx.get(t.i)!] || null;
       if (r && hasIst(r)) lines.push(doneLine(t, r));
-      else if (t) lines.push({ target: t, row: r, verdict: 'missing', why: 'nicht eingetragen', extra: false, done: false });
-    }
+      else lines.push({ target: t, row: r, verdict: 'missing', why: 'nicht eingetragen', extra: false, done: false });
+    });
+    for (let k = hard.length; k < ar.rows.length; k++) { const r = ar.rows[k]; if (r && hasIst(r)) lines.push(doneLine(null, r)); }
   } else {
-    const { pairs, extra } = alignRows(targets, ar.rows, sport);
+    // aus der Uhr: nur die harten Wiederholungen werden den Runden zugeordnet; lockere Teile bleiben ohne eigenes Urteil
+    const hard = hardTargets(targets);
+    const { pairs, extra } = alignRows(hard, ar.rows, sport);
+    const pairOf = new Map(hard.map((t, k) => [t.i, pairs[k]]));
     const items: { at: number; line: IvLine }[] = [];
     let lastAt = -1;
-    targets.forEach((t, i) => {
-      const j = pairs[i]; const r = j == null ? null : ar.rows[j];
+    ord.forEach(t => {
+      if (t.steady) { lastAt += 0.001; items.push({ at: lastAt, line: { target: t, row: null, verdict: null, why: '', extra: false, done: false } }); return; }
+      const j = pairOf.get(t.i); const r = j == null ? null : ar.rows[j];
       if (r && hasIst(r)) { const v = judge(t, r, sport); lastAt = j!; items.push({ at: j!, line: { target: t, row: r, verdict: v.v, why: v.why, extra: false, done: true, ...(v.zone ? { zone: v.zone } : {}) } }); }
       else { lastAt += 0.001; items.push({ at: lastAt, line: { target: t, row: null, verdict: 'missing', why: 'nicht gefunden', extra: false, done: false } }); }
     });
     extra.forEach(j => items.push({ at: j, line: { target: null, row: ar.rows[j], verdict: null, why: '', extra: true, done: true } }));
     items.sort((a, b) => a.at - b.at).forEach(x => lines.push(x.line));
   }
-  const doneLines = lines.filter(l => l.done && l.row);
+  // Auftrag 38: lockere Teile (aus lockeren Hauptteil-Schritten bzw. selbst eingetragen in Zone 1-2) zählen nicht als Intervall
+  const IL = lines.filter(l => !steadyLine(l));
+  const doneLines = IL.filter(l => l.done && l.row);
   // Auftrag 37: Durchschnitte und Verlauf nur aus echten Werten (nicht aus „wie geplant“)
   const measured = doneLines.filter(l => !l.row!.plan);
   const full = measured.filter(l => l.verdict !== 'short');
@@ -556,11 +606,11 @@ export function evaluateIntervals(session: any, st: any, act: any, thr: IvThresh
   const rec = measured.map(l => { const r = l.row!; const top = num(r.maxHr) ?? num(r.hr); return top != null && num(r.restHr) != null && r.restSec ? top - num(r.restHr)! : null; }).filter((x): x is number => x != null);
   const restRows = work.filter(r => num(r.restSec));
   return {
-    sport, source: ar.source, planned: targets.length, done: doneLines.filter(l => !l.extra).length, extra: lines.filter(l => l.extra).length,
-    missing: lines.filter(l => l.verdict === 'missing').length, short: lines.filter(l => l.verdict === 'short').length,
-    inTarget: lines.filter(l => l.verdict === 'ok').length, tooHard: lines.filter(l => l.verdict === 'hard').length, tooEasy: lines.filter(l => l.verdict === 'easy').length,
-    judged: lines.filter(l => l.verdict === 'ok' || l.verdict === 'hard' || l.verdict === 'easy').length, asPlanned: lines.filter(l => l.verdict === 'plan').length,
-    zoneFaster: lines.filter(l => l.zone === 'faster').length, zoneSlower: lines.filter(l => l.zone === 'slower').length,
+    sport, source: ar.source, planned: hardTargets(targets).length, done: doneLines.filter(l => !l.extra).length, extra: IL.filter(l => l.extra).length,
+    missing: IL.filter(l => l.verdict === 'missing').length, short: IL.filter(l => l.verdict === 'short').length,
+    inTarget: IL.filter(l => l.verdict === 'ok').length, tooHard: IL.filter(l => l.verdict === 'hard').length, tooEasy: IL.filter(l => l.verdict === 'easy').length,
+    judged: IL.filter(l => l.verdict === 'ok' || l.verdict === 'hard' || l.verdict === 'easy').length, asPlanned: IL.filter(l => l.verdict === 'plan').length,
+    zoneFaster: IL.filter(l => l.zone === 'faster').length, zoneSlower: IL.filter(l => l.zone === 'slower').length,
     lines,
     work: { sec: r0(avg(work.map(r => num(r.sec)))), hr: r0(w('hr')), maxHr: r0(avg(work.map(r => num(r.maxHr)))), paceSec: r0(wavg(paces)), power: r0(w('power')), speed: w('speed'), pace100: r0(wavg(p100)), cad: r0(w('cad')), rpe: r1(avg(work.map(r => num(r.rpe)))) },
     rest: { sec: r0(avg(restRows.map(r => num(r.restSec)))), hr: r0(avg(restRows.map(r => num(r.restHr)))) },
@@ -581,7 +631,7 @@ export function rowsToLaps(rows: IvRow[], sport: string): LapOut[] {
     else if (sport === 'bike') speed = num(r.speed) != null ? num(r.speed)! / 3.6 : m && sec ? m / sec : null;
     else { const p = paceToSec(r.pace100); speed = p ? 100 / p : m && sec ? m / sec : null; }
     const s = sec ?? (m && speed ? m / speed : null);
-    out.push({ n: n++, sec: s != null ? Math.round(s) : 0, m: m ?? (s && speed ? Math.round(s * speed) : null), avgHr: num(r.hr), maxHr: num(r.maxHr), speed: speed != null ? Math.round(speed * 100) / 100 : null, power: num(r.power), kind: 'work' });
+    out.push({ n: n++, sec: s != null ? Math.round(s) : 0, m: m ?? (s && speed ? Math.round(s * speed) : null), avgHr: num(r.hr), maxHr: num(r.maxHr), speed: speed != null ? Math.round(speed * 100) / 100 : null, power: num(r.power), kind: steadyRow(r) ? 'steady' : 'work' });
     if (num(r.restSec)) out.push({ n: n++, sec: Math.round(num(r.restSec)!), m: null, avgHr: num(r.restHr), maxHr: null, speed: null, power: null, kind: 'rest' });
   }
   return out;
@@ -589,7 +639,7 @@ export function rowsToLaps(rows: IvRow[], sport: string): LapOut[] {
 /** Kurzform (wie IntervalOut aus der Aufzeichnung) für Stellen, die nur die Zusammenfassung brauchen */
 export function evalToIntervalOut(e: IvEval | null): IntervalOut | null {
   if (!e || e.done + e.extra < 1) return null;
-  const work = e.lines.filter(l => l.done && l.row && !l.row.plan); if (!work.length) return null;
+  const work = e.lines.filter(l => l.done && l.row && !l.row.plan && !steadyLine(l)); if (!work.length) return null;
   const hr1 = num(work[0]?.row?.hr), hrN = num(work[work.length - 1]?.row?.hr);
   return { count: work.length, workSec: Math.round(work.reduce((a, l) => a + (num(l.row!.sec) || 0), 0)), avgHrWork: e.work.hr, hrDriftPct: hr1 && hrN && work.length >= 2 ? r1((hrN / hr1 - 1) * 100) : null, dropPct: e.fadePct, recoveryHrDrop: e.recovery, lapsHr: work.map(l => num(l.row!.hr)) };
 }

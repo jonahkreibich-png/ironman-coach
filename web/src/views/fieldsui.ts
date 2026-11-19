@@ -20,9 +20,8 @@ import './sectionsui';
 import { ablaufBlock } from './ablaufui';
 import { registerAbHost, UIH, SUB, setSubKey } from './ablaufstate';
 import { registerUndoHost } from '../undo';
-import { fillAsPlanned } from '../../../shared/ablauf';
 import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay } from '../../../shared/validate';
-import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, CHANGE_ZONES, changedOf, changeZone, changeParts, intervalsMode, omitOptions, placeLabel } from '../../../shared/results';
+import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, changedOf, intervalsMode } from '../../../shared/results';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
 /* Datensatz der Einheit (Zustand einer geplanten Einheit oder die Extra-Einheit selbst) */
@@ -104,11 +103,18 @@ export function zonePill(tg: Target): string {
   const zv = tg.planned ? zoneVerdict({ ...tg.planned, sport: tg.sport }, st, prof.thresholds, actZ) : zoneVerdict({ sport: tg.sport }, st, prof.thresholds, actZ);
   return zv ? `<span class="pill ${zv.over ? 'warn' : 'good'}" data-zone>${esc(t('fd.zone'))}: ${esc(zv.text)}</span>` : '';
 }
-/** „Wie lief es? Wie geplant gemacht / Anders gemacht“ mit den Angaben dazu und Rückfragen bei widersprüchlichen Werten */
+/** Auftrag 38: Knöpfe „Wie geplant gemacht“ / „Anders gemacht“ entfernt – der Ablauf ist der einzige Ort für das Gemachte (Titel, Coach,
+    Belastung folgen daraus). Ohne Werte abgehakt gilt still „wie geplant (nicht gemessen)“. Ältere Einheiten mit einer früher gewählten
+    Änderung zeigen sie weiter als Hinweis (zählt weiter so) und können sie entfernen. Dazu Rückfragen bei widersprüchlichen Werten. */
 export function changeBlock(tg: Target): string {
   const st = rec(tg) || {};
-  const moved = tg.kind === 'session' && tg.planned ? movedKeys(st) : [];
-  return `${tg.kind === 'session' && tg.planned ? changeHtml(tg, st, defsOf(tg, st).filter(f => moved.includes(f.key))) : ''}${doubtsHtml(tg, st)}`;
+  return `${tg.kind === 'session' && tg.planned ? legacyChangeHtml(tg, st) : ''}${doubtsHtml(tg, st)}`;
+}
+function legacyChangeHtml(tg: Target, st: any): string {
+  const c = changedOf(st); if (!c) return '';
+  const label = (CHANGE_KINDS.find(([k]) => k === c.kind) || [null, 'anders'])[1];
+  const why = (CHANGE_REASONS.find(([k]) => k === c.reason) || [])[1];
+  return `<div class="hint" data-legacy-change><b>Früher eingetragen: ${esc(label)}${c.kind === 'otherSport' && c.sport ? ' (' + esc(c.sport === 'run' ? 'Laufen' : c.sport === 'bike' ? 'Rad' : c.sport === 'swim' ? 'Schwimmen' : c.sport === 'strength' ? 'Kraft' : 'Teamsport') + ')' : ''}${why ? ', Grund: ' + esc(why) : ''}</b><br><span class="xs">Zählt weiter so. Neu trägst du Änderungen direkt im Ablauf ein.</span> <button class="link" data-act="fd-chg-clear" ${attrs(tg)}>Hinweis entfernen</button></div>`;
 }
 /** Ablauf (Abschnitte, Sätze, Wiederholungen bzw. Übungen) */
 export function ablaufPart(tg: Target, editable = true): string {
@@ -119,9 +125,7 @@ export function ablaufPart(tg: Target, editable = true): string {
 export function totalsBlock(tg: Target, after = ''): string {
   const st = rec(tg) || {};
   const defs = defsOf(tg, st);
-  // Auftrag 30: Dauer/Distanz stehen bei „kürzer/länger/abgebrochen“ oben im Änderungs-Block (dieselben Felder, keine doppelten)
-  const moved = tg.kind === 'session' && tg.planned ? movedKeys(st) : [];
-  const main = defs.filter(f => !f.more && !moved.includes(f.key)), extra = defs.filter(f => f.more && !moved.includes(f.key));
+  const main = defs.filter(f => !f.more), extra = defs.filter(f => f.more);
   const ld = loadOn(STATE, C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {}), tg.date);
   const srcs = [...new Set(Object.values(st.metricsSrc || {}).filter(Boolean))] as string[];
   const hasOrig = st.metricsAuto && Object.keys(st.metricsAuto).length && Object.keys(st.metricsManual || {}).length;
@@ -149,78 +153,8 @@ export function fieldsBlock(tg: Target): string {
 }
 
 const redraw = () => { saveSoon(); refreshSheet(); nav.rerender(); };
-/* Auftrag 29/30: „So wie geplant / Anders gemacht“ – je Art die passenden Felder, optional der Grund */
-const DUR_KINDS = ['shorter', 'longer', 'aborted'];
-function movedKeys(st: any): string[] { const c = changedOf(st); return c && DUR_KINDS.includes(c.kind) ? ['min', 'km', 'meters'] : []; }
-function changeHtml(tg: Target, st: any, durDefs: FieldDef[]): string {
-  const c = st.changed || {}; const other = st.asPlanned === false; const s = tg.planned;
-  const chip = (act: string, v: string, label: string, on: boolean) => `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}" data-act="${act}" data-v="${esc(v)}" ${attrs(tg)}>${esc(label)}</button>`;
-  const sports: [string, string][] = [['run', 'Laufen'], ['bike', 'Rad'], ['swim', 'Schwimmen'], ['strength', 'Kraft'], ['football', 'Teamsport']];
-  const endurance = ['run', 'bike', 'swim'].includes(s.sport);
-  const kinds = CHANGE_KINDS.filter(([k]) => endurance || !['otherIntervals', 'place', 'split'].includes(k));
-  let detail = '';
-  if ((c.kind === 'easy' || c.kind === 'harder') && !endurance) detail = '<div class="xs muted">Wie anstrengend es war, trägst du unten als RPE ein.</div>';
-  else if (c.kind === 'easy' || c.kind === 'harder') { const z = changeZone(st, s); detail = `<span class="lab">Tatsächliche Intensität</span><div class="chips" style="flex-wrap:wrap" data-change-zone>${CHANGE_ZONES.filter(([n]) => c.kind === 'easy' ? n <= 3 : n >= 3).map(([n, l]) => chip('fd-chg-zone', String(n), l, z === n)).join('')}</div><div class="xs muted">Dein Gefühl (RPE) trägst du unten ein.</div>`; }
-  else if (DUR_KINDS.includes(c.kind)) detail = `<div class="fgrid" data-change-dur>${durDefs.map(f => oneField(tg, f.key === 'min' && c.kind === 'aborted' ? { ...f, label: 'Abgebrochen nach' } : f, st)).join('')}</div>`;
-  else if (c.kind === 'otherSport') detail = `<label class="fld"><span class="lab">Sportart</span><select class="inp" data-ch="fd-chg-sport" ${attrs(tg)}><option value="">–</option>${sports.filter(([k]) => k !== s.sport).map(([k, l]) => `<option value="${k}" ${c.sport === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>${c.sport ? '<div class="xs muted">Unten stehen jetzt die Felder dieser Sportart.</div>' : ''}`;
-  else if (c.kind === 'place') detail = `<span class="lab">Wo?</span><div class="chips" data-change-place>${chip('fd-chg-place', 'in', placeLabel(s.sport, 'in'), c.place === 'in')}${chip('fd-chg-place', 'out', placeLabel(s.sport, 'out'), c.place === 'out')}</div>`;
-  else if (c.kind === 'split') {
-    const parts: any[] = Array.isArray(c.parts) && c.parts.length ? c.parts : [null, null]; const sum = changeParts(st).reduce((x, y) => x + y, 0);
-    detail = `<span class="lab">Teile</span><div class="stack" data-change-parts>${parts.map((v, i) => `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:flex-end"><label class="fld grow" for="fd-part-${i}"><span class="lab">Teil ${i + 1} <span class="muted">(min)</span></span><input class="inp" id="fd-part-${i}" inputmode="text" data-ch="fd-chg-part" data-i="${i}" ${attrs(tg)} value="${esc(v ?? '')}" placeholder="z. B. 30 oder 1:05"></label>${parts.length > 2 ? `<button class="btn ghost sm" data-act="fd-chg-part-del" data-i="${i}" ${attrs(tg)} aria-label="Teil ${i + 1} entfernen">×</button>` : ''}</div>`).join('')}
-      <button class="btn ghost sm" data-act="fd-chg-part-add" ${attrs(tg)}>+ Teil</button>${sum ? `<div class="xs muted" data-parts-sum>Zusammen ${Math.round(sum)} min</div>` : ''}</div>`;
-  }
-  else if (c.kind === 'omit') detail = `<span class="lab">Was hast du weggelassen?</span><div class="chips" style="flex-wrap:wrap" data-change-omit>${omitOptions(s).map(([k, l]) => chip('fd-chg-omit', k, l, c.omit === k)).join('')}</div>`;
-  else if (c.kind === 'otherIntervals') detail = '<div class="xs muted">Trag unten im Ablauf ein, was du gemacht hast (+ Satz hinzufügen).</div>';
-  return `<div class="fld wide" data-as-planned><span class="lab">Wie lief es?</span><div class="chips" role="group" aria-label="Wie lief es?" style="flex-wrap:wrap">${chip('fd-asplanned', '1', 'Wie geplant gemacht', st.asPlanned === true)}${chip('fd-asplanned', '0', 'Anders gemacht', other)}</div>
-    ${other ? `<span class="lab">Was hast du gemacht?</span><div class="chips" style="flex-wrap:wrap" data-change-kind>${kinds.map(([k, l]) => chip('fd-chg-kind', k, l, c.kind === k)).join('')}</div>
-      ${detail ? `<div class="stack" data-change-detail="${esc(c.kind)}">${detail}</div>` : ''}
-      <span class="lab">Grund (optional)</span><div class="chips" style="flex-wrap:wrap" data-change-reason>${CHANGE_REASONS.map(([k, l]) => chip('fd-chg-reason', k, l, c.reason === k)).join('')}</div>` : ''}</div>`;
-}
-function setChange(tg: Target, f: (st: any) => void) { const st = rec(tg); if (!st) return; f(st); if (st.asPlanned === false && !st.changed) st.changed = {}; redraw(); rev(tg); }
-const indoorPlanned = (s: any) => !!s && (s.indoor === true || /rolle|indoor|drinnen|laufband|halle/i.test(String(s.title || '')));
-/* Auftrag 37: „Wie geplant gemacht“ füllt den ganzen Ablauf mit dem Soll (als „wie geplant“ markiert, nicht als gemessen) und hakt die
-   Einheit ab. Uhrdaten und eigene Einträge bleiben (Vorrang). Danach ändert man nur, was anders war. */
-on('fd-asplanned', el => {
-  const tg = tg0(el);
-  if (el.dataset.v !== '1') { setChange(tg, st => { st.asPlanned = false; }); return; }
-  const st0 = rec(tg); if (!st0) return;
-  const planned = plannedFor(tg); const act = st0.activityId ? (STATE.activities || {})[st0.activityId] : null;
-  const next = fillAsPlanned(planned && planned.sport === tg.sport ? planned : null, { ...st0, asPlanned: true, changed: undefined }, act, ivThr(), tg.sport);
-  delete next.changed; next.asPlanned = true;
-  if (tg.kind === 'session' && !next.completed) { next.completed = true; next.skipped = false; }
-  put(tg, next); saveState(); redraw(); rev(tg);
-});
-on('fd-chg-kind', el => {
-  const tg = tg0(el); const planned = plannedFor(tg);
-  setChange(tg, st => {
-    const k = el.dataset.v!; const prev = st.changed || {};
-    // nur passende Angaben behalten; beim Wechsel der Art fallen die der alten weg (der Grund bleibt)
-    st.asPlanned = false; st.changed = k === prev.kind ? { ...prev } : { kind: k, ...(prev.reason ? { reason: prev.reason } : {}) };
-    if (k === 'place' && !st.changed.place) st.changed.place = indoorPlanned(planned) ? 'out' : 'in';
-  });
-});
-on('fd-chg-reason', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}) }; st.changed.reason = st.changed.reason === el.dataset.v ? undefined : el.dataset.v; }));
-on('fd-chg-zone', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), zone: +el.dataset.v! }; }));
-on('fd-chg-place', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), place: el.dataset.v }; }));
-on('fd-chg-omit', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}) }; st.changed.omit = st.changed.omit === el.dataset.v ? undefined : el.dataset.v; }));
-onChange('fd-chg-sport', el => setChange(tg0(el), st => { st.changed = { ...(st.changed || {}), kind: 'otherSport', sport: (el as HTMLSelectElement).value || undefined }; }));
-/* Aufgeteilt: Teile mit je Dauer; die Summe ist die Dauer der Einheit (dasselbe Feld wie überall) */
-function setParts(tg: Target, parts: any[]) {
-  const st = rec(tg); if (!st) return;
-  const nums = parts.map(v => (v == null || v === '' ? null : +v)).filter((v): v is number => v != null && v > 0);
-  let next: any = { ...st, changed: { ...(st.changed || {}), kind: 'split', parts } };
-  if (nums.length) next = setSessionMetricManual(next, 'min', String(Math.round(nums.reduce((a, b) => a + b, 0))));
-  put(tg, next); redraw(); rev(tg);
-}
-const partsOf = (st: any): any[] => Array.isArray(st.changed?.parts) && st.changed.parts.length ? [...st.changed.parts] : [null, null];
-onChange('fd-chg-part', el => {
-  const tg = tg0(el); const st = rec(tg); if (!st) return; const i = +el.dataset.i!;
-  const raw = (el as HTMLInputElement).value.trim(); const parts = partsOf(st);
-  if (raw) { const chk = checkField(tg.sport, 'min', raw); if (!chk.ok) { el.setAttribute('aria-invalid', 'true'); toast(chk.msg!); (el as HTMLInputElement).value = parts[i] ?? ''; return; } parts[i] = +chk.value; } else parts[i] = null;
-  el.removeAttribute('aria-invalid'); setParts(tg, parts);
-});
-on('fd-chg-part-add', el => { const tg = tg0(el); const st = rec(tg); if (!st) return; const parts = partsOf(st); parts.push(null); setParts(tg, parts); });
-on('fd-chg-part-del', el => { const tg = tg0(el); const st = rec(tg); if (!st) return; const parts = partsOf(st); parts.splice(+el.dataset.i!, 1); setParts(tg, parts); });
+/* Auftrag 38: ältere Änderung entfernen (dann zählt der Ablauf bzw. der Plan) */
+on('fd-chg-clear', el => { const tg = tgOf(el); const st = rec(tg); if (!st) return; delete st.changed; delete st.asPlanned; redraw(); rev(tg); });
 function plannedFor(tg: Target): any { const d = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((x: any) => x.date === tg.date); return (d && d.sessions.find((x: any) => x.id === tg.id)) || null; }
 function tg0(el: HTMLElement): Target { return tgOf(el); }
 /* Auftrag 22: Rückfrage bei widersprüchlichen Werten (z. B. 200 km in 30 min, Puls über max. Puls) mit Vorschlag */
@@ -317,7 +251,8 @@ function exList(tg: Target, st: any): any[] {
   const own = listOf(st, 'exercises'); if (Array.isArray(st.metrics?.exercises)) return own;
   const day = C.planDays(C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {})).find((d: any) => d.date === tg.date);
   const s = day && day.sessions.find((x: any) => x.id === tg.id);
-  return ((s && s.spec && s.spec.exercises) || []).map((e: any) => ({ ...e, kg: null }));
+  // Auftrag 38: die übrigen geplanten Übungen gelten als „wie geplant“, wenn die erste geändert wird (abgehakt ohne Werte = wie geplant)
+  return ((s && s.spec && s.spec.exercises) || []).map((e: any) => ({ ...e, kg: null, ...(st.completed ? { plan: true } : {}) }));
 }
 onChange('fd-ex', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); const i = +el.dataset.i!; if (!l[i]) return;

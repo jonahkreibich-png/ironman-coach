@@ -95,7 +95,7 @@ function runEasyForm0(key: string, stage: number, ctx: W.PaceCtx, minutes: numbe
     // Auftrag 20: in kurzen Läufen (unter 30 min) wären die Sprints ein zu großer Teil (dann „locker“ mit Zone 3): Steigerungen statt Hügel
     if (min < 30) return null;
     const [reps, sec] = pick<[number, number]>([[6, 10], [8, 12], [8, 15], [10, 15]], stage);
-    const hills = S('main', { reps, min: sec / 60, zone: 3, restMin: 1, note: `${sec} s zügig einen steilen Hügel hinauf, langsam zurückgehen (voll erholen)` });
+    const hills = S('main', { reps, min: sec / 60, zone: 3, restMin: 1, note: `${sec} s kräftig einen steilen Hügel hinauf, langsam zurückgehen (voll erholen)` });
     const wu = min >= 40 ? 10 : 5; const fill = Math.max(10, r5(min - wu - 5 - reps * (sec / 60 + 1)));
     return { sport: 'run', kind: 'hills', ctx, why, lib: { key, stage }, steps: [S('warm', { min: wu, zone: 1, note: 'ganz locker einlaufen' }), S('main', { min: fill, zone: 2 }), hills, S('cool', { min: 5, zone: 1, note: 'locker auslaufen' })] };
   }

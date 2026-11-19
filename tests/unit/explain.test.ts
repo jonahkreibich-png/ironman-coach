@@ -149,7 +149,7 @@ describe('Struktur jeder Einheit', () => {
     const p2 = { ...prof, thresholds: { ...prof.thresholds, lthrRun: 170 } };
     const x = structureOf({ id: 'r', sport: 'run', title: 'Langer Lauf', plannedMinutes: 45, zone: 'Zone 2' }, p2, CHAT_TODAY)!;
     expect(x.parts.map(p => p.label)).toEqual(['Einlaufen', 'Hauptteil', 'Auslaufen']);
-    expect(x.parts[1].lines[0]).toMatch(/30 min locker.*Puls 138–151/);
+    expect(x.parts[1].lines[0]).toMatch(/30 min (\(ca\. [\d,]+ km\) )?locker.*Puls 138–151/);
   });
   test('gespeicherter Bauplan nutzt die aktuellen Schwellen (nach dem Schwellentest neue Zahlen)', () => {
     const s = { id: 'x', sport: 'run', title: 'Lockerer Lauf 40 min', spec: W.runEasy({ lthrRun: 160, runThrSec: 360 }, 40) };

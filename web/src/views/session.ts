@@ -22,27 +22,35 @@ import { checkTestResult, checkSwimSkill } from '../testupdate';
 import { structureOf } from '../../../shared/coach/explain';
 import { toast } from '../toast';
 import { SPORT_COLOR } from '../icons';
-import { kmOf, planView, viewToggle, totalOf } from '../planview';
+import { kmOf, totalOf } from '../planview';
 import { convertBlock } from './convertui';
+import { doneSummary, type DoneSummary } from '../../../shared/ablauf';
+import { ivThr } from '../../../shared/coach/review';
 
 export function zoneText(s: any): string {
   const bpm = C.zoneBpm(s, profile().thresholds, null);
   return [s.zone, bpm].filter(Boolean).join(' · ');
 }
 export function metaLine(s: any): string {
-  // Auftrag 35: Lauf/Rad in Minuten oder km (dieselben Zahlen wie die Gesamtzeile der Einheit)
+  // Auftrag 35/38: Lauf/Rad mit Minuten und km (dieselben Zahlen wie die Gesamtzeile der Einheit)
   const k = kmOf(s);
-  if (k) return [...(planView() === 'km' ? [dist(k.km), `ca. ${duration(k.min)}`] : [duration(s.plannedMinutes || k.min), `ca. ${dist(k.km)}`]), zoneText(s) || null].filter(Boolean).join(' · ');
+  if (k) return [duration(s.plannedMinutes || k.min), `ca. ${dist(k.km)}`, zoneText(s) || null].filter(Boolean).join(' · ');
   return [s.plannedMinutes ? duration(s.plannedMinutes) : null, s.plannedKm ? (s.sport === 'swim' ? `${Math.round(s.plannedKm * 1000)} m` : dist(s.plannedKm)) : null, zoneText(s) || null].filter(Boolean).join(' · ');
+}
+/** Auftrag 38: was laut Ablauf wirklich gemacht wurde (Titel, Änderungen) – eine Quelle mit dem Coach (shared/ablauf doneSummary) */
+export function doneOf(s: any, st: any = sessState(s.id)): DoneSummary | null {
+  if (!s || !st || !st.completed || !s.spec || !['run', 'bike', 'swim'].includes(s.sport) || changedOf(st)) return null;
+  try { return doneSummary(s, st, st.activityId ? STATE.activities?.[st.activityId] : null, ivThr(profile()), s.sport); } catch (_) { return null; }
 }
 /** Historical completed strength uses results; the sheet retains its original prescription. */
 export function sessionTitle(s: any, st: any = sessState(s.id)): string {
   // Auftrag 29: anders gemacht → der Titel zeigt, was wirklich gemacht wurde (eine Quelle: shared/results actualTitle)
   if (st?.completed && changedOf(st)) return actualTitle(s, st, st.activityId ? STATE.activities?.[st.activityId] : null);
+  const d = doneOf(s, st); if (d && d.changed) return d.title;
   return s.sport === 'strength' && st?.completed ? actualStrength(st, st.activityId ? STATE.activities?.[st.activityId] : null).title : s.title;
 }
 /** kleine Zeile „geplant: …“ unter dem Titel (nur wenn anders gemacht) */
-export function plannedHtml(s: any, st: any = sessState(s.id)): string { const p = st?.completed ? plannedLine(s, st) : ''; return p ? `<span class="planned-was xs muted" data-planned-was>${esc(p)}</span>` : ''; }
+export function plannedHtml(s: any, st: any = sessState(s.id)): string { const d = doneOf(s, st); const p = st?.completed ? plannedLine(s, st) || (d && d.changed && d.title !== s.title ? `geplant: ${s.title}` : '') : ''; return p ? `<span class="planned-was xs muted" data-planned-was>${esc(p)}</span>` : ''; }
 export function doneLine(s: any): string {
   const m = (sessState(s.id).metrics) || {};
   const parts: string[] = [];
@@ -104,15 +112,16 @@ function sessionSheet(id: string): string {
   const editable = real && status !== 'cancelled' && status !== 'sick';
   const tg = { kind: 'session' as const, id, date: s.date, sport: actualSport(s, st), planned: s };
   const done = st.completed ? doneLine(s) : '';
-  const changed = st.completed && changedOf(st);
+  const ds = doneOf(s, st);
+  const changed = st.completed && (changedOf(st) || (ds && ds.changed));
   const urteil = [st.completed ? (changed ? pill('anders gemacht', 'warn') : st.asPlanned ? pill('wie geplant', 'good') : '') : '', st.completed ? zonePill(tg) : ''].filter(Boolean).join(' ');
   // Kopf
   let h = `<div class="stack sess-page">
     <div class="stack sess-kopf" data-kopf>
       <div class="row">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<div class="grow"><div class="lbl" data-kopf-date>${esc(dowShort(s.date))}, ${fmtDate(s.date)} · ${esc(sportLabel(s.sport))}</div>
         <div class="small" data-kopf-plan><span class="muted">Geplant:</span> ${esc(metaLine(s) || s.title)}</div>
-        ${done ? `<div class="small" data-kopf-done><span class="muted">Gemacht:</span> <b>${esc(done)}</b></div>` : ''}${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
-      ${urteil ? `<div class="row pills" data-urteil>${urteil}</div>` : ''}${viewToggle(s)}`;
+        ${done ? `<div class="small" data-kopf-done><span class="muted">Gemacht:</span> <b>${esc(done)}</b></div>` : ''}${ds && ds.changed ? `<div class="small" data-kopf-changes><span class="muted">Anders als geplant:</span> ${esc(ds.short)}</div>` : ''}${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
+      ${urteil ? `<div class="row pills" data-urteil>${urteil}</div>` : ''}`;
   if (s._adj && s._adj.length) {
     const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
     const o = s._orig || {};
@@ -168,11 +177,10 @@ export function structureHtml(s: any, o: { noDiagram?: boolean; noToggle?: boole
   const when = s.spec && s.spec.when ? `<div class="xs muted">${esc(s.spec.when)}</div>` : s.slot === 'am' ? `<div class="xs muted">${esc(t('sess.morning'))}</div>` : '';
   // Auftrag 19: Ablaufbild aus den Bausteinen (Höhe = Anstrengung)
   const dia = !o.noDiagram && s.spec && Array.isArray(s.spec.steps) && s.spec.steps.length > 1 && s.sport !== 'strength' ? `<div class="wo-diagram-wrap" data-diagram>${diagramSvg(s.spec, { label: t('sess.diagram') })}</div>` : '';
-  // Auftrag 35: in km – Strecke je Stück, Zieltempo und Zeit pro Wiederholung (shared/kmview)
-  const km = planView() === 'km' ? kmOf(s) : null;
-  const lines = (p: any) => km ? km.lines.filter(l => l.part === p.part).map(l => l.text) : p.lines;
-  const tot = totalOf(s);
-  return `<div class="card flat tight structure" data-structure data-view="${km ? 'km' : 'min'}">${o.noToggle ? '' : viewToggle(s)}${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${lines(p).map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>${tot ? `<div class="small" data-total><b>Gesamt: ${esc(tot)}</b></div>` : ''}
+  // Auftrag 38: Minuten und km zusammen in jeder Zeile („4×3 min (ca. 600 m)“, shared/workouts stepText) – kein Umschalter mehr
+  const lines = (p: any) => p.lines;
+  const tot = totalOf(s); void o.noToggle;
+  return `<div class="card flat tight structure" data-structure>${when}${dia}<ol class="steps">${x.parts.map(p => `<li data-part="${p.part}"><b>${esc(p.label)}</b><ul>${lines(p).map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></li>`).join('')}</ol>${tot ? `<div class="small" data-total><b>Gesamt: ${esc(tot)}</b></div>` : ''}
     ${x.drills && x.drills.length ? `<div class="small" data-drills><b>${esc(t('sess.drills'))}:</b><ul>${x.drills.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : ''}${x.sum ? `<div class="small" data-swimsum><b>${esc(x.sum)}</b></div>` : ''}
     ${x.how ? `<div class="small"><b>${esc(t('sess.how'))}:</b> ${esc(x.how)}</div>` : ''}${x.tip ? `<div class="small"><b>${esc(t('sess.tip'))}:</b> ${esc(x.tip)}</div>` : ''}${x.why ? `<div class="small muted"><b>${esc(t('sess.why'))}:</b> ${esc(x.why)}</div>` : ''}
     ${x.derived && s.description ? more(t('sess.original'), `<div class="hint" style="white-space:pre-line">${esc(s.description)}</div>`) : ''}</div>`;

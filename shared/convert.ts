@@ -74,3 +74,33 @@ export function convertSession(s: any, kind: ConvKind, o: { lighter?: boolean } 
   const what = `${s.title} → ${set.title}${set.plannedMinutes !== min ? ` (${min} → ${set.plannedMinutes} min)` : ''}`;
   return { kind, lighter, set, what };
 }
+
+/* Auftrag 38: „Andere Vorschläge“ – 2-3 weitere passende Varianten derselben Art (gleiche Sportart, sinnvolle Dauer), z. B. statt
+   Schwellen-Intervallen kurze schnelle Stücke, Tempowechsel oder zügig am Stück; länger/kürzer in anderen Stufen. Erste = Hauptvorschlag
+   (wie convertSession), zweite = leichtere Variante. Gleiche Bausteine wie der Plan (shared/workouts), Tempo aus dem Kontext der Einheit. */
+export interface ConvVariant extends ConvOption { label: string }
+export function convertVariants(s: any, kind: ConvKind): ConvVariant[] {
+  if (!convertKinds(s).includes(kind)) return [];
+  const spec: W.Spec = s.spec; const ctx = spec.ctx || {}; const min = s.plannedMinutes || W.totals(spec).min;
+  const out: ConvVariant[] = [];
+  const add = (label: string, o: ConvOption | null) => { if (o && !out.some(x => x.set.title === o.set.title && x.set.plannedMinutes === o.set.plannedMinutes)) out.push({ ...o, label }); };
+  const mk = (sp: W.Spec, lighter = false): ConvOption => { const set = toSet(W.build({ ...sp, noDistance: !!spec.noDistance || sp.noDistance })); return { kind, lighter, set, what: `${s.title} → ${set.title}${set.plannedMinutes !== min ? ` (${min} → ${set.plannedMinutes} min)` : ''}` }; };
+  add('Vorschlag', convertSession(s, kind));
+  add('Leichter', convertSession(s, kind, { lighter: true }));
+  if (kind === 'intervals') {
+    if (s.sport === 'run') { const avail = Math.max(10, min - 25); add('Kurz und schnell', mk(W.runIntervals(ctx, clamp(Math.round(avail / 2), 5, 10), 1, 1, 5))); add('Tempowechsel', mk(W.runIntervals(ctx, clamp(Math.round(avail / 3), 4, 8), 2, 1, 3), true)); }
+    else if (s.sport === 'bike') { const avail = Math.max(16, min - 25); add('Sweet Spot', mk(W.bikeSweetSpot(ctx, clamp(Math.round(avail / 17), 2, 3), 12, min))); add('Kurz und hart', mk(W.bikeIntervals(ctx, clamp(Math.round(avail / 6), 4, 6), 3, 5, 3))); }
+    else { const mode = (ctx.css || ctx.crawl100 ? 'crawl' : 'breast') as W.StrokeMode; const base = W.swimSession(ctx, 'css', [{ part: 'main', reps: 4, m: 200, zone: 3, mode, restSec: 30 }]); add('Längere Stücke', mk(W.scaleSpec(base, min / Math.max(1, W.totals(base).min)))); }
+  } else if (kind === 'easy') {
+    if (s.sport === 'run') add('Locker mit Steigerungen', mk(W.runEasy(ctx, min, { strides: 4 })));
+    else if (s.sport === 'swim') { const base = W.swimSession(ctx, 'technique', [{ part: 'main', reps: 6, m: 50, zone: 1, mode: 'drill', restSec: 20 }, { part: 'main', reps: 4, m: 100, zone: 2, mode: (ctx.css || ctx.crawl100 ? 'crawl' : 'breast') as W.StrokeMode, restSec: 20 }]); add('Technik locker', mk(W.scaleSpec(base, min / Math.max(1, W.totals(base).min)))); }
+    else add('Ganz locker (Zone 1)', mk({ ...W.bikeEasy(ctx, min), steps: W.bikeEasy(ctx, min).steps.map(x => ({ ...x, zone: 1 })) }));
+  } else {
+    for (const [label, f] of (kind === 'longer' ? [['Deutlich länger', 1.4]] : [['Deutlich kürzer', 0.6], ['Etwas kürzer', 0.9]]) as [string, number][]) {
+      const rb = W.rebuildScaled(s, f); if (!rb) continue;
+      if ((kind === 'longer' && rb.plannedMinutes <= min) || (kind === 'shorter' && rb.plannedMinutes >= min)) continue;
+      add(label, { kind, lighter: false, set: { title: rb.title, plannedMinutes: rb.plannedMinutes, plannedKm: rb.plannedKm ?? null, description: rb.description, spec: rb.spec, zone: rb.zone || s.zone || null, hard: !!s.hard }, what: `${s.title} → ${rb.title} (${min} → ${rb.plannedMinutes} min)` });
+    }
+  }
+  return out.slice(0, 4);
+}

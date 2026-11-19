@@ -14,15 +14,9 @@ const ZWORD: Record<number, string> = { 1: 'ganz locker', 2: 'locker', 3: 'zügi
 const mmss = (s: number) => { const r = Math.round(s / 5) * 5; return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
 const de = (x: number, d = 1) => String(Math.round(x * 10 ** d) / 10 ** d).replace('.', ',');
 
-/** Strecke runden: kurze Stücke auf 50 m, bis 2 km auf 100 m, Laufen darüber auf 0,5 km, Rad auf 1 km */
-export function roundKm(sport: string, km: number): number {
-  if (km <= 0) return 0;
-  if (sport === 'bike') return km < 5 ? Math.max(0.5, Math.round(km * 2) / 2) : Math.round(km);
-  if (km < 0.4) return Math.max(0.05, Math.round(km * 20) / 20);
-  if (km < 2) return Math.round(km * 10) / 10;
-  return Math.round(km * 2) / 2;
-}
-export const distTxt = (km: number) => (km < 1 ? `${Math.round(km * 1000)} m` : `${de(km, km < 10 ? 1 : 0)} km`);
+/* Auftrag 38: Runden und Text der Strecke kommen aus shared/workouts (eine Stelle, auch für die Zeilen „4×3 min (ca. 600 m)“) */
+export const roundKm = W.roundKm;
+export const distTxt = W.distTxt;
 /** Sekunden pro km (Laufen) bzw. km/h (Rad) einer Zone aus dem Kontext der Einheit */
 function speedOf(spec: W.Spec, zone: number): number | null {
   if (spec.sport === 'run') return W.runPace(spec.ctx, zone);
@@ -62,17 +56,6 @@ export function kmPlan(spec: W.Spec | null | undefined, o: { estimated?: boolean
     lines.push({ part: s.part, text, km, min: t / 60 });
   }
   return { lines, km: Math.round(lines.reduce((a, l) => a + l.km, 0) * 10) / 10, min: Math.round(lines.reduce((a, l) => a + l.min, 0)), estimated: est };
-}
-/** kurze Zeile wie shortPlan, in km: „2 km einlaufen · 4 × 600 m an der Schwelle · 1,5 km auslaufen“ */
-export function kmShort(spec: W.Spec | null | undefined, o: { estimated?: boolean } = {}): string {
-  const k = kmPlan(spec, o); if (!k || !spec) return '';
-  return spec.steps.map((s, i) => {
-    const l = k.lines[i]; const m = /^(\d+ × )?([\d,]+ k?m)/.exec(l.text);
-    const z = s.zone || 2; const run = spec.sport === 'run';
-    const word = s.part === 'warm' ? (run ? 'einlaufen' : 'einrollen') : s.part === 'cool' ? (run ? 'auslaufen' : 'ausrollen') : ZWORD[z] || 'locker';
-    const rest = /dazwischen ([^,]+)/.exec(l.text);
-    return `${m ? (m[1] || '') + m[2] : ''} ${word}${rest ? `, ${rest[1]} dazwischen` : ''}`.trim();
-  }).join(' · ');
 }
 /** Gesamtzeile je Ansicht: Minuten „60 min, ca. 9,5 km“ bzw. km „9,5 km, ca. 59 min“ (dieselben Zahlen) */
 export function totalLine(spec: W.Spec | null | undefined, view: PlanView, plannedMin?: number | null, o: { estimated?: boolean } = {}): string {

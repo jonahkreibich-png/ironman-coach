@@ -1,5 +1,5 @@
 /* Auftrag 37: Einheiten übersichtlich – ein „Ablauf“ je Einheit (Aufwärmen → Sätze mit Wiederholungen → Ausklang; Kraft: Übungen),
-   Bearbeiten im Fenster, „Wie geplant gemacht“, Rückgängig, aufgeräumte Seite, Nachtragen mit Datum. Echte Eingabe wie ein Mensch
+   Bearbeiten im Fenster, abgehakt = wie geplant (Auftrag 38: ohne Knopf), Rückgängig, aufgeräumte Seite, Nachtragen mit Datum. Echte Eingabe wie ein Mensch
    (Antippen, Tippen, Verlassen des Felds), in WebKit (iPhone) und Chromium. */
 import { test, expect } from './storage-harness';
 import { type Page } from '@playwright/test';
@@ -125,21 +125,18 @@ test('Schwimmen: Einschwimmen ändern, Ausschwimmen löschen und wieder hinzufü
   expect(st.sessions.s37.metricsSrc.meters).toBe('sections');
 });
 
-test('„Wie geplant gemacht“ + eine Abweichung; Rückgängig (mehrere Schritte); Diagramm öffnet dasselbe Fenster', async ({ page }) => {
+test('Abgehakt = still wie geplant + eine Abweichung; Rückgängig (mehrere Schritte); Diagramm öffnet dasselbe Fenster', async ({ page }) => {
   test.setTimeout(120000);
   await seed37(page);
   await open(page, '/?go=plan'); await openPlanSession(page, 'r37');
-  await sheet(page).locator('[data-as-planned] [data-act="fd-asplanned"][data-v="1"]').click();
-  await expect(page.locator('#toast')).toContainText('Wie geplant eingetragen');
+  // Auftrag 38: keine Knöpfe „Wie geplant / Anders gemacht“ mehr – abgehakt ohne Werte gilt still „wie geplant (nicht gemessen)“
+  await expect(sheet(page).locator('[data-act="fd-asplanned"]')).toHaveCount(0);
   await expect(ab(page).locator('.ab-rep')).toHaveCount(4);
   for (let i = 0; i < 4; i++) await expect(ab(page).locator('.ab-rep').nth(i)).toContainText('wie geplant');
   let st = await stored(page);
   expect(st.sessions.r37.completed).toBe(true);
-  expect(st.sessions.r37.metrics.intervals.every((r: any) => r.plan === true)).toBe(true);
-  expect(st.sessions.r37.metricsSrc.intervals).toBe('plan');
   // eine Abweichung: 3. Wiederholung mit Puls 172 (Pace 4:05)
   await ab(page).locator('.ab-rep[data-iv-row="2"]').click();
-  await expect(sub(page).locator('[data-plan-hint]')).toBeVisible();
   await human(sub(page).locator('#iv-2-pace'), '4:05');
   await human(sub(page).locator('#iv-2-hr'), '172');
   await closeSub(page);
@@ -147,7 +144,7 @@ test('„Wie geplant gemacht“ + eine Abweichung; Rückgängig (mehrere Schritt
   await expect(ab(page).locator('.ab-rep[data-iv-row="1"]')).toContainText('wie geplant');
   st = await stored(page);
   expect(st.sessions.r37.metrics.intervals[2].plan).toBeUndefined();
-  expect(st.sessions.r37.metrics.intervals[1].plan).toBe(true);
+  expect(st.sessions.r37.metrics.intervals[1].hr ?? null).toBeNull();
   // Diagramm antippen → dasselbe Fenster (Wiederholung)
   const hit = sheet(page).locator('.dia-hit[data-key="rep:2"]').first();
   await hit.dispatchEvent('click');
@@ -217,8 +214,7 @@ for (const [sid, sport] of [['r37', 'run'], ['b37', 'bike'], ['k37b', 'bike'], [
     await expect(ab(page).locator('.ab-item').first()).toContainText('Aufwärmen');
     await expect(ab(page).locator('.ab-item').last()).toContainText(/Ausklang|Hauptteil/);
     const openBefore = await openDetails(page);
-    // wie geplant
-    await sheet(page).locator('[data-as-planned] [data-act="fd-asplanned"][data-v="1"]').click();
+    // abgehakt ohne Werte: still wie geplant
     await expect(ab(page).locator('.ab-row', { hasText: 'wie geplant' }).first()).toBeVisible();
     // Aufwärmen ändern
     await ab(page).locator('button[data-key="sec:warm"]').click();
@@ -274,7 +270,6 @@ test('Kraft: Übungen als Liste, Fenster je Übung, wie geplant + Gewicht, hinzu
   await open(page, '/?go=plan'); await openPlanSession(page, 'st37');
   const n = (STRENGTH.spec.exercises || []).length;
   await expect(ab(page).locator('.ab-ex')).toHaveCount(n);
-  await sheet(page).locator('[data-as-planned] [data-act="fd-asplanned"][data-v="1"]').click();
   await expect(ab(page).locator('.ab-ex').first()).toContainText('wie geplant');
   await ab(page).locator('.ab-ex').first().locator('.ab-row').click();
   await human(sub(page).locator('#ex-0-kg'), '12,5');

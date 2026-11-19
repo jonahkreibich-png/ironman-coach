@@ -12,7 +12,6 @@ import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '.
 import { saveState } from '../store';
 import { toast } from '../toast';
 import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml, openSession } from './session';
-import { viewToggle } from '../planview';
 import { changedOf } from '../../../shared/results';
 import { openCheckin } from './werte';
 import { nav } from '../nav';
@@ -72,7 +71,7 @@ function answerCard(): string {
     return `<div class="session-hero ${st.completed ? 'done' : ''}" style="--c:${SPORT_COLOR[x.sport]}">
       <button class="row grow" data-act="sess-open" data-sid="${esc(x.id)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px"><span class="ic">${sportIcon(x.sport)}</span>
       <span class="grow"><span class="t">${esc(sessionTitle(x, st))}</span>${plannedHtml(x, st)}${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
-      ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}${st.completed ? '' : viewToggle(x, 'hero')}</div>`;
+      ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}</div>`;
   }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t(beforeStart ? 'plan.beforeStart' : 'heute.restDay'))}</span><br><span class="m">${esc(t(beforeStart ? 'heute.startsSoon' : 'heute.restLine'))}</span></span></div>`;
   return `<div class="answer l${s.level}">
     <div class="answer-top">${ring(d.ill ? null : d.readiness.score, s.level, t('heute.readiness'))}
@@ -130,7 +129,7 @@ function nextRows(): string {
   // Zuletzt erledigt
   const last = d.activities.filter(a => a.date <= d.today).sort((a, b) => b.startMs - a.startMs)[0];
   const lastSess = [...(PLAN.weeks || [])].flatMap((w: any) => w.days.flatMap((x: any) => x.sessions.map((s: any) => ({ ...s, date: x.date })))).filter((s: any) => s.date <= d.today && sessState(s.id).completed).sort((a: any, b: any) => b.date.localeCompare(a.date))[0];
-  if (lastSess) rows.push(li({ act: 'sess-open', data: { sid: lastSess.id }, icon: sportIcon(lastSess.sport), color: SPORT_COLOR[lastSess.sport], title: `${t('heute.last')}: ${changedOf(sessState(lastSess.id)) ? sessionTitle(lastSess) : doneLine(lastSess) ? lastSess.title.replace(/ \d+ min\b/, '') : lastSess.title}`, sub: `${dowShort(lastSess.date)} ${fmtDate(lastSess.date)} · ${doneLine(lastSess) || metaLine(lastSess)}`, value: srcBadge(sessState(lastSess.id).source) }));
+  if (lastSess) rows.push(li({ act: 'sess-open', data: { sid: lastSess.id }, icon: sportIcon(lastSess.sport), color: SPORT_COLOR[lastSess.sport], title: `${t('heute.last')}: ${changedOf(sessState(lastSess.id)) || sessionTitle(lastSess) !== lastSess.title ? sessionTitle(lastSess) : doneLine(lastSess) ? lastSess.title.replace(/ \d+ min\b/, '') : lastSess.title}`, sub: `${dowShort(lastSess.date)} ${fmtDate(lastSess.date)} · ${doneLine(lastSess) || metaLine(lastSess)}`, value: srcBadge(sessState(lastSess.id).source) }));
   void last;
   const forgot = forgottenSessions();
   if (forgot.length) rows.push(li({ act: 'missed-open', icon: ic('info'), color: 'var(--warn)', title: tn('heute.open', forgot.length), sub: t('heute.openSub') }));

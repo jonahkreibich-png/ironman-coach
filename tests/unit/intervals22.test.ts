@@ -42,11 +42,13 @@ describe('Soll aus dem Plan', () => {
   test('30/15 (26 sehr kurze Stücke) wird ein Block je Satz, nicht 26 Zeilen', () => {
     const steps: W.Step[] = [{ part: 'warm', min: 15, zone: 1 }, { part: 'main', reps: 13, min: 0.5, zone: 5, restMin: 0.25 }, { part: 'main', min: 5, zone: 1 }, { part: 'main', reps: 13, min: 0.5, zone: 5, restMin: 0.25 }, { part: 'cool', min: 10, zone: 1 }];
     const t = plannedIntervals({ sport: 'bike', ...W.build({ sport: 'bike', kind: 'vo2', ctx, steps }) });
-    expect(t).toHaveLength(2); expect(t[0].label).toMatch(/13×30 s/);
+    // Auftrag 38: die 5 min locker dazwischen stehen als lockerer Teil im Ablauf, zählen aber nicht als Intervall
+    expect(t.filter(x => !x.steady)).toHaveLength(2); expect(t[0].label).toMatch(/13×30 s/); expect(t.filter(x => x.steady).map(x => x.sec)).toEqual([300]);
   });
   test('Koppel (Rad mit Blöcken): harte Blöcke sind Intervalle', () => {
     const sp: W.Spec = { sport: 'bike', kind: 'brick', ctx, steps: [{ part: 'warm', min: 15, zone: 1 }, ...[0, 1, 2].flatMap(() => [{ part: 'main' as const, min: 10, zone: 4 }, { part: 'main' as const, min: 3, zone: 1 }]), { part: 'cool', min: 10, zone: 1 }] };
-    expect(plannedIntervals({ sport: 'bike', ...W.build(sp) }).map(t => t.sec)).toEqual([600, 600, 600]);
+    expect(plannedIntervals({ sport: 'bike', ...W.build(sp) }).filter(t => !t.steady).map(t => t.sec)).toEqual([600, 600, 600]);
+    expect(plannedIntervals({ sport: 'bike', ...W.build(sp) }).filter(t => t.steady).map(t => t.sec)).toEqual([180, 180, 180]);
   });
 });
 

@@ -139,7 +139,8 @@ export function contextParts(ctx: EngineCtx): ContextParts {
     // Auftrag 36: tatsächlich gemachte Lage/Hilfsmittel/Zone der Wiederholungen (z. B. mit Pull Buoy statt ohne)
     const ivx = ['run', 'bike', 'swim'].includes(d.sport) ? ivDiffNotes(ivEvalOf(ctx, d)) : [];
     const ivTxt = ivx.length ? ', Wiederholungen IST: ' + ivx.join(' ') : '';
-    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}${d.sport === 'strength' ? ', Bereich IST: ' + (AREA[v.area] || v.area || 'unbekannt') + ex : ''}${ivTxt}`);
+    const anders = d.done && d.done.changed ? `, IST anders als geplant: ${d.done.short}` : '';
+    L.push(`- ${dd(d.date)} ${SPORT[d.sport] || d.sport}: SOLL ${d.done && d.done.changed ? d.done.planTitle : d.title}${crawlSoll ? ` (Kraul-Stücke ${crawlSoll} m)` : ''} – IST erledigt${vals ? ': ' + vals : ''}${swimIst}${d.sport === 'strength' ? ', Bereich IST: ' + (AREA[v.area] || v.area || 'unbekannt') + ex : ''}${ivTxt}${anders}`);
   });
   days.filter((d: any) => d.date >= from && d.date < today).forEach((d: any) => d.sessions.forEach((s: any) => {
     if (s.sport === 'rest' || s.cancelled || (st[s.id] || {}).completed) return;

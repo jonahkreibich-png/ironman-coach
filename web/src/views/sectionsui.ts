@@ -77,20 +77,20 @@ onChange('sec', el => {
   if (row.plan) { delete row.plan; if (el.dataset.f !== 'min') delete row.min; if (el.dataset.f !== 'meters') delete row.meters; }
   if (res.v == null) delete row[el.dataset.f!]; else row[el.dataset.f!] = res.v;
   if (row.hr != null && row.maxHr != null && +row.maxHr < +row.hr) toast(`Max. Puls ${row.maxHr} liegt unter dem Ø Puls ${row.hr}. Bitte prüfen.`);
-  HOST.put(tg, applySections(st, asText(rows), tg.sport, undefined, 'manual', tgTargets(tg)));
+  HOST.put(tg, applySections(st, asText(rows), tg.sport, undefined, 'manual', tgTargets(tg), plannedIv(tg)));
   finish(tg);
 });
 /* Abschnitt löschen (nicht gemacht) bzw. wieder hinzufügen */
 on('sec-del', el => {
   if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return; const p = el.dataset.p!;
   const rows = rowsFor(tg, st, p).map(r => (r.part === p ? { part: r.part, off: true } : r));
-  setSubKey(''); HOST.put(tg, applySections(st, asText(rows), tg.sport, undefined, 'manual', tgTargets(tg))); finish(tg);
+  setSubKey(''); HOST.put(tg, applySections(st, asText(rows), tg.sport, undefined, 'manual', tgTargets(tg), plannedIv(tg))); finish(tg);
 });
 on('sec-add', el => {
   if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return; const p = el.dataset.p!;
   const rows = rowsFor(tg, st, p).map(r => (r.part === p ? { part: r.part, added: true } : r));
   // ohne eigene Werte ist ein Abschnitt einfach wieder sichtbar (noch nichts eingetragen)
-  const next = applySections(st, asText(rows), tg.sport, undefined, 'manual', tgTargets(tg));
+  const next = applySections(st, asText(rows), tg.sport, undefined, 'manual', tgTargets(tg), plannedIv(tg));
   HOST.put(tg, next); HOST.redraw(); UIH.open(tg, 'sec:' + p);
 });
 onChange('sec-bound', el => {

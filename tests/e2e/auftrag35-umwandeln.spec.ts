@@ -36,11 +36,12 @@ test('Lieber Intervalle mit harter Einheit morgen: Bedenken, leichtere Variante,
   const cs = sheet(page).locator('[data-conv-sheet]');
   await expect(cs.locator('[data-conv-main]')).toContainText(/Intervalle/);
   await expect(cs.locator('[data-conv-warn]')).toBeVisible();
-  await expect(cs.locator('[data-conv-lighter]')).toBeVisible();
-  await expect(cs.locator('[data-act="conv-apply"][data-v="main"]')).toHaveText('Trotzdem übernehmen');
+  // Auftrag 38: die leichtere Variante steht unter „Andere Vorschläge“
+  await expect(cs.locator('[data-conv-others]')).toContainText('leichter');
+  await expect(cs.locator('[data-act="conv-apply"]')).toHaveText('Trotzdem übernehmen');
   await noOverflow(page, '#sheetPanel');
   const newTitle = (await cs.locator('[data-conv-main] > b').innerText()).trim();
-  await cs.locator('[data-act="conv-apply"][data-v="main"]').click();
+  await cs.locator('[data-act="conv-apply"]').click();
   const st = await stored(page);
   const adj: any = Object.values(st.adjustments).find((a: any) => a.sessionId === 'u35-easy' && a.set && a.set.converted === 'intervals');
   expect(adj).toBeTruthy(); expect(adj.from_user).toBe(true);
@@ -60,7 +61,7 @@ test('Lieber kürzer ohne Bedenken: direkt „Übernehmen“; Lieber Intervalle:
   await sheet(page).locator('[data-act="conv"][data-k="shorter"]').click();
   await expect(sheet(page).locator('[data-conv-ok]')).toBeVisible();
   await expect(sheet(page).locator('[data-conv-main]')).toContainText('40 min');
-  await sheet(page).locator('[data-act="conv-apply"][data-v="main"]').click();
+  await sheet(page).locator('[data-act="conv-apply"]').click();
   let st = await stored(page);
   expect(Object.values(st.adjustments).some((a: any) => a.set && a.set.converted === 'shorter' && a.set.plannedMinutes === 40)).toBe(true);
 });

@@ -1,7 +1,7 @@
 /* Auftrag 35, Punkt 3: Minuten- oder km-Ansicht – gleiche Einheit, Summen passen zusammen, Intervalle in Metern mit Zeit pro Stück */
 import { test, expect } from 'vitest';
 import * as W from '../../shared/workouts';
-import { kmPlan, kmShort, totalLine, roundKm, paceEstimated } from '../../shared/kmview';
+import { kmPlan, totalLine, roundKm, paceEstimated } from '../../shared/kmview';
 
 const ctx: W.PaceCtx = { runThrSec: 300, lthrRun: 170, lthrBike: 160, bikeKmh: 30 };
 
@@ -35,6 +35,5 @@ test('Ohne gemessene Schwelle: „geschätzt – nach Gefühl“, Rolle drinnen 
 });
 
 test('Kurzzeile und Runden', () => {
-  expect(kmShort(W.runIntervals(ctx, 4, 3, 2, 4))).toMatch(/^[\d,]+ km einlaufen · 4 × 600 m an der Schwelle, 300 m traben dazwischen · [\d,]+ km auslaufen$/);
   expect(roundKm('run', 0.62)).toBe(0.6); expect(roundKm('run', 0.07)).toBe(0.05); expect(roundKm('run', 7.3)).toBe(7.5); expect(roundKm('bike', 23.4)).toBe(23);
 });

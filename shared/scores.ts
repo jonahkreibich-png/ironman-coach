@@ -13,6 +13,9 @@ import { mainPart } from './sections';
 import type { Activity } from './activity/analyze';
 import { intervalsOf, statsOf } from './activity/structure';
 import { rowsToLaps, swimIvFacts, manualIntervals } from './intervals';
+import { doneTitle } from './ablauf';
+/* Auftrag 38: Schwellen für den Ablauf (Titel des Gemachten) */
+const scoreThr = (state: any) => { const p = (state && state.profile) || {}; const th = p.thresholds || {}; return { lthrRun: th.lthrRun, lthrBike: th.lthrBike, ftp: p.powerMeter || p.trainerType === 'smart' ? th.ftp : null, runThrSec: th.thresholdPaceRunSec, css: th.cssSec }; };
 import { exerciseLoad, exerciseKey, STRENGTH_CATS, type StrengthCat, type ExerciseLoad } from './strength';
 import type { Profile } from './profile';
 import { ageOf, ageExact } from './profile';
@@ -1113,7 +1116,7 @@ function testLap(sport: string, m: any): any[] {
 /* Erledigte geplante Einheiten mit Aufzeichnung: der Name der Einheit aus dem Plan (z. B. „Radtest 20 min“), wenn die Uhr keinen hat */
 export function namedFromPlan(state: any, weeks: any[], acts: Activity[]): Activity[] {
   const title = new Map<string, string>(); const plan = new Map<string, [any, any]>();
-  planDays(weeks).forEach(d => d.sessions.forEach((s: any) => { const st = (state.sessions || {})[s.id]; if (st && st.activityId) { plan.set(st.activityId, [s, st]); if (s.title) title.set(st.activityId, actualTitle(s, st)); } }));
+  planDays(weeks).forEach(d => d.sessions.forEach((s: any) => { const st = (state.sessions || {})[s.id]; if (st && st.activityId) { plan.set(st.activityId, [s, st]); if (s.title) title.set(st.activityId, doneTitle(s, st, (state.activities || {})[st.activityId] || null, scoreThr(state))); } }));
   const thr = (state.profile && state.profile.thresholds) || {};
   return acts.map(a => {
     const named = a.name || !title.has(a.id) ? a : { ...a, name: title.get(a.id)! };
@@ -1181,7 +1184,7 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       }
     }
   };
-  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, actualTitle(s, st), { ...st, zone: effectiveSession(s, st).zone, race: !!s.race }, s.plannedMinutes); }));
+  planDays(weeks).forEach(d => d.sessions.forEach(s => { const st = (state.sessions || {})[s.id]; if (st && st.completed && !st.activityId) add(s.id, d.date, actualSport(s, st), st.metrics || {}, doneTitle(s, st, null, scoreThr(state)), { ...st, zone: effectiveSession(s, st).zone, race: !!s.race }, s.plannedMinutes); }));
   Object.entries(effectiveCustomBuckets(state) || {}).forEach(([d, l]) => (l as any[] || []).forEach((w: any) => { if (!w.activityId && w.completed !== false) add(w.id, d, w.sport, actualMetrics(w), w.title, w, null); }));
   return out;
 }

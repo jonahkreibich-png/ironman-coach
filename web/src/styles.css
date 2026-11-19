@@ -407,6 +407,12 @@ div.ab-set-h { cursor: default; }
 .ab-rep-wrap .ab-row { flex: 1 1 auto; }
 .ab-sheet .ab-btns { flex-wrap: wrap; gap: 6px; }
 .ab-sheet-head { flex-wrap: wrap; gap: 4px 8px; }
+/* Auftrag 38: Satz-Fenster oben: Wiederholungen [−] n [+], Dauer, Pause; Summe des Ablaufs */
+.iv-top { display: flex; flex-direction: column; gap: 8px; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper .btn { min-width: 44px; min-height: 44px; font-size: 1.2rem; }
+.stepper output { min-width: 2.5ch; text-align: center; font-weight: 700; font-size: 1.15rem; }
+.ab-sum { overflow-wrap: anywhere; }
 .wo-diagram-wrap[data-diagram-tap] .dia-hit { cursor: pointer; }
 .sub-wrap { z-index: 55; }
 .sub-sheet { max-height: 86%; }

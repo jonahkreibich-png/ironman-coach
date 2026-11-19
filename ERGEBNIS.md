@@ -1,3 +1,30 @@
+# Auftrag 38: Ablauf vollständig, Gemachtes gilt überall, einfacher eintragen, Umwandeln mit Vorschau (19.11.)
+
+**Stand:** Version **3.26.0**, Veröffentlichung läuft (erst Test-App, dann echte App mit Sicherung).
+
+## Was war falsch (Ursachen, gelten für alle Nutzer)
+- **Ablauf unvollständig:** `isIvStep` nahm nur Hauptteil-Schritte ab Zone 3. Lockere Hauptteile (z. B. 20 min locker vor Hügelsprints, Lauf-ABC, Erholungsblöcke) fehlten, die Summe stimmte nicht.
+- **Gemachtes nicht überall:** Zahlen wurden übernommen, aber Titel, Liste und Coach blieben beim Plan; nicht Eingetragenes zählte in der Summe gar nicht.
+- **Kurze Stücke:** Hügelsprints über 10 s bekamen Puls- und Pace-Ziel (betraf alle Bibliotheks-Einheiten mit Stücken unter 1 min bzw. bergauf).
+
+## Jetzt
+- **Ganze Einheit im Ablauf** (alle Sportarten): Aufwärmen, alle Hauptteile (auch Zone 1-2), Technik, Sätze, Ausklang; darunter „Summe: geplant 41 min · gemacht 41 min“. Lockere Teile werden gegen ihre Zone bewertet, zählen aber nicht als Intervall. Gespeicherte Daten bleiben gültig (ältere Listen werden beim Lesen ergänzt).
+- **Gemacht gilt überall:** z. B. Titel „Rad 3 × 10 min Sweet Spot, statt 2 × 8 min“, Kopf „Geplant 45 min · Gemacht 58 min · Anders als geplant: 3 × 10 min statt 2 × 8 min; Aufwärmen 10 statt 15 min“. Coach-Bewertung: „3 × 10 min statt 2 × 8 min – mehr Sweet-Spot-Zeit (30 min statt 16 min), gut.“ Chat, KI-Kontext, Belastung, Woche, Scores nutzen dasselbe.
+- **Einfacher eintragen:** Satz-Fenster oben Wiederholungen [−] n [+], Dauer, Pause, dann Werte. Neuer gleicher Satz → „Zu Satz 1 hinzufügen?“, gleiche Sätze zusammenführen. Knöpfe „Wie geplant gemacht“/„Anders gemacht“ entfernt; abgehakt ohne Werte gilt still „wie geplant“. Frühere Änderungen bleiben als Hinweis.
+- **Minuten und km zusammen** („41 min · ca. 6 km“, „4×3 min (ca. 650 m)“), Umschalter entfernt.
+- **Kurze Wiederholungen/bergauf:** ohne Puls bzw. Tempo, dafür „kräftig, fast maximal (Gefühl 9/10), langsam zurückgehen“; Bewertung danach.
+- **Umwandeln:** Vorschau Vorher → Nachher (Titel, Dauer, Ablauf, Belastung, Woche, Bedenken), andere Vorschläge, „Rückgängig“ im Hinweis, „Original wiederherstellen“ an der Einheit (auch nach Neuladen).
+- Entscheidungen 600–607.
+
+## Tests
+- Neuer Browser-Test `auftrag38` (WebKit iPhone + Chromium, echte Eingabe): Lauf mit Hügelsprints (10 + 20 + 6 × 10 s + 5 min, Summe 41 min, Sprints ohne Puls/Pace), Rad 2 × 8 → 3 × 10 mit [+] und Aufwärmen 10 (Titel, Geplant/Gemacht, Coach, Chat, KI-Kontext, Belastung steigt), „Zu Satz 1 hinzufügen?“, Umwandeln (Vorschau, andere Vorschläge, Rückgängig, Original nach Neuladen), Heute ohne Umschalter bei 320–430 px. Überlauf-Test für die neuen Fenster (320 px, 28 px Schrift, hell/dunkel).
+- Unit `auftrag38` (10), u. a. **alle Bibliotheks-Einheiten**: keine Puls-Ziele unter 1 min, kein Tempo bergauf, Ablauf-Summe = Dauer.
+- **Simulation:** 30 Testnutzer, je 6 Wochen, 259 geänderte Einheiten (Wiederholungen, Dauer, Sätze, Aufwärmen): Titel, Coach, KI-Kontext, Belastung, Woche, Scores und Summe überall das Gemachte, 0 Fehler.
+- Alte Tests angepasst statt doppelt (Intervalle, km, Umwandeln, Auftrag 29/37).
+- **Großer Test: 15 min**: Typprüfung, alle Unit-Tests, Simulation 36 Nutzer (19.292 Tage, 0 Fehler) + 30 Nutzer, 144 Browser-Abläufe. 3 rot (alte Erwartung „nicht gemacht“, WebKit-Timing) → angepasst, einzeln grün.
+
+---
+
 # Auftrag 37: Einheiten übersichtlich – ein Ablauf, Bearbeiten im Fenster, Nachtragen mit Datum (17.11.)
 
 **Stand:** Version **3.25.0**, **veröffentlicht am 18.11.** (alle Tests grün: 3.316 Unit, 796 Browser; erst Test-App, dann echte App; beide vorher gesichert; alle 3 Nutzer laden und starten fehlerfrei; 10 Minuten ohne Startfehler). Beim 1. Release-Lauf gefunden und behoben: Die Uhr meldete eine Schwimm-Bahn mit 0 m als Wiederholung, jetzt zählt sie als Pause (Nr. 599). Die Daten auf dem Server sind dabei unverändert geblieben.

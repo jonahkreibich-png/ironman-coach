@@ -8,7 +8,7 @@ import { type Page } from '@playwright/test';
 import fs from 'node:fs';
 // @ts-ignore – reines JS ohne Typen
 import { makeDemo } from '../../fixtures/demo.mjs';
-import { TODAY, narrowText, longBikeSession } from './helpers';
+import { TODAY, narrowText, longBikeSession, seed, open, openPlanSession } from './helpers';
 
 const MAIN = fs.readFileSync('web/src/main.ts', 'utf8');
 const TABS = [...MAIN.matchAll(/\{ id: '(\w+)', icon: '\w+', render: /g)].map(m => m[1]);
@@ -139,24 +139,29 @@ test('Auftrag 29: „Dein Trainingsdashboard“ passt bei jeder Schriftgröße',
   expect([...new Set(problems)]).toEqual([]);
 });
 
-/* Auftrag 30: „Anders gemacht“ – jede Art mit ihren Feldern passt bei 320 px und sehr großer Schrift (hell und dunkel) */
-for (const dark of [false, true]) test(`Auftrag 30: Anders gemacht, alle Arten, 320 px, 28 px Schrift, ${dark ? 'dunkel' : 'hell'}`, async ({ page }) => {
+/* Auftrag 38: neue Bildschirme – Satz-Fenster (Wiederholungen [−] n [+], Dauer, Pause, „Zu Satz X hinzufügen?“) und Umwandeln mit
+   Vorschau (Vorher → Nachher, andere Vorschläge) – passen bei 320 px und sehr großer Schrift (hell und dunkel) */
+for (const dark of [false, true]) test(`Auftrag 38: Satz-Fenster und Umwandeln-Vorschau, 320 px, 28 px Schrift, ${dark ? 'dunkel' : 'hell'}`, async ({ page }) => {
   test.setTimeout(180000);
   await page.setViewportSize({ width: 320, height: 760 });
-  await prepare(page, dark, 28);
-  await page.goto('/?go=plan'); await expect(page.locator('#app')).not.toBeEmpty();
-  const sid = await page.evaluate(() => { const b = document.querySelector('[data-act="sess-open"]') as HTMLElement | null; return b ? b.dataset.sid : null; });
-  expect(sid).toBeTruthy();
-  await page.locator(`[data-act="sess-open"][data-sid="${sid}"]`).first().click();
-  const sh = page.locator('#sheetPanel');
-  await sh.locator('[data-act="fd-asplanned"][data-v="0"]').click();
+  await seed(page, { extra: (d: any) => { const day = d.plan.weeks.flatMap((w: any) => w.days).find((x: any) => x.date === TODAY); day.sessions = [{ id: 'ss38', sport: 'bike', title: 'Rad-Intervalle 2×8 min Sweet Spot', plannedMinutes: 45, zone: 'Zone 3', hard: true, spec: { sport: 'bike', kind: 'sweetspot', ctx: { lthrBike: 160, bikeKmh: 30 }, steps: [{ part: 'warm', min: 15, zone: 1 }, { part: 'main', reps: 2, min: 8, zone: 3, restMin: 4 }, { part: 'cool', min: 10, zone: 1 }] } }]; } });
+  await page.addInitScript(() => { const set = () => { document.documentElement.style.fontSize = '28px'; }; if (document.documentElement) set(); document.addEventListener('DOMContentLoaded', set); });
+  await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
+  await open(page, '/?go=plan'); await openPlanSession(page, 'ss38');
+  const sh = page.locator('#sheetPanel'); const sub = page.locator('#subPanel');
   const problems: string[] = [];
-  const kinds = await sh.locator('[data-act="fd-chg-kind"]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.v!));
-  expect(kinds.length).toBeGreaterThanOrEqual(7);
-  for (const k of kinds) {
-    await sh.locator(`[data-act="fd-chg-kind"][data-v="${k}"]`).click(); await page.waitForTimeout(60);
-    if (k === 'split') { await sh.locator('[data-act="fd-chg-part-add"]').click(); await page.waitForTimeout(40); }
-    (await overflow(page)).forEach(p => problems.push(`${k}: ${p}`));
-  }
-  expect(problems).toEqual([]);
+  await sh.locator('.ablauf .ab-set-h').first().click();
+  await expect(sub.locator('[data-set-top]')).toBeVisible();
+  await sub.locator('[data-act="iv-count"][data-d="1"]').click(); await page.waitForTimeout(60);
+  (await overflow(page)).forEach(p => problems.push(`Satz: ${p}`));
+  await sub.locator('[data-act="sub-close"].btn').click(); await expect(page.locator('#sub')).toBeHidden();
+  await sh.locator('[data-act="ab-add"]').click(); await sub.locator('[data-act="iv-add"]').click(); await page.waitForTimeout(60);
+  await expect(sub.locator('[data-merge-ask]')).toBeVisible();
+  (await overflow(page)).forEach(p => problems.push(`Neuer Satz: ${p}`));
+  await sub.locator('[data-act="sub-close"].btn').click(); await expect(page.locator('#sub')).toBeHidden();
+  await sh.locator('[data-convert] [data-act="conv"]').first().click();
+  await expect(sh.locator('[data-conv-compare]')).toBeVisible();
+  (await overflow(page)).forEach(p => problems.push(`Umwandeln: ${p}`));
+  if (await sh.locator('[data-act="conv-pick"]').count()) { await sh.locator('[data-act="conv-pick"]').first().click(); await page.waitForTimeout(60); (await overflow(page)).forEach(p => problems.push(`Umwandeln (anderer Vorschlag): ${p}`)); }
+  expect([...new Set(problems)]).toEqual([]);
 });

@@ -229,18 +229,39 @@ export function mainText(mp: MainPart | null, lthr: number | null | undefined, s
 
 /** Kennzeichen eines Abschnitts (keine Werte) */
 const META = new Set(['part', 'plan', 'off', 'added']);
+/** geplante Minuten (Schwimmen: Meter) eines Abschnitts (vorher in shared/ablauf bzw. web/src/views/sectionsui.ts) */
+export function plannedPart(planned: any, part: SecPart): number | null {
+  const steps: any[] = (planned && planned.spec && planned.spec.steps) || [];
+  if (part === 'tech') { const t = steps.filter(s => s.part === 'main' && ['drill', 'kick'].includes(s.mode)); return t.length ? t.reduce((a, s) => a + (s.reps || 1) * (s.m || 0), 0) : null; }
+  const ss = steps.filter(s => s.part === part && (part !== 'main' || !['drill', 'kick'].includes(s.mode)));
+  if (!ss.length) return null;
+  return planned.sport === 'swim' ? ss.reduce((a, s) => a + (s.reps || 1) * (s.m || 0), 0) : ss.reduce((a, s) => a + (s.reps || 1) * (s.min || 0) + Math.max(0, (s.reps || 1) - 1) * (s.restMin || 0), 0);
+}
+const IV_VALS = ['sec', 'm', 'hr', 'maxHr', 'pace', 'power', 'speed', 'pace100', 'cad', 'spl', 'rpe'];
+const ivHas = (r: any) => !!r && IV_VALS.some(k => r[k] != null && r[k] !== '');
 /** Auftrag 37: Wiederholungen eines Satzes als Stücke für die Gesamtwerte (Belastung + Pause danach). Pausen zählen bei Dauer und
-    Strecke mit, beim Ø Puls nicht (kein Pulswert der Pause). Nicht eingetragene Wiederholungen bleiben leer → dann keine Gesamtdauer. */
-export function ivUnits(ivRows: any[], sport: string, targets?: any[] | null): (SecRow & { _rest?: boolean })[] {
-  const out: (SecRow & { _rest?: boolean })[] = [];
-  const owned = (ivRows || []).some(x => x && x.ti != null);
-  (ivRows || []).forEach((r: any, i: number) => {
+    Strecke mit, beim Ø Puls nicht (kein Pulswert der Pause).
+    Auftrag 38: nicht eingetragene Wiederholungen mit Soll zählen wie geplant (Dauer bzw. Strecke des Solls, ohne Messwert) – „wer nichts
+    anderes sagt, hat es wie geplant gemacht“; so ist die Summe des Ablaufs immer die Dauer der Einheit. Die Pause gilt je Satz: jede
+    Wiederholung außer der letzten des Satzes hat die geplante Pause (auch bei zusätzlich angehängten Wiederholungen). */
+export function ivUnits(ivRows: any[], sport: string, targets?: any[] | null): (SecRow & { _rest?: boolean; _plan?: boolean })[] {
+  const out: (SecRow & { _rest?: boolean; _plan?: boolean })[] = [];
+  const list = ivRows || [];
+  const owned = list.some(x => x && x.ti != null);
+  const tOf = (r: any, i: number) => (targets ? (r.ti != null ? targets[r.ti] : owned ? null : targets[i]) : null);
+  const setKey = (r: any, i: number) => { const t = tOf(r, i); return r.set != null ? 's' + r.set : t ? 'p' + t.set : 'i' + i; };
+  list.forEach((r: any, i: number) => {
     if (!r) return;
-    // Pause: eingetragen, sonst die geplante (wer nichts anderes sagt, hat die Pause wie geplant gemacht)
-    const t = targets ? (r.ti != null ? targets[r.ti] : owned ? null : targets[i]) : null;
-    const rest = num(r.restSec) ?? (t && t.restSec ? t.restSec : null);
-    const sec = num(r.sec), m = num(r.m);
-    const u: any = { part: 'main', min: sec != null ? sec / 60 : null, hr: r.hr ?? null, maxHr: r.maxHr ?? null, power: r.power ?? null, speed: r.speed ?? null, pace: r.pace ?? null, pace100: r.pace100 ?? null };
+    const t = tOf(r, i);
+    const has = ivHas(r);
+    if (!has && !t) return; // leere zusätzliche Zeile: zählt nicht
+    // Pause: eingetragen, sonst die geplante; im Satz (nicht nach der letzten Wiederholung) die Pause des Satzes
+    const k = setKey(r, i); const nx = list[i + 1];
+    const lastInSet = !nx || setKey(nx, i + 1) !== k;
+    const setRest = (() => { for (let j = 0; j < list.length; j++) { const x = list[j]; if (!x || setKey(x, j) !== k) continue; const tt = tOf(x, j); if (tt && tt.restSec) return tt.restSec; } return null; })();
+    const rest = num(r.restSec) ?? (t && t.restSec ? t.restSec : !lastInSet ? setRest : null);
+    const sec = num(r.sec) ?? (!has && t ? num(t.sec) : null), m = num(r.m) ?? (!has && t ? num(t.m) : null);
+    const u: any = { part: 'main', min: sec != null ? sec / 60 : null, hr: r.hr ?? null, maxHr: r.maxHr ?? null, power: r.power ?? null, speed: r.speed ?? null, pace: r.pace ?? null, pace100: r.pace100 ?? null, ...(!has ? { _plan: true, ...(r.steady || (t && t.steady) ? { _steady: true } : {}) } : {}) };
     if (sport === 'swim') u.meters = m; else u.km = m != null ? m / 1000 : null;
     if (sport === 'swim' && u.min == null && m && paceSec(r.pace100)) u.min = paceSec(r.pace100)! * m / 100 / 60;
     out.push(u);
@@ -250,12 +271,20 @@ export function ivUnits(ivRows: any[], sport: string, targets?: any[] | null): (
 }
 /** Gesamtwerte aus Abschnitten (Dauer, Strecke, Ø Puls zeitgewichtet, max. Puls). Nur Felder mit Werten in allen nötigen Abschnitten.
     Auftrag 37: mit den Wiederholungen der Sätze (ivRows) – die Gesamtwerte passen dann zum ganzen Ablauf, nicht nur zu Aufwärmen/Ausklang. */
-export function totalsFromSections(rows: SecRow[], sport: string, ivRows?: any[] | null, targets?: any[] | null): Record<string, string> {
+export function totalsFromSections(rows: SecRow[], sport: string, ivRows?: any[] | null, targets?: any[] | null, planned?: any): Record<string, string> {
   const own = rows.filter(r => r && !r.off && Object.keys(r).some(k => !META.has(k) && r[k as keyof SecRow] != null && r[k as keyof SecRow] !== ''));
-  const R: (SecRow & { _rest?: boolean })[] = [...own, ...(ivRows && ivRows.length ? ivUnits(ivRows, sport, targets) : [])];
+  // Auftrag 38: nicht eingetragene geplante Abschnitte zählen wie geplant (Dauer bzw. Strecke), gelöschte (off) nicht; „Hauptteil“ nur ohne Sätze
+  const fill: any[] = [];
+  if (planned && planned.spec) for (const [p] of ((SEC_PARTS as any)[sport] || []) as [SecPart, string][]) {
+    if (rows.some(r => r && r.part === p && (r.off || own.includes(r)))) continue;
+    if (p === 'main' && ((targets && targets.length) || (ivRows && ivRows.length))) continue;
+    const pm = plannedPart(planned, p); if (!pm) continue;
+    fill.push(sport === 'swim' ? { part: p, meters: pm, min: null, _plan: true } : { part: p, min: pm, _plan: true });
+  }
+  const R: (SecRow & { _rest?: boolean; _plan?: boolean })[] = [...own, ...fill, ...(ivRows && ivRows.length ? ivUnits(ivRows, sport, targets) : []).filter((u: any) => !(u._steady && own.some(r => r.part === 'main')))];
   if (!R.length) return {};
   // Pausen: zählen bei Dauer (und Strecke, falls bekannt), nicht beim Ø Puls
-  const restOk = (r: any) => r._rest;
+  const restOk = (r: any) => r._rest || r._plan;
   const out: Record<string, string> = {};
   const mins = R.map(r => num(r.min));
   const de = (x: number, d = 1) => String(Math.round(x * 10 ** d) / 10 ** d);
@@ -267,27 +296,28 @@ export function totalsFromSections(rows: SecRow[], sport: string, ivRows?: any[]
   const hrNeed = R.filter(r => !restOk(r));
   const hrRows = hrNeed.filter(r => num(r.hr) != null && num(r.min) != null);
   if (hrRows.length && hrRows.length === hrNeed.length) { const t = hrRows.reduce((a, r) => a + num(r.min)!, 0); if (t) out.hr = String(Math.round(hrRows.reduce((a, r) => a + num(r.hr)! * num(r.min)!, 0) / t)); }
+  if (!hrNeed.length) delete out.hr;
   const mx = R.map(r => num(r.maxHr) ?? num(r.hr)).filter((x): x is number => x != null); if (mx.length && R.some(r => num(r.maxHr) != null)) out.maxHr = String(Math.max(...mx));
   if (sport === 'bike') { const pw = hrNeed.filter(r => num(r.power) != null && num(r.min) != null); if (pw.length && pw.length === hrNeed.length) { const t = pw.reduce((a, r) => a + num(r.min)!, 0); if (t) out.power = String(Math.round(pw.reduce((a, r) => a + num(r.power)! * num(r.min)!, 0) / t)); } }
   return out;
 }
 /** Abschnitte von Hand speichern: Gesamtwerte nachziehen, solange sie nicht selbst eingetragen wurden (Quelle „sections“ oder leer) */
-export function applySections(st: any, rows: SecRow[], sport: string, ivRows?: any[] | null, src: 'manual' | 'plan' = 'manual', targets?: any[] | null): any {
+export function applySections(st: any, rows: SecRow[], sport: string, ivRows?: any[] | null, src: 'manual' | 'plan' = 'manual', targets?: any[] | null, planned?: any): any {
   const out = { ...st, metrics: { ...(st.metrics || {}) }, metricsSrc: { ...(st.metricsSrc || {}) }, metricsManual: { ...(st.metricsManual || {}) } };
   const clean = rows.map(r => Object.fromEntries(Object.entries(r).filter(([, v]) => v != null && v !== ''))) as SecRow[];
   const any = clean.some(r => Object.keys(r).length > 1);
   if (any) { out.metrics.sections = clean; out.metricsSrc.sections = src; if (out.metricsAuto && src === 'manual') out.metricsManual.sections = true; }
   else { delete out.metrics.sections; delete out.metricsSrc.sections; delete out.metricsManual.sections; }
-  return applyTotals(out, sport, ivRows, targets);
+  return applyTotals(out, sport, ivRows, targets, planned);
 }
 /** Auftrag 37: Gesamtwerte der Einheit aus dem ganzen Ablauf (eingetragene Abschnitte + Wiederholungen von Hand bzw. „wie geplant“),
     solange sie nicht selbst eingetragen oder von der Uhr gemessen wurden (Quelle „sections“ oder leer). */
-export function applyTotals(st: any, sport: string, ivRows?: any[] | null, targets?: any[] | null): any {
+export function applyTotals(st: any, sport: string, ivRows?: any[] | null, targets?: any[] | null, planned?: any): any {
   const out = { ...st, metrics: { ...(st.metrics || {}) }, metricsSrc: { ...(st.metricsSrc || {}) } };
   const secs: SecRow[] = Array.isArray(out.metrics.sections) && ['manual', 'plan'].includes(out.metricsSrc.sections) ? out.metrics.sections : [];
   const iv = ivRows !== undefined ? ivRows : Array.isArray(out.metrics.intervals) && ['manual', 'plan'].includes(out.metricsSrc.intervals) ? out.metrics.intervals : null;
   const any = secs.some(r => r && !r.off && Object.keys(r).some(k => !META.has(k) && (r as any)[k] != null && (r as any)[k] !== '')) || !!(iv && iv.length);
-  const tot = any ? totalsFromSections(secs, sport, iv, targets) : {};
+  const tot = any ? totalsFromSections(secs, sport, iv, targets, planned) : {};
   for (const k of ['min', 'km', 'meters', 'hr', 'maxHr', 'power']) {
     const own = out.metricsSrc[k] === 'sections';
     const empty = out.metrics[k] == null || out.metrics[k] === '';

@@ -24,7 +24,8 @@ test('Intervalle: Soll als Platzhalter, Eingabe mit Enter weiter, wie vorheriges
   const box = page.locator('#sheet [data-intervals]');
   await expect(box).toBeVisible();
   await expect(box.locator('.ab-rep')).toHaveCount(2);
-  await expect(box.locator('.ab-rep').first()).toContainText('nicht gemacht');
+  // Auftrag 38: abgehakt ohne Werte gilt still „wie geplant (nicht gemessen)“
+  await expect(box.locator('.ab-rep').first()).toContainText('wie geplant');
   // Auftrag 37: eine Zeile je Wiederholung im Ablauf, Antippen öffnet das Fenster dieser Wiederholung
   await box.locator('.ab-rep[data-iv-row="0"]').click();
   const sec = page.locator('#iv-0-sec');

@@ -12,7 +12,7 @@
 import { esc } from '../util';
 import { on, onChange } from '../kit';
 import { toast } from '../toast';
-import { plannedIntervals, paceToSec, secToPace, IV_LIMITS, ivLimit, ivGroups, ivAttrs, stampRows, targetOfRow,
+import { plannedIntervals, paceToSec, secToPace, IV_LIMITS, ivLimit, ivGroups, ivAttrs, stampRows, targetOfRow, rowHasValues,
   IV_STROKES, IV_GEAR, IV_TYPES, IV_TERRAIN, type IvRow, type IvTarget } from '../../../shared/intervals';
 import { applyTotals } from '../../../shared/sections';
 import { ivRowsFor, buildAblauf, repSoll, type AbSet, type AbRep } from '../../../shared/ablauf';
@@ -127,6 +127,15 @@ export function repSheet(tg: Tg, i: number, attrs: string): string {
 
 /* ---------- Fenster: ein Satz ---------- */
 export function setTitle(tg: Tg, gi: number): string { if (!HOST) return ''; const set = ctxOf(tg).ab.items.filter(x => x.kind === 'set')[gi] as AbSet | undefined; return set ? set.label : 'Satz'; }
+/* Auftrag 38: sieht Satz gi aus wie der Satz davor (gleiche Art bzw. Zone, Schwimmen gleiche Lage und Hilfsmittel)? */
+function sigOf(rows: IvRow[], targets: IvTarget[], g: { idx: number[] }, sport: string): string {
+  const a = ivAttrs(rows[g.idx[0]], targetOfRow(rows, targets, g.idx[0]), sport);
+  return sport === 'swim' ? [a.stroke, [...a.gear].sort().join('+'), a.zone].join('|') : [a.type || 'flat', a.zone].join('|');
+}
+export function similarToPrev(rows: IvRow[], targets: IvTarget[], sport: string, gi: number): boolean {
+  const groups = ivGroups(rows, targets, sport); if (gi < 1 || !groups[gi] || !groups[gi - 1]) return false;
+  return sigOf(rows, targets, groups[gi], sport) === sigOf(rows, targets, groups[gi - 1], sport);
+}
 export function setSheet(tg: Tg, gi: number, attrs: string): string {
   if (!HOST) return '';
   const { ab } = ctxOf(tg); const rows = ab.rows; const targets = ab.targets; const sport = tg.sport; const fields = IV_FIELDS[sport];
@@ -135,16 +144,34 @@ export function setSheet(tg: Tg, gi: number, attrs: string): string {
   const ids = g.idx.join(','); const t0 = grp.target;
   const at = g.idx.map(i => ivAttrs(rows[i], targetOfRow(rows, targets, i), sport));
   const mixed: Record<string, boolean> = { stroke: new Set(at.map(a => a.stroke)).size > 1, gear: new Set(at.map(a => [...a.gear].sort().join(','))).size > 1, zone: new Set(at.map(a => a.zone)).size > 1, type: new Set(at.map(a => a.type)).size > 1, terrain: new Set(at.map(a => a.terrain)).size > 1, title: new Set(at.map(a => a.ownTitle ? a.title : '')).size > 1 };
-  const same = SAME[sport].map(k => { const f = fields.find(x => x.k === k)!; const id = `iv-same-${g.idx[0]}-${String(k)}`; const vals = new Set(g.idx.map(i => valOf(f, rows[i]))); const v = vals.size === 1 ? [...vals][0] : '';
-    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv-same" data-idx="${ids}" data-f="${String(k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Ganzer Satz: ${esc(f.label)}" value="${esc(v)}" placeholder="${esc(ph(f, t0, sport))}"></label>`; }).join('');
+  const sameInp = (f: F, scope: number[]) => { const id = `iv-same-${g.idx[0]}-${String(f.k)}`; const vals = new Set(scope.map(i => valOf(f, rows[i]))); const v = vals.size === 1 ? [...vals][0] : '';
+    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv-same" data-idx="${scope.join(',')}" data-f="${String(f.k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Ganzer Satz: ${esc(f.label)}" value="${esc(v)}" placeholder="${esc(ph(f, t0, sport))}"></label>`; };
+  // Auftrag 38: ganz oben Wiederholungen [−] n [+], Dauer bzw. Strecke, Pause; danach die Werte für alle Wiederholungen
+  const sizeF = fields.find(x => x.k === (sport === 'swim' ? 'm' : 'sec'))!;
+  const restF = REST[0];
+  const notLast = g.idx.slice(0, -1);
+  const vals = SAME[sport].filter(k => k !== sizeF.k).map(k => sameInp(fields.find(x => x.k === k)!, g.idx)).join('');
+  const n = g.reps.length;
+  const top = `<div class="iv-top" data-set-top>
+    <div class="fld"><span class="lab">Wiederholungen</span><div class="stepper" role="group" aria-label="Wiederholungen"><button type="button" class="btn ghost sm" data-act="iv-count" data-d="-1" data-idx="${ids}" ${attrs} ${n <= 1 ? 'disabled' : ''} aria-label="Eine Wiederholung weniger">−</button><output class="num" data-set-reps aria-live="polite">${n}</output><button type="button" class="btn ghost sm" data-act="iv-count" data-d="1" data-idx="${ids}" ${attrs} aria-label="Eine Wiederholung mehr">+</button></div></div>
+    <div class="fgrid">${sameInp(sizeF, g.idx)}${n > 1 ? sameInp(restF, notLast) : ''}</div></div>`;
+  // Auftrag 38: neuer Satz wie der vorige → „Zu Satz X hinzufügen?“; gleiche Sätze nacheinander zusammenführen
+  const similar = similarToPrev(rows, targets, sport, gi);
+  const own = g.idx.every(i => rows[i] && rows[i].ti == null);
+  const asked = g.idx.some(i => rows[i] && rows[i].sep);
+  const prevLabel = gi > 0 ? sets[gi - 1].label : '';
+  const ask = similar && own && !asked ? `<div class="banner" role="status" data-merge-ask><div>Zu Satz ${gi} (${esc(prevLabel)}) hinzufügen?</div><div class="row ab-btns"><button class="btn sm" data-act="iv-merge" data-g="${gi}" ${attrs}>Ja, hinzufügen</button><button class="btn ghost sm" data-act="iv-sep" data-idx="${ids}" ${attrs}>Nein, eigener Satz</button></div></div>`
+    : similar ? `<button class="link" data-act="iv-merge" data-g="${gi}" ${attrs} data-merge-link>Mit Satz ${gi} (${esc(prevLabel)}) zusammenführen</button>` : '';
   return `<div class="stack ab-sheet" data-ab-sheet="set" data-iv-set="${gi}">
+    ${ask}${top}
     ${g.count ? `<div class="small muted" data-set-count>${esc(g.count)}</div>` : ''}
-    ${g.reps.length > 1 ? `<div class="stack"><span class="lab">Ganzer Satz gleich</span><div class="fgrid">${same}</div><div class="xs muted">Gilt für alle ${g.reps.length} Wiederholungen. Weicht eine ab, tippe sie unten an und ändere nur sie.</div></div>` : `<div class="fgrid">${same}</div>`}
+    <div class="stack"><span class="lab">${n > 1 ? 'Werte für alle Wiederholungen' : 'Werte'}</span><div class="fgrid">${vals}</div>${n > 1 ? `<div class="xs muted">Weicht eine Wiederholung ab, tippe sie unten an und ändere nur sie.</div>` : ''}</div>
     ${attrControls(sport, g.idx, { ...grp.attrs }, attrs, 'set', mixed)}
     <div class="stack"><span class="lab">Wiederholungen</span><div class="ab-reps">${g.reps.map(r => `<div class="ab-rep-wrap">${repLine(r, attrs, true)}<button class="icon-btn sm danger" data-act="iv-del" data-i="${r.i}" ${attrs} aria-label="Wiederholung ${r.n} löschen">×</button></div>`).join('')}</div></div>
-    <div class="row ab-btns"><button class="btn ghost sm" data-act="iv-rep-add" data-idx="${ids}" ${attrs}>+ Wiederholung</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="-1" ${attrs} ${gi === 0 ? 'disabled' : ''} aria-label="Satz nach oben">Satz ↑</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="1" ${attrs} ${gi >= sets.length - 1 ? 'disabled' : ''} aria-label="Satz nach unten">Satz ↓</button><button class="btn ghost sm danger" data-act="iv-set-del" data-idx="${ids}" ${attrs}>Satz löschen</button></div>
+    <div class="row ab-btns"><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="-1" ${attrs} ${gi === 0 ? 'disabled' : ''} aria-label="Satz nach oben">Satz ↑</button><button class="btn ghost sm" data-act="iv-set-move" data-g="${gi}" data-dir="1" ${attrs} ${gi >= sets.length - 1 ? 'disabled' : ''} aria-label="Satz nach unten">Satz ↓</button><button class="btn ghost sm danger" data-act="iv-set-del" data-idx="${ids}" ${attrs}>Satz löschen</button></div>
     <button class="btn block" data-act="sub-close">Speichern</button></div>`;
 }
+
 
 /* ---------- Ändern ---------- */
 function save(tg: Tg, rows: IvRow[]) {
@@ -152,7 +179,7 @@ function save(tg: Tg, rows: IvRow[]) {
   const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
   const stamped = stampRows(rows, targets, tg.sport);
   // Auftrag 37: die Gesamtwerte passen zum Ablauf (Abschnitte + Wiederholungen), solange sie nicht selbst eingetragen bzw. gemessen sind
-  HOST.put(tg, applyTotals(setSessionMetricManual(st, 'intervals', stamped), tg.sport, stamped, targets));
+  HOST.put(tg, applyTotals(setSessionMetricManual(st, 'intervals', stamped), tg.sport, stamped, targets, plannedIv(tg)));
 }
 const done = (tg: Tg) => { HOST!.rev(tg); HOST!.redraw(); };
 const rowsFor = (tg: Tg) => { const st = HOST!.rec(tg) || {}; return ivRowsFor(plannedIv(tg), st, actOf(st), HOST!.thresholds(), tg.sport).rows; };
@@ -238,22 +265,58 @@ on('iv-gear', el => {
 /* Satz hinzufügen: neuer Satz mit einer Wiederholung (Lage wie der letzte Satz), zusätzlich zum Plan; das Fenster zeigt den neuen Satz */
 on('iv-add', el => {
   if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg);
-  const key = Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1));
-  const last = rows[rows.length - 1] || {};
-  rows.push({ set: key, ti: null, ...(tg.sport === 'swim' ? { stroke: last.stroke || 'crawl', gear: [] } : {}) });
-  save(tg, rows);
   const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
+  const key = Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1));
+  // Auftrag 38: neuer Satz übernimmt Art bzw. Zone (Schwimmen: Lage, Hilfsmittel) des letzten Satzes – sieht er gleich aus, fragt das Fenster
+  // „Zu Satz X hinzufügen?“
+  const li = rows.length - 1; const a = li >= 0 ? ivAttrs(rows[li], targetOfRow(rows, targets, li), tg.sport) : null;
+  rows.push({ set: key, ti: null, ...(a && a.zone ? { zone: a.zone } : {}), ...(tg.sport === 'swim' ? { stroke: (a && a.stroke) || 'crawl', gear: a ? [...a.gear] : [] } : a && a.type && a.type !== 'flat' ? { type: a.type } : {}) });
+  save(tg, rows);
   const gi = ivGroups(stampRows(rows, targets, tg.sport), targets, tg.sport).length - 1;
   HOST.redraw(); UIH.open(tg, 'set:' + gi);
 });
-on('iv-rep-add', el => {
+/* Auftrag 38: Wiederholungen [−] n [+] – hinzufügen bzw. die letzte entfernen; vorhandene Werte bleiben. Die neue Wiederholung übernimmt
+   Art, Zone, Lage und Dauer bzw. Strecke der letzten (wenn dort selbst eingetragen), nicht deren Messwerte. */
+on('iv-count', el => {
   if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const idx = idxOf(el); if (!idx.length) return;
-  const last = rows[idx[idx.length - 1]] || {};
-  const { title, stroke, gear, zone, type, terrain, set } = last as any;
-  const at = idx[idx.length - 1] + 1;
-  rows.splice(at, 0, JSON.parse(JSON.stringify({ title, stroke, gear, zone, type, terrain, set: set ?? Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1)), ti: null })));
-  if (last.set == null) rows[idx[idx.length - 1]].set = rows[at].set;
+  const d = +el.dataset.d!;
+  const lastI = idx[idx.length - 1]; const last = rows[lastI] || {};
+  const setKey = last.set ?? Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1));
+  if (d < 0) {
+    if (idx.length <= 1) return;
+    if (SUB.key === 'rep:' + lastI) setSubKey('');
+    rows.splice(lastI, 1);
+  } else {
+    // Art, Zone, Lage und Hilfsmittel wie gemacht bzw. geplant (die neue Wiederholung hat kein eigenes Soll)
+    const tgs = plannedIntervals(plannedIv(tg), HOST.thresholds()); const ea = ivAttrs(last, targetOfRow(rows, tgs, lastI), sport(tg));
+    const { title, terrain, sec, m, restSec } = last as any;
+    const zone = ea.zone ?? undefined, type = ea.type ?? undefined, stroke = sport(tg) === 'swim' ? ea.stroke ?? undefined : undefined, gear = sport(tg) === 'swim' ? [...ea.gear] : undefined;
+    const own = rowHasValues(last);
+    const copy: IvRow = JSON.parse(JSON.stringify({ title, stroke, gear, zone, type, terrain, set: setKey, ti: null, ...(own && (sport(tg) === 'swim' ? m != null : sec != null) ? (sport(tg) === 'swim' ? { m } : { sec }) : {}) }));
+    // Pause nach der bisher letzten Wiederholung: die des Satzes (sie ist jetzt nicht mehr die letzte)
+    if (last.restSec == null) { const targets = plannedIntervals(plannedIv(tg), HOST.thresholds()); const t = idx.map(i => targetOfRow(rows, targets, i)).find(x => x && x.restSec); const r0 = idx.map(i => rows[i] && rows[i].restSec).find(x => x != null); if (r0 != null) rows[lastI] = { ...last, restSec: r0 }; else if (t && t.restSec && rowHasValues(last)) rows[lastI] = { ...last, restSec: t.restSec }; }
+    void restSec;
+    if (last.set == null) rows[lastI] = { ...rows[lastI], set: setKey };
+    rows.splice(lastI + 1, 0, copy);
+  }
   save(tg, rows); HOST.redraw();
+});
+const sport = (tg: Tg) => tg.sport;
+/* Auftrag 38: Satz zum vorigen hinzufügen (zusammenführen) bzw. als eigenen Satz behalten */
+on('iv-merge', el => {
+  if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const gi = +el.dataset.g!;
+  const targets = plannedIntervals(plannedIv(tg), HOST.thresholds());
+  const groups = ivGroups(stampRows(rows, targets, tg.sport), targets, tg.sport); const g = groups[gi], p = groups[gi - 1]; if (!g || !p) return;
+  const key = rows[p.idx[0]].set ?? targetOfRow(rows, targets, p.idx[0])?.set ?? Math.max(1000, ...rows.map(r => (r.set ?? 0) + 1));
+  p.idx.forEach(i => { rows[i] = { ...rows[i], set: key }; });
+  g.idx.forEach(i => { const r = { ...rows[i], set: key }; delete r.sep; rows[i] = r; });
+  setSubKey('set:' + (gi - 1));
+  save(tg, rows); done(tg); toast(`Zu Satz ${gi} hinzugefügt.`);
+});
+on('iv-sep', el => {
+  if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const idx = idxOf(el);
+  idx.forEach(i => { if (rows[i]) rows[i] = { ...rows[i], sep: true }; });
+  save(tg, rows); done(tg);
 });
 on('iv-set-del', el => {
   if (!HOST) return;
@@ -280,7 +343,7 @@ on('iv-del', el => {
 on('iv-move', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!, j = i + +el.dataset.dir!; if (j < 0 || j >= rows.length) return; [rows[i], rows[j]] = [rows[j], rows[i]]; if (SUB.key === 'rep:' + i) setSubKey('rep:' + j); save(tg, rows); done(tg); });
 on('iv-copy', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!; if (!rows[i - 1]) return; const { note, aborted, ti, set, title, ...prev } = rows[i - 1]; void note; void aborted; void ti; void set; void title; rows[i] = { ...rows[i], ...prev }; save(tg, rows); done(tg); });
 on('iv-abort', el => { if (!HOST) return; const tg = tgOf(el); const rows = rowsFor(tg); const i = +el.dataset.i!; if (!rows[i]) return; rows[i] = { ...rows[i], aborted: !rows[i].aborted }; if (!rows[i].aborted) delete rows[i].aborted; else delete rows[i].plan; save(tg, rows); done(tg); });
-on('iv-reset', el => { if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return; const next = setSessionMetricManual(st, 'intervals', ''); delete next.metricsManual.intervals; HOST.put(tg, applyTotals(next, tg.sport, undefined, plannedIntervals(plannedIv(tg), HOST.thresholds()))); done(tg); toast('Werte der Uhr gelten wieder.'); });
+on('iv-reset', el => { if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return; const next = setSessionMetricManual(st, 'intervals', ''); delete next.metricsManual.intervals; HOST.put(tg, applyTotals(next, tg.sport, undefined, plannedIntervals(plannedIv(tg), HOST.thresholds()), plannedIv(tg))); done(tg); toast('Werte der Uhr gelten wieder.'); });
 /* Enter springt zum nächsten Feld der Wiederholung (im Fenster) */
 if (typeof document !== 'undefined') document.addEventListener('keydown', e => {
   const el = e.target as HTMLElement | null;
