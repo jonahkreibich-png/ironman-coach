@@ -110,7 +110,8 @@ test.describe('B: Meldungen mit Server', () => {
     await page.unroute('**/api/feedback');
     await page.reload();
     await expect.poll(async () => (await (await request.get('/api/admin/feedback', { headers: H })).json()).feedback.map((f: any) => f.text), { timeout: 15000 }).toEqual(['Offline gemeldet']);
-    expect(await page.evaluate(() => localStorage.getItem('ec_fb_outbox'))).toBeNull();
+    // Auftrag 38 (Release-Fund): der Server hat die Meldung, das Leeren des Postausgangs folgt kurz danach – warten statt sofort prüfen
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('ec_fb_outbox')), { timeout: 10000 }).toBeNull();
   });
 
   test('Betreiber-Posteingang: Filter, Status, Als Text kopieren, Link aus der Mitteilung öffnet die Meldung', async ({ page, request, context }) => {
