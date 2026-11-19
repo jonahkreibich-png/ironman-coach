@@ -1,6 +1,6 @@
 # Auftrag 38: Ablauf vollständig, Gemachtes gilt überall, einfacher eintragen, Umwandeln mit Vorschau (19.11.)
 
-**Stand:** Version **3.26.0**, Veröffentlichung läuft (erst Test-App, dann echte App mit Sicherung).
+**Stand:** Version **3.26.0**, veröffentlicht am 19.11. (erst Test-App, dann echte App mit Sicherung; 3326 Unit-Tests und 788 Browser-Tests grün, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler).
 
 ## Was war falsch (Ursachen, gelten für alle Nutzer)
 - **Ablauf unvollständig:** `isIvStep` nahm nur Hauptteil-Schritte ab Zone 3. Lockere Hauptteile (z. B. 20 min locker vor Hügelsprints, Lauf-ABC, Erholungsblöcke) fehlten, die Summe stimmte nicht.
