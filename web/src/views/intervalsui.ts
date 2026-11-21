@@ -10,14 +10,14 @@
    Soll-Werte nur als Platzhalter. Werte der Uhr stehen drin (mit Quelle); wer etwas ändert, bekommt eine eigene Liste (Hand gewinnt),
    „Uhrwerte verwenden“ holt sie zurück. Enter springt zum nächsten Feld im Fenster. */
 import { esc } from '../util';
-import { on, onChange } from '../kit';
+import { on, onChange, tfData, tfHint, tfAsking } from '../kit';
 import { toast } from '../toast';
 import { plannedIntervals, paceToSec, secToPace, IV_LIMITS, ivLimit, ivGroups, ivAttrs, stampRows, targetOfRow, rowHasValues,
   IV_STROKES, IV_GEAR, IV_TYPES, IV_TERRAIN, type IvRow, type IvTarget } from '../../../shared/intervals';
 import { applyTotals } from '../../../shared/sections';
 import { ivRowsFor, buildAblauf, repSoll, type AbSet, type AbRep } from '../../../shared/ablauf';
 import { setSessionMetricManual } from '../../../shared/activity/merge';
-import { parseInput } from '../../../shared/validate';
+import { parseInput, readTimeInput, type TimeKind } from '../../../shared/validate';
 import { HOST, tgOf, plannedIv, actOf, SUB, setSubKey, UIH, type Tg } from './ablaufstate';
 
 type F = { k: keyof IvRow; label: string; unit?: string; kind: 'clock' | 'num' | 'pace' | 'text'; mode?: string };
@@ -32,16 +32,19 @@ const SAME: Record<string, (keyof IvRow)[]> = { run: ['sec', 'pace', 'hr'], bike
 const REST: F[] = [{ k: 'restSec', label: 'Pause', unit: 'min:s', kind: 'clock' }, { k: 'restHr', label: 'Puls am Ende der Pause', kind: 'num' }];
 const VALUE_KEYS = new Set(['sec', 'm', 'pace', 'hr', 'maxHr', 'cad', 'power', 'speed', 'pace100', 'spl', 'rpe']);
 
-/* Eingaben: „4:45“, „4.45“, „4,45“ oder „445“; Dauer auch „4“ (Minuten) */
-export function parseClock(v: string, kind: 'clock' | 'pace'): number | null | typeof NaN {
-  void kind;
-  const s = String(v || '').trim(); if (!s) return null;
-  let m = /^(\d{1,3})[:.,](\d{1,2})$/.exec(s);
-  if (m) { if (+m[2] > 59 || m[2].length !== 2) return NaN; return +m[1] * 60 + +m[2]; }
-  m = /^(\d{1,4})$/.exec(s); if (!m) return NaN;
-  const d = m[1];
-  if (d.length <= 2) return +d * 60;
-  const sec = +d.slice(-2); if (sec > 59) return NaN; return +d.slice(0, -2) * 60 + sec;
+/* Auftrag 39: Zeit-Felder einer Wiederholung – dieselbe Regel wie überall (shared/validate readTimeInput):
+   Dauer 'ms' (1-2 Ziffern = Minuten, 445 = 4:45), Pause 'sec' (90 = 90 s, 3 = 3 min, 130 = 1:30), Pace 'pace' mit Grenzen je Sportart. */
+export function ivTime(k: string, sport: string): { kind: TimeKind; lim: [number, number]; unit: string } {
+  if (k === 'pace' || k === 'pace100') return { kind: 'pace', lim: sport === 'swim' || k === 'pace100' ? [45, 600] : [150, 1200], unit: sport === 'swim' || k === 'pace100' ? 'pro 100 m' : 'pro km' };
+  if (k === 'restSec') return { kind: 'sec', lim: IV_LIMITS.restSec, unit: '' };
+  return { kind: 'ms', lim: IV_LIMITS.sec, unit: '' };
+}
+const ivTf = (f: { k: any; kind: string }, sport: string) => { if (f.kind !== 'clock' && f.kind !== 'pace') return ''; const x = ivTime(String(f.k), sport); return tfData(x.kind, x.lim, x.unit); };
+/* Eingaben: „4:45“, „4.45“, „4,45“ oder „445“; Dauer auch „4“ (Minuten). NaN = ungültig bzw. unklar */
+export function parseClock(v: string, kind: 'clock' | 'pace', k = 'sec', sport = 'run'): number | null | typeof NaN {
+  const t = ivTime(kind === 'pace' ? 'pace' : k, sport);
+  const r = readTimeInput(v, t.kind, t.lim);
+  return r.err || r.ask ? NaN : r.sec;
 }
 const fmtClock = (sec: any) => (sec == null || sec === '' ? '' : secToPace(+sec));
 function ph(f: { k: keyof IvRow }, t: IvTarget | null, sport: string): string {
@@ -112,7 +115,7 @@ export function repSheet(tg: Tg, i: number, attrs: string): string {
   const sport = tg.sport; const fields = IV_FIELDS[sport]; const n = rows.length;
   const inp = (f: F) => {
     const id = `iv-${i}-${String(f.k)}`;
-    return `<label class="fld ${f.kind === 'text' ? 'wide' : ''}" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv" data-iv-in data-i="${i}" data-f="${String(f.k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="${f.kind === 'text' ? 'text' : 'decimal'}" enterkeyhint="next" autocomplete="off" aria-label="Wiederholung ${rep ? rep.n : i + 1}: ${esc(f.label)}" value="${esc(valOf(f, r))}" placeholder="${esc(ph(f, t, sport))}"></label>`;
+    return `<label class="fld ${f.kind === 'text' ? 'wide' : ''}" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv" data-iv-in data-i="${i}" data-f="${String(f.k)}" data-kind="${f.kind}" ${ivTf(f, sport)} ${attrs} type="text" inputmode="${f.kind === 'text' ? 'text' : 'decimal'}" enterkeyhint="next" autocomplete="off" aria-label="Wiederholung ${rep ? rep.n : i + 1}: ${esc(f.label)}" value="${esc(valOf(f, r))}" placeholder="${esc(ph(f, t, sport))}">${f.kind === 'clock' || f.kind === 'pace' ? tfHint() : ''}</label>`;
   };
   return `<div class="stack ab-sheet" data-ab-sheet="rep" data-iv-row="${i}">
     <div class="spread ab-sheet-head"><span class="small muted">Soll: ${esc(repSoll(t, sport))}</span>${rep ? verdictPill(rep.verdict) : ''}</div>
@@ -145,7 +148,7 @@ export function setSheet(tg: Tg, gi: number, attrs: string): string {
   const at = g.idx.map(i => ivAttrs(rows[i], targetOfRow(rows, targets, i), sport));
   const mixed: Record<string, boolean> = { stroke: new Set(at.map(a => a.stroke)).size > 1, gear: new Set(at.map(a => [...a.gear].sort().join(','))).size > 1, zone: new Set(at.map(a => a.zone)).size > 1, type: new Set(at.map(a => a.type)).size > 1, terrain: new Set(at.map(a => a.terrain)).size > 1, title: new Set(at.map(a => a.ownTitle ? a.title : '')).size > 1 };
   const sameInp = (f: F, scope: number[]) => { const id = `iv-same-${g.idx[0]}-${String(f.k)}`; const vals = new Set(scope.map(i => valOf(f, rows[i]))); const v = vals.size === 1 ? [...vals][0] : '';
-    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv-same" data-idx="${scope.join(',')}" data-f="${String(f.k)}" data-kind="${f.kind}" ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Ganzer Satz: ${esc(f.label)}" value="${esc(v)}" placeholder="${esc(ph(f, t0, sport))}"></label>`; };
+    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="iv-same" data-idx="${scope.join(',')}" data-f="${String(f.k)}" data-kind="${f.kind}" ${ivTf(f, sport)} ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Ganzer Satz: ${esc(f.label)}" value="${esc(v)}" placeholder="${esc(ph(f, t0, sport))}">${f.kind === 'clock' || f.kind === 'pace' ? tfHint() : ''}</label>`; };
   // Auftrag 38: ganz oben Wiederholungen [−] n [+], Dauer bzw. Strecke, Pause; danach die Werte für alle Wiederholungen
   const sizeF = fields.find(x => x.k === (sport === 'swim' ? 'm' : 'sec'))!;
   const restF = REST[0];
@@ -189,9 +192,12 @@ export function readIvValue(f: string, kind: string, raw: string, sport: string)
   const v = raw.trim(); if (!v) return { ok: true, v: null };
   if (kind === 'text') return { ok: true, v: v.slice(0, 200) };
   if (kind === 'clock' || kind === 'pace') {
-    const s = parseClock(v, kind as any);
+    const tk = ivTime(kind === 'pace' ? (sport === 'swim' ? 'pace100' : 'pace') : f, sport);
+    const rr = readTimeInput(v, tk.kind, tk.lim);
+    if (rr.ask) return { ok: false, msg: 'Meinst du ' + rr.ask.map(x => secToPace(x)).join(' oder ') + '?' };
+    if (rr.err) return { ok: false, msg: 'Bitte als Minuten:Sekunden eingeben, z. B. 4:45 – oder nur Ziffern: 445.' };
+    const s = rr.sec;
     if (s == null) return { ok: true, v: null };
-    if (!Number.isFinite(s)) return { ok: false, msg: 'Bitte als Minuten:Sekunden eingeben, z. B. 4:45 oder 445.' };
     if (kind === 'pace') {
       const lim = sport === 'swim' ? [45, 600] : [150, 1200];
       if (s < lim[0] || s > lim[1]) return { ok: false, msg: sport === 'swim' ? `Pace ${secToPace(s)}/100 m ist unrealistisch (möglich: ${secToPace(lim[0])} bis ${secToPace(lim[1])}).` : `Pace ${secToPace(s)}/km ist unrealistisch (möglich: ${secToPace(lim[0])} bis ${secToPace(lim[1])}).` };
@@ -224,7 +230,7 @@ function setVal(r: IvRow, f: string, v: any) {
   if (VALUE_KEYS.has(f) && r.plan) delete r.plan;
 }
 onChange('iv', el => {
-  if (!HOST) return; const tg = tgOf(el); const i = +el.dataset.i!; const f = el.dataset.f!;
+  if (!HOST || tfAsking(el)) return; const tg = tgOf(el); const i = +el.dataset.i!; const f = el.dataset.f!;
   const res = readIvValue(f, el.dataset.kind || 'num', (el as HTMLInputElement).value, tg.sport);
   if (res.ok === false) { el.setAttribute('aria-invalid', 'true'); toast(res.msg); return; }
   el.removeAttribute('aria-invalid');
@@ -236,7 +242,7 @@ onChange('iv', el => {
 });
 /* ganzer Satz gleich: ein Wert für alle Wiederholungen des Satzes */
 onChange('iv-same', el => {
-  if (!HOST) return; const tg = tgOf(el); const f = el.dataset.f!;
+  if (!HOST || tfAsking(el)) return; const tg = tgOf(el); const f = el.dataset.f!;
   const res = readIvValue(f, el.dataset.kind || 'num', (el as HTMLInputElement).value, tg.sport);
   if (res.ok === false) { el.setAttribute('aria-invalid', 'true'); toast(res.msg); return; }
   el.removeAttribute('aria-invalid');

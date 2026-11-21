@@ -410,7 +410,7 @@ export const de: Record<string, string> = {
   'gen.apply': 'Plan übernehmen', 'gen.applyReplace': 'Ab heute übernehmen', 'gen.applyHint': 'Vergangene Tage und erledigte Einheiten bleiben. Der alte Plan wird gemerkt und kann zurückgeholt werden.',
   'gen.undo': 'Vorherigen Plan zurückholen', 'gen.undone': 'Vorheriger Plan ist zurück',
   // Auftrag 4
-  'time.h': 'Std', 'time.m': 'Min', 'time.s': 'Sek', 'time.invalid': 'Minuten und Sekunden bitte jeweils 0-59.',
+  'time.h': 'Std', 'time.m': 'Min', 'time.s': 'Sek', 'time.invalid': 'Bitte als Zeit eingeben, z. B. 530 für 5:30 oder 14530 für 1:45:30 (Sekunden und Minuten bis 59).',
   'welcome.continue': 'Fragebogen fortsetzen', 'welcome.connectedNoDataUser': 'Beantworte den Fragebogen, dann baut die App deinen Plan.',
   'ob.toSummary': 'Weiter zur Zusammenfassung', 'ob.dl0': 'frei', 'ob.dl1': 'kurz', 'ob.dl2': 'mittel', 'ob.dl3': 'lang',
   'ob.dlLegend': 'frei = kein Training · kurz = bis 45 min · mittel = bis 90 min · lang = mehr als 90 min',

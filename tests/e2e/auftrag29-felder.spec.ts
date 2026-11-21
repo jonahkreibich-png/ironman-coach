@@ -22,7 +22,8 @@ const VALUES: Record<string, [string, string, string, string?, string?]> = {
   spl: ['12,7', '12,7', '12.7'], rate: ['20,8', '20,8', '20.8'], dps: ['1,97 m', '1,97', '1.97'], longestCrawl: ['75 m', '75', '75', '100', '100'], longestPull: ['75', '75', '75'],
   crawlShare: ['46 %', '46', '46'], swolf: ['38', '38', '38'], sprints: ['12', '12', '12']
 };
-const PACE: Record<string, [string, string, string]> = { pace: ['6', '01', '6:01'], pace100: ['2', '27', '2:27'], paceBreast: ['2', '55', '2:55'] };
+/* Auftrag 39: Pace in EINEM Feld, Ziffern ohne Doppelpunkt: [Eingabe, Anzeige, gespeichert] */
+const PACE: Record<string, [string, string, string]> = { pace: ['601', '6:01', '6:01'], pace100: ['2,27', '2:27', '2:27'], paceBreast: ['2.55', '2:55', '2:55'] };
 const TEXT: Record<string, string> = { shoe: 'Pegasus 40', technique: 'Atmung, Beine sinken ab', aids: 'Pull Buoy' };
 const SPORTS = ['run', 'bike', 'swim', 'strength', 'football'] as const;
 
@@ -60,14 +61,14 @@ for (const sp of SPORTS) {
     expect((await stored(page)).sessions['f-' + sp]?.completed).toBe(true);
     // 2. Werte nachtragen
     for (const f of nums) { await typeField(page, f.key, VALUES[f.key][0]); await expect(sheet(page).locator(`#fd-${f.key}`), `${sp}.${f.key} direkt nach der Eingabe`).toHaveValue(VALUES[f.key][1]); }
-    for (const f of paces) { const [m, s] = PACE[f.key]; await sheet(page).locator(`#fd-${f.key}-m`).fill(m); await sheet(page).locator(`#fd-${f.key}-s`).fill(s); await sheet(page).locator(`#fd-${f.key}-s`).blur(); }
+    for (const f of paces) { await typeField(page, f.key, PACE[f.key][0]); await expect(sheet(page).locator(`#fd-${f.key}`)).toHaveValue(PACE[f.key][1]); }
     for (const f of texts) { await sheet(page).locator(`#fd-${f.key}`).fill(TEXT[f.key] || 'Text'); await sheet(page).locator(`#fd-${f.key}`).blur(); }
     // 3. neu laden: dieselben Werte
     await expect.poll(async () => (await stored(page)).sessions['f-' + sp]?.metrics?.[nums[nums.length - 1]?.key || 'min']).toBeTruthy();
     await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
     await openSession(page, sp);
     for (const f of nums) await expect(sheet(page).locator(`#fd-${f.key}`), `${sp}.${f.key} nach dem Neuladen`).toHaveValue(VALUES[f.key][1]);
-    for (const f of paces) { const [m, s] = PACE[f.key]; await expect(sheet(page).locator(`#fd-${f.key}-m`)).toHaveValue(m.padStart(2, '0')); await expect(sheet(page).locator(`#fd-${f.key}-s`)).toHaveValue(s.padStart(2, '0')); }
+    for (const f of paces) await expect(sheet(page).locator(`#fd-${f.key}`)).toHaveValue(PACE[f.key][1]);
     for (const f of texts) await expect(sheet(page).locator(`#fd-${f.key}`)).toHaveValue(TEXT[f.key] || 'Text');
     // 4. gespeichert, Liste, Coach-Kontext: dieselbe Zahl
     const st = await stored(page); const plan = await page.evaluate(() => JSON.parse(localStorage.getItem('ec_plan') || '{}'));

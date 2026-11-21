@@ -3,7 +3,7 @@
 import { STATE, saveState, saveSoon } from '../store';
 import { esc, fmtDate, dowShort, addDays } from '../util';
 import { t, hhmm, num } from '../../../shared/i18n';
-import { on, onChange, sec, ic, pill, field, more, empty, timeField, readTime } from '../kit';
+import { on, onChange, sec, ic, pill, field, more, empty, timeField, readTime, tfInvalid } from '../kit';
 import { D, invalidate, prognosisFor } from '../data';
 import { progCard } from './fortschritt';
 import { GOALS, legsOf } from '../../../shared/goals';
@@ -62,7 +62,7 @@ function after(g: Goal): string {
   const raceSec = res.timeSec || null;
   const day = daysUntil(g.date!, d.today);
   let h = `<div class="card stack"><div class="lbl">${esc(g.name)} · ${fmtDate(g.date!)}</div>
-    <div class="fgrid">${timeField('rr-time', t('race.yourTime'), res.timeSec, 'hms', 'data-ch="rr" data-k="time"')}${field('rr-place', t('race.place'), res.place || '', { data: 'data-ch="rr" data-k="place"' })}</div>
+    <div class="fgrid">${timeField('rr-time', t('race.yourTime'), res.timeSec, 'hms', 'data-ch="rr" data-k="time"', { lim: [300, 48 * 3600] })}${field('rr-place', t('race.place'), res.place || '', { data: 'data-ch="rr" data-k="place"' })}</div>
     ${multi ? `<div class="lbl">${esc(t('race.splits'))}</div><div class="fgrid" data-splits>${sports.map(sp => timeField('rr-' + sp, t('race.split.' + sp) + (pr && pr[sp] ? ` (${t('race.predShort')} ${fmtDuration(pr[sp])})` : ''), (res.splits || {})[sp], 'hms', `data-ch="rr" data-k="split" data-sp="${sp}"`)).join('')}</div><div class="hint">${esc(t('race.splitsHint'))}</div>` : ''}
     <div class="fld"><label for="rr-note">${esc(t('race.howWasIt'))}</label><textarea class="inp" id="rr-note" rows="2" data-ch="rr" data-k="note">${esc(res.note || '')}</textarea></div>
     <div class="banner info">${esc(raceReview(g, { timeSec: raceSec, note: res.note }, prog))}</div></div>`;
@@ -82,8 +82,8 @@ onChange('rr', el => {
   const k = el.dataset.k!; const v = (el as HTMLInputElement).value.trim();
   const goal = { ...(STATE.goals[g.id] || g) };
   const r = { ...(goal.result || {}) };
-  if (k === 'time') { const s = el.dataset.tf ? readTime(el) : parseHm(v); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } r.timeSec = s; }
-  else if (k === 'split') { const s = readTime(el); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } r.splits = { ...(r.splits || {}), [el.dataset.sp!]: s }; if (!s) delete r.splits[el.dataset.sp!]; }
+  if (k === 'time') { const s = el.dataset.tf ? readTime(el) : parseHm(v); if (s != null && isNaN(s)) { tfInvalid(el); return; } r.timeSec = s; }
+  else if (k === 'split') { const s = readTime(el); if (s != null && isNaN(s)) { tfInvalid(el); return; } r.splits = { ...(r.splits || {}), [el.dataset.sp!]: s }; if (!s) delete r.splits[el.dataset.sp!]; }
   else r[k] = v;
   // Prognose am Renntag einmal merken: Abweichung = persönlicher Korrekturfaktor für die nächsten Prognosen (Auftrag 12)
   if ((k === 'time' || k === 'split') && !r.predicted) {

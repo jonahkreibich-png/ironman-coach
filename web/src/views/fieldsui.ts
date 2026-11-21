@@ -5,7 +5,7 @@ import {customDraft} from './custom-draft27';
 import { findCustomRecord, STATE, BASE_WEEKS, saveSoon, saveState, profile } from '../store';
 import { esc } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, secToMmss, termLink, ic } from '../kit';
+import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, tfRead, tfInvalid, tfAsking, tfData, tfHint, durHint, secToMmss, termLink, ic } from '../kit';
 import { SPORT_FIELDS, FEEL, zoneVerdict, loadOn, type FieldDef } from '../../../shared/fields';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { nav } from '../nav';
@@ -20,7 +20,7 @@ import './sectionsui';
 import { ablaufBlock } from './ablaufui';
 import { registerAbHost, UIH, SUB, setSubKey } from './ablaufstate';
 import { registerUndoHost } from '../undo';
-import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay } from '../../../shared/validate';
+import { checkField, crossCheck, applyDoubtFix, parseNum, inputDisplay, timeSpecOf, paceLimits } from '../../../shared/validate';
 import { actualMetrics, CHANGE_KINDS, CHANGE_REASONS, changedOf, intervalsMode } from '../../../shared/results';
 
 export type Target = { kind: 'session' | 'custom'; id: string; date: string; sport: string; planned?: any };
@@ -51,17 +51,20 @@ function oneField(tg: Target, f: FieldDef, st: any): string {
   const m = st.metrics || {}; const src = (st.metricsSrc || {})[f.key] || (st.metricsManual && st.metricsManual[f.key] ? 'manual' : null);
   const lab = `${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''} ${srcBadge(src)}${f.key === 'np' ? ' ' + termLink('Normalized Power', '?') : ''}`;
   const id = `fd-${f.key}`;
-  if (f.kind === 'pace') return timeField(id, f.label + (f.unit ? ` (${f.unit})` : ''), paceSecOf(m[f.key]), 'ms', `data-ch="fd" data-k="${f.key}" data-pace="1" ${attrs(tg)}`);
+  // Auftrag 39: Pace und Testzeiten in einem Feld (Ziffern → Doppelpunkt von selbst), Art und Grenzen aus shared/validate
+  if (f.kind === 'pace') { const ts = timeSpecOf(f.key) || { kind: 'pace' as const, lim: null }; return timeField(id, f.label + (f.unit ? ` (${f.unit})` : ''), paceSecOf(m[f.key]), ts.kind, `data-ch="fd" data-k="${f.key}" data-pace="1" ${attrs(tg)}`, { lim: ts.lim, unit: f.unit && f.unit.startsWith('/') ? 'pro ' + f.unit.slice(1) : '' }); }
   if (f.kind === 'select') return `<div class="fld"><label for="${id}">${lab}</label><select class="inp" id="${id}" data-ch="fd" data-k="${f.key}" ${attrs(tg)}>${(f.options || []).map(([v, l]) => `<option value="${esc(v)}" ${String(m[f.key] ?? '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
   if (f.kind === 'text') return `<div class="fld wide"><label for="${id}">${lab}</label><input class="inp" id="${id}" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(m[f.key] ?? '')}" placeholder="${esc(f.ph || '')}"></div>`;
   if (f.kind === 'splits') return splitsHtml(tg, m.splits || []);
   if (f.kind === 'exercises') return '';
-  return `<div class="fld"><label for="${id}">${lab}</label><input class="inp" id="${id}" type="text" inputmode="decimal" data-ch="fd" data-k="${f.key}" ${attrs(tg)} value="${esc(inputDisplay(tg.sport, f.key, m[f.key]))}" placeholder="${esc(inputDisplay(tg.sport, f.key, (st.metricsAuto || {})[f.key]))}"></div>`;
+  // Auftrag 39: Dauer wie eine Zeit (90 = 90 min, 4530 = 45:30, 45,30 = 45 min 30 s), darunter die verstandene Dauer
+  const dur = f.key === 'min';
+  return `<div class="fld"><label for="${id}">${lab}</label><input class="inp" id="${id}" type="text" inputmode="decimal" data-ch="fd" data-k="${f.key}" ${dur ? tfData('min', [60, 86400]) : ''} ${attrs(tg)} value="${esc(inputDisplay(tg.sport, f.key, m[f.key]))}" placeholder="${esc(inputDisplay(tg.sport, f.key, (st.metricsAuto || {})[f.key]))}">${dur ? tfHint(durHint(m[f.key])) : ''}</div>`;
 }
 function splitsHtml(tg: Target, list: any[]): string {
   return `<div class="fld wide" data-splits><span class="lab">${esc(t('fd.splits'))}</span>${list.length ? `<div class="splits">${list.map((s: any, i: number) => `<div class="split-row"><b class="xs">${s.km} km</b>
-    <input class="inp sm" inputmode="numeric" aria-label="${esc(t('fd.splitPace', { n: s.km }))}" data-ch="fd-split" data-i="${i}" data-f="pace" ${attrs(tg)} value="${esc(s.pace || '')}" placeholder="6:20">
-    <input class="inp sm" inputmode="numeric" aria-label="${esc(t('fd.splitHr', { n: s.km }))}" data-ch="fd-split" data-i="${i}" data-f="hr" ${attrs(tg)} value="${esc(s.hr ?? '')}" placeholder="${esc(t('m.hr'))}">
+    <span class="split-pace"><input class="inp sm" id="fd-split-${i}" inputmode="decimal" autocomplete="off" ${tfData('pace', paceLimits('pace'), 'pro km')} aria-label="${esc(t('fd.splitPace', { n: s.km }))}" data-ch="fd-split" data-i="${i}" data-f="pace" ${attrs(tg)} value="${esc(s.pace || '')}" placeholder="620">${tfHint()}</span>
+    <input class="inp sm" inputmode="numeric" autocomplete="off" aria-label="${esc(t('fd.splitHr', { n: s.km }))}" data-ch="fd-split" data-i="${i}" data-f="hr" ${attrs(tg)} value="${esc(s.hr ?? '')}" placeholder="${esc(t('m.hr'))}">
     <button class="btn ghost sm" data-act="fd-split-del" data-i="${i}" ${attrs(tg)} aria-label="${esc(t('common.remove'))}">×</button></div>`).join('')}</div>` : ''}
     <button class="btn ghost sm" data-act="fd-split-add" ${attrs(tg)}>+ ${esc(t('fd.splitAdd'))}</button></div>`;
 }
@@ -205,18 +208,21 @@ onInput('fd', el => {
 onInput('fd-top',(el,ev)=>CHANGE['fd-top'](el,ev));
 onInput('fd-split',(el,ev)=>{
   const value=(el as HTMLInputElement).value.trim();
-  if(el.dataset.f==='pace' && value && !/^(\d{1,2})[:.,]?(\d{2})$/.test(value.replace(/\s/g,'')))return;
+  if(el.dataset.f==='pace' && value && !checkField('run','pace',value).ok)return;
   return CHANGE['fd-split'](el,ev);
 });
 onInput('fd-ex',(el,ev)=>{
   const f=el.dataset.f!,value=(el as HTMLInputElement).value.trim();
-  if(['sets','kg','restSec'].includes(f)){try{strengthNumber(value,f,f!=='kg',f==='sets');}catch(_){return;}}
+  if(el.dataset.tfkind){const s=readTime(el);if(value && (s==null||isNaN(s)))return;}
+  else if(['sets','kg','restSec'].includes(f)){try{strengthNumber(value,f,f!=='kg',f==='sets');}catch(_){return;}}
   return CHANGE['fd-ex'](el,ev);
 });
 onChange('fd', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const k = el.dataset.k!;
   let v: any = (el as HTMLInputElement).value.trim();
-  if (el.dataset.pace || el.dataset.tf) { const s = readTime(el); if (s != null && isNaN(s)) { toast(t('time.invalid')); return; } v = s ? secToMmss(s) : ''; }
+  // Auftrag 39: unklare Zeit („5,3“) → Nachfrage unter dem Feld; bis zur Antwort gilt der Wert von vorher (nie ein Zwischenstand)
+  if (tfAsking(el)) { restore(el, tg, st, k); return; }
+  if (el.dataset.pace || el.dataset.tf) { const s = readTime(el); if (s != null && isNaN(s)) { restore(el, tg, st, k); tfInvalid(el); return; } v = s ? secToMmss(s) : ''; }
   // Auftrag 22: Grenzen je Feld – unmögliche Werte freundlich ablehnen, der gespeicherte Wert bleibt
   const chk = checkField(tg.sport, k, v);
   if (!chk.ok) { restore(el, tg, st, k); el.setAttribute('aria-invalid', 'true'); toast(chk.msg!); refreshSheet(); nav.rerender(); return; }
@@ -241,7 +247,8 @@ on('fd-split-del', el => { const tg = tgOf(el); const st = rec(tg); if (!st) ret
 onChange('fd-split', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = listOf(st, 'splits'); const i = +el.dataset.i!; if (!l[i]) return;
   const v = (el as HTMLInputElement).value.trim();
-  if (el.dataset.f === 'pace') { const m = /^(\d{1,2})[:.,]?(\d{2})$/.exec(v.replace(/\s/g, '')); if (v && !m) { toast(t('time.invalid')); return; } l[i].pace = m ? `${+m[1]}:${m[2]}` : ''; }
+  // Auftrag 39: Pace je km wie jede Pace (530, 5,30, 5:30; „5,3“ → Nachfrage; Grenzen 2:20 bis 20:00)
+  if (el.dataset.f === 'pace') { if (tfAsking(el)) return; const c = checkField('run', 'pace', v); if (!c.ok) { toast(c.msg!); return; } l[i].pace = c.value || ''; }
   else l[i].hr = v ? Math.round(+v.replace(',', '.')) || null : null;
   put(tg, setSessionMetricManual(st, 'splits', l)); saveSoon();
 });
@@ -257,7 +264,16 @@ function exList(tg: Target, st: any): any[] {
 onChange('fd-ex', el => {
   const tg = tgOf(el); const st = rec(tg); if (!st) return; const l = exList(tg, st); const i = +el.dataset.i!; if (!l[i]) return;
   const v = (el as HTMLInputElement).value.trim(); const f = el.dataset.f!;
+  if (tfAsking(el)) return;
   delete l[i].plan; // Auftrag 37: eigener Wert statt „wie geplant“
+  // Auftrag 39: Pause und Haltezeit als Zeit (Sekunden); Haltezeit gespeichert wie bisher als Text „45 s“
+  if (el.dataset.tfkind) {
+    const r = tfRead(el);
+    if (r.err) { tfInvalid(el); return; }
+    if (r.out) { toast(f === 'restSec' ? 'Pause bitte zwischen 0 und 15 min.' : 'Haltezeit bitte zwischen 1 s und 30 min.'); return; }
+    if (f === 'restSec') { if (r.sec == null) delete l[i].restSec; else l[i].restSec = r.sec; } else l[i].reps = r.sec == null ? '' : `${r.sec} s`;
+    put(tg, setSessionMetricManual(st, 'exercises', l)); saveSoon(); return;
+  }
   try { l[i][f] = ['sets', 'kg', 'restSec'].includes(f) ? strengthNumber(v, f === 'sets' ? 'Sätze' : f === 'kg' ? 'Gewicht' : 'Pause', f !== 'kg', f === 'sets') : v; }
   catch (error) { toast((error as Error).message); (el as HTMLInputElement).value = String(l[i][f] ?? ''); return; }
   put(tg, setSessionMetricManual(st, 'exercises', l)); saveSoon();

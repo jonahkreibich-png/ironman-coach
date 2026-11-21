@@ -4,7 +4,9 @@
    „+ Abschnitt / Satz hinzufügen“ am Ende. Auftrag 38: der Ablauf ist der einzige Ort für das Gemachte (keine Knöpfe „Wie geplant“ /
    „Anders gemacht“ mehr); er enthält die ganze Einheit, darunter die Summe geplant / gemacht. */
 import { esc } from '../util';
-import { on, openSub, srcBadge } from '../kit';
+import { on, openSub, srcBadge, tfData, tfHint } from '../kit';
+import { fmtTimeInput } from '../../../shared/validate';
+import { repsOf } from '../../../shared/strength';
 import { buildAblauf, type Ablauf, type AbSec, type AbSet, type AbEx } from '../../../shared/ablauf';
 import { mainPart, mainText, plannedShape, partLabel } from '../../../shared/sections';
 import { secToPace } from '../../../shared/intervals';
@@ -115,10 +117,16 @@ function exSheet(tg: Tg, i: number, attrs: string): string {
   const it = ab.items.find(x => x.kind === 'ex' && x.i === i) as AbEx | undefined; if (!it) return '';
   const list = Array.isArray(st.metrics?.exercises) ? st.metrics.exercises : ((plannedFor(tg)?.spec?.exercises) || []).map((e: any) => ({ ...e, kg: null }));
   const e = list[i] || {}; const n = list.length;
-  const F: [string, string, string][] = [['name', 'Übung', 'text'], ['sets', 'Sätze', 'numeric'], ['reps', 'Wiederholungen / Dauer', 'text'], ['kg', 'Gewicht (kg)', 'decimal'], ['restSec', 'Pause (Sekunden)', 'numeric']];
+  /* Auftrag 39: Halteübung (z. B. Plank 45 s) → Haltezeit als Zeitfeld (45 = 0:45, 130 = 1:30); Pause ebenso (90 = 90 s, 2 = 2 min) */
+  const plannedRep = ((plannedFor(tg)?.spec?.exercises) || [])[i]?.reps;
+  const hold = repsOf(e.reps).holdSec != null || (!e.reps && repsOf(plannedRep).holdSec != null);
+  const F: [string, string, string][] = [['name', 'Übung', 'text'], ['sets', 'Sätze', 'numeric'], ['reps', hold ? 'Haltezeit (min:s)' : 'Wiederholungen / Dauer', hold ? 'decimal' : 'text'], ['kg', 'Gewicht (kg)', 'decimal'], ['restSec', 'Pause (min:s)', 'decimal']];
+  const timeOf = (f: string): number | null => f === 'restSec' ? (e.restSec != null && e.restSec !== '' && Number.isFinite(+e.restSec) ? +e.restSec : null) : f === 'reps' && hold ? repsOf(e.reps).holdSec : null;
+  const tf = (f: string) => f === 'restSec' ? tfData('sec', [0, 900]) : f === 'reps' && hold ? tfData('sec', [1, 1800]) + ' data-hold="1"' : '';
+  const val = (f: string) => { const s = timeOf(f); return s != null ? fmtTimeInput(s, 'sec') : e[f] ?? ''; };
   return `<div class="stack ab-sheet" data-ab-sheet="ex" data-ex="${i}">
     ${it.soll ? `<div class="small muted">Geplant: ${esc(it.soll)}</div>` : ''}${e.plan ? '<div class="hint" data-plan-hint>Wie geplant eingetragen. Trag ein, was anders war (z. B. das Gewicht).</div>' : ''}
-    <div class="fgrid">${F.map(([f, l, im]) => `<label class="fld ${f === 'name' ? 'wide' : ''}" for="ex-${i}-${f}"><span class="lab">${esc(l)}</span><input class="inp" id="ex-${i}-${f}" aria-label="${esc(l)}" data-ch="fd-ex" data-i="${i}" data-f="${f}" ${attrs} inputmode="${im}" autocomplete="off" value="${esc(e[f] ?? '')}"></label>`).join('')}</div>
+    <div class="fgrid">${F.map(([f, l, im]) => `<label class="fld ${f === 'name' ? 'wide' : ''}" for="ex-${i}-${f}"><span class="lab">${esc(l)}</span><input class="inp" id="ex-${i}-${f}" aria-label="${esc(l)}" data-ch="fd-ex" data-i="${i}" data-f="${f}" ${tf(f)} ${attrs} inputmode="${im}" autocomplete="off" value="${esc(val(f))}">${tf(f) ? tfHint() : ''}</label>`).join('')}</div>
     <div class="row ab-btns"><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="-1" ${attrs} ${i === 0 ? 'disabled' : ''} aria-label="Übung nach oben">↑</button><button class="btn ghost sm" data-act="fd-ex-move" data-i="${i}" data-dir="1" ${attrs} ${i >= n - 1 ? 'disabled' : ''} aria-label="Übung nach unten">↓</button><button class="btn ghost sm danger" data-act="fd-ex-del" data-i="${i}" ${attrs}>Übung löschen</button></div>
     <button class="btn block" data-act="sub-close">Speichern</button></div>`;
 }

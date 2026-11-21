@@ -5,9 +5,9 @@
    „+ Abschnitt / Satz hinzufügen“ wieder anlegen. Gespeichert und geprüft wie alle Felder (shared/validate checkField); die Gesamtwerte zieht
    shared/sections applySections aus dem ganzen Ablauf nach. */
 import { esc } from '../util';
-import { on, onChange, srcBadge } from '../kit';
+import { on, onChange, srcBadge, tfData, tfHint, tfAsking, durHint } from '../kit';
 import { toast } from '../toast';
-import { checkField, inputDisplay } from '../../../shared/validate';
+import { checkField, inputDisplay, timeSpecOf } from '../../../shared/validate';
 import { sectionsOf, applySections, setBounds, SEC_PARTS, SEC_FIELDS, partLabel, type SecRow, type SecPart } from '../../../shared/sections';
 import { plannedPart, buildAblauf, type AbSec } from '../../../shared/ablauf';
 import { plannedIntervals } from '../../../shared/intervals';
@@ -18,6 +18,8 @@ const show = (sport: string, key: string, v: any) => (v == null || v === '' ? ''
 const resOf = (tg: Tg, st: any) => sectionsOf(tg.planned || { sport: tg.sport }, st, actOf(st), HOST!.thresholds(), tg.sport);
 const verdictPill = (v: { word: string; cls: string } | null) => (v ? `<span class="pill ${v.cls}">${esc(v.word)}</span>` : '');
 
+/* Auftrag 39: Dauer eines Abschnitts wie eine Zeit („5:30“ = 5 min 30 s, „1230“ = 12:30), Pace wie überall */
+const secTf = (k: string) => { if (k === 'min') return tfData('minShort', [6, 86400]); const ts = timeSpecOf(k); return ts ? tfData(ts.kind, ts.lim, k === 'pace100' ? 'pro 100 m' : 'pro km') : ''; };
 export function secTitle(tg: Tg, p: SecPart): string { return partLabel(tg.sport, p); }
 export function secSheet(tg: Tg, p: SecPart, attrs: string): string {
   if (!HOST || !['run', 'bike', 'swim'].includes(tg.sport)) return '';
@@ -32,7 +34,7 @@ export function secSheet(tg: Tg, p: SecPart, attrs: string): string {
     const id = `sec-${p}-${String(f.key)}`;
     const own = row && !row.plan ? (row as any)[f.key] : row && row.plan ? (row as any)[f.key] : '';
     const ph = au && (au as any)[f.key] != null ? show(tg.sport, String(f.key), (au as any)[f.key]) : f.key === 'min' && pm && tg.sport !== 'swim' ? String(pm) : f.key === 'meters' && pm && tg.sport === 'swim' ? String(pm) : f.pace ? (tg.sport === 'swim' ? '2:10' : '5:30') : '';
-    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="sec" data-p="${p}" data-f="${String(f.key)}" ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="${esc(item.label)}: ${esc(f.label)}" value="${esc(show(tg.sport, String(f.key), own))}" placeholder="${esc(ph)}"></label>`;
+    return `<label class="fld" for="${id}"><span class="lab">${esc(f.label)}${f.unit ? ` <span class="muted">(${esc(f.unit)})</span>` : ''}</span><input class="inp" id="${id}" data-ch="sec" data-p="${p}" data-f="${String(f.key)}" ${secTf(String(f.key))} ${attrs} type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="${esc(item.label)}: ${esc(f.label)}" value="${esc(show(tg.sport, String(f.key), own))}" placeholder="${esc(ph)}">${f.key === 'min' || f.pace ? tfHint(f.key === 'min' ? durHint(own) : '') : ''}</label>`;
   }).join('');
   // Werte der Uhr: wo die Grenzen erkannt wurden, korrigierbar (Aufwärmen bis Minute X, Ausklang ab Minute Y)
   const auto = !manual && r.rows.length && r.source !== 'none';
@@ -63,11 +65,11 @@ const tgTargets = (tg: Tg) => plannedIntervals(plannedIv(tg), HOST!.thresholds()
 const finish = (tg: Tg) => { HOST!.rev(tg); HOST!.redraw(); };
 /** Wert eines Abschnitts lesen: dieselbe Prüfung wie das Feld der Einheit */
 export function readSecValue(sport: string, f: string, raw: string): { ok: true; v: any } | { ok: false; msg: string } {
-  const c = checkField(sport, f, raw.trim());
+  const c = checkField(sport, f, raw.trim(), { short: f === 'min' });
   return c.ok ? { ok: true, v: c.value === '' ? null : c.value } : { ok: false, msg: c.msg! };
 }
 onChange('sec', el => {
-  if (!HOST) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return;
+  if (!HOST || tfAsking(el)) return; const tg = tgOf(el); const st = HOST.rec(tg); if (!st) return;
   const res = readSecValue(tg.sport, el.dataset.f!, (el as HTMLInputElement).value);
   if (res.ok === false) { el.setAttribute('aria-invalid', 'true'); toast(res.msg); return; }
   el.removeAttribute('aria-invalid');

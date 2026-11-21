@@ -1,7 +1,7 @@
 import { swimAids, GEAR_TXT } from '../../shared/workouts';
 /* UI-Bausteine nach DESIGN.md: Karten, Listen, Ring, Sparkline, Quellen-Symbol, Sheets, Aktionen. */
 import { esc, $ } from './util';
-import { parseInput, type InputSpec } from '../../shared/validate';
+import { parseInput, readTimeInput, autoColon, timeWords, fmtTimeInput, type InputSpec, type TimeKind, type TimeRead } from '../../shared/validate';
 import { toast as showToast } from './toast';
 import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
 import { t } from '../../shared/i18n';
@@ -109,30 +109,108 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 export function more(summary: string, body: string, open = false): string {
   return `<details class="more" ${open ? 'open' : ''}><summary>${esc(summary)}<span class="chev">${ic('down')}</span></summary><div class="body">${body}</div></details>`;
 }
-export function field(id: string, label: string, value: any, o: { type?: string; step?: string; placeholder?: string; wide?: boolean; inputmode?: string; data?: string; min?: string; max?: string } = {}): string {
-  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${o.inputmode ? `inputmode="${o.inputmode}"` : ''} ${o.min ? `min="${o.min}"` : ''} ${o.max ? `max="${o.max}"` : ''} ${o.data || ''} value="${esc(value ?? '')}" placeholder="${esc(o.placeholder || '')}"></div>`;
+export function field(id: string, label: string, value: any, o: { type?: string; step?: string; placeholder?: string; wide?: boolean; inputmode?: string; data?: string; min?: string; max?: string; dur?: boolean } = {}): string {
+  // Auftrag 39: o.dur = Dauer in Minuten (90 = 90 min, 4530 = 45:30, 45,30 = 45 min 30 s), darunter die verstandene Dauer
+  const dur = o.dur ? ` ${tfData('min', [0, 86400])}` : '';
+  const im = o.dur ? 'decimal' : o.inputmode;
+  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${im ? `inputmode="${im}"` : ''} ${o.min ? `min="${o.min}"` : ''} ${o.max ? `max="${o.max}"` : ''}${dur} ${o.data || ''} value="${esc(value ?? '')}" placeholder="${esc(o.placeholder || '')}">${o.dur ? tfHint(durHint(value)) : ''}</div>`;
 }
-/* Zeit- und Pace-Felder (Auftrag 4 A7): getrennte Zahlenfelder statt „5:30“, weil die iPhone-Zahlentastatur keinen Doppelpunkt hat.
-   kind 'ms': Min + Sek (Pace, CSS, kurze Zeiten), 'hms': Std + Min + Sek (Bestzeiten, Wunschzeiten).
-   Jedes Teilfeld trägt dieselben data-Attribute (data), dazu data-tf; readTime(el) liefert die Sekunden der ganzen Gruppe. */
-export function timeField(id: string, label: string, sec: number | null | undefined, kind: 'ms' | 'hms', data = '', o: { wide?: boolean; hint?: string } = {}): string {
+/** „= 1 h 30 min“ unter einem Minuten-Feld, wenn die Zahl allein nicht klar ist */
+export function durHint(v: any): string { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && n > 0 && (n >= 60 || !Number.isInteger(n)) ? '= ' + timeWords(n * 60) : ''; }
+/* Zeit- und Pace-Felder. Auftrag 39: EIN Feld statt getrennter Kästchen. Nur Ziffern tippen, der Doppelpunkt kommt von selbst
+   (530 → 5:30, 14530 → 1:45:30); Komma, Punkt, Doppelpunkt gehen auch. Unter dem Feld steht, was verstanden wurde („= 45 min 30 s“),
+   bei unklarer Eingabe eine Nachfrage mit Knöpfen (gespeichert wird erst nach der Antwort). Regel: readTimeInput (shared/validate.ts).
+   kind: 'ms' Min:Sek (Pace, Testzeiten), 'hms' Std:Min:Sek (Bestzeiten, Wunsch- und Wettkampfzeiten), dazu 'pace' und 'sec'. */
+export type TfOpts = { wide?: boolean; hint?: string; lim?: [number, number] | null; unit?: string };
+/** data-Attribute für ein Zeitfeld (Feldart, Grenzen in Sekunden, Einheit für die Anzeige darunter) */
+export function tfData(kind: TimeKind, lim?: [number, number] | null, unit?: string): string {
+  return `data-tfkind="${kind}"${lim ? ` data-tflo="${lim[0]}" data-tfhi="${lim[1]}"` : ''}${unit ? ` data-tfunit="${esc(unit)}"` : ''}`;
+}
+/** Zeile unter dem Feld („= 45 min 30 s“); leer bis zur ersten Eingabe */
+export const tfHint = (text = '') => `<span class="tf-hint" data-tf-hint aria-live="polite">${esc(text)}</span>`;
+export function timeField(id: string, label: string, sec: number | null | undefined, kind: TimeKind, data = '', o: TfOpts = {}): string {
   const s = sec != null && isFinite(sec) && sec > 0 ? Math.round(sec) : null;
-  const parts: [string, string, number | null, number][] = kind === 'hms'
-    ? [['h', t('time.h'), s == null ? null : Math.floor(s / 3600), 99], ['m', t('time.m'), s == null ? null : Math.floor(s % 3600 / 60), 59], ['s', t('time.s'), s == null ? null : s % 60, 59]]
-    : [['m', t('time.m'), s == null ? null : Math.floor(s / 60), 99], ['s', t('time.s'), s == null ? null : s % 60, 59]];
-  return `<div class="fld ${o.wide ? 'wide' : ''}"><span class="lab" id="${id}-l">${esc(label)}</span><div class="tf" role="group" aria-labelledby="${id}-l" data-tfkind="${kind}">${parts.map(([k, l, v, max]) =>
-    `<label class="tfp"><input class="inp" id="${id}-${k}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" data-tf="${k}" data-max="${max}" ${data} value="${v == null ? '' : k === 'h' ? v : String(v).padStart(2, '0')}" placeholder="${k === 'h' ? '0' : '00'}" aria-label="${esc(l)}"><span>${esc(l)}</span></label>`).join('')}</div>${o.hint ? `<div class="hint">${esc(o.hint)}</div>` : ''}</div>`;
+  const lim = o.lim !== undefined ? o.lim : kind === 'hms' ? [60, 48 * 3600] as [number, number] : null;
+  const ph = kind === 'hms' ? 'z. B. 14530 = 1:45:30' : kind === 'sec' ? 'z. B. 45 = 0:45' : 'z. B. 530 = 5:30';
+  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-tf="1" ${tfData(kind, lim, o.unit)} ${data} value="${s == null ? '' : fmtTimeInput(s, kind)}" placeholder="${esc(ph)}">${tfHint()}${o.hint ? `<div class="hint">${esc(o.hint)}</div>` : ''}</div>`;
 }
-/* Sekunden aus einer Zeitgruppe (null = leer, NaN = ungültig) */
+const tfLim = (el: HTMLElement): [number, number] | null => (el.dataset.tflo != null && el.dataset.tfhi != null ? [+el.dataset.tflo, +el.dataset.tfhi] : null);
+/** Eingabe eines Zeitfelds lesen (Regel und Grenzen aus den data-Attributen) */
+export function tfRead(el: HTMLElement): TimeRead { return readTimeInput((el as HTMLInputElement).value, (el.dataset.tfkind || 'ms') as TimeKind, tfLim(el)); }
+/* Sekunden aus einem Zeitfeld (null = leer, NaN = ungültig oder noch unklar – dann steht die Nachfrage unter dem Feld) */
 export function readTime(el: HTMLElement): number | null {
-  const g = el.closest('.tf'); if (!g) return null;
-  const v = (k: string) => { const i = g.querySelector(`[data-tf="${k}"]`) as HTMLInputElement | null; if (!i) return 0; const raw = i.value.trim(); if (raw === '') return null; const n = +raw.replace(/\D/g, ''); return n; };
-  const h = v('h'), m = v('m'), s = v('s');
-  if (h == null && m == null && s == null) return null;
-  if ((m ?? 0) > 59 && g.getAttribute('data-tfkind') === 'hms') return NaN;
-  if ((s ?? 0) > 59) return NaN;
-  return (h ?? 0) * 3600 + (m ?? 0) * 60 + (s ?? 0);
+  const r = tfRead(el);
+  if (r.err || r.ask) return NaN;
+  return r.sec;
 }
+/** true, solange unter dem Feld eine Nachfrage steht (dann nichts speichern und keine Fehlermeldung zeigen) */
+export const tfAsking = (el: HTMLElement) => !!el && !!el.dataset && el.dataset.tfask === '1';
+/** ungültige Zeit melden – außer es steht gerade die Nachfrage unter dem Feld */
+export function tfInvalid(el: HTMLElement) { if (!tfAsking(el)) showToast(t('time.invalid')); }
+function tfHintEl(el: HTMLElement): HTMLElement {
+  let h = el.nextElementSibling as HTMLElement | null;
+  if (!h || !h.matches('[data-tf-hint]')) { const tmp = document.createElement('span'); tmp.innerHTML = tfHint(); h = tmp.firstElementChild as HTMLElement; el.insertAdjacentElement('afterend', h); }
+  return h;
+}
+function tfShow(el: HTMLElement, final: boolean) {
+  const inp = el as HTMLInputElement; const kind = (el.dataset.tfkind || 'ms') as TimeKind;
+  const raw = inp.value.trim(); const h = tfHintEl(el);
+  if (!raw) { h.textContent = ''; delete el.dataset.tfask; return; }
+  const r = tfRead(el);
+  // Dauer-Feld mit Einheit („1,5 h“, „45 min“): das prüft parseInput beim Verlassen
+  if (r.err === 'format' && (kind === 'min' || kind === 'minShort') && /[a-zäöü]/i.test(raw)) { h.textContent = ''; delete el.dataset.tfask; return; }
+  if (r.ask && final) {
+    el.dataset.tfask = '1';
+    h.innerHTML = `<span>Meinst du</span> ${r.ask.map((s, i) => `${i ? '<span>oder</span> ' : ''}<button type="button" class="btn ghost sm" data-act="tf-pick" data-for="${esc(el.id)}" data-v="${esc(fmtTimeInput(s, kind))}">${esc(askLabel(s, kind, raw))}</button>`).join(' ')}<span>?</span>`;
+    h.classList.add('ask'); return;
+  }
+  delete el.dataset.tfask; h.classList.remove('ask');
+  if (r.ask) { h.textContent = '…'; return; }
+  if (r.err) { h.textContent = final ? (r.err === 'sec' ? 'Sekunden bitte unter 60 (z. B. 5:30).' : 'Bitte nur Ziffern tippen, z. B. 530 für 5:30.') : ''; return; }
+  if (r.sec == null) { h.textContent = ''; return; }
+  h.textContent = `= ${timeWords(r.sec)}${el.dataset.tfunit ? ' ' + el.dataset.tfunit : ''}`;
+}
+/* Knopf der Nachfrage: „5:30“ / „5:18 (5,3 min)“ bzw. bei langen Zeiten in Worten („1 h 30 min“ / „1 min 30 s“) */
+function askLabel(s: number, kind: TimeKind, raw: string): string {
+  if (kind === 'min' || kind === 'minShort' || kind === 'hms') return timeWords(s);
+  const clock = fmtTimeInput(s, kind);
+  const m = /^(\d+)[,.](\d)$/.exec(raw.replace(/\s/g, ''));
+  return m && s === +m[1] * 60 + +m[2] * 6 ? `${clock} (${m[1]},${m[2]} min)` : clock;
+}
+const TF_LAST = new WeakMap<HTMLElement, string>();
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('input', ev => {
+    const el = ev.target as HTMLInputElement;
+    if (!el || !el.dataset || !el.dataset.tfkind || el.tagName !== 'INPUT') return;
+    const next = autoColon(el.value, el.dataset.tfkind as TimeKind);
+    if (next !== el.value) { el.value = next; try { el.setSelectionRange(next.length, next.length); } catch (e) { /* nicht jedes Feld */ } }
+    tfShow(el, false);
+  }, true);
+  // vor den Ansichten: bei unklarer Eingabe die Nachfrage setzen (die Ansicht sieht tfAsking und speichert nichts)
+  document.addEventListener('change', ev => {
+    const el = ev.target as HTMLInputElement;
+    if (!el || !el.dataset || !el.dataset.tfkind || el.tagName !== 'INPUT') return;
+    // eindeutig verstanden → im Feld so zeigen, wie es gespeichert wird („2,27“ → „2:27“, „5“ → „5:00“); Minuten-Felder zeigt die Ansicht
+    const kind = el.dataset.tfkind as TimeKind; const r = tfRead(el);
+    if (kind !== 'min' && kind !== 'minShort' && r.sec != null && !r.ask && !r.err && !r.out) el.value = fmtTimeInput(r.sec, kind);
+    TF_LAST.set(el, el.value);
+    tfShow(el, true);
+  }, true);
+  /* Setzt das Skript beim Tippen den Doppelpunkt (letzte Änderung „von uns“), lösen WebKit und Chromium beim Verlassen kein „change“
+     aus – die Eingabe wäre nie gespeichert worden. Deshalb: Wert beim Antippen merken und beim Verlassen selbst „change“ auslösen. */
+  document.addEventListener('focusin', ev => { const el = ev.target as HTMLInputElement; if (el && el.dataset && el.dataset.tfkind && el.tagName === 'INPUT') TF_LAST.set(el, el.value); }, true);
+  document.addEventListener('focusout', ev => {
+    const el = ev.target as HTMLInputElement;
+    if (!el || !el.dataset || !el.dataset.tfkind || el.tagName !== 'INPUT' || !TF_LAST.has(el)) return;
+    if (TF_LAST.get(el) !== el.value) el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, true);
+}
+on('tf-pick', el => {
+  const inp = document.getElementById(el.dataset.for || '') as HTMLInputElement | null; if (!inp) return;
+  inp.value = el.dataset.v || ''; delete inp.dataset.tfask;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+});
 export const secToMmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 export function select(id: string, label: string, value: string, options: [string, string][], data = ''): string {
   return `<div class="fld"><label for="${id}">${esc(label)}</label><select class="inp" id="${id}" ${data}>${options.map(([v, l]) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
@@ -235,6 +313,8 @@ export { ic, sportIcon, esc };
 export function readNumberInput(el: HTMLElement, spec: InputSpec): number | null | undefined {
   const inp = el as HTMLInputElement;
   const r = parseInput(spec, inp.value);
+  // Auftrag 39: unklare Dauer → die Nachfrage steht unter dem Feld; nichts speichern, Eingabe stehen lassen
+  if (!r.ok && (r.ask || tfAsking(el))) return undefined;
   if (!r.ok) { inp.setAttribute('aria-invalid', 'true'); inp.value = inp.defaultValue; showToast(r.msg!); return undefined; }
   inp.removeAttribute('aria-invalid');
   if (r.note) showToast(r.note);

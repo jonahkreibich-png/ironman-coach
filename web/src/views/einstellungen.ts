@@ -6,7 +6,7 @@ import { esc, fmtDate, parseNum, paceToSec, secToPace, todayStr, addDays } from 
 import { INPUTS } from '../../../shared/validate';
 import { readNumberInput } from '../kit';
 import { t, num } from '../../../shared/i18n';
-import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel, timeField, readTime } from '../kit';
+import { on, onChange, sec, ic, pill, field, select, toggle, armed, more, refreshSheet, openSheet, closeSheet, sportLabel, timeField, readTime, tfInvalid } from '../kit';
 import { hrZonesFor, powerZonesFor, swimZonesFor } from '../../../shared/sports';
 import { bikeSpeedsOf, kindsOf, speedRange, mainKind, BIKE_KIND_LABEL, SPEED_HINT, type BikeKind } from '../../../shared/bikespeed';
 import { setThreshold, isEstimated, estimateThresholds, type ThresholdKey } from '../../../shared/profile';
@@ -110,9 +110,9 @@ function zonesCard(): string {
   const hasRun = p.sports.includes('run'), hasBike = p.sports.includes('bike'), hasSwim = p.sports.includes('swim');
   const est = (k: ThresholdKey) => isEstimated(p, k) ? ' ' + t('set.estShort') : '';
   return `<div class="card stack">${estimatedNote(p)}<div class="fgrid">
-    ${hasRun ? field('z-lr', t('set.lthrRun') + est('lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + timeField('z-tp', t('set.paceRun') + est('thresholdPaceRunSec'), th.thresholdPaceRunSec, 'ms', 'data-ch="thr" data-k="thresholdPaceRunSec"') : ''}
+    ${hasRun ? field('z-lr', t('set.lthrRun') + est('lthrRun'), th.lthrRun, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrRun"' }) + timeField('z-tp', t('set.paceRun') + est('thresholdPaceRunSec'), th.thresholdPaceRunSec, 'pace', 'data-ch="thr" data-k="thresholdPaceRunSec"', { lim: [150, 600], unit: 'pro km' }) : ''}
     ${hasBike ? field('z-lb', t('set.lthrBike') + est('lthrBike'), th.lthrBike, { inputmode: 'numeric', data: 'data-ch="thr" data-k="lthrBike"' }) + field('z-ftp', t('set.ftp'), th.ftp ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="ftp"' }) + bikeSpeedFields(p) : ''}
-    ${hasSwim ? timeField('z-css', t('set.css') + est('cssSec'), th.cssSec, 'ms', 'data-ch="thr" data-k="cssSec"') : ''}
+    ${hasSwim ? timeField('z-css', t('set.css') + est('cssSec'), th.cssSec, 'pace', 'data-ch="thr" data-k="cssSec"', { lim: [50, 240], unit: 'pro 100 m' }) : ''}
     ${field('z-max', t('set.maxHr') + est('maxHr'), th.maxHr ?? '', { inputmode: 'numeric', data: 'data-ch="thr" data-k="maxHr"' })}</div>
     ${hasRun ? `<div class="lbl">${esc(sportLabel('run'))}</div>` + tbl(run.map((z, i) => `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${paceRange(i)}/km</td></tr>`)) : ''}
     ${hasBike ? `<div class="lbl">${esc(sportLabel('bike'))}</div>` + tbl(bike.map((z, i) => { const pw = th.ftp ? powerZonesFor(th.ftp)[i] : null; return `<tr><td><b style="color:${zc[i]}">Z${z.zone}</b></td><td>${esc(z.label)}</td><td class="num">${z.lo}${z.hi ? '–' + z.hi : '+'} bpm</td><td class="num">${pw ? `${pw.lo}${pw.hi ? '–' + pw.hi : '+'} W` : ''}</td></tr>`; })) + bikeSpeedTable(p) : ''}
@@ -178,7 +178,7 @@ onChange('thr', el => {
   if (!el.dataset.tf && INPUTS.thr[k]) { const n = readNumberInput(el, INPUTS.thr[k]); if (n === undefined) return; if (n == null && !(k === 'ftp' || k === 'maxHr')) { toast(t('common.invalidNumber')); return; } saveProfile(setThreshold(p, k as ThresholdKey, n, { src: 'von dir eingetragen', at: todayStr() })); invalidate(); nav.rerender(); toast(t('common.saved')); return; }
   let v: number | null = el.dataset.tf ? readTime(el) : (k === 'thresholdPaceRunSec' || k === 'cssSec') ? paceToSec(raw) : parseNum(raw);
   if (el.dataset.tf && v == null && k !== 'cssSec') return; // Feld wird gerade geleert
-  if (v != null && isNaN(v)) { toast(t('time.invalid')); return; }
+  if (v != null && isNaN(v)) { tfInvalid(el); return; }
   if ((raw === '' || v == null) && (k === 'ftp' || k === 'cssSec' || k === 'maxHr')) v = null;
   else if (v == null || v <= 0) { toast(t('common.invalidNumber')); return; }
   const lim: Record<string, [number, number]> = { lthrRun: [100, 215], lthrBike: [100, 215], maxHr: [120, 230], ftp: [50, 600], thresholdSpeedBikeKmh: [10, 60], thresholdPaceRunSec: [150, 600], cssSec: [50, 240] };

@@ -164,7 +164,8 @@ export function checkSession(s: any, week?: number, date?: string): CheckIssue[]
   // Auftrag 17: klare Namen, kein Widerspruch zwischen Titel und Zone, Aufbau und „Warum“
   for (const m of nameIssues(s)) out.push({ rule: 'names', week, date, msg: m });
   const spec: W.Spec | undefined = s.spec;
-  if (spec) {
+  // nur Bausteine prüfen, wenn es welche gibt (eine Einheit nur mit Übungsliste ließ vorher jede Plan-Änderung abstürzen)
+  if (spec && Array.isArray(spec.steps)) {
     const t = W.totals(spec);
     if (Math.abs(t.min - (s.plannedMinutes || 0)) > 1) bad(`Dauer ${s.plannedMinutes} min, aus den Bausteinen ${t.min} min.`);
     if (t.km != null && s.plannedKm != null && Math.abs(t.km - s.plannedKm) > 0.051) bad(`Distanz ${s.plannedKm} km, aus den Bausteinen ${t.km} km.`);

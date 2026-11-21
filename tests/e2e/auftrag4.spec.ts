@@ -17,7 +17,7 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
   await page.selectOption('#og-type-0', 'bike_event');
   await fill(page, '#og-date-0', '2027-03-21');
   await fill(page, '#og-name-0', 'Radmarathon 150 km');
-  await fill(page, '#og-time-0-h', '6'); await fill(page, '#og-time-0-m', '30');
+  await fill(page, '#og-time-0', '63000');
   await expect(page.locator('[data-realism="0"]')).toContainText(/realistisch|ehrgeizig/);
   await page.locator('[data-act="ob-goal-add"]').click();
   await page.selectOption('#og-type-1', 'run_10k');
@@ -90,29 +90,28 @@ test('A1/B/F2/A4/A5: Test-Person „Vater“ füllt den ganzen Fragebogen aus, s
   expect(await page.locator('#ca-sport option').allTextContents()).not.toContain('Teamsport');
 });
 
-test('A7: Pace in Min und Sek getrennt eintragen (Zahlentastatur), geschätzte Werte sind markiert', async ({ page }) => {
+test('A7/Auftrag 39: Pace als Ziffern ohne Doppelpunkt eintragen (Zahlentastatur), geschätzte Werte sind markiert', async ({ page }) => {
   await seed(page);
   await open(page, '/?go=zonen');
-  const m = page.locator('#z-tp-m');
-  await expect(m).toHaveAttribute('inputmode', 'numeric');
-  await expect(page.locator('#z-tp-s')).toHaveAttribute('inputmode', 'numeric');
-  await fill(page, '#z-tp-m', '5'); await fill(page, '#z-tp-s', '45');
+  const m = page.locator('#z-tp');
+  await expect(m).toHaveAttribute('inputmode', 'decimal');
+  await m.click(); await m.fill(''); await m.pressSequentially('545'); await expect(m).toHaveValue('5:45'); await m.blur();
   await expect.poll(async () => (await stored(page)).profile?.thresholds?.thresholdPaceRunSec).toBe(345);
   expect((await stored(page)).profile.thresholds.estimated || []).not.toContain('thresholdPaceRunSec');
   // CSS ebenso
-  await fill(page, '#z-css-m', '1'); await fill(page, '#z-css-s', '58');
+  await fill(page, '#z-css', '158');
   await expect.poll(async () => (await stored(page)).profile?.thresholds?.cssSec).toBe(118);
 });
 
-test('A7: Pace bei einer Einheit mit getrennten Feldern', async ({ page }) => {
+test('A7/Auftrag 39: Pace bei einer Einheit als Ziffern', async ({ page }) => {
   await seed(page);
   await open(page);
   await tab(page, 'plan').click();
   // Auftrag 19: erste Laufeinheit ab heute (Tage sind zugeklappt)
   const sid = await page.evaluate((today) => { const p = JSON.parse(localStorage.getItem('ec_plan')!); for (const w of p.weeks) for (const d of w.days) if (d.date >= today) { const s = d.sessions.find((x: any) => x.sport === 'run' && !x.race); if (s) return s.id; } return null; }, TODAY);
   await openPlanSession(page, sid!);
-  if (!(await page.locator('#fd-pace-m').count())) await page.locator('#sheetPanel [data-act="sess-toggle"]').first().click();
-  await fill(page, '#fd-pace-m', '5'); await fill(page, '#fd-pace-s', '30');
+  if (!(await page.locator('#fd-pace').count())) await page.locator('#sheetPanel [data-act="sess-toggle"]').first().click();
+  await fill(page, '#fd-pace', '530');
   await expect.poll(async () => ((await stored(page)).sessions[sid!] || {}).metrics?.pace).toBe('5:30');
 });
 

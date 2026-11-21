@@ -10,7 +10,7 @@ import { STATE, SESS_BY_ID, saveState, saveSoon, profile } from '../store';
 import { esc, fmtDate, dowShort, todayStr } from '../util';
 import { t } from '../../../shared/i18n';
 import { duration, dist, num, pace, swimPace, speed, mmss } from '../../../shared/i18n';
-import { on, onChange, onInput, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, gearChips, sportLabel, more, field, ic, pill, timeField, readTime, secToMmss } from '../kit';
+import { on, onChange, onInput, openSheet, refreshSheet, closeSheet, srcBadge, sportIc, gearChips, sportLabel, more, field, ic, pill, timeField, readTime, tfInvalid, secToMmss } from '../kit';
 import { sessState, ensureSess, effStatus } from '../domain';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
 import { diagramSvg } from '../../../shared/workoutdiagram';
@@ -246,7 +246,7 @@ onInput('sess-field', el=>{ensureSess(el.dataset.sid!)[el.dataset.sf!]=(el as HT
 onChange('sess-metric', el => {
   const id = el.dataset.sid!; const k = el.dataset.sm!;
   let val = (el as HTMLInputElement).value.trim();
-  if (el.dataset.tf) { const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } val = sec ? secToMmss(sec) : ''; }
+  if (el.dataset.tf) { const sec = readTime(el); if (sec != null && isNaN(sec)) { tfInvalid(el); return; } val = sec ? secToMmss(sec) : ''; }
   STATE.sessions[id] = setSessionMetricManual(ensureSess(id), k, val);
   saveSoon(); nav.rerender();
 });

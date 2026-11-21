@@ -302,9 +302,11 @@ label.li input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--a
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
 
 /* Auftrag 4: Zeitfelder (Min/Sek getrennt), Tage-Raster, Häufigkeit, Plan-Kopf, Bearbeiten */
-.fld .tf { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
-.fld .tfp { display: flex; align-items: center; gap: 4px; font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); margin: 0; }
-.fld .tfp .inp { width: 3em; text-align: center; padding: 10px 4px; }
+/* Auftrag 39: Zeile unter Zeitfeldern („= 45 min 30 s“) bzw. Nachfrage mit Knöpfen */
+.tf-hint { display: block; font-size: var(--t-xs); color: var(--ink-2); margin-top: 2px; overflow-wrap: anywhere; }
+.tf-hint:empty { display: none; }
+.tf-hint.ask { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: var(--ink); font-weight: 600; }
+.tf-hint.ask .btn { min-height: 36px; }
 .dl-grid { display: grid; grid-template-columns: 30px 1fr; gap: 6px 8px; align-items: center; }
 .dl-grid .seg button { padding: 8px 4px; font-size: var(--t-xs); }
 .daychips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -381,6 +383,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .splits { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .split-row, .ex-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
 .split-row .inp.sm { flex: 1 1 70px; width: 0; }
+.split-row .split-pace { flex: 1 1 70px; min-width: 0; display: flex; flex-direction: column; }
+.split-row .split-pace .inp.sm { flex: none; width: 100%; }
 .split-row b { flex: 0 0 3em; }
 /* Auftrag 37: Ablauf – eine Liste (Abschnitte, Sätze mit Wiederholungen, Übungen). Ist fett, Soll grau, Urteil rechts; Antippen öffnet ein Fenster. */
 .ablauf .ab-head { flex-wrap: wrap; gap: 4px 8px; }

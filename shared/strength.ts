@@ -43,6 +43,9 @@ export function exerciseCats(name: string): StrengthCat[] {
 export function repsOf(reps: any): { reps: number | null; holdSec: number | null } {
   const s = norm(String(reps ?? '')).replace(',', '.').trim();
   if (!s) return { reps: null, holdSec: null };
+  // Auftrag 39: Haltezeit als Minuten:Sekunden („1:30“, auch „1:30 min“) – vorher 1 Wiederholung
+  const ms = /^(\d{1,2}):([0-5]\d)(?:\s*(?:min|s|sek|sec))?$/.exec(s);
+  if (ms) return { reps: null, holdSec: +ms[1] * 60 + +ms[2] };
   const t = /(\d+(?:\.\d+)?)\s*(s|sek|sec|min)\b/.exec(s);
   if (t) return { reps: null, holdSec: Math.round(+t[1] * (t[2] === 'min' ? 60 : 1)) };
   const x = /\d+\s*[x×]\s*(\d+)/.exec(s); if (x) return { reps: +x[1], holdSec: null };

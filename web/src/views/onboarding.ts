@@ -6,7 +6,7 @@ import { storage as localStorage } from "../persistence";
 import { STATE, HAS_PLAN, PLAN_KEY, readPlan, saveState, profile, saveProfile } from '../store';
 import { esc, todayStr, parseNum } from '../util';
 import { t } from '../../../shared/i18n';
-import { on, onChange, ic, field, select, armed, more, sportLabel, timeField, readTime, readNumberInput } from '../kit';
+import { on, onChange, ic, field, select, armed, more, sportLabel, timeField, readTime, tfInvalid, tfData, tfHint, durHint, readNumberInput } from '../kit';
 import { BLOCKS, visibleQuestions, missingRequired, progress, prefillFromData, applyOnboarding, profileFromAnswers, understood, availableDays, goalTarget, DAYLOAD_OPTIONS, type Answers, type Question } from '../../../shared/onboarding';
 import { GOALS, type GoalType } from '../../../shared/goals';
 import { currentStages, replanFuture, replanFrom } from '../replan';
@@ -106,7 +106,7 @@ function question(q: Question, a: Answers): string {
   const hint = q.hint ? `<div class="hint">${esc(q.hint)}</div>` : '';
   const pre = (D().activities.length && ['weeklyHoursNow', 'sports', 'runContinuousMin', 'bikeLongestMin', 'swimCrawlM', 'sleep'].includes(q.id) && v != null) ? ` <span class="pill">${esc(t('ob.prefilled'))}</span>` : '';
   switch (q.type) {
-    case 'number': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}${pre}</label><input class="inp" id="q-${q.id}" inputmode="decimal" data-ch="ob-q" data-q="${q.id}" data-t="number" value="${esc(v ?? '')}"></div>${hint}`;
+    case 'number': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}${pre}</label><input class="inp" id="q-${q.id}" inputmode="decimal" ${q.unit === 'min' ? tfData('min', [0, 86400]) : ''} data-ch="ob-q" data-q="${q.id}" data-t="number" value="${esc(v ?? '')}">${q.unit === 'min' ? tfHint(durHint(v)) : ''}</div>${hint}`;
     case 'text': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}${pre}</label><input class="inp" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}" data-t="text" value="${esc(v ?? '')}"></div>${hint}`;
     case 'date': return `<div class="fld wide" data-qid="${q.id}"><label for="q-${q.id}">${lab}</label><input class="inp" type="date" id="q-${q.id}" data-ch="ob-q" data-q="${q.id}" data-t="text" value="${esc(v ?? '')}"></div>${hint}`;
     case 'notes': return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${lab}</span>${hint}${listHtml('ob')}<div style="margin-top:var(--s2)">${addHtml('ob')}</div></div>`;
@@ -154,13 +154,14 @@ function freqQ(q: Question, a: Answers): string {
     <div class="xs muted">${esc(t('ob.freqHint'))}</div></div>`;
 }
 const FREQ_STEPS: [number, number][] = [[0, 0], [1, 1], [1, 2], [2, 2], [2, 3], [3, 3], [3, 4], [4, 4], [4, 5], [5, 5], [5, 6], [6, 6], [7, 7]];
-/* Bestzeiten mit getrennten Feldern (A7) */
+/* Bestzeiten (Auftrag 39: ein Feld, Ziffern ohne Doppelpunkt; Grenzen machen „1:45“ beim Halbmarathon eindeutig) */
+const BEST_LIM: Record<string, [number, number]> = { run5k: [600, 7200], run10k: [1200, 14400], runHalf: [3000, 21600], runMarathon: [6000, 36000], swim400: [180, 1800] };
 function bestsQ(q: Question, a: Answers): string {
   const b = a.bests || {};
   const rows: [string, string, 'ms' | 'hms'][] = [];
   if ((a.sports || []).includes('run')) rows.push(['run5k', '5 km', 'hms'], ['run10k', '10 km', 'hms'], ['runHalf', t('goal.run_half'), 'hms'], ['runMarathon', t('goal.run_marathon'), 'hms']);
   if ((a.sports || []).includes('swim')) rows.push(['swim400', '400 m ' + t('ob.crawl'), 'ms']);
-  return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${esc(q.label)}</span><div class="fgrid">${rows.map(([k, l, kind]) => timeField('qb-' + k, l, typeof b[k] === 'number' ? b[k] : null, kind, `data-ch="ob-best" data-k="${k}"`)).join('')}</div></div>`;
+  return `<div class="fld wide" data-qid="${q.id}"><span class="lab">${esc(q.label)}</span><div class="fgrid">${rows.map(([k, l, kind]) => timeField('qb-' + k, l, typeof b[k] === 'number' ? b[k] : null, kind, `data-ch="ob-best" data-k="${k}"`, { lim: BEST_LIM[k] })).join('')}</div></div>`;
 }
 /* B4: Ziele mit eigener Wunschzeit, Triathlon gesamt oder je Disziplin, Realismus direkt sichtbar */
 function goalsQ(q: Question, a: Answers): string {
@@ -179,8 +180,8 @@ function goalsQ(q: Question, a: Answers): string {
       ${select('og-prio-' + i, t('goal.priority'), g.priority || (i ? 'B' : 'A'), [['A', t('goal.prioA')], ['B', t('goal.prioB')], ['C', t('goal.prioC')]], `data-ch="ob-goal" data-k="priority" data-i="${i}"`)}
       ${field('og-name-' + i, t('goal.name'), g.name || '', { placeholder: goalLabel(g.type), data: `data-ch="ob-goal" data-k="name" data-i="${i}"` })}</div>
       ${g.type !== 'fitness' ? `${tri ? `<div class="seg" role="group">${[['total', t('ob.timeTotal')], ['split', t('ob.timeSplit')]].map(([k, l]) => `<button class="${(g.timeMode || 'total') === k ? 'on' : ''}" data-act="ob-goal-mode" data-i="${i}" data-v="${k}">${esc(l)}</button>`).join('')}</div>` : ''}
-        ${tri && g.timeMode === 'split' ? `<div class="fgrid">${legs.map(s => timeField(`og-sp-${i}-${s}`, sportLabel(s), (g.splits || {})[s], 'hms', `data-ch="ob-goal-split" data-i="${i}" data-s="${s}"`)).join('')}</div>`
-          : timeField('og-time-' + i, t('ob.wishTime', { name: g.name || goalLabel(g.type) }), typeof g.targetTime === 'number' ? g.targetTime : target, 'hms', `data-ch="ob-goal-time" data-i="${i}"`, { wide: true, hint: t('ob.wishHint') })}
+        ${tri && g.timeMode === 'split' ? `<div class="fgrid">${legs.map(s => timeField(`og-sp-${i}-${s}`, sportLabel(s), (g.splits || {})[s], 'hms', `data-ch="ob-goal-split" data-i="${i}" data-s="${s}"`, { lim: [120, 48 * 3600] })).join('')}</div>`
+          : timeField('og-time-' + i, t('ob.wishTime', { name: g.name || goalLabel(g.type) }), typeof g.targetTime === 'number' ? g.targetTime : target, 'hms', `data-ch="ob-goal-time" data-i="${i}"`, { wide: true, hint: t('ob.wishHint'), lim: [300, 48 * 3600] })}
         ${r ? `<div class="banner ${r.ok === false ? 'warn' : 'info'}" data-realism="${i}">${esc(r.text)}</div>` : ''}` : ''}
       ${!al.ok ? `<div class="banner warn">${esc(al.msg || '')}</div>` : ''}<button class="link" data-act="ob-goal-del" data-i="${i}">${esc(t('common.remove'))}</button></div>`; }).join('')}
     <button class="btn ghost" data-act="ob-goal-add">${ic('plus')} ${esc(t('ob.addGoal'))}</button></div>`;
@@ -255,13 +256,13 @@ on('ob-freq', el => {
   const cur = f[s] || def[s]; let i = FREQ_STEPS.findIndex(x => x[0] === cur[0] && x[1] === cur[1]); if (i < 0) i = 2;
   i = Math.max(0, Math.min(FREQ_STEPS.length - 1, i + +el.dataset.d!)); f[s] = FREQ_STEPS[i]; a.freq = f; redraw();
 });
-onChange('ob-best', el => { const a = A(); const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } a.bests = { ...(a.bests || {}), [el.dataset.k!]: sec }; saveState(); });
+onChange('ob-best', el => { const a = A(); const sec = readTime(el); if (sec != null && isNaN(sec)) { tfInvalid(el); return; } a.bests = { ...(a.bests || {}), [el.dataset.k!]: sec }; saveState(); });
 on('ob-goal-add', () => { const a = A(); a.goals = [...(a.goals || []), { id: 'goal-' + Date.now(), type: 'run_10k', name: '', date: '', priority: (a.goals || []).length ? 'B' : 'A', timeMode: 'total' }]; redraw(); });
 on('ob-goal-del', el => { const a = A(); a.goals = (a.goals || []).filter((_: any, i: number) => i !== +el.dataset.i!); redraw(); });
 on('ob-goal-mode', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; g.timeMode = el.dataset.v; redraw(); });
 onChange('ob-goal', el => { const a = A(); const g = (a.goals || [])[+el.dataset.i!]; if (!g) return; g[el.dataset.k!] = (el as HTMLInputElement).value; redraw(); });
-onChange('ob-goal-time', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } g.targetTime = sec; saveState(); refreshRealism(+el.dataset.i!); });
-onChange('ob-goal-split', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; const sec = readTime(el); if (sec != null && isNaN(sec)) { toast(t('time.invalid')); return; } g.splits = { ...(g.splits || {}), [el.dataset.s!]: sec }; saveState(); refreshRealism(+el.dataset.i!); });
+onChange('ob-goal-time', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; const sec = readTime(el); if (sec != null && isNaN(sec)) { tfInvalid(el); return; } g.targetTime = sec; saveState(); refreshRealism(+el.dataset.i!); });
+onChange('ob-goal-split', el => { const g = (A().goals || [])[+el.dataset.i!]; if (!g) return; const sec = readTime(el); if (sec != null && isNaN(sec)) { tfInvalid(el); return; } g.splits = { ...(g.splits || {}), [el.dataset.s!]: sec }; saveState(); refreshRealism(+el.dataset.i!); });
 /* Auftrag 24: Ziele kommen im Fragebogen vor den Sportarten. Solange keine gewählt sind, keine Prüfung „Ziel passt zu den Sportarten“
    (sonst fehlte die Einordnung, weil der Entwurf nur den Standard „Laufen“ kennt). */
 function obProfile(a: any) { const p = profileFromAnswers(a, todayStr()).profile; return Array.isArray(a.sports) && a.sports.length ? p : { ...p, sports: [] as any }; }

@@ -2,11 +2,17 @@
 import { applyCustomPlanAdjustments } from './custom-locations26';
 export { applyCustomPlanAdjustments } from './custom-locations26';
 import { applyAdjustments } from './core';
+import { parseInput } from './validate';
 export type PlanAction26 = {type:'move';sessionId:string;to:string} | {type:'swap';sessionId:string;otherSessionId:string} | {type:'swapDays';from:string;to:string};
 export type PlanPreview26 = {sessionId:string;title:string;from:string;to:string};
 /** Parse before generation: invalid input must never silently fall back to a different duration. */
 export function parsePlanNumbers(minutesInput:string, kmInput=''):{minutes:number;km:number|null} {
- const minutes=Number(minutesInput.trim().replace(',','.'));
+ // Auftrag 39: Dauer wie überall lesen (90, 1:30 h, 4530 = 45:30, 45,30 = 45 min 30 s); unklar oder ungültig → Meldung statt Ersatzwert
+ const n0=Number(minutesInput.trim().replace(',','.'));
+ if(Number.isFinite(n0)&&n0<=0) throw Error('Bitte eine positive, endliche Trainingsdauer eingeben.');
+ const r=parseInput({label:'Trainingsdauer',unit:'min',min:1,max:1440,hm:'min',units:{h:60}},minutesInput);
+ if(!r.ok) throw Error(r.msg||'Bitte eine positive, endliche Trainingsdauer eingeben.');
+ const minutes=r.value==null?NaN:r.value;
  const raw=kmInput.trim(); const km=raw===''?null:Number(raw.replace(',','.'));
  if(!Number.isFinite(minutes)||minutes<=0) throw Error('Bitte eine positive, endliche Trainingsdauer eingeben.');
  if(km!==null&&(!Number.isFinite(km)||km<0)) throw Error('Bitte eine nichtnegative, endliche Distanz eingeben.');

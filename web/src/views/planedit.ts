@@ -130,6 +130,7 @@ function previewAdjustments(adj:any[],label:string,warnings:string[]=[]) {
  openSheet('Änderung prüfen',()=>'<div class="stack" data-edit-preview>'+adj.map(a=>'<div class="card">'+esc(a.what)+'</div>').join('')+(warnings.length?'<div class="banner warn">'+warnings.map(x=>esc(x)).join('<br>')+'</div>':'')+'<div class="hint">Rueckgaengig im Plan ueber Undo.</div><button class="btn block" data-act="edit-preview-confirm">Aenderung bestaetigen</button><button class="btn ghost block" data-act="edit-cancel">Abbrechen</button></div>');
 }
 on('edit-preview-confirm',()=>{if(!PENDING)return;const p=PENDING;PENDING=null;propose(p.adj,p.label);});
+const BUILD_SPORTS = ['run', 'bike', 'swim', 'strength'];
 const INT: [string, string][] = [['easy', 'edit.int.easy'], ['long', 'edit.int.long'], ['tempo', 'edit.int.tempo'], ['intervals', 'edit.int.intervals']];
 function weekOf(date: string) { return PLAN.weeks.find((w: any) => w.days.some((d: any) => d.date === date)); }
 function editSheet(): string {
@@ -141,8 +142,8 @@ function editSheet(): string {
   const kind = s.spec ? (['intervals', 'threshold'].includes(s.spec.kind) ? 'intervals' : s.spec.kind === 'tempo' ? 'tempo' : s.spec.kind === 'long' ? 'long' : 'easy') : 'easy';
   return `<div class="stack" data-edit-sheet><div class="hint">${esc(dowLong(d.date))}, ${fmtDate(d.date)} · ${esc(s.title)}</div>
     <div class="fgrid">${select('ed-day', t('edit.day'), d.date, allDayOptions())}
-    ${select('ed-sport', t('common.sport'), s.sport, ['run', 'bike', 'swim', 'strength'].map(k => [k, sportLabel(k)] as [string, string]))}
-    ${field('ed-min', t('m.min'), s.plannedMinutes || '', { inputmode: 'numeric' })}
+    ${/* Auftrag 39: Teamsport bzw. andere Sportarten behalten ihre Sportart (vorher stand „Laufen“ vorgewählt und die Einheit wurde beim Speichern still zum Lauf umgebaut) */ BUILD_SPORTS.includes(s.sport) ? select('ed-sport', t('common.sport'), s.sport, BUILD_SPORTS.map(k => [k, sportLabel(k)] as [string, string])) : ''}
+    ${field('ed-min', t('m.min'), s.plannedMinutes || '', { dur: true })}
     ${s.sport !== 'strength' ? field('ed-km', s.sport === 'swim' ? t('edit.meters') : t('m.km'), s.plannedKm ? (s.sport === 'swim' ? Math.round(s.plannedKm * 1000) : s.plannedKm) : '', { inputmode: 'decimal' }) : ''}
     ${s.sport === 'run' || s.sport === 'bike' ? select('ed-int', t('edit.intensity'), kind, INT.map(([k, l]) => [k, t(l)] as [string, string])) : ''}</div>
     ${toggle('ed-lock', t('edit.lock'), !!s.locked)}<div class="hint">${esc(t('edit.lockHint'))}</div>
@@ -178,12 +179,12 @@ on('edit-save', () => {
   if(s.trainingBlocks) { toast('Bitte die Trainingsbausteine bearbeiten.'); return; }
   let numbers:{minutes:number;km:number|null};
   try { numbers=parsePlanNumbers(v('ed-min'),v('ed-km')); } catch(e) { toast((e as Error).message); return; }
-  const day = v('ed-day'), sport = v('ed-sport'), min = numbers.minutes, kmRaw = v('ed-km').replace(',', '.'), kind = v('ed-int') || 'easy';
+  const day = v('ed-day'), sport = v('ed-sport') || s.sport, min = numbers.minutes, kmRaw = v('ed-km').replace(',', '.'), kind = v('ed-int') || 'easy';
   const lock = !!(document.getElementById('ed-lock') as HTMLInputElement)?.checked;
   const group = uid(); const adj: any[] = [];
   let set: any = {};
   const curKind = s.spec ? (['intervals', 'threshold'].includes(s.spec.kind) ? 'intervals' : s.spec.kind) : 'easy';
-  if (sport !== s.sport || (v('ed-int') && kind !== curKind)) {
+  if (BUILD_SPORTS.includes(sport) && (sport !== s.sport || (v('ed-int') && kind !== curKind))) {
     const b = W.build(specFor(sport, kind, min, s));
     set = { sport, title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, zone: b.zone || null, hard: !!b.hard, stage: null };
   } else if (min !== s.plannedMinutes || (kmRaw && s.plannedKm && Math.abs(+kmRaw / (s.sport === 'swim' ? 1000 : 1) - s.plannedKm) > 0.01)) {
@@ -226,7 +227,7 @@ on('edit-add', el => {
   const opts = w.days.map((d: any) => [d.date, `${dowShort(d.date)} ${fmtDate(d.date)}`] as [string, string]);
   const first = (w.days.find((d: any) => d.date >= todayStr()) || w.days[0]).date;
   openSheet(t('edit.add'), () => `<div class="stack"><div class="fgrid">${select('ad-day', t('edit.day'), first, opts)}${select('ad-sport', t('common.sport'), 'run', ['run', 'bike', 'swim', 'strength'].map(k => [k, sportLabel(k)] as [string, string]))}
-    ${field('ad-min', t('m.min'), '40', { inputmode: 'numeric' })}${select('ad-int', t('edit.intensity'), 'easy', INT.map(([k, l]) => [k, t(l)] as [string, string]))}</div><button class="btn block" data-act="edit-add-go">${esc(t('edit.add'))}</button></div>`);
+    ${field('ad-min', t('m.min'), '40', { dur: true })}${select('ad-int', t('edit.intensity'), 'easy', INT.map(([k, l]) => [k, t(l)] as [string, string]))}</div><button class="btn block" data-act="edit-add-go">${esc(t('edit.add'))}</button></div>`);
 });
 on('edit-add-go', () => {
   const v = (id: string) => (document.getElementById(id) as HTMLInputElement).value;

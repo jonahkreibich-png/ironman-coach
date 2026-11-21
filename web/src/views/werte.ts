@@ -6,7 +6,7 @@ import { STATE, saveState } from '../store';
 import { esc, fmtDate, dowShort, todayStr, parseNum } from '../util';
 import { t, num, temp } from '../../../shared/i18n';
 import { D } from '../data';
-import { on, onChange, sec, srcBadge, openSheet, refreshSheet, ic, termLink, readNumberInput } from '../kit';
+import { on, onChange, sec, srcBadge, openSheet, refreshSheet, ic, termLink, readNumberInput, tfData, tfHint, durHint } from '../kit';
 import { INPUTS, deNum } from '../../../shared/validate';
 import { setManual, resetToOriginal, hasOriginal, bestAuto, SOURCE_LABEL } from '../../../shared/activity/merge';
 import { nav } from '../nav';
@@ -57,7 +57,7 @@ function checkinSheet(): string {
     <div class="fgrid">${FIELDS.map(([k, lk]) => {
       const src = (p._src || {})[k];
       const orig = hasOriginal(p, k) ? bestAuto(p, k, STATE.settings) : null;
-      return `<div class="fld"><label for="ck-${k}">${esc(t(lk))} ${srcBadge(src)}</label><input class="inp" id="ck-${k}" type="text" inputmode="decimal" data-ch="ck-field" data-k="${k}" value="${esc(p[k] == null ? '' : deNum(p[k]))}">
+      return `<div class="fld"><label for="ck-${k}">${esc(t(lk))} ${srcBadge(src)}</label><input class="inp" id="ck-${k}" type="text" inputmode="decimal" ${INPUTS.trend[k] && INPUTS.trend[k].hm === 'min' ? tfData('min', [0, 36000]) : ''} data-ch="ck-field" data-k="${k}" value="${esc(p[k] == null ? '' : deNum(p[k]))}">${INPUTS.trend[k] && INPUTS.trend[k].hm === 'min' ? tfHint(durHint(p[k])) : ''}
         ${orig ? `<button class="link" data-act="ck-reset" data-k="${k}">${ic('back').replace('<svg', '<svg width="12" height="12"')} ${esc(t('v.original', { v: num(orig.value, 1), s: SOURCE_LABEL[orig.source] || orig.source }))}</button>` : ''}</div>`;
     }).join('')}</div>
     <div class="fld"><label for="ck-note">${esc(t('v.note'))}</label><input class="inp" id="ck-note" type="text" data-ch="ck-note" value="${esc(p.illness || '')}" placeholder="${esc(t('v.notePh'))}"></div>
