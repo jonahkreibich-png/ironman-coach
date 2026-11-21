@@ -53,3 +53,24 @@ describe('Coach-Fragen aus der Fehlersuche (16 Testnutzer × 20 Fragen)', () => 
     for (const id of ['laeuferin-hm', 'einsteiger-sprint', 'vater-rad-lauf']) expect(ask(id, 'Was mache ich heute?'), id).not.toMatch(/^Ja\b/);
   });
 });
+
+describe('Release-Fund 3.27.0 (Kopie echter Daten): gespeicherte Dauer mit Kommastelle', () => {
+  test('gespeicherte Zahl 83,7 min: kein Absturz, bleibt 83,7 (keine Zeit-Lesart), 45,25 bleibt 45,25', async () => {
+    const { checkField, readTimeInput } = await import('../../shared/validate');
+    for (const v of [83.7, 45.25, 45.3, 61.9, 30.5]) {
+      const c = checkField('run', 'min', v);
+      expect(c.ok, String(v)).toBe(true);
+      expect(Number(c.value), String(v)).toBe(v);
+    }
+    // getippt: „83,7“ / „5:7“ stürzt nicht ab (vorher: null.c)
+    expect(() => readTimeInput('83,7', 'min', [60, 86400])).not.toThrow();
+    expect(() => readTimeInput('5:7', 'min', [60, 86400])).not.toThrow();
+    expect(() => readTimeInput('5:7', 'pace', [150, 600])).not.toThrow();
+    expect(checkField('run', 'min', '83,7').value).toBeCloseTo(83.7, 6);
+  });
+  test('Daten-Check mit gespeicherter Dauer 83,7 min läuft durch und meldet sie nicht als falsch', async () => {
+    const { checkField } = await import('../../shared/validate');
+    expect(checkField('swim', 'min', 52.8).ok).toBe(true);
+    expect(checkField('bike', 'min', 127.45).ok).toBe(true);
+  });
+});

@@ -18,5 +18,6 @@ Nicht eingebaut. Du entscheidest, was umgesetzt wird. Aufwand: klein (unter 1 Ta
 | 12 | **Hinweis „Neue Version“ verdeckt den Fenster-Titel** (oben über dem geöffneten Fenster) | Bei 320 px und großer Schrift liegt er über Titel und Schließen-Knopf, bis man tippt | klein | alle nach einem Update |
 | 13 | **Ladezeit:** Hauptdatei (1,5 MB) in Teile zerlegen, Plan-Bearbeiten nur bei Bedarf laden | Erster Start auf älteren Handys schneller; der Build warnt schon länger | mittel | alle |
 | 14 | **Zeile „= 45 min 30 s“ unter Zeitfeldern dauerhaft zeigen** (heute beim Tippen und bis zum Neuzeichnen) | Wer später nachsieht, sieht nur „45,5“ im Minutenfeld | klein | alle |
+| 15 | **Dauer-Feld zeigt gespeicherte Werte als Zeit** („45:15“ statt „45,25“) | Wer „45,25“ nur leicht ändert (z. B. „45,26“), bekommt nach der neuen Regel 45 min 26 s; die App liest es eindeutig, aber anders als angezeigt | klein | alle, die Dauern von Hand ändern |
 
 **Eingebaut wurde nur, was ein Fehler war** (Liste in ERGEBNIS.md).

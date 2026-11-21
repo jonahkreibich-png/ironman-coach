@@ -91,13 +91,14 @@ export function readTimeInput(raw: any, kind: TimeKind, lim?: [number, number] |
     const asTens = twoPart(a, d * 10, kind), asOnes = twoPart(a, d, kind);
     if (sep === ':') {
       // „5:3“: 5:03 oder 5:30?
-      if (d === 0) return pick(asTens!.c, asTens!.ask, lim);
-      return pick([asOnes!.c[0], asTens!.c[0]], true, lim);
+      if (!asTens) return asOnes ? pick(asOnes.c, asOnes.ask, lim) : { sec: null, err: 'sec' }; // „5:7“ kann nur 5:07 sein
+      if (d === 0) return pick(asTens.c, asTens.ask, lim);
+      return pick([asOnes!.c[0], asTens.c[0]], true, lim);
     }
     const dec = a * 60 + d * 6; // Zehntel-Minute
     if (d === 0) return pick([dec], false, lim);
-    if (isMinKind(kind) && d === 5) return pick([dec], false, lim);
-    return pick(isMinKind(kind) ? [dec, asTens!.c[0]] : [asTens!.c[0], dec], true, lim);
+    if ((isMinKind(kind) && d === 5) || !asTens) return pick([dec], false, lim); // „83,7“: 83:70 gibt es nicht → 83,7 min
+    return pick(isMinKind(kind) ? [dec, asTens.c[0]] : [asTens.c[0], dec], true, lim);
   }
   return { sec: null, err: 'format' };
 }
@@ -207,7 +208,8 @@ export function parseInput(spec: InputSpec, raw: any): ParsedInput {
   const unitTxt = spec.unit ? ' ' + spec.unit : '';
   let v: number | null = null; let note: string | undefined;
   // Auftrag 39: Dauer in Minuten wie eine Zeit lesen (Ziffern, Komma, Punkt, Doppelpunkt): „45,30“ = 45 min 30 s, „4530“ = 45:30
-  if (spec.hm === 'min' && (spec.unit || 'min') === 'min' && /^\d+(?:[:.,]\d{1,2}){0,2}$/.test(s)) {
+  // gespeicherte Zahlen (typeof number) sind schon Minuten mit Kommastelle (83,7 min) – nie als Zeit lesen (Release-Fund 3.27.0)
+  if (spec.hm === 'min' && typeof raw !== 'number' && (spec.unit || 'min') === 'min' && /^\d+(?:[:.,]\d{1,2}){0,2}$/.test(s)) {
     const r = readTimeInput(s, spec.clock || 'min', [spec.min * 60, spec.max * 60]);
     if (r.ask) return { ok: false, value: null, msg: `${spec.label}: meinst du ${r.ask.map(timeWords).join(' oder ')}?`, ask: r.ask };
     if (r.err) return { ok: false, value: null, msg: `${spec.label}: bitte in Minuten eingeben, z. B. 45 oder 45:30 (nur Ziffern: 4530).` };

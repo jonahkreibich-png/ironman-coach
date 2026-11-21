@@ -37,7 +37,7 @@ export async function releaseDataCheck(src: string, today = localDate()): Promis
   const users: any[] = [];
   for (const uid of ids) {
     const errors: string[] = []; const stats: any = { uid };
-    const step = async (name: string, fn: () => any) => { try { return await fn(); } catch (e: any) { errors.push(`${name}: ${String(e && e.message || e).slice(0, 200)}`); return null; } };
+    const step = async (name: string, fn: () => any) => { try { return await fn(); } catch (e: any) { if (process.env.DC_STACK) console.error(name, e && e.stack); errors.push(`${name}: ${String(e && e.message || e).slice(0, 200)}`); return null; } };
     await withTz(await userTz(env, uid), async () => {
       const L: any = await step('Zustand laden', () => loadState(env, uid));
       if (!L) return;
@@ -70,7 +70,7 @@ export async function releaseDataCheck(src: string, today = localDate()): Promis
           for (const m of Object.values(L.state.coachMsgs || {}) as any[]) { if (!m || m.from === 'user' || !m.text) continue; const r = checkValueClaims(m.text, f, m.date || today); fixed += r.corrected.length + r.dropped.length; }
           stats.coachFixed = fixed;
         });
-        await step('Daten-Check', () => { const r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today }); stats.findings = r.findings.length; stats.safeFixes = r.fixes.length; });
+        await step('Daten-Check', () => { const r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today }); stats.findings = r.findings.length; if (process.env.DC_STACK) console.error('Befunde', uid, JSON.stringify(r.findings.map((f: any) => f.group + ': ' + f.text))); stats.safeFixes = r.fixes.length; });
         // Auftrag 34 (Pflicht): Plan-Pflege wie auf dem Server am Morgen, danach darf der Daten-Check keine Regel-Verstöße und keine
         // widersprüchlichen Werte mehr melden (sicher behobene Befunde wie verwaiste Anpassungen zählen nicht)
         await step('Plan-Pflege', () => {
