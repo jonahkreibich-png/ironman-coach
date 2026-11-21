@@ -448,9 +448,12 @@ function weekStats(ctx: EngineCtx, from: string, to: string) {
   const items = doneItems(ctx, from, to);
   const planned = C.planDays(weeksOf(ctx)).filter((d: any) => d.date >= from && d.date <= to && !C.illnessAt(ctx.state.illnessPeriods, d.date)).flatMap((d: any) => d.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled && !s.fixed).map((s: any) => ({ s, date: d.date })));
   const vals = items.map(d => ({ d, v: valsOf(d) }));
-  // Auftrag 17: nur eingetragene oder gemessene Dauer zählt; ohne Dauer wird nichts aus dem Plan eingesetzt
-  const min = vals.reduce((a, x) => a + (x.v.min || 0), 0);
-  const noMin = vals.filter(x => x.v.min == null && x.d.sport !== 'rest').length;
+  // Auftrag 39: abgehakt ohne Dauer gilt „wie geplant“ (Auftrag 38) – wie bei Belastung und Scores zählt die geplante Dauer, als solche genannt.
+  // Vorher 0 h („Umfang 0 h statt 0,5 h, −100 %“), obwohl die Einheit erledigt war. Ohne geplante Dauer (Extra ohne Minuten): nicht gezählt.
+  const asPlannedMin = (x: { d: Done; v: Vals }) => (x.v.min == null && x.d.planned && x.d.planned.plannedMinutes ? x.d.planned.plannedMinutes : 0);
+  const planMin = vals.reduce((a, x) => a + asPlannedMin(x), 0);
+  const min = vals.reduce((a, x) => a + (x.v.min || 0), 0) + planMin;
+  const noMin = vals.filter(x => x.v.min == null && !asPlannedMin(x) && x.d.sport !== 'rest').length;
   const plannedMin = planned.reduce((a: number, x: any) => a + (x.s.plannedMinutes || 0), 0);
   const missedKey = planned.filter((x: any) => C.isKey(x.s) && x.date < ctx.today && !((ctx.state.sessions || {})[x.s.id] || {}).completed && !C.illnessAt(ctx.state.illnessPeriods, x.date)).map((x: any) => x.s.title);
   const easyRuns = vals.filter(x => x.d.sport === 'run' && x.v.pace && x.v.hr && !isHardDone(x.d, x.v));
@@ -463,7 +466,7 @@ function weekStats(ctx: EngineCtx, from: string, to: string) {
   const fatigue = vals.reduce((a, x) => a + reviewOne(ctx, x.d).fatigue, 0);
   const illDays: string[] = []; for (let d = from; d <= to; d = C.addDays(d, 1)) if (C.illnessAt(ctx.state.illnessPeriods, d)) illDays.push(d);
   const ill = illDays.length ? illDays : null;
-  return { items, planned, min, noMin, plannedMin, missedKey, eff, rpes, hardN, sleepAvg, bySport, fatigue, ill, vals };
+  return { items, planned, min, noMin, planMin, plannedMin, missedKey, eff, rpes, hardN, sleepAvg, bySport, fatigue, ill, vals };
 }
 const hh = (m: number) => de(m / 60, 1) + ' h';
 export function reviewWeek(ctx: EngineCtx, compare: boolean, offset = 0): Review {
@@ -475,12 +478,13 @@ export function reviewWeek(ctx: EngineCtx, compare: boolean, offset = 0): Review
   const doneN = W0.items.length, planN = W0.planned.filter((x: any) => x.date <= to).length;
   const label = offset ? 'Letzte Woche' : 'Diese Woche';
   const plannedTo = W0.planned.filter((x: any) => x.date <= to).reduce((a: number, x: any) => a + (x.s.plannedMinutes || 0), 0);
-  const head = `${label} (${fmtD(mon)} bis ${fmtD(to)}): ${doneN} Einheit${doneN === 1 ? '' : 'en'}${planN ? ` von ${planN} geplanten` : ''}, ${hh(W0.min)}${W0.noMin ? ` (dazu ${W0.noMin} ohne eingetragene Dauer)` : ''}${plannedTo ? ` (geplant ${offset || to >= sun ? '' : 'bis heute '}${hh(plannedTo)})` : ''}.`;
+  const head = `${label} (${fmtD(mon)} bis ${fmtD(to)}): ${doneN} Einheit${doneN === 1 ? '' : 'en'}${planN ? ` von ${planN} geplanten` : ''}, ${hh(W0.min)}${W0.planMin ? ` (davon ${hh(W0.planMin)} wie geplant, nicht gemessen)` : ''}${W0.noMin ? ` (dazu ${W0.noMin} ohne eingetragene Dauer)` : ''}${plannedTo ? ` (geplant ${offset || to >= sun ? '' : 'bis heute '}${hh(plannedTo)})` : ''}.`;
   if (!doneN) {
     return { intent: 'review', text: [head, `🔧 Besser: ${W0.ill ? 'Du warst krank, da ist Pause richtig.' : 'Noch keine erledigte Einheit eingetragen. Hak erledigte Einheiten im Plan ab oder verbinde deine Uhr, dann kann ich die Woche bewerten.'}`, `➡️ Nächste Tage: ${nextDays(ctx, ctx.today, 0).text}`].join('\n'), options: [{ label: 'Zum Plan', say: '', go: 'plan' }], good, better, next: [], missing: ['erledigte Einheiten'], items: 0 };
   }
   if (W0.ill) good.push(`Krank ${W0.ill.length === 1 ? 'am ' + fmtD(W0.ill[0]) : `von ${fmtD(W0.ill[0])} bis ${fmtD(W0.ill[W0.ill.length - 1])}`}: die Pause war richtig, diese Tage zählen nicht.`);
-  if (planN && doneN >= planN * 0.85) good.push(`Fast alles geschafft (${doneN} von ${planN}).`);
+  if (planN && doneN >= planN) good.push(`Alles geschafft (${doneN} von ${planN}).`);
+  else if (planN && doneN >= planN * 0.85) good.push(`Fast alles geschafft (${doneN} von ${planN}).`);
   else if (planN && doneN < planN * 0.6) better.push(`Nur ${doneN} von ${planN} Einheiten. Wenn es zeitlich nicht passt, sag mir, welche Tage schwierig sind, dann plane ich anders.`);
   if (W0.missedKey.length) better.push(`Verpasst: ${joinDe(W0.missedKey.slice(0, 2))}. Das sind die wichtigsten Einheiten der Woche.`);
   else if (planN) good.push('Keine wichtige Einheit verpasst.');

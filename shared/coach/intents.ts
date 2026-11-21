@@ -97,7 +97,7 @@ export const INTENTS: Intent[] = [
   // Auftrag 18: „Warum habe ich heute frei?“ – Grund aus dem Plan (Spiel, langer Tag, Wettkampf, Erholungswoche) und die Ruhetag-Regel
   { id: 'why-rest', when: t => has(t, ['warum', 'wieso', 'weshalb']) && has(t, ['frei', 'ruhetag', 'kein training', 'nichts geplant', 'pause', 'nichts']),
     answer: (ctx, _t, r0) => { const t0 = ctx.today; const d = /morgen/.test(String(r0 || '')) ? C.addDays(t0, 1) : t0;
-      const r = restDayReason(weeksOf(ctx), d, ctx.profile, ctx.goals);
+      const r = restDayReason(weeksOf(ctx), d, ctx.profile, ctx.goals, t0);
       return r || `${d === t0 ? 'Heute' : 'Morgen'} ist Training geplant. Ruhetage sind fest im Plan: mindestens einer pro Woche${isMinor(ctx.profile, t0) ? ', für dich eher zwei' : ''}. ${KNOWLEDGE_REST}`; } },
   // Auftrag 18: Trainingsregeln erklären („Warum kein Koppellauf/Kraft/Tempo?“, „Welche Regeln gelten?“)
   { id: 'why-rule', when: t => (has(t, ['warum', 'wieso', 'weshalb']) && has(t, ['koppel', 'keine kraft', 'kuerzer', 'kein tempo', 'ohne tempo', 'kein intervall', 'keine intervalle', 'nur locker'])) || has(t, ['trainingsregeln', 'welche regeln', 'regeln der app']),

@@ -16,15 +16,20 @@ import { legsOf } from './goals';
 import { markExcuse } from './planrules';
 
 export type TRuleId = 'restDay' | 'teenHours' | 'bigDayNext' | 'maxSports' | 'hardCount' | 'hardAdjacent' | 'hardBeforeEvent' | 'goalQuality' | 'afterRace' | 'raceWeek'
-  | 'longCap' | 'longStep' | 'legsStrength' | 'strengthGameDay' | 'recoveryIntervals' | 'testLoad' | 'warmup' | 'raceSim' | 'minFreq' | 'longRunTempo' | 'recoveryDepth';
+  | 'longCap' | 'longStep' | 'legsStrength' | 'strengthGameDay' | 'recoveryIntervals' | 'testLoad' | 'warmup' | 'raceSim' | 'minFreq' | 'longRunTempo' | 'recoveryDepth' | 'testAfterRace';
 export const TRULE_LABEL: Record<TRuleId, string> = {
   restDay: 'Ruhetage (mind. 1, unter 18/Einsteiger 2)', teenHours: 'Jugendliche: Wochenstunden ≤ Alter', bigDayNext: 'Nach langem Tag kein langer/harter Lauf',
   maxSports: 'Höchstens 2 Sportarten pro Tag', hardCount: 'Harte Einheiten pro Woche', hardAdjacent: 'Keine harten Tage hintereinander', hardBeforeEvent: 'Nichts Hartes vor Spiel/Wettkampf',
   goalQuality: 'Lauf-Qualität vor dem Laufziel', afterRace: 'Locker nach dem Wettkampf', raceWeek: 'Wettkampfwoche (keine Kraft, nichts Hartes)', longCap: 'Lange Einheit passend zum Ziel',
   longStep: 'Lange Einheit höchstens +10 min/Woche', legsStrength: 'Kraft Beine nicht vor/an Spiel, Wettkampf, langem Lauf', strengthGameDay: 'Kraft am Spieltag kurz (≤ 30 min)',
   recoveryIntervals: 'Erholungswoche ohne Intervalle (Tests erlaubt)', testLoad: 'Tests nicht neben Spiel/Wettkampf', warmup: 'Harte Einheit mit Ein- und Auslaufen', raceSim: 'Dreifach-Tag nur als Wettkampf-Simulation',
-  minFreq: 'Mindest-Häufigkeit je Sportart (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×)', longRunTempo: 'Tempo im langen Lauf nur jede 2. Woche, nie mit hartem Lauf', recoveryDepth: 'Erholungswoche etwa 60–70 % der Aufbauwoche'
+  minFreq: 'Mindest-Häufigkeit je Sportart (Laufziel ab 10 km 3×, wenig Zeit 2×; Triathlon je 2×)', longRunTempo: 'Tempo im langen Lauf nur jede 2. Woche, nie mit hartem Lauf', recoveryDepth: 'Erholungswoche etwa 60–70 % der Aufbauwoche',
+  testAfterRace: 'Kein Test in den 2 Wochen nach einem Wettkampf; ein A/B-Wettkampf zählt als Test seiner Sportarten'
 };
+/* Auftrag 39: Sportarten, für die ein Wettkampf als Test zählt (A/B; ein C-Wettkampf läuft „zügig, nicht am Limit“) */
+export const raceTestSports = (r: { type: GoalType | null; priority: string }): string[] => (r.priority === 'C' || !r.type || !GOALS[r.type] ? [] : [...new Set(GOALS[r.type].legs.map(l => l.sport))]);
+const RACE_TEST_DAYS = 14, RACE_TEST_COUNTS = 42;
+const SPORT_DE: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen' };
 export interface TIssue { rule: TRuleId; week?: number; date?: string; msg: string }
 export interface TOpts {
   from?: string | null; today?: string;
@@ -321,6 +326,17 @@ export function checkTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): TIs
       }
       prevLQ = lq.length > 0;
     } }
+  // Auftrag 39: Tests nach einem Wettkampf – 2 Wochen gar keiner; ein A/B-Wettkampf zählt als Test seiner Sportarten (6 Wochen kein weiterer)
+  for (const r of races) {
+    const rs = raceTestSports(r);
+    for (const x of D) {
+      const k = diffD(r.date, x.d.date); if (k < 1 || k > RACE_TEST_COUNTS || !inR(x.d.date)) continue;
+      for (const s of live(x.d).filter((y: any) => isTestS(y) && !fixedS(y) && !pinnedS(y))) {
+        if (k <= RACE_TEST_DAYS) add('testAfterRace', x.w, x.d.date, `${fmt(x.d.date)}: ${s.title} ${k} Tag${k === 1 ? '' : 'e'} nach ${r.name} – in den 2 Wochen nach einem Wettkampf kein Test.`);
+        else if (rs.includes(s.sport)) add('testAfterRace', x.w, x.d.date, `${fmt(x.d.date)}: ${s.title} ${k} Tage nach ${r.name} – der Wettkampf zählt als Test (${SPORT_DE[s.sport] || s.sport}), der nächste kommt im 8-Wochen-Rhythmus.`);
+      }
+    }
+  }
   // Wettkämpfe: Woche davor, Tage danach, Lauf-Qualität vor Laufzielen
   for (const r of races) {
     const after = r.type ? easyAfterDays(r.type) : 3;
@@ -435,6 +451,42 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
       if (!String(g.w.important || '').includes(hint)) g.w.important = [g.w.important, hint].filter(Boolean).join(' ');
       fixes.push(`Woche ${g.w.weekNumber}: leichter (Spiel kurz vor ${r.name})`);
     }
+  }
+  // 1b) Auftrag 39: Tests nach einem Wettkampf. Zählt der Wettkampf als Test dieser Sportart → normale lockere Einheit statt Test;
+  //     sonst den Test hinter die 2 Wochen schieben (Tausch mit einer lockeren Einheit derselben Sportart, Tag 15-35), geht das nicht → locker.
+  for (const r of races) {
+    const rs = raceTestSports(r);
+    const D = daysOf(weeks);
+    D.forEach((x, i) => {
+      const k = diffD(r.date, x.d.date); if (k < 1 || k > RACE_TEST_COUNTS || !inR(x.d.date)) return;
+      for (const s of [...live(x.d)].filter((y: any) => isTestS(y) && !pinnedS(y))) {
+        if (!movable(s, x.d.date)) continue;
+        const counted = rs.includes(s.sport);
+        if (k > RACE_TEST_DAYS && !counted) continue;
+        if (!counted) {
+          // Zieltag: außer der getauschten Einheit nichts Hartes, Nachbartage nicht hart (der Test ersetzt dort z. B. die Schlüsseleinheit)
+          const free = (j: number, z: any) => { const pv = at(D, j, -1), nx = at(D, j, 1); return !live(D[j].d).some((y: any) => y !== z && hardS(y)) && !(pv && hardDay(pv.d)) && !(nx && (hardDay(nx.d) || eventDay(nx.d))); };
+          let done = false;
+          for (let j = i + 1; j < D.length && !done; j++) {
+            const kk = diffD(r.date, D[j].d.date); if (kk <= RACE_TEST_DAYS) continue; if (kk > 35) break;
+            const z = live(D[j].d).find((y: any) => y.sport === s.sport && movable(y, D[j].d.date) && !isTestS(y) && !isLongS(y) && !pinnedS(y));
+            if (!z || !free(j, z)) continue;
+            // die getauschte Einheit kommt in die Tage nach dem Wettkampf: dort nur locker
+            const back = hardS(z) ? easyShortOf(z, minOf(z), `Getauscht mit ${s.title} (2 Wochen nach ${r.name} kein Test): hier nur locker.`, x.w.phase) : z;
+            if (!back) continue;
+            removeS(x.d, s); removeS(D[j].d, z); addS(D[j].d, s); addS(x.d, back === z ? z : { ...back, id: z.id });
+            fixes.push(`${x.d.date}: ${s.title} → ${D[j].d.date} (2 Wochen nach ${r.name} kein Test)`); done = true;
+          }
+          if (done) continue;
+        }
+        const why = counted ? `${r.name} zählt als Test (${SPORT_DE[s.sport] || s.sport}); der nächste Test kommt im 8-Wochen-Rhythmus.` : `In den 2 Wochen nach ${r.name} kein Test – der Körper erholt sich noch, das Ergebnis wäre zu schlecht.`;
+        // Schwimmen: die nächste normale Schwimmeinheit als Vorlage (passt zur Kraul-Lernstufe; „Grundlage 1.500 m“ wäre für Lernende zu viel)
+        const swimLike = s.sport === 'swim' ? D.map(y => ({ y, k: Math.abs(diffD(x.d.date, y.d.date)) })).filter(o => o.k > 0 && o.k <= 10)
+          .flatMap(o => live(o.y.d).filter((z: any) => z.sport === 'swim' && !isTestS(z) && !hardS(z) && z.spec).map((z: any) => ({ z, k: o.k }))).sort((a, b) => a.k - b.k)[0] : null;
+        const nx = swimLike ? { ...JSON.parse(JSON.stringify(swimLike.z)), ruleNote: why } : easyShortOf(s, minOf(s), why, x.w.phase);
+        if (nx) { setS(x.d, s, { ...nx, id: s.id }); fixes.push(`${x.d.date}: ${s.title} → ${nx.title} (${counted ? 'Wettkampf zählt als Test' : 'nach dem Wettkampf kein Test'})`); }
+      }
+    });
   }
   // 2) Tage nach einem Wettkampf: locker und kurz, nichts Langes, nichts Hartes
   for (const r of races) {
@@ -974,17 +1026,21 @@ export function hardBlocked(weeks: any[], date: string, goals: Goal[] = []): boo
 }
 
 /* Auftrag 18, Punkt 6: Warum ist an diesem Tag frei? (für den Regel-Coach und die Plan-Ansicht) */
-export function restDayReason(weeks: any[], date: string, p: Profile | null = null, goals: Goal[] = []): string | null {
+export function restDayReason(weeks: any[], date: string, p: Profile | null = null, goals: Goal[] = [], today: string | null = null): string | null {
   const D = daysOf(weeks); const i = D.findIndex(x => x.d.date === date); if (i < 0 || live(D[i].d).length) return null;
   const pv = at(D, i, -1), nx = at(D, i, 1); const w = D[i].w;
   const title = (y: DayRef | null, f: (s: any) => boolean) => y ? (live(y.d).find(f) || {}).title : null;
+  // Auftrag 39: „gestern/morgen“ von heute aus (vorher vom Ruhetag aus: Frage am Mo nach dem Ruhetag Di → „morgen steht …“ meinte Mi)
+  const ref = today || date;
+  const W = (d: string) => { const k = diffD(ref, d); return k === 0 ? 'heute' : k === -1 ? 'gestern' : k === 1 ? 'morgen' : k === 2 ? 'übermorgen' : `am ${fmt(d)}`; };
+  const was = (d: string) => (d < ref ? 'war' : 'ist');
   const why: string[] = [];
-  for (const r of racesOf(weeks, goals)) { const k = diffD(r.date, date); if (k > 0 && k <= (r.type ? easyAfterDays(r.type) : 3)) why.push(`du erholst dich von ${r.name} (${k === 1 ? 'gestern' : `vor ${k} Tagen`})`); else if (k === -1 || k === -2) why.push(`${k === -1 ? 'morgen' : 'übermorgen'} ist ${r.name}`); }
-  if (pv && eventDay(pv.d)) why.push(`gestern war ${title(pv, (s: any) => s.race || isGame(s)) || 'ein Spiel'}`);
-  else if (pv && bigDay(pv.d).big) why.push(`gestern war ein langer Tag (${Math.round(dayMin(pv.d) / 6) / 10} h${live(pv.d).some(isBrick) ? ' mit Koppellauf' : ''})`.replace('.', ','));
-  else if (pv && hardDay(pv.d)) why.push(`gestern war ${title(pv, hardS)}`);
-  if (nx && eventDay(nx.d)) why.push(`morgen ist ${title(nx, (s: any) => s.race || isGame(s))}`);
-  else if (nx && hardDay(nx.d)) why.push(`morgen steht ${title(nx, hardS)} an`);
+  for (const r of racesOf(weeks, goals)) { const k = diffD(r.date, date); if (k > 0 && k <= (r.type ? easyAfterDays(r.type) : 3)) why.push(`du erholst dich von ${r.name} (${today ? W(r.date) : k === 1 ? 'gestern' : `vor ${k} Tagen`})`); else if (k === -1 || k === -2) why.push(`${W(r.date)} ist ${r.name}`); }
+  if (pv && eventDay(pv.d)) why.push(`${W(pv.d.date)} ${was(pv.d.date)} ${title(pv, (s: any) => s.race || isGame(s)) || 'ein Spiel'}`);
+  else if (pv && bigDay(pv.d).big) why.push(`${W(pv.d.date)} ${was(pv.d.date)} ein langer Tag (${Math.round(dayMin(pv.d) / 6) / 10} h${live(pv.d).some(isBrick) ? ' mit Koppellauf' : ''})`.replace('.', ','));
+  else if (pv && hardDay(pv.d)) why.push(`${W(pv.d.date)} ${was(pv.d.date)} ${title(pv, hardS)}`);
+  if (nx && eventDay(nx.d)) why.push(`${W(nx.d.date)} ist ${title(nx, (s: any) => s.race || isGame(s))}`);
+  else if (nx && hardDay(nx.d)) why.push(`${W(nx.d.date)} steht ${title(nx, hardS)} an`);
   if (w && w.isRecoveryWeek) why.push('es ist Erholungswoche');
   const minor = p ? (ageOf(p, date) ?? 30) < 18 : false;
   const head = `Am ${fmt(date)} ist Ruhetag${why.length ? ': ' + why.slice(0, 3).join(', ') : ''}.`;

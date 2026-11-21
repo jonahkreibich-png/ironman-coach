@@ -3,6 +3,7 @@
 import { STATE, saveState, saveSoon } from '../store';
 import { esc, fmtDate, dowShort, addDays } from '../util';
 import { t, hhmm, num } from '../../../shared/i18n';
+import { checkTestResult } from '../testupdate';
 import { on, onChange, sec, ic, pill, field, more, empty, timeField, readTime, tfInvalid } from '../kit';
 import { D, invalidate, prognosisFor } from '../data';
 import { progCard } from './fortschritt';
@@ -92,7 +93,10 @@ onChange('rr', el => {
   }
   goal.result = r;
   STATE.goals = { ...STATE.goals, [g.id]: goal };
-  saveState(); invalidate(); nav.rerender();
+  saveState(); invalidate();
+  // Auftrag 39: das Ergebnis zählt als Test der Sportart (Zonen aus der Zeit, einmal je Wettkampf)
+  if ((k === 'time' || k === 'split') && checkTestResult()) saveState();
+  nav.rerender();
   if (k === 'time' && r.timeSec) toast(t('race.saved'));
 });
 void num; void on;

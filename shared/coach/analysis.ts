@@ -239,7 +239,10 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   if (srcCk && srcCk.uncertain && ((prof.skills || {}).runContinuousMin ?? 99) >= 45) {
     add({ id: 'test-sources', kind: 'trend', tone: 'info', score: 45, title: 'Lauf-Schwelle unsicher', why: srcCk.text!, tip: srcCk.test! });
     const wk = (d: string) => weeks.find((w: any) => w.days.some((x: any) => x.date === d));
-    const cand = C.planDays(weeks).filter((d: any) => d.date > today && d.date <= C.addDays(today, 21) && !(wk(d.date) || {}).isRecoveryWeek && !['race', 'taper'].includes((wk(d.date) || {}).phase))
+    // Auftrag 39: nicht in die 2 Wochen nach einem Wettkampf
+    const raceDays = C.planDays(weeks).filter((d: any) => d.sessions.some((s: any) => s && s.race && !s.cancelled)).map((d: any) => d.date);
+    const afterRace = (date: string) => raceDays.some((r: string) => date >= r && date <= C.addDays(r, 14));
+    const cand = C.planDays(weeks).filter((d: any) => d.date > today && d.date <= C.addDays(today, 21) && !afterRace(d.date) && !(wk(d.date) || {}).isRecoveryWeek && !['race', 'taper'].includes((wk(d.date) || {}).phase))
       .flatMap((d: any) => d.sessions.filter((s: any) => s.sport === 'run' && !s.cancelled && !s.race && !s.stage && !s.fixed && !s.pinned && (s.plannedMinutes || 0) >= 40 && !(st.sessions || {})[s.id]).map((s: any) => ({ d, s })))
       .sort((a: any, b: any) => (C.isHard(b.s) ? 1 : 0) - (C.isHard(a.s) ? 1 : 0) || a.d.date.localeCompare(b.d.date))[0];
     if (cand) {

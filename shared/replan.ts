@@ -224,7 +224,7 @@ export function planUpkeep(baseWeeks: any[], state: any, profile: Profile, goals
     if (b.date !== a.date) out.push({ id: `${group}-${id}-move`, group, type: 'move', sessionId: id, from: a.date, to: b.date, what: `${a.s.title}: ${dm(a.date)} → ${dm(b.date)}`, reason });
     const sa = strip(a.s), sb = strip(b.s); const set: any = {};
     for (const k of UPKEEP_FIELDS) if (JSON.stringify(sa[k]) !== JSON.stringify(sb[k])) set[k] = sb[k];
-    if (Object.keys(set).length) out.push({ id: `${group}-${id}-modify`, group, type: 'modify', sessionId: id, set, what: a.s.plannedMinutes !== b.s.plannedMinutes ? `${a.s.title} (${dm(b.date)}): ${a.s.plannedMinutes} → ${b.s.plannedMinutes} min` : `${a.s.title} (${dm(b.date)}) → ${b.s.title}`, reason });
+    if (Object.keys(set).length) out.push({ id: `${group}-${id}-modify`, group, type: 'modify', sessionId: id, set, what: a.s.plannedMinutes !== b.s.plannedMinutes && a.s.title === b.s.title ? `${a.s.title} (${dm(b.date)}): ${a.s.plannedMinutes} → ${b.s.plannedMinutes} min` : `${a.s.title} (${dm(b.date)}) → ${b.s.title}`, reason });
   }
   for (const [id, b] of B) if (!A.has(id) && b.date >= from) { const { _adj, _orig, ...sess } = b.s; out.push({ id: `${group}-${id}-add`, group, type: 'add', to: b.date, session: sess, what: `${b.s.title} (${dm(b.date)}) dazu`, reason: reasonOf(id) }); }
   if (!out.length) return { ...none, before: issues0.length, after: issues0.length, gaps };

@@ -485,6 +485,17 @@ function generatePlanIn(inp: GenInput): GenResult {
     keyWeeks: ks - Math.floor(ks / 4), strideWeeks: weeksSince(strideSlot && strideSlot.stridesFrom), brickWeeks: weeksSince(brickSlot && brickSlot.from),
     lastTestMon: pat ? ((pat.targets || []).filter(t => (t.tests || []).length && t.start < start).map(t => t.start).sort().pop() || (pat.lastTest && pat.lastTest < start ? mondayOf(pat.lastTest) : null)) : null,
     runRef: cont && cont.lastNormalWeek ? weekMinutes(cont.lastNormalWeek, 'run') || null : null };
+  // Auftrag 39: Testrhythmus je Sportart. Ein A/B-Wettkampf zählt als Test seiner Sportarten (vergangene nur mit Ergebnis);
+  // C-Wettkämpfe laufen „zügig, nicht am Limit“ und zählen nicht. In den 2 Wochen nach jedem Wettkampf kein Test.
+  const raceSportsOf = (g: Goal): WP.TestSport[] => g.priority === 'C' ? [] : legsOf(g).map(l => l.sport).filter((x): x is WP.TestSport => x === 'swim' || x === 'bike' || x === 'run');
+  const pastRaces = (inp.goals || []).filter(g => g && g.date && g.date < start && GOALS[g.type] && g.type !== 'fitness' && !goals.some(x => x.id === g.id));
+  const allRaces = [...goals, ...pastRaces].filter(g => g.date && g.type !== 'fitness');
+  const afterRaceDays = (ds: string[]) => ds.some(d => allRaces.some(g => d >= g.date! && daysBetween(g.date!, d) <= 14));
+  if (pat) {
+    const by: Partial<Record<WP.TestSport, string>> = pst.lastTestMon ? { swim: pst.lastTestMon, bike: pst.lastTestMon, run: pst.lastTestMon } : {};
+    for (const g of pastRaces) if (g.result && (g.result.timeSec || Object.keys(g.result.splits || {}).length)) for (const sp of raceSportsOf(g)) { const m = mondayOf(g.date!); if (!by[sp] || by[sp]! < m) by[sp] = m; }
+    pst.lastTestBy = by;
+  }
   // Auftrag 30: Rumpf (core) belastet die Beine nicht – vorher galt alles außer Oberkörper als Beinkraft und fiel vor Spieltagen weg
   const legsStrength = (x: Cand) => !!x.strength && x.s.area !== 'upper' && x.s.area !== 'core' && !(x.s.spec && (x.s.spec.area === 'upper' || x.s.spec.area === 'core'));
   let blockNo = cont ? cont.blockNo + (cont.builtSinceRecovery ? 0 : 1) : 1, blockWeek = cont && cont.builtSinceRecovery ? cont.builtSinceRecovery : 0;
@@ -562,10 +573,13 @@ function generatePlanIn(inp: GenInput): GenResult {
       if (!tg && inp.needTests && wi >= tw && wi <= tw + 1) { if (wi === tw && inp.needTests.run) tests.add('run'); if (wi === tw && inp.needTests.swim) tests.add('swim'); if (wi === tw + 1 && inp.needTests.bike) tests.add('bike'); }
       // Auftrag 17: aufgeschobene Tests aus der Vorwoche; in der Erholungswoche höchstens ein harter Test (Rad oder Lauf), nie in den lockeren
       // Tagen nach einem Wettkampf und nie in der Wettkampfwoche oder im Tapering – der Rest kommt in die nächste passende Woche
-      const carriedIn = new Set(pst.carryTests || []); const scheduled = tests.size > 0;
+      const carriedIn = new Set(pst.carryTests || []); const scheduled = tests.size > 0; const dueNow = new Set(tests);
       (pst.carryTests || []).forEach(t => tests.add(t as WP.TestSport));
       const carry: WP.TestSport[] = [];
-      const afterRace = dates.some(d => goals.some(g => g.date && g.type !== 'fitness' && g.priority !== 'C' && d > g.date && daysBetween(g.date, d) <= 7));
+      // Auftrag 39: Wettkampf dieser Woche = Test seiner Sportarten; 2 Wochen danach kein Test (vorher 7 Tage und nur A/B)
+      const raceSp = new Set<WP.TestSport>(); goals.filter(g => g.date && dates.includes(g.date) && g.type !== 'fitness').forEach(g => raceSportsOf(g).forEach(sp => raceSp.add(sp)));
+      raceSp.forEach(sp => tests.delete(sp));
+      const afterRace = dates.some(d => allRaces.some(g => d > g.date! && daysBetween(g.date!, d) <= 14));
       if (afterRace || ph.phase === 'race' || ph.phase === 'taper') { tests.forEach(t => carry.push(t)); tests.clear(); }
       else if (ph.recovery || entryWeek[wi]) { const hardT = (['bike', 'run'] as WP.TestSport[]).filter(t => tests.has(t)); hardT.slice(1).forEach(t => { tests.delete(t); carry.push(t); }); }
       const cOut = bikeChoice(profile, false, month, eff), cIn = bikeChoice(profile, true, month, eff);
@@ -596,9 +610,17 @@ function generatePlanIn(inp: GenInput): GenResult {
         put(sl.i, { s: it.s, long: it.long, hard: it.hard, test: it.test, strength: it.strength, prio: 1 });
       }
       // nachgeholte Tests verschieben den Testrhythmus nicht (alle 8 Wochen ab dem geplanten Termin)
-      const lastTestMon0 = pst.lastTestMon;
-      pst = { ...WP.advance(pst, items, ph.recovery || entryWeek[wi] || ph.phase === 'taper' || ph.phase === 'race', mon, tests), carryTests: carry };
+      const lastTestMon0 = pst.lastTestMon, lastBy0 = pst.lastTestBy;
+      pst = { ...WP.advance(pst, items, ph.recovery || entryWeek[wi] || ph.phase === 'taper' || ph.phase === 'race', mon, tests, raceSp), carryTests: carry };
       if (!scheduled && carriedIn.size) pst.lastTestMon = lastTestMon0;
+      // Auftrag 39: Rhythmus je Sportart ab dem GEPLANTEN Termin – ein verschobener Test zählt dort, wo er fällig war (vorher kam 2 Wochen
+      // nach einem nachgeholten Test schon der nächste, z. B. Schwimm-/Radtest am 23./24.2. und wieder am 9./10.3.)
+      if (lastBy0 && pst.lastTestBy) {
+        const by = { ...pst.lastTestBy };
+        carriedIn.forEach(sp => { if (!raceSp.has(sp as WP.TestSport) && !dueNow.has(sp as WP.TestSport)) by[sp as WP.TestSport] = lastBy0[sp as WP.TestSport]; });
+        dueNow.forEach(sp => { by[sp] = mon; });
+        pst.lastTestBy = by;
+      }
       const T: Record<string, string> = { swim: 'Schwimmen (Kraul-Check)', bike: 'Rad', run: 'Lauf' };
       const testDays = items.filter(x => x.test).map(x => `${T[x.s.sport] || x.s.title} ${DOW[x.dow]}`);
       patImportant = [
@@ -747,7 +769,7 @@ function generatePlanIn(inp: GenInput): GenResult {
       }
     }
     // Einstiegstests in den ersten 2 Wochen (nur, wenn das Können passt)
-    if (wi >= tw && wi <= tw + 1 && inp.needTests) {
+    if (wi >= tw && wi <= tw + 1 && inp.needTests && !afterRaceDays(dates)) {
       const ctx = pc(false, null);
       const swap = (sport: string, spec: W.Spec) => { const i = cands.findIndex(c => c.s.sport === sport && c.hard) ; const j = i >= 0 ? i : cands.findIndex(c => c.s.sport === sport && !c.long); const soft = /Kraul-Check/.test(spec.title || ''); const b = W.build(spec); if (soft) delete b.hard; const c: Cand = { s: b, hard: !soft, prio: 0.8, test: true }; if (j >= 0) cands[j] = c; else cands.push(c); };
       // Lauftest (30 min hart + Ein-/Auslaufen) erst, wer mindestens 45 min am Stück läuft (Auftrag 15)

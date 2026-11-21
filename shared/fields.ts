@@ -6,6 +6,8 @@
 import * as C from './core';
 import { kindOf, mainKind, BIKE_KIND_LABEL } from './bikespeed';
 import { mainPart } from './sections';
+import { GOALS, legsOf } from './goals';
+import { vdot, timeForVdot } from './vdot';
 
 export type FieldKind = 'num' | 'pace' | 'text' | 'select' | 'splits' | 'exercises';
 export interface FieldDef { key: string; label: string; unit?: string; kind: FieldKind; options?: [string, string][]; ph?: string; more?: boolean; /** nur bei Tests */ test?: boolean }
@@ -250,7 +252,7 @@ export function migrateNotes(state: any, weeks: any[]): number {
    - Schwimmen (Kraul-Check): längste Strecke Kraul am Stück (Können und Lernstufe), Ø Zeit pro 25 m Kraul, Brust-Tempo aus 200 m Brust.
      CSS-Test: Schwimm-Schwelle = (Zeit 400 m − Zeit 200 m) / 2 pro 100 m. */
 export type TestSportKey = 'run' | 'bike' | 'swim';
-export interface TestUpdate { sport: TestSportKey; sessionId: string; date: string; thresholds: Record<string, any>; skills?: Record<string, any>; settings?: Record<string, any>; text: string; title: string;
+export interface TestUpdate { /** Auftrag 39: Herkunft (Name des Wettkampfs), sonst Lauftest/Radtest/Schwimmtest */ label?: string; sport: TestSportKey; sessionId: string; date: string; thresholds: Record<string, any>; skills?: Record<string, any>; settings?: Record<string, any>; text: string; title: string;
   /** Lauf (wie bisher) */ lthrRun?: number; thresholdPaceRunSec?: number | null; aetHr?: [number, number] | null }
 const secOf = (v: any): number | null => { const m = /^(\d+)[:.,](\d{1,2})$/.exec(String(v == null ? '' : v).trim()); return m ? +m[1] * 60 + +m[2] : null; };
 export function runTestUpdate(state: any, weeks: any[], profile: any, today: string): TestUpdate | null {
@@ -321,10 +323,70 @@ export function runTestUpdate(state: any, weeks: any[], profile: any, today: str
         text: `Aus deinem ${s.title} (${when(d.date)}): ${parts.join(', ')}. Schwimm-Score und Technik-Stufe richten sich danach.` };
     }
   }
+  return raceTestUpdate(state, weeks, profile, today);
+}
+
+/* Auftrag 39: Ein A/B-Wettkampf mit Ergebnis zählt als Test seiner Sportart und aktualisiert die Zonen (einmal je Wettkampf, Kennung race:<Ziel>).
+   Laufen (reines Laufrennen): Schwellen-Pace über VDOT (Tempo, das man etwa 60 min hält), Schwellenpuls aus dem Ø Puls des Rennens
+   (5 km ÷ 1,03, 10 km ÷ 1,01, Halbmarathon ÷ 0,98, Marathon ÷ 0,93). Schwimmen (Schwimm-Wettkampf bzw. Teilzeit im Becken, 400-1900 m):
+   CSS ≈ Renn-Tempo je 100 m. Rad (Rad-Event mit Wattmessung): FTP aus Ø Watt nach Dauer. Freiwasser und Triathlon-Rad/-Lauf (ermüdet, Wind,
+   Neopren) ändern keine Zonen – der Wettkampf zählt trotzdem als Test im Plan-Rhythmus. C-Wettkämpfe (nicht am Limit) zählen nicht. */
+export function thresholdPaceFromRace(km: number, sec: number): number | null {
+  if (!(km > 0) || !(sec > 0)) return null;
+  const v = vdot(km * 1000, sec / 60); if (!Number.isFinite(v) || v < 20 || v > 90) return null;
+  let lo = 3000, hi = 30000;
+  for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (timeForVdot(mid, v) < 60) lo = mid; else hi = mid; }
+  return Math.round(3600 / ((lo + hi) / 2) * 1000);
+}
+const RACE_HR: Record<string, number> = { run_5k: 1.03, run_10k: 1.01, run_half: 0.98, run_marathon: 0.93 };
+const fmtH = (sec: number) => { const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = Math.round(sec % 60); return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} h` : `${m}:${String(s).padStart(2, '0')} min`; };
+export function raceTestUpdate(state: any, weeks: any[], profile: any, today: string): TestUpdate | null {
+  const th = profile.thresholds || {}; const applied: string[] = profile.appliedTests || [];
+  const when = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}.`;
+  const goals = (Object.values(state.goals || {}) as any[])
+    .filter(g => g && g.date && g.date <= today && g.date >= C.addDays(today, -21) && g.priority !== 'C' && g.result && (GOALS as any)[g.type] && g.type !== 'fitness')
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  for (const g of goals) {
+    const key = 'race:' + g.id; if (applied.includes(key)) continue;
+    const def = (GOALS as any)[g.type]; const legs = legsOf(g); const res = g.result || {};
+    // Einheit des Wettkampfs im Plan (Puls bzw. Watt von der Uhr)
+    const rs = C.planDays(weeks).filter((d: any) => d.date === g.date).flatMap((d: any) => d.sessions).find((s: any) => s && s.race && (!s.goalId || s.goalId === g.id));
+    const st = rs ? (state.sessions || {})[rs.id] : null; const act = st && st.activityId ? (state.activities || {})[st.activityId] : null;
+    const avgHr = num(st && st.metrics && st.metrics.hr) || (act && act.avgHr) || null;
+    const name = g.name || 'Wettkampf';
+    if (def.group === 'run' && res.timeSec && legs.length === 1) {
+      const pace = thresholdPaceFromRace(legs[0].km, res.timeSec);
+      const okPace = pace != null && (!th.thresholdPaceRunSec || (pace >= th.thresholdPaceRunSec * 0.75 && pace <= th.thresholdPaceRunSec * 1.25));
+      const hr0 = avgHr && RACE_HR[g.type] ? Math.round(avgHr / RACE_HR[g.type]) : null;
+      const hr = hr0 && (!th.lthrRun || (hr0 >= th.lthrRun * 0.85 && hr0 <= th.lthrRun * 1.1)) ? hr0 : null;
+      if (!okPace && !hr) continue;
+      const t: Record<string, any> = { ...(okPace ? { thresholdPaceRunSec: pace } : {}), ...(hr ? { lthrRun: hr } : {}) };
+      const parts = [okPace ? `Schwellen-Pace ${th.thresholdPaceRunSec ? mmss(th.thresholdPaceRunSec) : '–'} → ${mmss(pace!)}/km` : '', hr ? `Schwellenpuls ${th.lthrRun || '–'} → ${hr}` : ''].filter(Boolean);
+      return { label: name, sport: 'run', sessionId: key, date: g.date, title: 'Zonen aus dem Wettkampf', thresholdPaceRunSec: okPace ? pace : null, ...(hr ? { lthrRun: hr } : {}), thresholds: t, settings: t,
+        text: `Dein ${name} (${when(g.date)}, ${fmtH(res.timeSec)}) zählt als Lauftest: ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit; der nächste Lauftest kommt im 8-Wochen-Rhythmus. Ändern kannst du die Werte unter Mehr → Zonen und Tests.` };
+    }
+    const swimLeg = legs.find(l => l.sport === 'swim');
+    const swimSec = def.group === 'tri' ? num(res.splits && res.splits.swim) : swimLeg && legs.length === 1 ? num(res.timeSec) : null;
+    const venue = g.course && g.course.swimVenue;
+    if (swimLeg && swimSec && swimLeg.km >= 0.4 && swimLeg.km <= 1.9 && venue !== 'open' && (venue === 'pool' || def.group !== 'tri')) {
+      const css = Math.round(swimSec / (swimLeg.km * 10));
+      if (css >= 60 && css <= 240 && (!th.cssSec || (css >= th.cssSec * 0.8 && css <= th.cssSec * 1.25)))
+        return { label: name, sport: 'swim', sessionId: key, date: g.date, title: 'Schwimm-Schwelle aus dem Wettkampf', thresholds: { cssSec: css },
+          text: `Dein ${name} (${when(g.date)}) zählt als Schwimmtest: Schwimm-Schwelle (CSS) ${th.cssSec ? mmss(th.cssSec) : '–'} → ${mmss(css)}/100 m. Die Schwimm-Einheiten rechnen ab jetzt damit.` };
+    }
+    if (g.type === 'bike_event' && res.timeSec && profile.powerMeter) {
+      const w = num(st && st.metrics && (st.metrics.np || st.metrics.power)) || (act && (act.np || act.avgPower)) || null; const h = res.timeSec / 3600;
+      const f = h <= 1.1 ? 0.95 : h <= 2.5 ? 0.88 : h <= 5 ? 0.8 : 0.72;
+      const ftp = w && w > 50 ? Math.round(w / f) : null;
+      if (ftp && ftp >= 50 && ftp <= 600 && (!th.ftp || (ftp >= th.ftp * 0.8 && ftp <= th.ftp * 1.2)))
+        return { label: name, sport: 'bike', sessionId: key, date: g.date, title: 'Rad-Zonen aus dem Wettkampf', thresholds: { ftp },
+          text: `Dein ${name} (${when(g.date)}) zählt als Radtest: FTP ${th.ftp || '–'} → ${ftp} W (Ø ${Math.round(w!)} W über ${fmtH(res.timeSec)}). Die Rad-Einheiten rechnen ab jetzt damit.` };
+    }
+  }
   return null;
 }
 export function applyTestUpdate(profile: any, u: TestUpdate): any {
-  const label = { run: 'Lauftest', bike: 'Radtest', swim: 'Schwimmtest' }[u.sport || 'run'];
+  const label = u.label || { run: 'Lauftest', bike: 'Radtest', swim: 'Schwimmtest' }[u.sport || 'run'];
   const th = { ...profile.thresholds, ...(u.thresholds || {}), ...(u.sport === 'swim' ? {} : { source: `${label} ${u.date.slice(8)}.${u.date.slice(5, 7)}.` }) };
   const done = Object.keys(u.thresholds || {});
   th.estimated = (th.estimated || []).filter((k: string) => !done.includes(k));

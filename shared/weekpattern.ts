@@ -38,6 +38,7 @@ export interface PatternState { longRun: number; longBike: number; swim: number;
   keyN?: Record<string, number>; runQN?: Record<string, number>; weekN?: number; blockWeek?: number;
   /** Auftrag 17: Wochen seit dem letzten Koppellauf (Koppel nur jede 2.-3. Woche) */ sinceBrick?: number;
   /** Auftrag 17: Tests, die in die nächste passende Woche verschoben wurden */ carryTests?: string[];
+  /** Auftrag 39: Montag des letzten Tests je Sportart – ein A/B-Wettkampf zählt als Test seiner Sportarten (vorher ein Datum für alle) */ lastTestBy?: Partial<Record<TestSport, string>>;
   /** Auftrag 19: Schwimm-Qualität je Phase; Wochen seit dem letzten Tempo im langen Lauf */ swimQN?: Record<string, number>; longQAgo?: number | null }
 export interface PatternWeekIn {
   mon: string; dates: string[]; recovery: boolean; entry: boolean;
@@ -71,9 +72,16 @@ export function testsFor(p: WeekPattern, mon: string, recovery: boolean, st: Pat
   const t = targetFor(p, mon);
   if (t) return new Set(t.tests || []);
   const every = p.testEveryWeeks || 0;
-  if (!every || !recovery || !st.lastTestMon) return new Set();
-  const weeks = Math.round((+new Date(mon + 'T12:00:00Z') - +new Date(st.lastTestMon + 'T12:00:00Z')) / 86400000 / 7);
-  return weeks >= every ? new Set<TestSport>(['swim', 'bike', 'run']) : new Set();
+  if (!every || !recovery) return new Set();
+  // Auftrag 39: Rhythmus je Sportart (ein Wettkampf setzt ihn für seine Sportarten neu)
+  const out = new Set<TestSport>();
+  for (const sp of ['swim', 'bike', 'run'] as TestSport[]) {
+    const last = st.lastTestBy && st.lastTestBy[sp] !== undefined ? st.lastTestBy[sp] : st.lastTestMon;
+    if (!last) continue;
+    const weeks = Math.round((+new Date(mon + 'T12:00:00Z') - +new Date(last + 'T12:00:00Z')) / 86400000 / 7);
+    if (weeks >= every) out.add(sp);
+  }
+  return out;
 }
 
 export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState): PatternItem[] {
@@ -311,7 +319,7 @@ export function patternWeek(p: WeekPattern, inp: PatternWeekIn, st: PatternState
 }
 
 /* Nach der Woche: lange Einheiten, Leiter und Tests für die nächste Woche merken */
-export function advance(st: PatternState, items: PatternItem[], recovery: boolean, mon: string, tests: Set<TestSport>): PatternState {
+export function advance(st: PatternState, items: PatternItem[], recovery: boolean, mon: string, tests: Set<TestSport>, raceSports: Iterable<TestSport> = []): PatternState {
   // recovery: auch Wiedereinstieg (die Woche ist kein Bezug für die Steigerung)
   const n = { ...st };
   const lr = items.find(x => x.long && x.s.sport === 'run'), lb = items.find(x => x.long && x.s.sport === 'bike');
@@ -332,6 +340,9 @@ export function advance(st: PatternState, items: PatternItem[], recovery: boolea
     if (!tests.has('run')) n.runRef = items.filter(x => x.s.sport === 'run').reduce((a, x) => a + (x.s.plannedMinutes || 0), 0) || n.runRef;
   }
   if (tests.size) n.lastTestMon = mon;
+  // Auftrag 39: Test bzw. A/B-Wettkampf dieser Woche setzt den Rhythmus je Sportart
+  const done = [...tests, ...raceSports];
+  if (done.length && n.lastTestBy) { const by = { ...n.lastTestBy }; done.forEach(sp => { by[sp] = mon; }); n.lastTestBy = by; }
   // Auftrag 19: Schwimm-Qualität je Phase (Leiter) und Wochen seit dem letzten Tempo im langen Lauf (nie zwei Wochen hintereinander)
   if (!recovery && items.some(x => x.s.sport === 'swim' && x.s.spec && x.s.spec.lib && LIB[x.s.spec.lib.key] && LIB[x.s.spec.lib.key].quality)) n.swimQN = { ...(n.swimQN || {}), [phaseOf(items)]: ((n.swimQN || {})[phaseOf(items)] || 0) + 1 };
   n.longQAgo = items.some(x => x.s.sport === 'run' && x.s.spec && x.s.spec.kind === 'longq') ? 0 : n.longQAgo == null ? null as any : n.longQAgo + 1;

@@ -47,7 +47,7 @@ import { APP, FEATURES, STORAGE } from './config';
 import { isSyncOn, loadAiState, loadMe, entitled, onSynced, me, aiState, retrySync, ensurePush, onPushChange } from './sync';
 /* Auftrag 29: „Erneut versuchen“ in der Abgleich-Meldung */
 on('sync-retry', () => { void retrySync().then(ok => toast(ok ? 'Alles gesichert.' : 'Noch nicht gesichert – ich versuche es automatisch weiter. Deine Einträge bleiben auf dem Gerät.')); });
-import { checkSwimSkill } from './testupdate';
+import { checkSwimSkill, checkTestResult } from './testupdate';
 
 initErrorLog();
 const storageBanner = document.createElement('div');
@@ -382,9 +382,11 @@ try { const th = localStorage.getItem(STORAGE.theme); if (th) applyTheme(th); } 
     autoReady = true;
     let changed = cal();
     try { if (HAS_PLAN && checkSwimSkill()) { saveState(); changed = true; } } catch (e) { /* nie den Start verhindern */ }
+    // Auftrag 39: Wettkampf-Ergebnis (auch beim Ziel eingetragen) zählt als Test der Sportart
+    try { if (HAS_PLAN && checkTestResult()) { saveState(); changed = true; } } catch (e) { /* nie den Start verhindern */ }
     if (changed) nav.refresh();
   });
-  else if (cal()) rerender(); }
+  else { let ch = cal(); try { if (HAS_PLAN && checkTestResult()) { saveState(); ch = true; } } catch (e) { /* nie den Start verhindern */ } if (ch) rerender(); } }
 // Auftrag 15: nur gewählte Sportarten, gleiche Sportart nicht an zwei Tagen hintereinander. Mit Sync erst nach dem ersten Abgleich
 // (sonst könnte ein alter Stand auf diesem Gerät den neueren Plan vom Server überschreiben).
 { let ran = false; const check = () => { if (ran) return; ran = true; try { if (HAS_PLAN && planRulesOnStart()) nav.refresh(); } catch (e) { /* nie den Start verhindern */ } };
