@@ -68,6 +68,7 @@ const weeksOf = (ctx: EngineCtx) => C.applyAdjustments(ctx.baseWeeks, ctx.state.
 const dayOf = (ctx: EngineCtx, date: string) => C.planDays(weeksOf(ctx)).find((d: any) => d.date === date) || null;
 const live = (d: any) => d ? d.sessions.filter((s: any) => s.sport !== 'rest' && !s.cancelled && !s.removed) : [];
 const sessLine = (s: any) => `${s.title}${s.plannedMinutes && !/\d+ min/.test(s.title) ? ` (${s.plannedMinutes} min)` : ''}`;
+const EST_NAME: Record<string, string> = { lthrRun: 'Schwellenpuls Laufen', thresholdPaceRunSec: 'Schwellen-Pace Laufen', lthrBike: 'Schwellenpuls Rad', thresholdSpeedBikeKmh: 'Schwellen-Tempo Rad', ftp: 'FTP', cssSec: 'Schwimm-Schwelle (CSS)', maxHr: 'max. Puls' };
 const fmtD = (d: string) => `${dowName(d)} ${d.slice(8)}.${d.slice(5, 7)}.`;
 const gid = () => 'chat-' + Date.now();
 
@@ -94,6 +95,20 @@ interface Intent { id: string; when: (toks: string[], raw: string) => boolean; a
 const A = (...g: string[][]) => (toks: string[]) => g.every(words => has(toks, words));
 
 export const INTENTS: Intent[] = [
+  // Auftrag 39: „Wie viele Stunden trainiere ich diese Woche?“ – vorher antwortete der Coach mit dem heutigen Tag bzw. dem Ruhetag
+  { id: 'week-hours', when: t => has(t, ['stunden', 'minuten', 'umfang', 'trainingszeit']) && has(t, ['woche', 'wochen']) && !has(t, ['letzte', 'letzten', 'vergangene', 'vergangenen', 'vorige']),
+    answer: (ctx, t) => {
+      const next = has(t, ['naechste', 'naechsten', 'kommende', 'kommenden']);
+      const [mon] = C.weekRange(next ? C.addDays(ctx.today, 7) : ctx.today); const sun = C.addDays(mon, 6);
+      const ses = C.planDays(weeksOf(ctx)).filter((d: any) => d.date >= mon && d.date <= sun).flatMap((d: any) => live(d).map((s: any) => ({ s, d: d.date })));
+      const planned = ses.reduce((a: number, x: any) => a + (x.s.plannedMinutes || 0), 0);
+      const stOf = (x: any) => ((ctx.state.sessions || {})[x.s.id] || {});
+      const done = ses.filter((x: any) => stOf(x).completed);
+      const doneMin = done.reduce((a: number, x: any) => { const m = parseFloat(String((stOf(x).metrics || {}).min ?? '').replace(',', '.')); return a + (Number.isFinite(m) && m > 0 ? m : x.s.plannedMinutes || 0); }, 0);
+      const team = ses.filter((x: any) => x.s.sport === 'football').length;
+      const head = `${next ? 'Nächste Woche' : 'Diese Woche'} (${fmtD(mon)} bis ${fmtD(sun)}): ${de(planned / 60, 1)} h geplant in ${ses.length} Einheit${ses.length === 1 ? '' : 'en'}${team ? ` (davon ${team}× Teamsport)` : ''}.`;
+      return next || !ses.length ? head : `${head} Erledigt: ${done.length} Einheit${done.length === 1 ? '' : 'en'} mit ${de(doneMin / 60, 1)} h${done.length ? ' (ohne eingetragene Dauer zählt die geplante)' : ''}, offen ${ses.length - done.length}.`;
+    } },
   // Auftrag 18: „Warum habe ich heute frei?“ – Grund aus dem Plan (Spiel, langer Tag, Wettkampf, Erholungswoche) und die Ruhetag-Regel
   { id: 'why-rest', when: t => has(t, ['warum', 'wieso', 'weshalb']) && has(t, ['frei', 'ruhetag', 'kein training', 'nichts geplant', 'pause', 'nichts']),
     answer: (ctx, _t, r0) => { const t0 = ctx.today; const d = /morgen/.test(String(r0 || '')) ? C.addDays(t0, 1) : t0;
@@ -192,7 +207,20 @@ export const INTENTS: Intent[] = [
   { id: 'swim-learn', when: t => has(t, ['kraulen', 'kraul']) && has(t, ['lernen', 'kann nicht', 'wie', 'atmen', 'atmung']),
     answer: () => 'Kraul lernst du in Stufen: Wassergewöhnung und Ausatmen ins Wasser, Beinschlag mit Brett, Technikübungen, dann kurze Strecken mit Pause und immer längere Stücke. Der Plan steigert erst, wenn die Stufe klappt. Ein Kurs oder eine Stunde mit Trainer hilft enorm.' },
   { id: 'test', when: t => has(t, ['test', 'schwellentest', 'ftp', 'css']) && !has(t, ['nachricht']),
-    answer: ctx => { const est = ctx.profile.thresholds.estimated || []; return est.length ? `Diese Werte sind noch geschätzt: ${est.length}. Tests: 30 min Laufen so schnell wie gleichmäßig möglich, 20 min Rad volle Leistung, 400 m und 200 m Kraul schnell. Danach trägst du die Werte unter Einstellungen → Zonen ein.` : 'Deine Zonen beruhen schon auf eigenen Werten. Ein neuer Test lohnt sich etwa alle 6-8 Wochen.'; } },
+    // Auftrag 39: nächster Test mit Datum aus dem Plan; geschätzte Werte mit Namen (vorher „Diese Werte sind noch geschätzt: 5.“)
+    answer: ctx => {
+      const next = C.planDays(weeksOf(ctx)).filter((d: any) => d.date >= ctx.today).flatMap((d: any) => live(d).filter((x: any) => !x.race && /test|Kraul-Check/i.test(x.title || '')).map((x: any) => ({ x, d: d.date })));
+      const first = next.slice(0, 3);
+      const when = first.length ? `Nächster Test: ${joinDe(first.map(n => `${n.x.title} am ${fmtD(n.d)}`))}.` : 'Im Plan steht gerade kein Test.';
+      // nur Werte und Tests der gewählten Sportarten (vorher bekam eine reine Radfahrerin Lauf- und Schwimmtests genannt)
+      const sp: string[] = ctx.profile.sports || [];
+      const SP_OF: Record<string, string> = { lthrRun: 'run', thresholdPaceRunSec: 'run', lthrBike: 'bike', thresholdSpeedBikeKmh: 'bike', ftp: 'bike', cssSec: 'swim' };
+      const keys = ((ctx.profile.thresholds.estimated || []) as string[]).filter(k => !SP_OF[k] || sp.includes(SP_OF[k]));
+      const est = [...new Set(keys.map(k => EST_NAME[k]).filter(Boolean))];
+      const how = [sp.includes('run') ? '30 min Laufen so schnell wie gleichmäßig möglich' : '', sp.includes('bike') ? '20 min Rad volle Leistung' : '', sp.includes('swim') ? '400 m und 200 m Kraul schnell' : ''].filter(Boolean);
+      return est.length ? `${when} Noch geschätzt: ${joinDe(est)}.${how.length ? ` So geht der Test: ${joinDe(how)}.` : ''} Die App übernimmt die Werte automatisch; ändern kannst du sie unter Mehr → Zonen und Tests.`
+        : `${when} Deine Zonen beruhen schon auf eigenen Werten. Ein neuer Test lohnt sich etwa alle 8 Wochen; ein A- oder B-Wettkampf zählt als Test seiner Sportart.`;
+    } },
   { id: 'recovery-week', when: t => has(t, ['erholungswoche', 'ruhewoche', 'entlastungswoche']),
     answer: ctx => { const w = weeksOf(ctx).find((x: any) => x.isRecoveryWeek && x.endDate >= ctx.today); return w ? `Die nächste Erholungswoche beginnt am ${w.startDate.split('-').reverse().join('.')}.` : 'In den geplanten Wochen kommt keine Erholungswoche mehr, vor dem Wettkampf wird ohnehin reduziert.'; } },
   { id: 'too-hard', when: t => has(t, ['zu viel', 'zu hart', 'zu anstrengend', 'ueberfordert', 'zu schwer', 'schaffe das nicht']),

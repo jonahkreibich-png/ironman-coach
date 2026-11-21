@@ -14,7 +14,7 @@ const PICK = ['n02-fitness', 'n06-fitness', 'n08-fitness', 'n16-fitness', 'n20-r
   'n31-bike-event', 'n32-swim-goal', 'n37-tri-supersprint', 'n49-tri-long', 'n51-swim-goal', 'n53-fitness', 'n57-mama', 'n58-laeufer-6x', 'n60-team-tri'];
 const USERS = manyUsers().filter(u => PICK.includes(u.id));
 const SUBS = ['profil', 'werte', 'verbindungen', 'konto', 'daten', 'zonen', 'ausruestung', 'coachset', 'mitteilungen', 'beruecksichtigungen', 'einstellungen', 'essen', 'lexikon', 'vorlagen', 'strength'];
-const BAD = /\bNaN\b|\bundefined\b|\bnull\b|\bInfinity\b|\[object |\{\{|(?<![\w-])-\d+ (?:min|km|m)\b|\bvon 0 (?:min|km)\b/;
+const BAD = /\bNaN\b|\bundefined\b|\bnull\b|\bInfinity\b|\[object |\{\{|(?<![\w-])-\d+ (?:min|km|m)\b|\bvon 0 (?:min|km)\b|\d,0 (?:min|Minuten)\b/;
 
 async function problems(page: Page): Promise<string[]> {
   return page.evaluate(() => {

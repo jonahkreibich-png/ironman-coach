@@ -227,6 +227,8 @@ Soll ich das so ändern?`, ops, yes: 'Ja, so machen' };
 export function explainWanted(toks: string[], raw: string): boolean {
   const j = toks.join(' ');
   if (/\b(verschieb|verlege|tausch|streich|absag|krank|schmerz|urlaub)/.test(j)) return false;
+  // Auftrag 39: „Wie viele Stunden … diese Woche?“ ist eine Wochenfrage, keine Tageserklärung (vorher Antwort zum heutigen Tag)
+  if (/\bwochen?\b/.test(j) && /\b(stunden|minuten|umfang|trainingszeit)\b/.test(j)) return false;
   return /\b(was genau|wie genau|genau machen|ablauf|laeuft .* ab|wie soll ich|wie mache ich|was soll ich|was mache ich|was muss ich|erklaer|struktur|wie viele|welche uebungen|wie viel(e)? (meter|bahnen|minuten)|wie trainiere ich|wie geht)\b/.test(j)
     || (/\bnur \d+ ?(min|minuten)\b/.test(j) && /\b(was|machen|soll)\b/.test(j))
     || /\b(einheit|training|schwimmen|lauf|laufen|rad|kraft)\b.*\b(heute|morgen|uebermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b.*\b(genau|ablauf)\b/.test(j);

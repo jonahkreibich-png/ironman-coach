@@ -86,7 +86,7 @@ export function lastDecision(ctx: EngineCtx): any | null {
 const NOT_TRAINING_Q = /\b(essen|esse|isst|trinken|trinke|ernaehr\w*|fruehstueck\w*|snack\w*|schlaf\w*|atme\w*|atmung|witz\w*|wetter|regen)\b/;
 const TRAIN_WORD = /\b(machen|mache|tun|trainier\w*|training|sport|einheit|bewegen|bewegung|aktiv|radeln|rad\w*|laufen|joggen|schwimmen)\b/;
 /** Was will die Person? null = keine Tagesentscheidung (andere Absicht: verschieben, Bewertung, Wissen …) */
-export function askKind(ctx: EngineCtx, text: string): { kind: AskKind; sport: string | null; cancelled: boolean } | null {
+export function askKind(ctx: EngineCtx, text: string): { kind: AskKind; sport: string | null; cancelled: boolean; yesNo?: boolean } | null {
   const j = norm(text); if (!j) return null;
   if (painMention(j.split(' '))) return null;
   const sports = sportsIn(j).filter(s => s !== 'strength' || /\bkraft\w*\b/.test(j));
@@ -107,7 +107,8 @@ export function askKind(ctx: EngineCtx, text: string): { kind: AskKind; sport: s
   const forToday = /\b(heute|jetzt|noch|gleich|irgendwas|irgendetwas|stattdessen|ersatz|alternative)\b/.test(j) && !/\b(doppelt|pro woche|jede woche|ab jetzt|ab sofort|immer)\b/.test(j);
   if (((WANTS_RE.test(j) && TRAIN_WORD.test(j) && forToday) || TODAY_Q_RE.test(j)) || ((offer || last) && /\b(aber ich will|ich will aber|trotzdem|will (heute )?(irgendwas|was|etwas))\b/.test(j))) {
     if (/\bwas genau\b|\bwie genau\b|\bablauf\b|\bbeim (schwimmen|laufen|radfahren|rad)\b/.test(j)) return null;
-    return { kind: 'today', sport, cancelled: false };
+    // Auftrag 39: „Was mache ich heute?“ ist keine Ja/Nein-Frage (vorher Antwort „Ja: …“)
+    return { kind: 'today', sport, cancelled: false, yesNo: !/^(was|wie|wann|welche\w*|wo)\b/.test(j) };
   }
   return null;
 }
@@ -199,7 +200,7 @@ export function decide(ctx: EngineCtx, text: string): Decision | null {
   const a = askKind(ctx, text); if (!a) return null;
   try { return decideFor(ctx, a); } catch (e) { return null; }
 }
-export function decideFor(ctx: EngineCtx, a: { kind: AskKind; sport: string | null; cancelled: boolean }): Decision {
+export function decideFor(ctx: EngineCtx, a: { kind: AskKind; sport: string | null; cancelled: boolean; yesNo?: boolean }): Decision {
   const today = ctx.today;
   const facts: string[] = [];
   const offer = openOffer(ctx);
@@ -243,7 +244,7 @@ export function decideFor(ctx: EngineCtx, a: { kind: AskKind; sport: string | nu
     if (level === 2) return out('rest', `Heute lieber Pause statt ${s.title}: Deine Ampel ist rot${why.length ? ' (' + why[0] + ')' : ''}. Wenn du dich bewegen willst: 20–30 min ruhig spazieren oder dehnen.`);
     if (a.kind === 'how-long') return out('info', `${s.title}: ${s.plannedMinutes || '–'} min${level === 1 && isHardSession(s) ? ', heute wegen der gelben Ampel lieber locker statt hart' : ''}.`);
     if (level === 1 && isHardSession(s)) return out('easy', `Ja, aber locker: ${s.title} heute ohne harte Teile, ${Math.max(20, r5((s.plannedMinutes || 45) * 0.8))} min in Zone 2. Deine Ampel ist gelb${why.length ? ' (' + why[0] + ')' : ''}.`);
-    return out('go', `Ja: ${s.title}${s.plannedMinutes && !/\d+\s*min/.test(s.title) ? ` (${s.plannedMinutes} min)` : ''} steht heute noch an.${level === 1 ? ' Ampel gelb: ruhig angehen.' : ''}${F.done.length ? ` ${F.done.map(d => d.title).join(' und ')} hast du heute schon erledigt.` : ''}`);
+    return out('go', `${a.yesNo === false ? 'Heute steht noch an: ' : 'Ja: '}${s.title}${s.plannedMinutes && !/\d+\s*min/.test(s.title) ? ` (${s.plannedMinutes} min)` : ''}${a.yesNo === false ? '' : ' steht heute noch an'}.${level === 1 ? ' Ampel gelb: ruhig angehen.' : ''}${F.done.length ? ` ${F.done.map(d => d.title).join(' und ')} hast du heute schon erledigt.` : ''}`);
   }
 
   // ---- Ersatz oder Extra-Einheit ----
@@ -311,7 +312,7 @@ export function decideFor(ctx: EngineCtx, a: { kind: AskKind; sport: string | nu
   }
   const verdict: Decision['verdict'] = level === 1 || F.doneMin ? 'easy' : 'go';
   const z2 = `(Zone 2${hrLine(ctx, p.sport)})`;
-  const first = prefix || a.kind === 'how-long' ? `${minutes} min ${act} ${z2}.` : `${cancelledAny || a.kind === 'today' ? 'Ja' : 'Gern'}: ${minutes} min ${act} ${z2}.`;
+  const first = prefix || a.kind === 'how-long' ? `${minutes} min ${act} ${z2}.` : `${cancelledAny || a.kind === 'today' ? (a.yesNo === false ? 'Vorschlag' : 'Ja') : 'Gern'}: ${minutes} min ${act} ${z2}.`;
   const lines = [prefix + first, swapLine, gridLine && pk.rule ? gridLine : '', reason, doneLine, notes[0] || '', gridLine && !pk.rule ? gridLine : ''].filter(Boolean).map(x => /[.!?]$/.test(x) ? x : x + '.');
   // höchstens 4 Sätze plus der Hinweis aufs Übernehmen
   const textOut = lines.slice(0, 4).join(' ') + ' Mit „Übernehmen“ steht es im Plan.';

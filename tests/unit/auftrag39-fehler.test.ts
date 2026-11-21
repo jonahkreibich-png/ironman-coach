@@ -35,3 +35,21 @@ describe('Ruhetag-Begründung: „morgen/gestern“ von heute aus', () => {
     void C;
   });
 });
+
+describe('Coach-Fragen aus der Fehlersuche (16 Testnutzer × 20 Fragen)', () => {
+  const ask = (id: string, q: string) => { const W = world(id, '2026-10-21'); return converse(W.ctx(), {}, q).reply.text; };
+  test('„Wie viele Stunden trainiere ich diese Woche?“ → Wochenstunden (vorher Antwort zum heutigen Tag bzw. Ruhetag)', () => {
+    const t = ask('laeuferin-hm', 'Wie viele Stunden trainiere ich diese Woche?');
+    expect(t).toMatch(/^Diese Woche \(.*\): [\d,]+ h geplant in \d+ Einheit/);
+    expect(t).not.toMatch(/Ruhetag|^Heute/);
+  });
+  test('„Wann ist der nächste Test?“ → Termin bzw. „kein Test“, geschätzte Werte mit Namen nur der eigenen Sportarten (vorher „geschätzt: 5.“)', () => {
+    const t = ask('vater-rad-lauf', 'Wann ist der nächste Test?');
+    expect(t).toMatch(/Nächster Test: .+ am |Im Plan steht gerade kein Test/);
+    expect(t).not.toMatch(/geschätzt: \d+\./);
+    expect(t).not.toMatch(/Kraul|Schwimm-Schwelle/); // Person schwimmt nicht
+  });
+  test('„Was mache ich heute?“ ist keine Ja/Nein-Frage: kein „Ja:“ am Anfang; „Soll ich heute trainieren?“ weiter mit „Ja“', () => {
+    for (const id of ['laeuferin-hm', 'einsteiger-sprint', 'vater-rad-lauf']) expect(ask(id, 'Was mache ich heute?'), id).not.toMatch(/^Ja\b/);
+  });
+});
