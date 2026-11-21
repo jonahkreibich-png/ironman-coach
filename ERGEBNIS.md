@@ -1,3 +1,41 @@
+# Auftrag 39: Zeiteingabe ohne Doppelpunkt, Wettkampf zählt als Test, große Fehlersuche (21.11.)
+
+**Stand:** Version **3.27.0** – veröffentlicht am 21.11. (erst Test-App, dann echte App mit Sicherung; Kopie der echten Daten aller Nutzer geprüft, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler).
+
+## 1. Zeit und Pace ohne Doppelpunkt
+- **Vorher:** fünf verschiedene Leser für Zeiten, getrennte Kästchen (Std/Min/Sek) neben Feldern mit Komma-Tastatur; „5,3“ als Pace nicht erkannt; „45,30“ in Minuten-Feldern = 45,3 min; km-Abschnitte mit Tastatur ohne Komma; Haltezeit „1:30“ = 1 Wiederholung.
+- **Jetzt (alle Zeitfelder, eine Regel):** nur Ziffern tippen, der Doppelpunkt kommt von selbst (530 → 5:30, 14530 → 1:45:30). Komma, Punkt und Doppelpunkt gehen auch. **Zwei Ziffern nach dem Trenner = Sekunden** („45,30“ = 45 min 30 s), **eine Ziffer = Zehntel-Minute** („45,5“ = 45 min 30 s). Unter dem Feld steht „= 45 min 30 s“. Unklar („5,3“, „5:3“, Wettkampf „9:30“) → Nachfrage mit zwei Knöpfen, gespeichert wird erst danach.
+- Gilt für: Einheiten-Werte, Testfelder, km-Abschnitte, Ablauf (Wiederholung, ganzer Satz, Pause, Abschnitte), Kraft (Haltezeit, Pause), Schwellen, Ziele (Wunsch- und Ergebniszeit), Wettkampf (Zeit, Teilzeiten), Fragebogen, Können/Teamsport, Plan bearbeiten, Morgenwerte.
+- Entscheidungen 608–610.
+
+## 2. Wettkampf zählt als Test
+- **Ursache (Nutzer 1, Lauftest 18.4. nach Halbmarathon 4.4., dazu Schwimm-/Radtest 13./14.4.):** Der Plan kannte ein gemeinsames Testdatum für alle Sportarten, Wettkämpfe zählten nicht, die Sperre danach galt 7 Tage und nur für A/B.
+- **Jetzt (alle Nutzer, alle Sportarten):** Rhythmus je Sportart; ein A/B-Wettkampf zählt als Test seiner Sportarten; 14 Tage nach jedem Wettkampf kein Test (fällige werden dahinter verschoben). Zonen aus dem Ergebnis: Laufrennen → Schwellen-Pace (VDOT) und -Puls, Schwimmen im Becken → CSS, Rad-Event mit Watt → FTP. Bestehende Pläne repariert die Plan-Pflege (mit Kopie der Daten von Nutzer 1 geprüft: 3 Tests → 0). Entscheidungen 612–615.
+
+## 3. Gefundene Fehler (alle behoben, jeder mit Test, der vorher scheiterte)
+| Nr. | Fehler | Schwere | Ursache |
+|---|---|---|---|
+| 1 | Tests 9–14 Tage nach einem Wettkampf, Wettkampf zählte nicht als Test | mittel | ein Testdatum für alle Sportarten, Sperre nur 7 Tage |
+| 2 | Verschobener Test → 2 Wochen später schon der nächste (Schwimm-/Radtest doppelt) | mittel | Rhythmus nach Verschieben auf alten Termin zurückgesetzt |
+| 3 | Teamsport-Training bearbeitet → still zum Lauf umgebaut | hoch | Sportart-Auswahl kannte keinen Teamsport, „Laufen“ vorgewählt |
+| 4 | Plan-Änderung stürzte ab bei einer Einheit nur mit Übungsliste | mittel | Plan-Prüfung erwartete immer Bausteine |
+| 5 | Zeit mit automatischem Doppelpunkt wurde beim Verlassen nicht gespeichert | hoch (neu, vor Release gefunden) | Browser lösen nach Skript-Änderung kein „change“ aus |
+| 6 | Coach-Woche: abgehakt ohne Werte zählte 0 h („−100 %“) | mittel | Woche ignorierte „wie geplant“ (Belastung/Scores nicht) |
+| 7 | „Fast alles geschafft (1 von 1)“ | klein | fehlender Fall „alles“ |
+| 8 | Ruhetag-Begründung: „morgen steht …“ meinte übermorgen | klein | „morgen/gestern“ vom Ruhetag statt von heute aus |
+| 9 | „Wie viele Stunden … diese Woche?“ → Antwort zum heutigen Tag | mittel | „wie viele“ galt als Tagesfrage |
+| 10 | „Wann ist der nächste Test?“ → „geschätzt: 5.“, kein Termin, fremde Sportarten | mittel | Anzahl statt Namen, Plan nicht gelesen |
+| 11 | „Was mache ich heute?“ → Antwort beginnt mit „Ja:“ | klein | Ja/Nein-Antwort für jede Tagesfrage |
+| 12 | Plan-Dashboard „0,0 min“, „405,0 Minuten“ | klein | feste Kommastelle |
+| 13 | Daten-Check und Plan-Pflege stürzten bei gespeicherter Dauer mit Kommastelle ab (83,7 min) | hoch (neu, beim Release mit Kopie der echten Daten gefunden, nie live) | gespeicherte Zahl lief durch die neue Zeit-Lesart |
+
+## Tests
+- Neu: Unit `auftrag39-zeit` (Regel), `auftrag39-wettkampftest` (Plan, Pflege, Zonen; vorher rot), `auftrag39-fehler` (Coach; vorher rot). Browser (WebKit iPhone + Chromium, echte Eingabe): `auftrag39-zeit` (jedes Zeitfeld, Nachfrage, Überlauf 320 px/28 px, hell/dunkel), `auftrag39-rundgang` (19 Nutzer: alle Tabs und Unterseiten, Einheiten abhaken/ändern/Rückgängig, Umwandeln, Coach mit Folgefrage, Score, Ziel, dunkel, große Schrift, 320 px, Querformat, App-Wechsel), `auftrag39-knoepfe` (jeder sichtbare Knopf jedes Bildschirms und seiner Fenster, 648 Klicks). Coach-Fragen: 16 Nutzer × 20 Fragen.
+- Alte Tests angepasst (getrennte Zeitkästchen → ein Feld).
+- **Großer Test: 36:31 min** (Unit 3352 grün, Simulation 36 Nutzer / 19.292 Tage / 0 Fehler, Browser 408 Läufe; 5 rot nur durch die Test-Umgebung: fester Port, Zeitlimit, Last – behoben, einzeln grün).
+- **Release:** 3354 Unit-Tests und 842 Browser-Tests grün. Zwei Läufe angehalten: Bildrate-Test unter Last (kein App-Fehler, Test misst neu) und Fehler 13 (behoben).
+- **Vorschläge:** 15 Stück in VORSCHLAEGE.md (dabei die 4 offenen aus Auftrag 35), nichts davon eingebaut.
+
 # Auftrag 38: Ablauf vollständig, Gemachtes gilt überall, einfacher eintragen, Umwandeln mit Vorschau (19.11.)
 
 **Stand:** Version **3.26.0**, veröffentlicht am 19.11. (erst Test-App, dann echte App mit Sicherung; 3326 Unit-Tests und 788 Browser-Tests grün, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler).
