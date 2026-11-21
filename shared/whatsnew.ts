@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.27.0', items: [
+    'Zeiten ohne Doppelpunkt: einfach Ziffern tippen, der Doppelpunkt kommt von selbst (530 → 5:30, 14530 → 1:45:30). Komma und Punkt gehen auch. Unter dem Feld steht, was die App verstanden hat; ist es unklar (z. B. 5,3), fragt sie kurz nach.',
+    'Ein Wettkampf zählt als Test: Er aktualisiert deine Zonen (z. B. Halbmarathon → Schwellen-Pace), und der nächste Test seiner Sportart kommt erst 8 Wochen später. In den 2 Wochen nach einem Wettkampf gibt es keinen Test.',
+    'Viele kleine Fehler behoben, u. a.: Teamsport bleibt beim Bearbeiten Teamsport, der Coach zählt „wie geplant“ abgehakte Einheiten in der Woche und beantwortet „Wie viele Stunden diese Woche?“ und „Wann ist der nächste Test?“ richtig.'
+  ] },
   { version: '3.26.0', items: [
     'Der Ablauf zeigt jetzt die ganze Einheit, auch lockere Teile (z. B. 20 min locker vor den Hügelsprints), mit Summe geplant und gemacht. Was du einträgst (z. B. 3 × 10 statt 2 × 8 min), steht danach überall: Titel, Coach, Belastung, Woche.',
     'Einfacher eintragen: im Satz oben Wiederholungen [−] [+], Dauer und Pause. Gleicher Satz neu? Die App fragt „Zu Satz 1 hinzufügen?“. Abgehakt ohne Werte gilt wie geplant. Minuten und km stehen jetzt immer zusammen.',

@@ -267,3 +267,15 @@ test('Morgenwerte: Tiefschlaf 1:30 = 90 min mit Anzeige darunter', async ({ page
   await decimalPad(ds);
   await typeTime(ds, '1:30', '1:30', '= 1 h 30 min');
 });
+
+for (const dark of [false, true]) test(`Überlauf: Nachfrage unter dem Zeitfeld bei 320 px, 28 px Schrift${dark ? ', dunkel' : ''}`, async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 }); await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
+  await page.addInitScript(() => { const set = () => { document.documentElement.style.fontSize = '28px'; }; if (document.documentElement) set(); document.addEventListener('DOMContentLoaded', set); });
+  await seed39(page); await open(page, '/?go=plan'); await openPlanSession(page, 'lt39'); await openDetails(page);
+  for (const [id, raw] of [['#fd-min', '45,3'], ['#fd-pace', '5,3']] as const) {
+    const loc = sheet(page).locator(id); await loc.click(); await loc.fill(''); await loc.pressSequentially(raw); await loc.blur();
+    await expect(hintOf(loc).locator('[data-act="tf-pick"]')).toHaveCount(2);
+    const over = await page.evaluate(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('[data-tf-hint], [data-tf-hint] *')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.right > W + 1 || r.left < -1); }).length + (document.documentElement.scrollWidth > W + 1 ? 100 : 0); });
+    expect(over, id).toBe(0);
+  }
+});
