@@ -228,7 +228,7 @@ test('iPhone: Zurück-Wischen (Verlauf) führt von der Unterseite zur Liste, off
   await expect(page.locator('[data-view="zonen"]')).toBeVisible();
   await page.goBack();
   await expect(page.locator('#mehr-q')).toBeVisible();
-  expect(new URL(page.url()).origin).toBe('http://localhost:4180');
+  expect(new URL(page.url()).origin).toBe(new URL(test.info().project.use.baseURL || 'http://localhost:4180').origin); // Auftrag 39: Port je Testteil
   // Blatt offen: erst das Blatt zu, dann die Seite
   await page.locator('.mrow[data-sub="werte"]').click();
   await page.locator('.view [data-act="checkin-open"]').first().click();
