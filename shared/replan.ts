@@ -141,7 +141,7 @@ export function calibrationDue(plan: any, state: any, today: string): { minutes:
    normale Anpassungen (mit Grund, Mitteilung und Rückgängig), der gespeicherte Plan bleibt unverändert. Nicht angefasst: Erledigtes,
    Feste/Gesperrte, Wettkämpfe, Teamsport, von Hand oder im Chat geänderte Einheiten. Hat jemand eine Pflege-Änderung rückgängig gemacht,
    bleibt die Einheit, wie sie ist. Ergebnis nur, wenn danach weniger Verstöße übrig sind. */
-const UPKEEP_FIELDS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description', 'spec', 'hard', 'long'] as const;
+const UPKEEP_FIELDS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description', 'spec', 'hard', 'long', 'droppedTest'] as const; // droppedTest: Auftrag 40 (Vorschlag 8)
 export interface Upkeep { adjustments: any[]; before: number; after: number; texts: string[]; /** Wochen, in denen eine Regel mit den eigenen Regeln der Person nicht erfüllbar ist (ehrliche Lücke, wie im Generator) */ gaps: { week: number; rule: string; why: string }[] }
 export function planUpkeep(baseWeeks: any[], state: any, profile: Profile, goals: Goal[], today: string, now = Date.now(), meta: any = {}): Upkeep {
   const none: Upkeep = { adjustments: [], before: 0, after: 0, texts: [], gaps: [] };

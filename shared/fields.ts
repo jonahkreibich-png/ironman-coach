@@ -8,6 +8,7 @@ import { kindOf, mainKind, BIKE_KIND_LABEL } from './bikespeed';
 import { mainPart } from './sections';
 import { GOALS, legsOf } from './goals';
 import { vdot, timeForVdot } from './vdot';
+import { OFF_BIKE_BASE, TRI_BIKE_IF, OPEN_WATER_F, wetsuitF, swimRaceAdd } from './prognosis';
 
 export type FieldKind = 'num' | 'pace' | 'text' | 'select' | 'splits' | 'exercises';
 export interface FieldDef { key: string; label: string; unit?: string; kind: FieldKind; options?: [string, string][]; ph?: string; more?: boolean; /** nur bei Tests */ test?: boolean }
@@ -347,8 +348,10 @@ export function raceTestUpdate(state: any, weeks: any[], profile: any, today: st
     .filter(g => g && g.date && g.date <= today && g.date >= C.addDays(today, -21) && g.priority !== 'C' && g.result && (GOALS as any)[g.type] && g.type !== 'fitness')
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   for (const g of goals) {
-    const key = 'race:' + g.id; if (applied.includes(key)) continue;
+    const key = 'race:' + g.id;
     const def = (GOALS as any)[g.type]; const legs = legsOf(g); const res = g.result || {};
+    // Triathlon: Merker je Sportart (ein alter Merker „race:<id>“ steht nur für das Schwimmen, Auftrag 40)
+    if (applied.includes(key) && def.group !== 'tri') continue;
     // Einheit des Wettkampfs im Plan (Puls bzw. Watt von der Uhr)
     const rs = C.planDays(weeks).filter((d: any) => d.date === g.date).flatMap((d: any) => d.sessions).find((s: any) => s && s.race && (!s.goalId || s.goalId === g.id));
     const st = rs ? (state.sessions || {})[rs.id] : null; const act = st && st.activityId ? (state.activities || {})[st.activityId] : null;
@@ -365,10 +368,50 @@ export function raceTestUpdate(state: any, weeks: any[], profile: any, today: st
       return { label: name, sport: 'run', sessionId: key, date: g.date, title: 'Zonen aus dem Wettkampf', thresholdPaceRunSec: okPace ? pace : null, ...(hr ? { lthrRun: hr } : {}), thresholds: t, settings: t,
         text: `Dein ${name} (${when(g.date)}, ${fmtH(res.timeSec)}) zählt als Lauftest: ${parts.join(', ')}. Alle Lauf-Zonen und Einheiten rechnen ab jetzt damit; der nächste Lauftest kommt im 8-Wochen-Rhythmus. Ändern kannst du die Werte unter Mehr → Zonen und Tests.` };
     }
-    const swimLeg = legs.find(l => l.sport === 'swim');
-    const swimSec = def.group === 'tri' ? num(res.splits && res.splits.swim) : swimLeg && legs.length === 1 ? num(res.timeSec) : null;
     const venue = g.course && g.course.swimVenue;
-    if (swimLeg && swimSec && swimLeg.km >= 0.4 && swimLeg.km <= 1.9 && venue !== 'open' && (venue === 'pool' || def.group !== 'tri')) {
+    // Auftrag 40 (Vorschlag 9): Triathlon – jede Teilzeit zählt für ihre Sportart (eigener Merker je Sportart), mit denselben Faktoren wie
+    // die Prognose, nur umgekehrt: Laufen nach dem Rad (langsamer als frisch), Rad im Triathlon (unter der FTP), Freiwasser und Neopren.
+    // Vorher zählte nur ein Becken-Schwimmen; Rad- und Lauf-Teil und Freiwasser änderten keine Zonen.
+    if (def.group === 'tri') {
+      const sp: any = res.splits || {};
+      for (const sport of ['swim', 'bike', 'run'] as const) {
+        const k2 = `${key}:${sport}`; if (applied.includes(k2) || (sport === 'swim' && applied.includes(key))) continue;
+        const leg = legs.filter(l => l.sport === sport); const sec = num(sp[sport]);
+        if (leg.length !== 1 || !sec) continue; // Duathlon: zwei Lauf-Teile, eine Lauf-Teilzeit → nicht eindeutig
+        const km = leg[0].km;
+        if (sport === 'swim') {
+          if (km < 0.3 || km > 4) continue;
+          const open = venue ? venue === 'open' : true; const wet = open && g.course && g.course.wetsuit === true;
+          const p100 = sec / (km * 10);
+          const css = Math.round(open ? p100 / (OPEN_WATER_F * (wet ? wetsuitF(th.cssSec) : 1)) - swimRaceAdd(km) : p100);
+          if (css < 60 || css > 240 || (th.cssSec && (css < th.cssSec * 0.8 || css > th.cssSec * 1.25))) continue;
+          const how = open ? ` (Freiwasser${wet ? ' mit Neopren' : ''} umgerechnet aufs Becken)` : '';
+          return { label: name, sport: 'swim', sessionId: k2, date: g.date, title: 'Schwimm-Schwelle aus dem Wettkampf', thresholds: { cssSec: css },
+            text: `Dein ${name} (${when(g.date)}): der Schwimm-Teil (${fmtH(sec)}) zählt als Schwimmtest${how}: Schwimm-Schwelle (CSS) ${th.cssSec ? mmss(th.cssSec) : '–'} → ${mmss(css)}/100 m. Die Schwimm-Einheiten rechnen ab jetzt damit.` };
+        }
+        if (sport === 'bike') {
+          if (!profile.powerMeter) continue;
+          const w = num(st && st.metrics && (st.metrics.np || st.metrics.power)) || (act && (act.np || act.avgPower)) || null;
+          const f = TRI_BIKE_IF[g.type]; if (!w || w <= 50 || !f) continue;
+          const ftp = Math.round(w / f);
+          if (ftp < 50 || ftp > 600 || (th.ftp && (ftp < th.ftp * 0.8 || ftp > th.ftp * 1.2))) continue;
+          return { label: name, sport: 'bike', sessionId: k2, date: g.date, title: 'Rad-Zonen aus dem Wettkampf', thresholds: { ftp },
+            text: `Dein ${name} (${when(g.date)}): der Rad-Teil (Ø ${Math.round(w)} W, ${fmtH(sec)}) zählt als Radtest – im Triathlon fährt man etwa ${Math.round(f * 100)} % der FTP: FTP ${th.ftp || '–'} → ${ftp} W. Die Rad-Einheiten rechnen ab jetzt damit.` };
+        }
+        if (sport === 'run') {
+          const pen = OFF_BIKE_BASE[g.type] ?? 0;
+          const pace = thresholdPaceFromRace(km, sec / (1 + pen));
+          if (pace == null || (th.thresholdPaceRunSec && (pace < th.thresholdPaceRunSec * 0.75 || pace > th.thresholdPaceRunSec * 1.25))) continue;
+          const t: Record<string, any> = { thresholdPaceRunSec: pace };
+          return { label: name, sport: 'run', sessionId: k2, date: g.date, title: 'Zonen aus dem Wettkampf', thresholdPaceRunSec: pace, thresholds: t, settings: t,
+            text: `Dein ${name} (${when(g.date)}): der Lauf-Teil (${fmtH(sec)}) zählt als Lauftest${pen ? ` – nach dem Rad läuft man etwa ${Math.round(pen * 100)} % langsamer, das ist herausgerechnet` : ''}: Schwellen-Pace ${th.thresholdPaceRunSec ? mmss(th.thresholdPaceRunSec) : '–'} → ${mmss(pace)}/km. Die Lauf-Einheiten rechnen ab jetzt damit.` };
+        }
+      }
+      continue;
+    }
+    const swimLeg = legs.find(l => l.sport === 'swim');
+    const swimSec = swimLeg && legs.length === 1 ? num(res.timeSec) : null;
+    if (swimLeg && swimSec && swimLeg.km >= 0.4 && swimLeg.km <= 1.9 && venue !== 'open') {
       const css = Math.round(swimSec / (swimLeg.km * 10));
       if (css >= 60 && css <= 240 && (!th.cssSec || (css >= th.cssSec * 0.8 && css <= th.cssSec * 1.25)))
         return { label: name, sport: 'swim', sessionId: key, date: g.date, title: 'Schwimm-Schwelle aus dem Wettkampf', thresholds: { cssSec: css },

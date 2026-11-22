@@ -108,10 +108,11 @@ describe('Auftrag 39: Zonen aus dem Wettkampf-Ergebnis', () => {
     expect(raceTestUpdate(st({ ...hm, priority: 'C' }), weeks, prof, T)).toBeNull();
     expect(raceTestUpdate(st(hm), weeks, prof, '2027-04-30')).toBeNull();
   });
-  test('Triathlon: Schwimm-Teilzeit im Becken → CSS; Freiwasser ändert nichts', () => {
+  test('Triathlon: Schwimm-Teilzeit im Becken → CSS; Freiwasser seit Auftrag 40 umgerechnet (ohne Wenden +3 %, Strecke +3 s/100 m)', () => {
     const tri = { id: 'g-tri', type: 'tri_sprint', name: 'Sprint', date: D, priority: 'A', result: { timeSec: 4800, splits: { swim: 900 } }, course: { swimVenue: 'pool' } };
     const u = raceTestUpdate({ goals: { 'g-tri': tri }, sessions: {} }, [], { thresholds: { cssSec: 125 } }, T)!;
     expect(u.sport).toBe('swim'); expect(u.thresholds.cssSec).toBe(120);
-    expect(raceTestUpdate({ goals: { 'g-tri': { ...tri, course: { swimVenue: 'open' } } }, sessions: {} }, [], { thresholds: { cssSec: 125 } }, T)).toBeNull();
+    const o = raceTestUpdate({ goals: { 'g-tri': { ...tri, course: { swimVenue: 'open' } } }, sessions: {} }, [], { thresholds: { cssSec: 125 } }, T)!;
+    expect(o.thresholds.cssSec).toBe(114); expect(o.sessionId).toBe('race:g-tri:swim'); expect(o.text).toMatch(/Freiwasser umgerechnet/);
   });
 });

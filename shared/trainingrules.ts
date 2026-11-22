@@ -484,7 +484,7 @@ export function repairTrainingRules(weeks: any[], p: Profile, o: TOpts = {}): st
         const swimLike = s.sport === 'swim' ? D.map(y => ({ y, k: Math.abs(diffD(x.d.date, y.d.date)) })).filter(o => o.k > 0 && o.k <= 10)
           .flatMap(o => live(o.y.d).filter((z: any) => z.sport === 'swim' && !isTestS(z) && !hardS(z) && z.spec).map((z: any) => ({ z, k: o.k }))).sort((a, b) => a.k - b.k)[0] : null;
         const nx = swimLike ? { ...JSON.parse(JSON.stringify(swimLike.z)), ruleNote: why } : easyShortOf(s, minOf(s), why, x.w.phase);
-        if (nx) { setS(x.d, s, { ...nx, id: s.id }); fixes.push(`${x.d.date}: ${s.title} → ${nx.title} (${counted ? 'Wettkampf zählt als Test' : 'nach dem Wettkampf kein Test'})`); }
+        if (nx) { setS(x.d, s, { ...nx, id: s.id, ...(counted ? {} : { droppedTest: r.date }) }); /* Auftrag 40 (Vorschlag 8): Merker für den Coach-Hinweis mit neuem Termin */ fixes.push(`${x.d.date}: ${s.title} → ${nx.title} (${counted ? 'Wettkampf zählt als Test' : 'nach dem Wettkampf kein Test'})`); }
       }
     });
   }

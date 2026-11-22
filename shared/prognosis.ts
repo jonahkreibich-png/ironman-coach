@@ -15,6 +15,16 @@ import type { Profile } from './profile';
 import { vdot, timeForVdot, riegel, vdotFromThreshold } from './vdot';
 import { GRAVEL_F } from './bikespeed';
 import { wkgFromKmh } from './sports';
+/* Auftrag 40: gemeinsame Faktoren für Prognose (Wettkampfzeit aus den Schwellen) und Zonen aus dem Wettkampf (umgekehrt, shared/fields.ts) */
+/** Laufen nach dem Rad: so viel langsamer als frisch (ohne Koppeltraining) */
+export const OFF_BIKE_BASE: Record<string, number> = { tri_supersprint: 0.03, tri_sprint: 0.04, tri_olympic: 0.06, tri_middle: 0.09, tri_long: 0.13, duathlon: 0.05 };
+/** typische Rad-Intensität im Triathlon (Anteil der FTP) */
+export const TRI_BIKE_IF: Record<string, number> = { tri_supersprint: 0.92, tri_sprint: 0.9, tri_olympic: 0.85, tri_middle: 0.77, tri_long: 0.7, duathlon: 0.87 };
+/** Schwimmen im Wettkampf: Sekunden pro 100 m langsamer als die CSS, je Strecke */
+export const swimRaceAdd = (km: number) => km <= 0.75 ? 3 : km <= 1.5 ? 5 : km <= 2 ? 7 : 10;
+/** Freiwasser (ohne Wenden, mit Orientieren) und Neopren */
+export const OPEN_WATER_F = 1.03;
+export const wetsuitF = (css: number | null | undefined) => css && css < 110 ? 0.96 : 0.94;
 
 export { vdot, timeForVdot, riegel };
 
@@ -220,7 +230,7 @@ function model(goal: Goal, sd: Side, prof: Partial<Profile>, spreads: Record<str
     let t = 0; let note = '';
     if (l.sport === 'swim') {
       const raceM = l.km * 1000;
-      const add = l.km <= 0.75 ? 3 : l.km <= 1.5 ? 5 : l.km <= 2 ? 7 : 10;
+      const add = swimRaceAdd(l.km);
       const breastP = sd.breast + 5;
       let p100: number;
       if (sd.canCrawl && sd.css) {
@@ -230,8 +240,8 @@ function model(goal: Goal, sd: Side, prof: Partial<Profile>, spreads: Record<str
         if (swimMix < 1) note = `etwa ${Math.round(swimMix * 100)} % Kraul, Rest Brust`;
       } else { p100 = breastP; swimMix = 0; note = 'Brust'; }
       const open = course.swimVenue ? course.swimVenue === 'open' : tri;
-      if (open) p100 *= 1.03;
-      if (course.wetsuit && swimMix > 0) p100 *= sd.css && sd.css < 110 ? 0.96 : 0.94;
+      if (open) p100 *= OPEN_WATER_F;
+      if (course.wetsuit && swimMix > 0) p100 *= wetsuitF(sd.css);
       t = p100 * l.km * 10 * ((corr && corr.swim) || 1);
       assumptions.push(`Schwimmen: ${note || 'Kraul'} mit ${mmss(p100)}/100 m${open ? ' im Freiwasser (ohne Wenden, mit Orientieren)' : ' im Becken'}${course.wetsuit ? ', mit Neopren' : ''}.`);
     }
@@ -241,8 +251,8 @@ function model(goal: Goal, sd: Side, prof: Partial<Profile>, spreads: Record<str
       runK = r.k; let rt = r.sec;
       const offBike = tri && legs.findIndex(x => x.sport === 'bike') >= 0 && legs.findIndex(x => x.sport === 'bike') < legs.indexOf(l);
       if (offBike) {
-        const base = ({ tri_supersprint: 0.03, tri_sprint: 0.04, tri_olympic: 0.06, tri_middle: 0.09, tri_long: 0.13, duathlon: 0.05 } as any)[type] ?? 0.05;
-        const typical = ({ tri_supersprint: 0.92, tri_sprint: 0.9, tri_olympic: 0.85, tri_middle: 0.77, tri_long: 0.7, duathlon: 0.87 } as any)[type] ?? 0.85;
+        const base = OFF_BIKE_BASE[type] ?? 0.05;
+        const typical = TRI_BIKE_IF[type] ?? 0.85;
         // Koppeltraining verkleinert den Abschlag um bis zu ein Viertel (Auftrag 23: vorher ein Drittel, Ironman-Marathon war zu schnell)
         const brickF = 1 - 0.25 * Math.min(1, sd.bricks / 8);
         const pen = base * ((ifac || typical) / typical) * brickF;
