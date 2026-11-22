@@ -218,7 +218,7 @@ test('Auftrag 38: keine Knöpfe „Wie geplant / Anders gemacht“; frühere Än
   await openPlanSession(page, 'a30-bike');
   await expect(sheet(page).locator('[data-as-planned], [data-act="fd-asplanned"], [data-act="fd-chg-kind"]')).toHaveCount(0);
   await expect(sheet(page).locator('[data-legacy-change]')).toContainText('Früher eingetragen: Lockerer, Grund: müde');
-  await expect(sheet(page).locator('[data-planned-was]')).toContainText('geplant: Rad-Intervalle 2×12 min Sweet Spot · Grund: müde');
+  await expect(sheet(page).locator('[data-planned-was]')).toContainText('Geplant: Rad-Intervalle 2×12 min Sweet Spot · Grund: müde'); // Auftrag 41: eine „Geplant“-Zeile im Kopf
   await page.keyboard.press('Escape');
   expect(await rowText(page, 'a30-bike')).toContain('Rad Zone 2 · 60 min');
   expect(await ctxMin(page, 'a30-bike')).toEqual({ title: 'Rad Zone 2 · 60 min', min: 60 });

@@ -108,7 +108,7 @@ W = C.weeklyAdjustments(s, plan({ recovery: true }), '2026-10-11', { now: 1 });
 ok(!W.adjustments.some(a => a.id.includes('-vol-')), 'Erholungswoche bleibt bestehen');
 W = C.weeklyAdjustments(Object.assign({}, s, { sessions: { 'w1-di': doneAll['w1-di'] } }), plan(), '2026-10-11', { now: 1 });
 // Auftrag 18: Großteil der Woche ausgelassen → die nächste Woche wiederholt diese Woche (gleich groß), statt zu steigern oder stark zu kürzen
-ok(!W.adjustments.some(a => a.id.includes('-vol-') && a.sessionId === 'w2-so' && a.set.plannedMinutes > 150) && /wiederholt/.test(W.adjustments.find(a => a.type === 'note').reason), 'Unter 50 % umgesetzt → Woche wiederholen (nicht steigern)');
+ok(!W.adjustments.some(a => a.id.includes('-vol-') && a.sessionId === 'w2-so' && a.set.plannedMinutes > 150) && /wiederholt|In den letzten 4 Wochen/.test(W.adjustments.find(a => a.type === 'note').reason), 'Unter 50 % umgesetzt → nicht steigern (wiederholen bzw. seit Auftrag 41 nach dem echten Training)');
 W = C.weeklyAdjustments(Object.assign({}, s, { sessions: Object.assign({}, doneAll, { 'w1-di': { completed: true, rpe: '9', quality: 'ok' } }) }), plan(), '2026-10-11', { now: 1 });
 ok(!W.adjustments.some(a => a.id.includes('ladder')), 'RPE 9 → Stufe wiederholen (keine Änderung)');
 const groinW = Object.assign({}, s, { sessions: Object.assign({}, doneAll, { 'w1-fr': { completed: true, notes: 'Leiste 4/10' } }) });
@@ -116,7 +116,12 @@ W = C.weeklyAdjustments(groinW, plan(), '2026-10-11', { now: 1 });
 ok(!W.adjustments.some(a => a.id.includes('-vol-')) , 'Leistenschmerz → eine Woche keine Steigerung');
 W = C.weeklyAdjustments(Object.assign({}, s, { illnessPeriods: [{ start: '2026-10-07', end: '2026-10-08' }] }), plan(), '2026-10-11', { now: 1 });
 ok(W.adjustments.find(a => a.sessionId === 'w2-so' && a.id.includes('-vol-')).set.plannedMinutes === 120, 'Krankheit in der Woche → −20 %');
-W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note' } } }), plan(), '2026-10-11', { now: 1 });
+W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note', v41: true } } }), plan(), '2026-10-11', { now: 1 });
 ok(W.adjustments.length === 0, 'Nur einmal pro Woche');
+// Auftrag 41: Woche mit älterer Fassung geplant → nur die Anpassung an das echte Training wird nachgeholt (eigene Gruppe, einmal)
+W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note' } } }), plan(), '2026-10-11', { now: 1 });
+ok(W.adjustments.every(a => a.group === 'week-2-cap'), 'Nachholen nur in der Gruppe week-2-cap');
+W = C.weeklyAdjustments(Object.assign({}, s, { adjustments: { 'week-2-summary': { id: 'week-2-summary', type: 'note' }, 'week-2-cap-summary': { id: 'week-2-cap-summary', type: 'note' } } }), plan(), '2026-10-11', { now: 1 });
+ok(W.adjustments.length === 0, 'Nachholen nur einmal');
 
 });

@@ -97,9 +97,9 @@ describe('Wochen-Engine beim festen Wochenaufbau', () => {
   test('Umfang bleibt (nicht automatisch ±10 %), auch wenn wenig abgehakt ist; die Sweet-Spot-Leiter bleibt beim Generator', () => {
     const state = { sessions: { ss1: { completed: true, metrics: { min: '60', hr: '150' } } }, trend, illnessPeriods: [], adjustments: {}, customWorkouts: {}, activities: {}, profile: prof };
     const r = C.weeklyAdjustments(state, weeks, '2026-11-29', { planMeta: { pattern: true } });
-    expect(r.adjustments.filter((a: any) => /-vol-/.test(a.id))).toEqual([]);
-    expect(r.adjustments.some((a: any) => a.sessionId === 'ss2')).toBe(false);
-    expect(r.adjustments.find((a: any) => /summary/.test(a.id)).reason).toMatch(/Fester Wochenplan/);
+    // Auftrag 41: auch beim festen Wochenplan richtet sich der Umfang nach dem echten Training (vorher blieb er immer gleich)
+    expect(r.adjustments.find((a: any) => /summary/.test(a.id)).reason).toMatch(/In den letzten 4 Wochen hast du höchstens/);
+    expect(r.adjustments.some((a: any) => a.sessionId === 'ss2' && /ladder/.test(a.id))).toBe(false);
     // ohne festen Wochenaufbau wie bisher: wenig umgesetzt → weniger
     const r2 = C.weeklyAdjustments(state, weeks, '2026-11-29', { planMeta: {} });
     expect(r2.adjustments.some((a: any) => /-vol-/.test(a.id))).toBe(true);

@@ -171,12 +171,14 @@ function sessionSheet(id: string): string {
   const shown = sessionTitle(s, st); const sp = String(sportLabel(s.sport) || '');
   const STEM: Record<string, RegExp> = { run: /lauf/i, bike: /rad|ausfahrt|rolle/i, swim: /schwimm|kraul/i, strength: /kraft/i, football: /fußball|spiel|training/i };
   const spInTitle = !!sp && (STEM[s.sport] ? STEM[s.sport].test(shown) : shown.toLowerCase().includes(sp.toLowerCase().slice(0, 5)));
-  const planTxt = [shown !== s.title ? s.title : '', metaLine(s) || (shown !== s.title ? '' : s.title)].filter(Boolean).join(' · ');
+  // frühere Änderung mit Grund („Rad-Intervalle … · Grund: müde“) steht in derselben Zeile
+  const pl = st.completed ? String(plannedLine(s, st) || '').replace(/^geplant:\s*/i, '') : '';
+  const planTxt = pl ? [pl, metaLine(s)].filter(Boolean).join(' · ') : [shown !== s.title ? s.title : '', metaLine(s) || (shown !== s.title ? '' : s.title)].filter(Boolean).join(' · ');
   // Kopf
   let h = `<div class="stack sess-page">
     <div class="stack sess-kopf" data-kopf>
       <div class="row">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<div class="grow"><div class="lbl" data-kopf-date>${esc(dowShort(s.date))}, ${fmtDate(s.date)}${spInTitle ? '' : ` · ${esc(sp)}`}</div>
-        ${planTxt ? `<div class="small" data-kopf-plan><span class="muted">Geplant:</span> ${esc(planTxt)}</div>` : ''}
+        ${planTxt ? `<div class="small" data-kopf-plan${pl ? ' data-planned-was' : ''}><span class="muted">Geplant:</span> ${esc(planTxt)}</div>` : ''}
         ${done ? `<div class="small" data-kopf-done><span class="muted">Gemacht:</span> <b>${esc(done)}</b></div>` : ''}${ds && ds.changed ? `<div class="small" data-kopf-changes><span class="muted">Anders als geplant:</span> ${esc(ds.short)}</div>` : ''}${gearChips(s)}</div><span data-badge>${badge}</span></div>
       ${urteil ? `<div class="row pills" data-urteil>${urteil}</div>` : ''}`;
   h += adjBox(s);

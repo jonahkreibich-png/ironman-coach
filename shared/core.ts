@@ -1120,7 +1120,7 @@ function actualTraining(state, baseWeeks, date) {
     const st = (state.sessions || {})[x.id]; planned14++; if (st && (st.completed || st.skipped)) entered14++;
   }));
   const acts14 = recordedActivities(state).filter(a => a.date >= addDays(date, -13) && a.date <= date && a.sport !== 'football').length;
-  const unknown = acts14 === 0 && planned14 >= 3 && entered14 < planned14 * 0.4;
+  const unknown = acts14 === 0 && planned14 >= 3 && entered14 === 0;
   return { weeksMin, maxWeek: Math.max(...weeksMin), avgWeek: Math.round(weeksMin.reduce((a, b) => a + b, 0) / 4), longest, unknown, planned14, entered14 };
 }
 /* Bezug für die Steigerung: das meiste eigene Training einer der letzten 3 abgeschlossenen Wochen. Wochen mit mindestens 2 Krankheitstagen
@@ -1248,7 +1248,9 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   let capLow = -20, capWhy = '';
   const capOk = !S.sick && !next.isRecoveryWeek && !returnStageActive(illness, addDays(date, 1));
   if (capOk && real.unknown) {
-    if (pct <= 0 && S.red < 2) { pct = 0; why = `In den letzten 2 Wochen ist fast nichts eingetragen (${real.entered14} von ${real.planned14}): der Umfang bleibt, bis du einträgst, was du gemacht hast`; }
+    const unk = `in den letzten 2 Wochen ist fast nichts eingetragen (${real.entered14} von ${real.planned14}): der Umfang bleibt, bis du einträgst, was du gemacht hast`;
+    if (pct < 0 && S.red < 2) { pct = 0; why = unk.charAt(0).toUpperCase() + unk.slice(1); }
+    else if (pct === 0) why = why ? `${why} (${unk})` : unk.charAt(0).toUpperCase() + unk.slice(1);
   } else if (capOk) {
     const own = planDays([next]).flatMap(d => d.sessions).filter(s => !['football', 'rest'].includes(s.sport) && !s.cancelled && !s.race && !s.fixed).reduce((a, s) => a + (s.plannedMinutes || 0), 0);
     const allow = Math.max(60, real.maxWeek * 1.1 + 20);

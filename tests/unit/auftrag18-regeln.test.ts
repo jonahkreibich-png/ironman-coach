@@ -179,7 +179,7 @@ describe('Punkt 6: Zusätzliches Trainingswissen', () => {
     const W0 = world('laeuferin-hm');
     const r = C.weeklyAdjustments({ ...W0.state, profile: W0.profile }, W0.plan.weeks, '2026-10-25', { planMeta: W0.plan.meta });
     const note = r.adjustments.find((a: any) => a.type === 'note');
-    if (note && r.summary && r.summary.ratio != null && r.summary.ratio < 0.5) expect(note.reason).toMatch(/wiederholt/);
+    if (note && r.summary && r.summary.ratio != null && r.summary.ratio < 0.5) expect(note.reason).toMatch(/wiederholt|In den letzten 4 Wochen|nichts eingetragen/); // Auftrag 41
   });
   test('Einheiten-Texte: Verpflegung ab etwa 80 min, Essen nach harten/langen Einheiten, Lauf-ABC', () => {
     const g = { id: 'm', type: 'tri_middle' as const, name: 'Mitteldistanz', date: '2027-07-04', priority: 'A' as const };
