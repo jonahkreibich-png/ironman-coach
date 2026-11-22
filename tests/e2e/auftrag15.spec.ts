@@ -139,7 +139,9 @@ test('neues Gerät ganz ohne Daten: Dropbox verbinden führt nach dem Konto dire
   await page.route('https://www.dropbox.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<p>Dropbox</p>' }));
   for (let k = 0; k < 3; k++) {
     await page.goto('/?go=verbindungen');
-    if (k) await page.evaluate(() => { localStorage.removeItem('ec_sync_auth'); });
+    // erst wenn die App fertig gestartet ist und mit dem Server gesprochen hat; sonst schreibt die laufende Kontoabfrage die Anmeldung
+    // gleich wieder zurück (seit 3.28.0 startet die App vor dem Ende des Seitenladens, Entscheidung 639)
+    if (k) { await page.waitForLoadState('networkidle'); await page.evaluate(() => { localStorage.removeItem('ec_sync_auth'); }); }
     if (k) await page.goto('/?go=verbindungen');
     await page.locator('[data-act="conn-open"][data-id="dropbox"]').click();
     const nav = page.waitForURL(/dropbox\.com\/oauth2\/authorize/, { timeout: 15000 });
