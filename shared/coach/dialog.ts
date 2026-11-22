@@ -9,7 +9,7 @@ import { claimFacts, stripUnsupported, fixCoachText, type ClaimFacts } from './c
 import * as C from '../core';
 import { withTerms } from '../glossary';
 import * as W from '../workouts';
-import type { EngineCtx } from './engine';
+import { readinessOf, readinessFacts, type EngineCtx } from './engine';
 import { painMention, trainingChoice, understand as answerQuestion, norm, has, dayIn, sportIn, bodyIn, weeksOf, dayOf, live, fmtD, sessLine, easyToday } from './intents';
 import { checkMessage } from './safety';
 import { joinDe } from './texts';
@@ -29,7 +29,7 @@ export interface Opt { label: string; say: string; go?: string }
 export interface Pending { kind: 'confirm' | 'move-day' | 'which' | 'scope' | 'period' | 'pain' | 'pain-where' | 'rule-scope' | 'goal-date' | 'what'; at: number; ops?: Op[]; data?: any; options?: Opt[] }
 export interface DialogState { pending?: Pending | null; focus?: { sid: string; date: string } | null }
 export interface Reply { intent: string; text: string; options?: Opt[]; apply?: Op[]; pending?: Pending | null; suggestions?: string[]; /** Auftrag 32: Angebot der Tagesentscheidung (gilt bis Ja/Nein) */ offer?: Offer | null; decision?: { kind: string; verdict: string } }
-type Extra = { scores?: any[]; prognosis?: any };
+type Extra = { scores?: any[]; prognosis?: any; form?: any };
 type Sx = { s: any; date: string };
 type AdjOp = Extract<Op, { op: 'adjust' }>;
 
@@ -531,6 +531,14 @@ function runVerb(ctx: EngineCtx, d: DialogState, verb: Verb, list: Sx[], data: a
     }
     const op = scaleOp(ctx, [x], f, 'Wunsch im Coach-Chat', target || undefined);
     if (!op.adj.length) return { intent: verb, text: `${x.s.title} hat keine feste Dauer, die ich ändern kann.` };
+    // Auftrag 40 (Vorschlag 11): rote Ampel heute → erst Pause anbieten (vorher: Pause empfohlen, auf Nachfrage aber nur gekürzt)
+    if (verb === 'shorter' && !data.redOk && x.date === ctx.today && !target) {
+      const R: any = readinessOf(ctx);
+      if (R && R.level === 2) {
+        const why = readinessFacts(ctx, ctx.today).slice(0, 2);
+        return { intent: 'shorter-red', text: `Deine Ampel ist heute rot${why.length ? ` (${why.join(', ')})` : ''}. Dann lieber ganz Pause statt nur kürzer: Soll ich „${x.s.title}“ heute streichen?`, pending: { kind: 'what', at: Date.now(), data: { list: [x], redOk: true } }, options: [{ label: 'Heute Pause', say: 'streichen' }, { label: 'Trotzdem nur kürzer', say: 'kürzer' }, { label: 'So lassen', say: 'nein' }] };
+      }
+    }
     return propose(verb, `${op.adj[0].what}?`, [op]);
   }
   if (verb === 'harder') {

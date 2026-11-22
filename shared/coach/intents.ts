@@ -11,13 +11,14 @@ import { joinDe, de, dowName } from './texts';
 import { sleepNeed, isMinor } from '../profile';
 import { mainGoal, nextGoal, GOALS } from '../goals';
 import { parseConsiderations } from '../considerations';
-import { hrZonesFor } from '../sports';
+import { hrZonesFor, powerZonesFor, swimZonesFor } from '../sports';
 import { restDayReason } from '../trainingrules';
+import { loadSeriesFromDaily } from '../load';
 const KNOWLEDGE_REST = 'In der Pause passt sich der Körper an das Training an und wird stärker.';
 
 export interface ChatAction { label: string; kind: 'illness-start' | 'illness-end' | 'add-note' | 'adjust' | 'go' | 'say' | 'rule-fix'; payload?: any }
 export interface ChatReply { intent: string; text: string; actions?: ChatAction[]; suggestions?: string[] }
-type Extra = { scores?: any[]; prognosis?: any };
+type Extra = { scores?: any[]; prognosis?: any; form?: any };
 
 /* ---------- Text normalisieren und unscharf vergleichen ---------- */
 export function norm(s: string): string {
@@ -90,11 +91,86 @@ export function clearDay(ctx: EngineCtx, date: string): { adj: any[]; text: stri
   return { adj, text: `Vorschlag für ${fmtD(date)}: ${joinDe(done)}.` };
 }
 
+/* Auftrag 40 (Vorschlag 6): Zonen je Sportart aus den Schwellen im Profil (Laufen/Rad Puls, Rad Watt, Schwimmen Pace pro 100 m) */
+const mmssZ = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+function zonesAnswer(ctx: EngineCtx, t: string[]): string {
+  const th: any = ctx.profile.thresholds || {}; const est: string[] = th.estimated || [];
+  const ZS = ['run', 'bike', 'swim']; const asked = sportIn(t);
+  const mine = (ctx.profile.sports || []).filter((x: string) => ZS.includes(x));
+  const list = asked && ZS.includes(asked) ? [asked] : mine.length ? mine : ['run'];
+  const parts: string[] = []; const guessed: string[] = []; const missing: string[] = [];
+  for (const sp of list) {
+    if (sp === 'run') {
+      if (!th.lthrRun) { missing.push('Laufen'); continue; }
+      const z = hrZonesFor(th.lthrRun); parts.push(`Laufen: Zone 2 (locker) ${z[1].lo}-${z[1].hi}, Zone 4 (Schwelle) ${z[3].lo}-${z[3].hi} Schläge`);
+      if (est.includes('lthrRun')) guessed.push('Laufen');
+    } else if (sp === 'bike') {
+      const bits: string[] = [];
+      if (th.ftp) { const z = powerZonesFor(th.ftp); bits.push(`Zone 2 ${z[1].lo}-${z[1].hi} W, Zone 4 ${z[3].lo}-${z[3].hi} W`); }
+      if (th.lthrBike) { const z = hrZonesFor(th.lthrBike); bits.push(`Puls Zone 2 ${z[1].lo}-${z[1].hi}, Zone 4 ${z[3].lo}-${z[3].hi}`); }
+      if (!bits.length) { missing.push('Rad'); continue; }
+      parts.push(`Rad: ${bits.join('; ')}`);
+      if ((th.ftp && est.includes('ftp')) || (!th.ftp && est.includes('lthrBike'))) guessed.push('Rad');
+    } else if (sp === 'swim') {
+      if (!th.cssSec) { missing.push('Schwimmen'); continue; }
+      const z = swimZonesFor(th.cssSec); parts.push(`Schwimmen: Zone 2 (locker) ${mmssZ(z[1].fast)}-${mmssZ(z[1].slow)}, Zone 4 (CSS) ${mmssZ(z[3].fast)}-${mmssZ(z[3].slow)} pro 100 m`);
+      if (est.includes('cssSec')) guessed.push('Schwimmen');
+    }
+  }
+  if (!parts.length) return `Für ${joinDe(missing)} habe ich noch keine Schwelle. Ein Test macht die Zonen genau: Mehr → Zonen und Tests.`;
+  return `${parts.join('. ')}.${guessed.length ? ` Geschätzt aus deinem Profil: ${joinDe(guessed)}. Ein Test macht die Werte genau.` : ''}${missing.length ? ` Für ${joinDe(missing)} fehlt noch eine Schwelle.` : ''} Alle Zonen stehen unter Mehr → Zonen und Tests.`;
+}
+
+/* Auftrag 40 (Vorschlag 5): „Wie fit bin ich?“ und „Bin ich übertrainiert?“ – aus Gesamt-Form, Scores, Ampel und Belastung (CTL/ATL/TSB) */
+function loadNow(ctx: EngineCtx): { ctl: number; atl: number; tsb: number; ratio: number | null } | null {
+  try {
+    const loads: Record<string, number> = {};
+    C.dailyLoadEntries({ ...ctx.state, profile: ctx.profile }, weeksOf(ctx)).forEach((e: any) => { loads[e.date] = (loads[e.date] || 0) + e.load; });
+    const last: any = loadSeriesFromDaily(loads, ctx.state.trend || [], ctx.today, ctx.state.settings).at(-1);
+    return last ? { ctl: last.ctl, atl: last.atl, tsb: last.tsb, ratio: last.loadRatio } : null;
+  } catch (e) { return null; }
+}
+const SPN: Record<string, string> = { run: 'Laufen', bike: 'Rad', swim: 'Schwimmen', strength: 'Kraft' };
+function fitnessAnswer(ctx: EngineCtx, x: Extra): string {
+  const out: string[] = [];
+  const g = mainGoal(ctx.goals, ctx.today);
+  const f = x && x.form;
+  if (f && typeof f.score === 'number') out.push(`Gesamt-Form ${f.score} von 100${g ? ` für ${g.name}` : ''}: deine Trainingsbelastung der letzten Wochen (Fitness ${Math.round(f.ctl || 0)}) im Vergleich zu dem, was ${g ? 'das Ziel' : 'allgemeine Fitness'} etwa braucht (${f.target}).`);
+  else { const L = loadNow(ctx); out.push(L && L.ctl >= 1 ? `Deine Fitness (CTL, Belastung der letzten etwa 6 Wochen) liegt bei ${Math.round(L.ctl)}.` : 'Deine Fitness kann ich noch nicht berechnen: Dafür brauche ich erledigte Einheiten mit Dauer.'); }
+  const sc = (x && x.scores || []).filter((s: any) => s && typeof s.score === 'number');
+  if (sc.length) out.push(`Scores: ${sc.map((s: any) => `${SPN[s.sport] || s.sport} ${s.score}`).join(', ')}.`);
+  const R: any = readinessOf(ctx);
+  if (R && R.level <= 2) out.push(`Heute: Ampel ${['grün', 'gelb', 'rot'][R.level]}.`);
+  if (!out.length) return 'Dafür habe ich noch zu wenig Daten. Trag ein paar Einheiten mit Dauer und Puls ein oder verbinde deine Uhr, dann sehe ich deine Form. Den Stand siehst du unter Fortschritt.';
+  out.push('Mehr unter Fortschritt.');
+  return out.join(' ');
+}
+function overtrainedAnswer(ctx: EngineCtx): string {
+  const signs: string[] = []; const ok: string[] = [];
+  const R: any = readinessOf(ctx);
+  if (R && R.level === 2) signs.push('deine Ampel ist heute rot'); else if (R && R.level === 1) signs.push('deine Ampel ist heute gelb'); else if (R && R.level === 0) ok.push('Ampel grün');
+  const L = loadNow(ctx);
+  if (L && L.ctl > 0) {
+    if (L.tsb < -30) signs.push(`du bist sehr müde (Frische ${Math.round(L.tsb)})`); else ok.push(`Frische ${L.tsb > 0 ? '+' : ''}${Math.round(L.tsb)}`);
+    if (L.ratio != null && L.ratio > 1.5) signs.push(`die letzte Woche war viel mehr als gewohnt (${de(L.ratio)}-fach)`);
+  }
+  const b = C.baselineOf(ctx.state.trend, ctx.state.illnessPeriods, ctx.today, 'restingHR');
+  const rhr = (ctx.state.trend || []).filter((p: any) => p && p.restingHR && p.date <= ctx.today && p.date > C.addDays(ctx.today, -4));
+  if (b && b.n >= C.MIN_DAYS && rhr.length >= 2 && rhr.every((p: any) => p.restingHR >= b.mean + 5)) signs.push(`dein Ruhepuls ist seit ${rhr.length} Tagen erhöht`);
+  const tail = ' Übertraining entsteht über Wochen: anhaltende Müdigkeit, schlechtere Leistung trotz Pause, schlechter Schlaf. Hält das länger als 2 Wochen an, sprich mit einer Ärztin oder einem Arzt.';
+  if (signs.length) return `Ein paar Warnzeichen: ${joinDe(signs)}. Dann 2-3 Tage locker oder frei, viel Schlaf und gut essen.${tail}`;
+  if (!ok.length) return `Dafür habe ich noch zu wenig Werte (Morgenwerte oder Einheiten mit Dauer). Achte auf dein Gefühl.${tail}`;
+  return `Keine Zeichen von Übertraining: ${joinDe(ok)}.${tail}`;
+}
+
 /* ---------- Absichten ---------- */
 interface Intent { id: string; when: (toks: string[], raw: string) => boolean; answer: (ctx: EngineCtx, toks: string[], raw: string, x: Extra) => ChatReply | string }
 const A = (...g: string[][]) => (toks: string[]) => g.every(words => has(toks, words));
 
 export const INTENTS: Intent[] = [
+  // Auftrag 40 (Vorschlag 5): vorher „nicht verstanden“
+  { id: 'overtrained', when: t => /\b(ue?bertrain\w*|overtrain\w*|zu viel trainiert)\b/.test(t.join(' ')), answer: ctx => overtrainedAnswer(ctx) },
+  { id: 'fitness', when: t => { const j = t.join(' '); return /\bwie fit\b|\bwie gut in form\b|\b(meine|mein) (fitness|form|fitnessstand|fitnesslevel)\b|\bfitnessstand\b|\bfitnesslevel\b|\bin welcher form\b/.test(j) && !/\bheute\b|\bwieder fit\b/.test(j); }, answer: (ctx, _t, _r, x) => fitnessAnswer(ctx, x) },
   // Auftrag 39: „Wie viele Stunden trainiere ich diese Woche?“ – vorher antwortete der Coach mit dem heutigen Tag bzw. dem Ruhetag
   { id: 'week-hours', when: t => has(t, ['stunden', 'minuten', 'umfang', 'trainingszeit']) && has(t, ['woche', 'wochen']) && !has(t, ['letzte', 'letzten', 'vergangene', 'vergangenen', 'vorige']),
     answer: (ctx, t) => {
@@ -188,9 +264,9 @@ export const INTENTS: Intent[] = [
   { id: 'rhr', when: t => has(t, ['ruhepuls', 'ruheherzfrequenz']),
     answer: ctx => { const p = (ctx.state.trend || []).filter((x: any) => x && x.restingHR).slice(-1)[0]; const b = C.baselineOf(ctx.state.trend, ctx.state.illnessPeriods, ctx.today, 'restingHR');
       return p ? `Ruhepuls zuletzt ${p.restingHR}.${b && b.n >= C.MIN_DAYS ? ` Normal sind bei dir etwa ${Math.round(b.mean)}.` : ' Deinen Normalbereich lerne ich noch.'} 5 Schläge über normal sind ein Warnzeichen.` : 'Noch keine Ruhepuls-Werte.'; } },
-  { id: 'zones', when: t => has(t, ['zone', 'zonen', 'pulsbereich', 'welcher puls', 'puls']) && !has(t, ['ruhepuls', 'zone 2 ist', 'was ist zone']),
-    answer: ctx => { const th = ctx.profile.thresholds; const z = hrZonesFor(th.lthrRun); const est = (th.estimated || []).includes('lthrRun');
-      return `Laufen: Zone 2 (locker) ${z[1].lo}-${z[1].hi}, Zone 4 (Schwelle) ${z[3].lo}-${z[3].hi} Schläge.${est ? ' Die Werte sind aus deinem Profil geschätzt. Ein 30-min-Lauftest macht sie genau.' : ''} Alle Zonen stehen unter Mehr → Zonen und Tests.`; } },
+  // Auftrag 40 (Vorschlag 6): Zonen je Sportart (vorher nur Laufen, auch bei Rad und Triathlon); genannte Sportart oder alle eigenen
+  { id: 'zones', when: t => has(t, ['zone', 'zonen', 'pulsbereich', 'welcher puls', 'puls', 'wattbereich', 'watt']) && !has(t, ['ruhepuls', 'zone 2 ist', 'was ist zone']),
+    answer: (ctx, t) => zonesAnswer(ctx, t) },
   { id: 'what-zone2', when: t => has(t, ['was ist', 'was bedeutet', 'erklaer']) && has(t, ['zone', 'grundlage', 'schwelle', 'rpe', 'hfv', 'ctl', 'tapering']),
     answer: (_c, t) => has(t, ['tapering']) ? 'Tapering heißt: vor dem Wettkampf weniger trainieren, aber kurz und knackig. So startest du frisch.' : has(t, ['rpe']) ? 'RPE ist dein Gefühl von 1 (ganz leicht) bis 10 (Maximum). 3-4 ist locker, 7-8 hart.' : has(t, ['ctl']) ? 'CTL ist deine Fitness aus den letzten etwa 6 Wochen Training, ATL die Müdigkeit der letzten Woche.' : has(t, ['schwelle']) ? 'Die Schwelle ist das Tempo, das du etwa eine Stunde halten kannst. Zone 4 liegt dort.' : 'Zone 2 ist locker: du kannst noch ganze Sätze sprechen. Dort entsteht die Grundlage, etwa 80 % deines Trainings.' },
   { id: 'nutrition', when: t => has(t, ['essen', 'ernaehrung', 'kalorien', 'kohlenhydrate', 'eiweiss', 'protein', 'hunger']) && !has(t, ['wettkampf', 'rennen']),
@@ -277,7 +353,7 @@ export function understand(ctx: EngineCtx, text: string, extra: Extra = {}): Cha
       if (!it.when(toks, norm(raw))) continue;
       const a = it.answer(ctx, toks, norm(raw), extra);
       return typeof a === 'string' ? { intent: it.id, text: a } : a;
-    } catch (e) { /* nächste Absicht probieren */ }
+    } catch (e) { if (typeof process !== "undefined" && process.env && process.env.COACH_DEBUG) console.error("INTENT", it.id, e); /* nächste Absicht probieren */ }
   }
   return { intent: 'unknown', text: 'Das verstehe ich leider noch nicht. Ich kann Fragen zu Training, Erholung, Plan und Zielen beantworten und den Plan umstellen. Probier zum Beispiel einen dieser Sätze:', suggestions: SUGGEST };
 }

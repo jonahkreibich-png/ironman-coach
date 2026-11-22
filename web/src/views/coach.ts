@@ -266,7 +266,7 @@ export async function ask(text: string, el?: HTMLButtonElement, o: { local?: boo
       catch (e) { STREAM = null; delete STATE.coachMsgs[userMsg.id]; /* ohne Verbindung, Kontingent leer oder Fehler: der Regel-Coach antwortet */ if (!FELL_BACK) { FELL_BACK = true; toast(t('coach.freeFallback')); } loadAiState().then(() => nav.rerender()); } finally { if (el) el.disabled = false; }
     }
     invalidate(); const d = D();
-    const { reply, dialog } = converse(d.engine, STATE.chatDialog || {}, text, { scores: d.scores, prognosis: d.prognosis });
+    const { reply, dialog } = converse(d.engine, STATE.chatDialog || {}, text, { scores: d.scores, prognosis: d.prognosis, form: d.form });
     STATE.chatDialog = dialog;
     const msg: any = { id: `msg-a-${now}`, at: now + 1, date: todayStr(), kind: reply.intent === 'safety' ? 'warning' : 'answer', from: 'coach', chat: true, intent: reply.intent, text: reply.text, options: reply.options || [], suggestions: reply.suggestions || [], pendingOpen: !!reply.pending,
       // Auftrag 32: Angebot der Tagesentscheidung bleibt an der Nachricht (gilt bis Ja/Nein; Folgefragen beziehen sich darauf)
