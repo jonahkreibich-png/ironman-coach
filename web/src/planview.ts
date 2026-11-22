@@ -4,6 +4,7 @@
 import { profile } from './store';
 import { kmPlan, totalLine, distTxt, paceEstimated, type KmPlan } from '../../shared/kmview';
 import { shortPlan } from '../../shared/workouts';
+import { duration } from '../../shared/i18n';
 
 /** km-Rechnung der Einheit (null: geht nicht in km, z. B. Rolle drinnen, Lauf-Geh-Wechsel, Schwimmen) */
 export function kmOf(s: any): KmPlan | null {
@@ -18,6 +19,6 @@ export function whatText(s: any): string {
 /** Dauer/Strecke für Listen: „60 min · ca. 9,5 km“ */
 export function amountParts(s: any): string[] | null {
   const k = kmOf(s); if (!k) return null;
-  return [`${s.plannedMinutes || k.min} min`, `ca. ${distTxt(k.km)}`];
+  return [duration(s.plannedMinutes || k.min), `ca. ${distTxt(k.km)}`];
 }
 export function totalOf(s: any): string { const k = kmOf(s); return k ? totalLine(s.spec, 'min', s.plannedMinutes, { estimated: k.estimated }) : ''; }

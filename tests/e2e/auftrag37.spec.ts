@@ -189,7 +189,7 @@ test('Nachtragen: Wochentag + Datum je Einheit, nach Datum sortiert; „Nachtrag
   await seed37(page); await open(page, '/');
   await page.locator('[data-act="missed-open"]').click();
   const labels = await sheet(page).locator('[data-missed-label]').allTextContents();
-  expect(labels.some(l => l.startsWith('Mo, 12.10. · Rad locker 60 min'))).toBe(true);
+  expect(labels.some(l => l.startsWith('Mo, 12.10. · Rad locker 1 h') /* Auftrag 40: eine Schreibweise für Dauern */)).toBe(true);
   expect(labels.some(l => l.startsWith('Di, 13.10. · Lockerer Lauf 40 min'))).toBe(true);
   const dates = await sheet(page).locator('[data-missed]').evaluateAll(els => els.map(e => e.getAttribute('data-date')));
   expect([...dates].sort()).toEqual(dates);

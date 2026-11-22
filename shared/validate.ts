@@ -124,6 +124,16 @@ export function fmtTimeInput(sec: number, kind: TimeKind): string {
   if (h || kind === 'hms') return `${h}:${String(mi).padStart(2, '0')}:${String(se).padStart(2, '0')}`;
   return `${mi}:${String(se).padStart(2, '0')}`;
 }
+/** Auftrag 40 (Vorschlag 15): gespeicherte Dauer (Minuten) so im Feld zeigen, wie die Zeitregel sie wieder liest – ganze Minuten als
+ *  Zahl („65“), mit Sekunden als Zeit („45:15“ statt „45,25“, „1:05:30“, unter 10 min „0:05:30“). Gilt für lange und kurze Dauer-Felder. */
+export function fmtDurInput(min: number): string {
+  if (!Number.isFinite(min)) return '';
+  const t = Math.round(min * 60);
+  if (t % 60 === 0) return String(t / 60);
+  const h = Math.floor(t / 3600), mi = Math.floor(t / 60), se = t % 60;
+  if (mi >= 10 && mi < 60) return `${mi}:${String(se).padStart(2, '0')}`;
+  return `${h}:${String(mi % 60).padStart(2, '0')}:${String(se).padStart(2, '0')}`;
+}
 /** Pace-Grenzen eines Felds in Sekunden (Laufen je km, Schwimmen je 100 m) */
 export const paceLimits = (key: string): [number, number] | null => PACE[key] || null;
 
@@ -278,6 +288,7 @@ export function inputDisplay(sport: VSport, key: string, stored: any): string {
   const spec = sessionInputSpec(sport, key);
   const n = parseNum(stored);
   if (!spec || n == null || !Number.isFinite(n)) return String(stored);
+  if (spec.hm === 'min' && (spec.unit || 'min') === 'min') return fmtDurInput(n);
   return deNum(round6(n / (spec.store || 1)));
 }
 

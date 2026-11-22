@@ -45,7 +45,8 @@ test('Einheit Laufen: Dauer, Pace, Test-Pace und km-Abschnitt nur mit Ziffern; â
   const min = sheet(page).locator('#fd-min'); await decimalPad(min);
   await typeTime(min, '4530', '45:30', '= 45 min 30 s');
   await expect.poll(async () => (await stored(page)).sessions.lt39.metrics.min).toBe('45.5');
-  await expect(min).toHaveValue('45,5');
+  // Auftrag 40 (Vorschlag 15): gespeicherte Dauer als Zeit, Zeile darunter bleibt stehen (Vorschlag 14)
+  await expect(min).toHaveValue('45:30'); await expect(hintOf(min)).toHaveText('= 45 min 30 s');
   await typeTime(min, '45,30', '45,30', '= 45 min 30 s');
   await expect.poll(async () => (await stored(page)).sessions.lt39.metrics.min).toBe('45.5');
   // â€ž45,3â€œ ist unklar: Nachfrage, gespeichert bleibt 45,5 bis zur Antwort
@@ -82,7 +83,12 @@ test('Einheit Laufen: Dauer, Pace, Test-Pace und km-Abschnitt nur mit Ziffern; â
   // neu laden: dieselben Zeiten
   await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
   await openPlanSession(page, 'lt39'); await openDetails(page);
-  await expect(sheet(page).locator('#fd-min')).toHaveValue('45,3');
+  await expect(sheet(page).locator('#fd-min')).toHaveValue('45:18');
+  // Vorschlag 14: nach dem Neuladen steht unter jedem ausgefÃ¼llten Zeitfeld, was gespeichert ist
+  await expect(hintOf(sheet(page).locator('#fd-min'))).toHaveText('= 45 min 18 s');
+  await expect(hintOf(sheet(page).locator('#fd-pace'))).toHaveText('= 5 min 18 s pro km');
+  await expect(hintOf(sheet(page).locator('#fd-testPace'))).toHaveText('= 4 min 40 s pro km');
+  await expect(hintOf(sheet(page).locator('#fd-split-0'))).toHaveText('= 6 min 12 s pro km');
   await expect(sheet(page).locator('#fd-pace')).toHaveValue('5:18');
   await expect(sheet(page).locator('#fd-testPace')).toHaveValue('4:40');
   await expect(sheet(page).locator('#fd-split-0')).toHaveValue('6:12');

@@ -4,7 +4,7 @@ import {customDraft} from './custom-draft27';
    Darunter für alle: RPE, Gefühl, „geplant vs. gemacht“ und eine optionale Notiz. Automatisch: Pulszone und CTL/ATL/TSB des Tages. */
 import { findCustomRecord, STATE, BASE_WEEKS, saveSoon, saveState, profile } from '../store';
 import { esc } from '../util';
-import { t } from '../../../shared/i18n';
+import { t, duration } from '../../../shared/i18n';
 import { on, onChange, onInput, CHANGE, srcBadge, more, refreshSheet, timeField, readTime, tfRead, tfInvalid, tfAsking, tfData, tfHint, durHint, secToMmss, termLink, ic } from '../kit';
 import { SPORT_FIELDS, FEEL, zoneVerdict, loadOn, type FieldDef } from '../../../shared/fields';
 import { setSessionMetricManual, resetSessionMetrics } from '../../../shared/activity/merge';
@@ -134,7 +134,7 @@ export function totalsBlock(tg: Target, after = ''): string {
   const hasOrig = st.metricsAuto && Object.keys(st.metricsAuto).length && Object.keys(st.metricsManual || {}).length;
   const watch = !!(st.activityId || (st.metricsAuto && Object.keys(st.metricsAuto).length));
   const m = st.metrics || {};
-  const sum = [m.min ? `${String(m.min).replace('.', ',')} min` : '', tg.sport === 'swim' && m.meters ? `${m.meters} m` : m.km ? `${String(m.km).replace('.', ',')} km` : '', m.hr ? `Ø Puls ${m.hr}` : ''].filter(Boolean).join(' · ');
+  const sum = [m.min ? duration(+String(m.min).replace(',', '.')) : '', tg.sport === 'swim' && m.meters ? `${m.meters} m` : m.km ? `${String(m.km).replace('.', ',')} km` : '', m.hr ? `Ø Puls ${m.hr}` : ''].filter(Boolean).join(' · ');
   const body = `<div class="stack">${hasOrig ? `<button class="link" data-act="fd-reset" ${attrs(tg)}>${esc(t('common.resetOriginal'))}</button>` : ''}
     <div class="fgrid">${main.map(f => oneField(tg, f, st)).join('')}</div>
     ${extra.length || ld ? more(t('fd.more'), `<div class="fgrid">${extra.map(f => oneField(tg, f, st)).join('')}</div>${ld ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-auto><span class="pill" data-load>CTL ${ld.ctl} · ATL ${ld.atl} · TSB ${ld.tsb > 0 ? '+' : ''}${ld.tsb}</span></div>` : ''}`, extra.some(f => { const v = (st.metrics || {})[f.key]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })) : ''}${after}</div>`;

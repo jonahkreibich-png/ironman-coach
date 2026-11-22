@@ -56,7 +56,7 @@ function planRow(s: any): string {
   const marks = sessionMarks(eff); const band = intensityBand(eff);
   // Auftrag 38: erledigt → die gemachte Dauer (aus dem Ablauf bzw. eingetragen), sonst die geplante
   const doneMin = st.completed ? parseFloat(String((st.metrics || {}).min ?? '').replace(',', '.')) : NaN;
-  const dur = Number.isFinite(doneMin) && doneMin > 0 ? duration(Math.round(doneMin)) : s.plannedMinutes && !new RegExp('\\b' + s.plannedMinutes + ' min').test(s.title || '') ? duration(s.plannedMinutes) : '';
+  const dur = Number.isFinite(doneMin) && doneMin > 0 ? duration(doneMin) : s.plannedMinutes && !new RegExp('\\b' + s.plannedMinutes + ' min').test(s.title || '') ? duration(s.plannedMinutes) : '';
   const check = status === 'done' || status === 'open' || status === 'missed'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   const test = marks.includes('test') && !st.completed && status !== 'cancelled';
@@ -145,7 +145,7 @@ function selDay(w: any, today: string): string | null {
   if (UI.planDate === '') return null;
   return w.days.some((d: any) => d.date === today) ? today : null;
 }
-const mins = (m: number) => m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : `${m}′`;
+const mins = (m: number) => duration(m); // Auftrag 40: wie überall („1 h 30 min“ statt „1:30“, „25 min“ statt „25′“)
 /* C: Wochenüberblick (Balken je Tag) und aufklappbare Tage */
 function weekMix(w: any, today: string): string {
   const sel = selDay(w, today);

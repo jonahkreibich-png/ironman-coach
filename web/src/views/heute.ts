@@ -186,13 +186,13 @@ export function renderHeute(): string {
 
 on('plan-day', el => { UI.planDate = el.dataset.date; nav.go('plan'); });
 on('checkin-open', () => openCheckin(D().today));
-void duration;
+
 
 /* Offene (vergessene) Einheiten. Auftrag 37: je Einheit Wochentag + Datum („Mi, 11.11. · Lockerer Lauf 40 min“), nach Datum sortiert;
    „Nachtragen“ öffnet die Einheit dieses Tages, „Nicht gemacht“ markiert nur diese; „Alle als nicht gemacht“ bleibt. */
 export function missedLabel(s: any): string {
   const title = String(s.title || '');
-  const min = s.plannedMinutes && !/\bmin\b/.test(title) ? ` ${s.plannedMinutes} min` : '';
+  const min = s.plannedMinutes && !/\bmin\b/.test(title) ? ` ${duration(s.plannedMinutes)}` : '';
   return `${dowShort(s.date)}, ${fmtDate(s.date)} · ${title}${min}`;
 }
 function missedSheet(): string {

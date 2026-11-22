@@ -70,8 +70,12 @@ export function temp(c: number | null | undefined, signed = false): string {
   if (UNITS === 'imperial') { const f = signed ? c * 1.8 : c * 1.8 + 32; return `${signed && f > 0 ? '+' : ''}${num(f, 1)} °F`; }
   return `${signed && c > 0 ? '+' : ''}${num(c, 1)} °C`;
 }
+/** Auftrag 40 (Vorschlag 10): EINE Schreibweise für Dauern überall (Plan-Tag, Heute, Dashboard, Einheit, Coach-Hinweise):
+ *  „25 min“, „45 min 30 s“ (Sekunden nur unter einer Stunde), „1 h“, „1 h 30 min“ – wie die Zeile unter den Zeitfeldern. */
 export function duration(min: number | null | undefined): string {
   if (min == null || !isFinite(min)) return '–';
+  const t = Math.round(min * 60);
+  if (t < 3600 && t % 60) { const mm = Math.floor(t / 60), ss = t % 60; return mm ? `${mm} min ${ss} s` : `${ss} s`; }
   const m = Math.round(min);
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60), r = m % 60;

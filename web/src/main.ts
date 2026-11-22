@@ -6,7 +6,7 @@ import { morph } from './morph';
 import { STATE, UI, HAS_PLAN, findDay, saveState, saveUi, refreshStoredState, rebuildPlanIndex, readPlan, replacePlanInPlace, dataVersion } from './store';
 import { esc, todayStr, addDays } from './util';
 import { t } from '../../shared/i18n';
-import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, subOpen, closeSub, safeBlock, safeRun, refreshSheet, onSheetClose } from './kit';
+import { ACTIONS, CHANGE, INPUT, on, ic, closeSheet, sheetOpen, subOpen, closeSub, safeBlock, safeRun, refreshSheet, onSheetClose, tfFill } from './kit';
 import { undoBegin, undoEnd, undoToast, undoCount, clearUndo, updateUndoSlots, type UTg, type UToken } from './undo';
 import { icFill } from './icons';
 import { CHARTS, chartTap } from './charts';
@@ -166,6 +166,7 @@ function render() {
   const app = byId('app'), cur = app.firstElementChild as HTMLElement | null;
   if (cur && app.childElementCount === 1 && cur.classList.contains('view') && cur.dataset.view === viewId) morph(cur, html, softInserted || undefined);
   else app.innerHTML = `<div class="view" data-view="${esc(viewId)}">${html}</div>`;
+  tfFill(app);
   document.getElementById('app-startup')?.setAttribute('hidden', '');
   if (HAS_PLAN && UI.tab === 'coach') { if (!UI.coachVisit) { UI.coachSeenPrev = UI.coachSeenAt || 0; UI.coachVisit = true; } UI.coachSeenAt = Date.now(); saveUi(); } else if (UI.coachVisit) { UI.coachVisit = false; saveUi(); }
   // Letzte Bildschirme (für „Fehler melden“)

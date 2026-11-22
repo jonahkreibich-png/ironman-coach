@@ -127,8 +127,8 @@ function sessionSheet(id: string): string {
     const o = s._orig || {};
     // Auftrag 29: oben steht der neue Titel; hier ein kleines Abzeichen „angepasst“ mit Grund, Antippen zeigt „vorher → nachher“
     const why = [...new Set(list.map((a: any) => String(a.reason || '').trim()).filter(Boolean))].join('; ');
-    const was = [o.title, o.plannedMinutes ? o.plannedMinutes + ' min' : null, o.zone].filter(Boolean).join(' · ');
-    const now = [s.title, s.plannedMinutes ? s.plannedMinutes + ' min' : null, s.zone].filter(Boolean).join(' · ');
+    const was = [o.title, o.plannedMinutes ? duration(o.plannedMinutes) : null, o.zone].filter(Boolean).join(' · ');
+    const now = [s.title, s.plannedMinutes ? duration(s.plannedMinutes) : null, s.zone].filter(Boolean).join(' · ');
     h += `<details class="adj-info card flat tight" data-adj-info data-key="adj-info"><summary><span class="pill warn">${esc(s.movedFrom ? t('st.moved') : t('st.adjusted'))}</span> <span class="small">${esc(why || list.map((a: any) => a.what || '').join('; '))}</span><span class="chev">${ic('down')}</span></summary><div class="body small">${o.title ? `<div data-adj-before><span class="muted">vorher:</span> ${esc(was)}</div><div data-adj-after><span class="muted">nachher:</span> ${esc(now)}</div>` : ''}${list.map((a: any) => `<div class="muted">${esc(a.what || '')}</div>`).join('')}</div></details>`;
   }
   if (real && status !== 'cancelled') {

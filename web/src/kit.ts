@@ -1,7 +1,7 @@
 import { swimAids, GEAR_TXT } from '../../shared/workouts';
 /* UI-Bausteine nach DESIGN.md: Karten, Listen, Ring, Sparkline, Quellen-Symbol, Sheets, Aktionen. */
 import { esc, $ } from './util';
-import { parseInput, readTimeInput, autoColon, timeWords, fmtTimeInput, type InputSpec, type TimeKind, type TimeRead } from '../../shared/validate';
+import { parseInput, readTimeInput, autoColon, timeWords, fmtTimeInput, fmtDurInput, parseNum, type InputSpec, type TimeKind, type TimeRead } from '../../shared/validate';
 import { toast as showToast } from './toast';
 import { ic, sportIcon, SPORT_COLOR, SPORT_LABEL_KEY } from './icons';
 import { t } from '../../shared/i18n';
@@ -113,7 +113,10 @@ export function field(id: string, label: string, value: any, o: { type?: string;
   // Auftrag 39: o.dur = Dauer in Minuten (90 = 90 min, 4530 = 45:30, 45,30 = 45 min 30 s), darunter die verstandene Dauer
   const dur = o.dur ? ` ${tfData('min', [0, 86400])}` : '';
   const im = o.dur ? 'decimal' : o.inputmode;
-  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${im ? `inputmode="${im}"` : ''} ${o.min ? `min="${o.min}"` : ''} ${o.max ? `max="${o.max}"` : ''}${dur} ${o.data || ''} value="${esc(value ?? '')}" placeholder="${esc(o.placeholder || '')}">${o.dur ? tfHint(durHint(value)) : ''}</div>`;
+  // Auftrag 40 (Vorschlag 15): gespeicherte Dauer als Zeit zeigen (45,25 → „45:15“), damit sie beim Ändern genauso gelesen wird
+  const nv = o.dur && value !== '' && value != null ? parseNum(value) : null;
+  const shown = nv != null && Number.isFinite(nv) ? fmtDurInput(nv) : (value ?? '');
+  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="${o.type || 'text'}" ${o.step ? `step="${o.step}"` : ''} ${im ? `inputmode="${im}"` : ''} ${o.min ? `min="${o.min}"` : ''} ${o.max ? `max="${o.max}"` : ''}${dur} ${o.data || ''} value="${esc(shown)}" placeholder="${esc(o.placeholder || '')}">${o.dur ? tfHint(durHint(value)) : ''}</div>`;
 }
 /** „= 1 h 30 min“ unter einem Minuten-Feld, wenn die Zahl allein nicht klar ist */
 export function durHint(v: any): string { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && n > 0 && (n >= 60 || !Number.isInteger(n)) ? '= ' + timeWords(n * 60) : ''; }
@@ -132,7 +135,7 @@ export function timeField(id: string, label: string, sec: number | null | undefi
   const s = sec != null && isFinite(sec) && sec > 0 ? Math.round(sec) : null;
   const lim = o.lim !== undefined ? o.lim : kind === 'hms' ? [60, 48 * 3600] as [number, number] : null;
   const ph = kind === 'hms' ? 'z. B. 14530 = 1:45:30' : kind === 'sec' ? 'z. B. 45 = 0:45' : 'z. B. 530 = 5:30';
-  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-tf="1" ${tfData(kind, lim, o.unit)} ${data} value="${s == null ? '' : fmtTimeInput(s, kind)}" placeholder="${esc(ph)}">${tfHint()}${o.hint ? `<div class="hint">${esc(o.hint)}</div>` : ''}</div>`;
+  return `<div class="fld ${o.wide ? 'wide' : ''}"><label for="${id}">${esc(label)}</label><input class="inp" id="${id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-tf="1" ${tfData(kind, lim, o.unit)} ${data} value="${s == null ? '' : fmtTimeInput(s, kind)}" placeholder="${esc(ph)}">${tfHint(s == null ? '' : `= ${timeWords(s)}${o.unit ? ' ' + o.unit : ''}`)}${o.hint ? `<div class="hint">${esc(o.hint)}</div>` : ''}</div>`;
 }
 const tfLim = (el: HTMLElement): [number, number] | null => (el.dataset.tflo != null && el.dataset.tfhi != null ? [+el.dataset.tflo, +el.dataset.tfhi] : null);
 /** Eingabe eines Zeitfelds lesen (Regel und Grenzen aus den data-Attributen) */
@@ -169,6 +172,22 @@ function tfShow(el: HTMLElement, final: boolean) {
   if (r.err) { h.textContent = final ? (r.err === 'sec' ? 'Sekunden bitte unter 60 (z. B. 5:30).' : 'Bitte nur Ziffern tippen, z. B. 530 für 5:30.') : ''; return; }
   if (r.sec == null) { h.textContent = ''; return; }
   h.textContent = `= ${timeWords(r.sec)}${el.dataset.tfunit ? ' ' + el.dataset.tfunit : ''}`;
+}
+/** Auftrag 40 (Vorschlag 14): „= 45 min 30 s“ steht dauerhaft unter jedem ausgefüllten Zeitfeld (nicht nur beim Tippen) – nach jedem
+ *  Zeichnen von Ansicht, Fenster und Unterfenster. Ganze Minuten unter 60 brauchen keine Erklärung. Nachfragen bleiben stehen. */
+export function tfFill(root: ParentNode | null | undefined): void {
+  if (!root || typeof (root as any).querySelectorAll !== 'function') return;
+  root.querySelectorAll<HTMLInputElement>('input[data-tfkind]').forEach(el => {
+    try {
+      const raw = el.value.trim(); if (!raw || el.dataset.tfask === '1') return;
+      const nx = el.nextElementSibling as HTMLElement | null;
+      if (nx && nx.matches('[data-tf-hint]') && nx.textContent) return;
+      const kind = (el.dataset.tfkind || 'ms') as TimeKind; const r = tfRead(el);
+      if (r.sec == null || r.ask || r.err || r.out) return;
+      if ((kind === 'min' || kind === 'minShort') && r.sec % 60 === 0 && r.sec < 3600) return;
+      tfHintEl(el).textContent = `= ${timeWords(r.sec)}${el.dataset.tfunit ? ' ' + el.dataset.tfunit : ''}`;
+    } catch (e) { /* Anzeige darf nie scheitern */ }
+  });
 }
 /* Knopf der Nachfrage: „5:30“ / „5:18 (5,3 min)“ bzw. bei langen Zeiten in Worten („1 h 30 min“ / „1 min 30 s“) */
 function askLabel(s: number, kind: TimeKind, raw: string): string {
@@ -226,7 +245,7 @@ export function termLink(term: string, label = term): string { return `<button t
 export function openSheet(title: string, render: () => string): void {
   nav.seq++; // Auftrag 35: neuere Handlung – ein noch ausstehender Tab-Tipp schließt das Blatt nicht mehr
   sheetRender = () => `<div class="sheet-grip"></div><div class="sheet-h"><h2>${esc(title)}</h2><button class="icon-btn" data-act="sheet-close" aria-label="${esc(t('common.close'))}">${ic('close')}</button></div>${render()}`;
-  $('#sheetPanel').innerHTML = sheetRender();
+  $('#sheetPanel').innerHTML = sheetRender(); tfFill($('#sheetPanel'));
   $('#sheet').hidden = false; document.body.style.overflow = 'hidden';
 }
 /* Auftrag 37: aufgeklappte Bereiche nach dem Neuzeichnen wiederfinden. Vorher über den Text der Überschrift – gleich lautende Bereiche
@@ -251,6 +270,7 @@ function redrawPanel(p: HTMLElement, html: string): void {
   const after = Array.from(p.querySelectorAll('details')); const ak = detailsKeys(after);
   after.forEach((d, i) => { if (ak[i] && open.has(ak[i]!)) (d as HTMLDetailsElement).open = true; });
   if (keep) { const el = document.getElementById(keep.id) as HTMLInputElement | null; if (el && p.contains(el)) { if (keep.typed) el.value = keep.value; el.focus({ preventScroll: true }); try { if (keep.sel != null) el.setSelectionRange(keep.sel, keep.sel); } catch (e) { /* Feldart ohne Auswahl */ } } }
+  tfFill(p);
   p.scrollTop = y;
 }
 export function refreshSheet(): void {
@@ -277,7 +297,7 @@ export function openSub(title: string | (() => string), render: () => string, on
   if (subRender) closeSub(true); // Wechsel zu einem anderen Teil: ohne Schließen-Hinweis
   subTitle = typeof title === 'function' ? title : () => title; subRender = render; subClosed = onClose || null;
   const html = subHtml(); if (!html) { subRender = null; subClosed = null; return; }
-  $('#subPanel').innerHTML = html; el.hidden = false; document.body.style.overflow = 'hidden'; $('#subPanel').scrollTop = 0;
+  $('#subPanel').innerHTML = html; tfFill($('#subPanel')); el.hidden = false; document.body.style.overflow = 'hidden'; $('#subPanel').scrollTop = 0;
 }
 export function refreshSub(): void {
   const el = subEl(); if (!subRender || !el || el.hidden) return;
