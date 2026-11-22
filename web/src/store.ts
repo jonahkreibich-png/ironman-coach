@@ -289,6 +289,9 @@ export function repairOnStart(): boolean {
     ghosts.forEach((g, i) => { const id = `nogame-${g.id}`; if (!STATE.adjustments[id]) { STATE.adjustments[id] = { id, group: 'nogame-' + today, type: 'cancel', removed: true, sessionId: g.id, date: today, createdAt: now + i, what: `${g.title} entfällt`, reason: 'Keine Spiele eingetragen' }; changed = true; } });
     if (changed) rebuildPlanIndex();
   }
+  // Auftrag 41: leere bzw. doppelte Anpassungen und interne Platzhalter über den normalen Sync bereinigen (mit Zeitstempel)
+  const fixed = CoachCore.adjustmentCleanup(BASE_WEEKS, STATE.adjustments || {});
+  if (Object.keys(fixed).length) { const now = Date.now(); Object.entries(fixed).forEach(([id, a]: any) => { STATE.adjustments[id] = { ...a, updatedAt: now }; }); rebuildPlanIndex(); changed = true; }
   return changed;
 }
 { try { if (repairOnStart()) saveState(); } catch (e) { /* nie den Start verhindern */ } }

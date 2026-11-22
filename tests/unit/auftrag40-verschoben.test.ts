@@ -35,18 +35,20 @@ describe('Vorschlag 8: verschobener Test, der nicht mehr passt', () => {
     expect(x.s.title).not.toMatch(/test/i);
     expect(x.s.droppedTest).toBe(FEB);
   });
-  test('Coach: neuer Termin nach den 2 Wochen als Vorschlag mit „Übernehmen“ (ersetzt eine Rad-Einheit an Tag 15-42)', () => {
+  test('Coach: neuer Termin nach den 2 Wochen gleich eingeplant (Auftrag 41: Tests verschwinden nicht still), deutliche Nachricht', () => {
     const { ctx } = setup([11, 35]);
     const a = analyze(ctx, 'morning');
-    const p = a.proposals.find(x => x.id === `test-moved-bike-${FEB}`);
-    const i = a.insights.find(x => x.id === 'test-moved-bike');
-    expect(p || i, 'Vorschlag oder Hinweis').toBeTruthy();
-    if (p) {
-      expect(p.text).toMatch(/Dein Radtest am 17\.2\. lag in den 2 Wochen nach dem Wettkampf/);
-      const sid = p.changes[0].data.sessionId; const at = sessOf(ctx.baseWeeks, sid)!.d.date;
+    const x = a.auto.find((y: any) => y.group === `test-moved-bike-${FEB}`);
+    const i = a.insights.find(y => y.id === 'test-moved-bike');
+    expect(x || i, 'Neueinplanung oder Hinweis').toBeTruthy();
+    if (x) {
+      const at = sessOf(ctx.baseWeeks, x.sessionId)!.d.date;
       expect(diff(FEB, at)).toBeGreaterThan(14); expect(diff(FEB, at)).toBeLessThanOrEqual(42);
-      expect(p.changes[0].data.set.title).toBe('Radtest 20 min');
-      expect(a.messages.some((m: any) => m.kind === 'proposal' && m.id === 'msg-ana-prop-' + p.id)).toBe(true);
+      expect(x.set.title).toBe('Radtest 20 min');
+      const m = a.messages.find((y: any) => y.id === 'msg-ana-test-bike-' + FEB)!;
+      expect(m.text).toMatch(/Dein Radtest am 17\.2\. lag in den 2 Wochen nach dem Wettkampf/);
+      expect(m.text).toMatch(/Neuer Termin: /); expect(m.important).toBe(true);
+      expect(a.proposals.some(y => y.id.startsWith('test-moved-'))).toBe(false);
     }
   });
   test('kein Rad-Tag frei bis 6 Wochen nach dem Wettkampf → Hinweis mit frühestem Termin statt Vorschlag', () => {
@@ -54,8 +56,7 @@ describe('Vorschlag 8: verschobener Test, der nicht mehr passt', () => {
     // auch was die übrigen Regeln danach wieder eingeplant haben (Mindesthäufigkeit), fällt weg – wie am Ende eines Planabschnitts
     for (const d of ctx.baseWeeks.flatMap((x: any) => x.days)) { const k = diff(FEB, d.date); if (k >= 11 && k <= 60) d.sessions = d.sessions.filter((x: any) => x.sport !== 'bike' || x.id === 'u1-bike-test'); }
     const a = analyze(ctx, 'morning');
-    const pp = a.proposals.find(x => x.id.startsWith('test-moved-bike')); if (pp) console.log('P', pp.title, sessOf(ctx.baseWeeks, pp.changes[0].data.sessionId)?.d.date);
-    expect(!!pp).toBe(false);
+    expect(a.auto.some((x: any) => /^test-moved-/.test(x.id))).toBe(false);
     const i = a.insights.find(x => x.id === 'test-moved-bike')!;
     expect(i).toBeTruthy();
     expect(i.tip).toMatch(/Frühestens ab 22\.2\./);

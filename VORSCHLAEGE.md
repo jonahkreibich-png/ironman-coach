@@ -1,3 +1,19 @@
+# Neue Vorschläge (Auftrag 41, 22.11.) – nicht eingebaut, du entscheidest
+
+Aufwand: klein (unter 1 Tag), mittel (1–3 Tage), groß (mehr).
+
+| Nr. | Was | Warum | Aufwand |
+|---|---|---|---|
+| A | **Englisch:** entweder (a) vollständig übersetzen – alle Texte über `t()`, auch Coach-Antworten und Plan-Texte, dazu ein Test „keine deutschen Wörter bei Englisch“ – oder (b) „English (beta)“ ausblenden, bis es fertig ist | Heute sind nur 115 von 1.737 Texten übersetzt (ca. 7 %), dazu viele feste deutsche Sätze in 19 Ansichten und fast alle Coach- und Plan-Texte (shared). Wer Englisch wählt, sieht fast nur Deutsch. | (a) groß (2–3 Wochen: Ansichten ~1 Woche, Coach/Plan-Texte ~1–2 Wochen); (b) klein (1 Stunde). **Meine Empfehlung: erst (b)**, (a) nur, wenn es englische Nutzer gibt. |
+| B | **Einheiten metrisch/imperial überall:** alle km/m/Pace-Angaben über die vorhandenen Funktionen (`dist`, `pace`, `swimPace`) statt fest „km“ | Geprüft: Die Auswahl greift in Zahlen-Anzeigen über `dist()`/`pace()`, aber an ca. 25 Stellen in den Ansichten und ca. 60 Stellen in Coach-, Ablauf- und Plan-Texten steht „km“, „/km“ oder „/100 m“ fest (z. B. Einheiten-Titel, Coach-Antworten, Ablauf-Zeilen). Imperial-Nutzer sehen gemischt. | mittel (2–3 Tage) |
+| C | **Heute: höchstens 2 Hinweis-Karten gleichzeitig** (Reihenfolge: Verbindung, offene Einheiten, Mitteilungen, Pflege-Hinweise), der Rest unter „Weitere Hinweise“ | Neue Karten (Verbindung, Wochenfrage, Mitteilungen) können sich an einem Tag sammeln und die Einheit nach unten schieben | klein |
+| D | **Plan-Änderungen (Plan → Änderungen) je Einheit statt je Anlass** gruppieren, mit dem Netto-Unterschied wie in der Einheit | Die Liste zeigt jeden Schritt einzeln (z. B. „80 → 60 min“ und „60 → 50 min“ für dieselbe Einheit) | mittel |
+| E | **Coach-Tab: Plan-Nachrichten einer Woche zusammenfassen** („3 Anpassungen diese Woche“ mit Aufklappen) | Wochen-Anpassung, Plan-Pflege und Testtermin kommen als getrennte Nachrichten | klein |
+| F | **Fortschritt: gesperrte Karten („noch 14 Tage mit Messwerten“) gesammelt unten** statt zwischen den echten | Wer wenig misst, sieht viele graue Karten zwischen wenigen echten | klein |
+| G | **Wiederholungs-Prüfer auch für Mitteilungen** (Push-Texte) und den Wochenrückblick | Heute prüft er alles Sichtbare in der App, aber nicht die Texte, die als Mitteilung kommen | klein |
+| H | **Unbekannte Einheiten (ohne Eintrag) im Plan grau mit „?“** statt ohne Zeichen | Seit Auftrag 41 gelten Einheiten nach 3 Wochen ohne Eintrag als „ohne Eintrag“; im Plan ist das nur im Fenster der Einheit zu sehen | klein |
+
+
 # Vorschläge zur Entscheidung (Stand Auftrag 40, 22.11.)
 
 **Alle 15 sind seit Auftrag 40 eingebaut** (Version 3.28.0, Entscheidungen 621–635). Abweichung bei Nr. 13: Datei in Teile zerlegt, Plan-Bearbeiten wird weiter gleich mit geladen (siehe Entscheidung 635).

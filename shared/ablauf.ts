@@ -315,12 +315,14 @@ export function doneSummary(planned: any, st: any, act: any, thr: IvThresholds, 
       const size = mode(sizes);
       const zone = g.attrs ? g.attrs.zone : null;
       const steady = t0 ? !!t0.steady && !(zone != null && zone >= 3) : zone != null && zone <= 2;
-      const dDesc = descT(g.reps, size, sport);
       const w = wordOf(planned, t0, zone, sport);
+      // Auftrag 41: Schwimm-Sätze immer mit Lage („3 × 100 m Brust“)
+      const dDesc = swim && w ? `${descT(g.reps, size, sport)} ${w}` : descT(g.reps, size, sport);
       if (!steady) { workDone += sizes.reduce((a, x) => a + x, 0); hardDone.push(dDesc); }
-      if (!ts) { changes.push(`zusätzlich ${[dDesc, w].filter(Boolean).join(' ')}`); if (!steady) hardChanged = true; return; }
+      if (!ts) { changes.push(`zusätzlich ${swim ? dDesc : [dDesc, w].filter(Boolean).join(' ')}`); if (!steady) hardChanged = true; return; }
       seen.add(si!);
-      const pDesc = descT(ts.length, sizeOfT(ts[0]), sport);
+      const pw = swim ? wordOf(planned, ts[0], null, sport) : '';
+      const pDesc = pw ? `${descT(ts.length, sizeOfT(ts[0]), sport)} ${pw}` : descT(ts.length, sizeOfT(ts[0]), sport);
       const sizeDiff = size != null && sizeOfT(ts[0]) != null && Math.abs(size - sizeOfT(ts[0])!) > (swim ? 0 : 2);
       if (g.reps !== ts.length || sizeDiff) { changes.push(`${dDesc} statt ${pDesc}`); if (!ts[0].steady || !steady) hardChanged = true; }
       if (zone != null && zone !== ts[0].zone) { changes.push(`${dDesc} in Zone ${zone} statt ${ts[0].zone}`); if (!ts[0].steady) hardChanged = true; }
@@ -340,7 +342,14 @@ export function doneSummary(planned: any, st: any, act: any, thr: IvThresholds, 
   secs.filter(r => r.off).forEach(r => { const pm = plannedPart(planned, r.part); if (pm) changes.push(`ohne ${((SEC_PARTS as any)[sport] as [SecPart, string][]).find(x => x[0] === r.part)![1]}`); });
   const planTitle = String(planned.title || '');
   const more = !own || !workPlan ? null : workDone > workPlan * 1.02 ? 'more' : workDone < workPlan * 0.98 ? 'less' : null;
-  const title = hardChanged && hardDone.length ? `${SPN[sport]} ${hardDone.join(' + ')}${word ? ' ' + word : ''}${hardPlan.length ? `, statt ${hardPlan.join(' + ')}` : ''}` : planTitle;
+  // Auftrag 41: kurzer Titel – ein Satz: „Rad 3 × 10 min Sweet Spot“; mehrere Sätze: Sportart, Gesamt und Schwerpunkt („Schwimmen 1.250 m · Kraul“),
+  // ohne Gesamt der Plan-Titel. Was anders war, steht nur in „Anders als geplant“ (changes), nie als lange Liste im Titel.
+  const total = swim ? (num(st && st.metrics && st.metrics.meters) ?? (act && act.totals && act.totals.distanceM) ?? null) : (num(st && st.metrics && st.metrics.min) ?? null);
+  const totTxt = total ? (swim ? `${String(Math.round(total)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} m` : `${Math.round(total)} min`) : '';
+  const one = hardDone.length === 1 ? hardDone[0] : '';
+  const title = !(hardChanged && hardDone.length) ? planTitle
+    : one ? `${SPN[sport]} ${one}${word && !(swim && one.endsWith(word)) ? ' ' + word : ''}`
+    : totTxt ? `${SPN[sport]} ${totTxt}${word ? ' · ' + word : ''}` : planTitle;
   return { changed: changes.length > 0, title, planTitle, changes, setChanges, short: changes.join('; '), workPlan, workDone, more, word };
 }
 /** Satz für den Coach („3 × 10 min statt 2 × 8 min – mehr Sweet-Spot-Zeit (30 statt 16 min), gut.“) */

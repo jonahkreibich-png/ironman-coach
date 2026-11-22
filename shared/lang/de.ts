@@ -68,7 +68,7 @@ export const de: Record<string, string> = {
   /* ---------- Heute ---------- */
   'heute.st.ready': 'Bereit', 'heute.st.easy': 'Locker', 'heute.st.rest': 'Ruhe', 'heute.st.novalues': 'Unsicher',
   'heute.line.green': '{s}/100: normal trainieren. Alles im grünen Bereich.', 'heute.line.yellow': '{s}/100: lockerer trainieren, Intensität raus.', 'heute.line.red': '{s}/100: Ruhe oder nur ganz locker.',
-  'heute.unsureNone': 'Ampel unsicher – keine Morgenwerte. Trag Schlaf und Ruhepuls ein oder verbinde Uhr oder Ring.', 'heute.unsureFew': 'Ampel unsicher – nur {v} von heute. Mit Schlaf und Ruhepuls oder HFV wird sie sicher.', 'heute.unsureStale': 'Nach den letzten Werten war sie {c}.',
+  'heute.unsureNone': 'Ampel unsicher – keine Morgenwerte. Trag Schlaf und Ruhepuls ein oder verbinde Uhr oder Ring.', 'heute.unsureFew': 'Ampel unsicher – nur {v} von heute. Mit Schlaf und Ruhepuls oder HFV wird sie sicher.', 'heute.unsureStale': 'Nach den letzten Werten war sie {c}.', 'heute.noDataSince': 'Ampel unsicher – keine aktuellen Morgenwerte seit {d}. Trag sie ein oder prüfe die Verbindung zu Uhr bzw. Ring.',
   'heute.c.green': 'grün', 'heute.c.yellow': 'gelb', 'heute.c.red': 'rot', 'heute.c.none': 'fehlt oder wird gelernt', 'heute.critMissing': 'fehlt heute',
   'v.feelMorning': 'Wie fühlst du dich?', 'v.soreness': 'Muskelkater', 'v.feel1': 'sehr frisch', 'v.feel2': 'frisch', 'v.feel3': 'normal', 'v.feel4': 'müde', 'v.feel5': 'sehr müde', 'v.sore0': 'keiner', 'v.sore1': 'leicht', 'v.sore2': 'deutlich', 'v.sore3': 'stark',
   'cons.terrain': 'In der Nähe', 'cons.terrainHills': 'Hügel oder Berge (auch Laufband)', 'cons.terrainTrack': 'Laufbahn', 'cons.terrainHint': 'Für Berg- und Bahn-Einheiten. Ohne Angabe gibt es Ersatz, z. B. Steigerungen in der Ebene oder Rolle mit hohem Widerstand.',
@@ -101,8 +101,8 @@ export const de: Record<string, string> = {
   'ill.reopened': 'Krankheitsphase läuft wieder',
 
   /* ---------- Einheiten ---------- */
-  'st.done': 'erledigt', 'st.skipped': 'ausgefallen', 'st.sick': 'krank', 'st.missed': 'verpasst', 'st.cancelled': 'gestrichen',
-  'st.moved': 'verschoben', 'st.adjusted': 'angepasst',
+  'st.done': 'erledigt', 'st.skipped': 'ausgefallen', 'st.sick': 'krank', 'st.missed': 'verpasst', 'st.unknown': 'ohne Eintrag', 'st.cancelled': 'gestrichen',
+  'st.moved': 'verschoben', 'st.adjusted': 'angepasst', 'st.movedAdjusted': 'verschoben und angepasst', 'st.testChanged': 'Test umgewandelt', 'st.added': 'neu', 'sess.markUndone': 'Als nicht erledigt markieren', 'sess.guide': 'Anleitung',
   'sess.done': 'Als erledigt markieren', 'sess.undone': 'Erledigt zurücknehmen', 'sess.isDone': 'Erledigt', 'sess.markDone': 'Erledigt',
   'sess.skip': 'Fällt aus', 'sess.unskip': 'Doch nicht ausgefallen', 'sess.skipReason': 'Grund (optional)',
   'sess.data': 'Gemessen', 'sess.dataHint': 'Noch keine Messdaten. Sie kommen automatisch aus den Verbindungen, oder du trägst sie hier ein.',

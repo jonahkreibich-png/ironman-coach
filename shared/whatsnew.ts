@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.29.0', items: [
+    'Einheiten aufgeräumt: Die Anleitung steht vor dem Training wieder oben (nach dem Training eingeklappt über dem Ablauf, im Heute-Tab „Anleitung ›“). Kurzer Titel, ein Abzeichen („✓ erledigt · anders als geplant“), „Geplant“ nur einmal. Die Box „verschoben/angepasst“ zeigt nur noch, was sich wirklich geändert hat – ohne Wiederholungen.',
+    'Der Plan richtet sich nach deinem echten Training der letzten 4 Wochen: weniger Stunden, lange Einheiten höchstens etwa 10 min über deiner längsten, mit Begründung – trainierst du mehr, steigt er wieder. Tests verschwinden nicht mehr still, sondern werden neu eingeplant.',
+    'Heute: deutlicher Hinweis, wenn eine Verbindung (z. B. Oura) neu angemeldet werden muss, einmal pro Woche „Hast du diese Woche trainiert?“ zum schnellen Abhaken und ein Angebot für Erinnerungen.'
+  ] },
   { version: '3.28.0', items: [
     'Coach: versteht „Wie fit bin ich?“ und „Bin ich übertrainiert?“, nennt deine Zonen für Laufen, Rad und Schwimmen und bietet bei roter Ampel eine Pause statt nur „kürzer“ an. Fitness-Ziel ohne Wettkampf: alle 8 Wochen ein Test als Vorschlag.',
     'Auswertung genauer: Lauf-Geh-Wechsel zählt nur die Laufteile, Teamsport und die Verteilung locker/mittel/hart rechnen mit der Zeit in den Zonen, 5 und 10 km auch aus dem schnellsten Abschnitt eines längeren Laufs. Triathlon-Teilzeiten und Freiwasser aktualisieren die Zonen.',

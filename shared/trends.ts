@@ -79,7 +79,7 @@ function rollingVsBase(I: TrendInput, key: string, id: string, title: string, un
     ? (rel >= 3 ? `HFV liegt über deiner Basis: dein Körper ist gut erholt.` : rel > -5 ? `HFV im normalen Bereich: Erholung passt.` : rel > -10 ? `HFV etwas unter deiner Basis: achte auf Schlaf und lockere Tage.` : `HFV deutlich unter deiner Basis: Zeichen von Müdigkeit oder Stress, lieber locker trainieren.`)
     : (diff <= -1 ? `Ruhepuls unter deiner Basis: gutes Zeichen für Fitness und Erholung.` : diff < 3 ? `Ruhepuls normal: Erholung passt.` : diff < 5 ? `Ruhepuls leicht erhöht: etwas mehr Erholung tut gut.` : `Ruhepuls deutlich erhöht: Müdigkeit oder ein Infekt im Anmarsch? Lieber locker.`);
   return { id, group: 'recovery', title, value: de(a7, dec), unit, delta: key === 'hrv' ? pctTxt(Math.round(rel * 10) / 10) + ' zur Basis' : (Math.round(diff) === 0 ? '± 0' : `${diff > 0 ? '▲ +' : '▼ '}${de(Math.abs(diff), 0)}`) + ' zur Basis', text, tone: good ? 'good' : bad ? 'warn' : 'info',
-    spark: chartPts.map(p => p.avg7 as number).filter(v => v != null), chart: { pts: chartPts, series: [{ key: 'v', name: title, color: 'var(--info)' }, { key: 'avg7', name: '7-Tage-Schnitt', color: 'var(--accent)' }], lines: [{ v: Math.round(b60 * 10) / 10, label: '60-Tage-Basis' }] } };
+    spark: chartPts.map(p => p.avg7 as number).filter(v => v != null), chart: { pts: chartPts, series: [{ key: 'v', name: 'Tageswert', color: 'var(--info)' }, { key: 'avg7', name: '7-Tage-Schnitt', color: 'var(--accent)' }], lines: [{ v: Math.round(b60 * 10) / 10, label: '60-Tage-Basis' }] } };
 }
 function sleepCard(I: TrendInput, from: string): TrendCard {
   const pts = sorted((I.trend || []).filter(p => p && num(p.sleepHours) != null && p.date >= from && p.date <= I.today));

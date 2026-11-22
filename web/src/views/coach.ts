@@ -323,8 +323,9 @@ on('prop', async el => {
     const accept = el.dataset.ok === '1';
     if (accept && (p.changes || []).some((c:any) => c.kind === 'adjust' && STATE.sessions[c.data?.sessionId]?.completed)) { toast('Diese Einheit ist inzwischen absolviert. Bitte einen aktuellen Vorschlag anfordern.'); return; }
     if (accept && p.evidenceSignature && p.evidenceSignature !== evidenceSignature(STATE, D().engine.baseWeeks)) { toast('Trainingsdaten geändert. Bitte den aktuellen Vorschlag prüfen.'); return; }
-    if (accept) for (const c of p.changes || []) if (c.kind === 'adjust') STATE.adjustments[c.key] = c.data;
-    else if (p.skillsOnly && c.kind === 'profile') saveProfile({ ...profile(), skills: { ...profile().skills, ...c.data.skills } });
+    // Auftrag 41: Zeitpunkt der Annahme (sonst wirkte ein Vorschlag ohne Zeitstempel vor allen späteren Änderungen, z. B. Lauftest 25.10.)
+    const acceptedAt = Date.now();
+    if (accept) (p.changes || []).forEach((c: any, i: number) => { if (c.kind === 'adjust') STATE.adjustments[c.key] = { ...c.data, createdAt: acceptedAt + i }; else if (p.skillsOnly && c.kind === 'profile') saveProfile({ ...profile(), skills: { ...profile().skills, ...c.data.skills } }); });
     p.status = accept ? 'accepted' : 'rejected'; rebuildPlanIndex(); saveState(); invalidate(); nav.rerender(); return;
   }
   try { await apiCall('POST', '/api/coach/proposal/' + el.dataset.id, { accept: el.dataset.ok === '1' }); await syncNow(); toast(el.dataset.ok === '1' ? t('coach.accepted') : t('coach.rejected')); }

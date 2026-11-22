@@ -91,7 +91,7 @@ const dayNo = (d: string) => Math.round(Date.parse(d + 'T12:00:00Z') / 86400000)
 
 export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   const today = ctx.today; const st = ctx.state; const prof = ctx.profile;
-  const ins: Insight[] = []; const auto: any[] = []; const proposals: Analysis['proposals'] = [];
+  const ins: Insight[] = []; const auto: any[] = []; const proposals: Analysis['proposals'] = []; const testMsgs: { id: string; title: string; text: string; ids: string[] }[] = [];
   const add = (i: Insight) => { if (!ins.some(x => x.id === i.id)) ins.push(i); };
   const lthrRun = prof.thresholds.lthrRun || 0;
   const aet = prof.thresholds.aetHr && prof.thresholds.aetHr.length === 2 ? prof.thresholds.aetHr : null;
@@ -217,7 +217,8 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
     const nextW = weeks.find((w: any) => w.startDate === C.addDays(w0, 1));
     if (nextW && !nextW.isRecoveryWeek) {
       const g = `ana-week-${nextW.weekNumber}`;
-      const changes = C.planDays([nextW]).flatMap((d: any) => d.sessions.filter((s: any) => ['run', 'bike', 'swim'].includes(s.sport) && s.plannedMinutes && !s.stage && !s.fixed && !s.race).map((s: any) => {
+      // Auftrag 41: Tests bleiben Tests (Lauftest 25.10. wurde sonst still zum lockeren Lauf)
+      const changes = C.planDays([nextW]).flatMap((d: any) => d.sessions.filter((s: any) => ['run', 'bike', 'swim'].includes(s.sport) && s.plannedMinutes && !s.stage && !s.fixed && !s.race && !C.isTestOrRace(s)).map((s: any) => {
         const rb = W.rebuildScaled(s, 0.85);
         const a = { id: `${g}-${s.id}`, group: g, type: 'modify', sessionId: s.id, set: rb || { plannedMinutes: Math.max(10, Math.round(s.plannedMinutes * 0.85 / 5) * 5) }, what: `${s.title}: ${s.plannedMinutes} → ${(rb && rb.plannedMinutes) || Math.round(s.plannedMinutes * 0.85 / 5) * 5} min`, reason: 'mehrere Müdigkeitszeichen', date: today };
         return { kind: 'adjust', key: a.id, data: a };
@@ -290,25 +291,40 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   // ein Hinweis mit dem frühesten Termin (der Test kommt dann mit dem nächsten Planabschnitt)
   {
     const days = C.planDays(weeks);
-    const isTestS = (s: any) => !!s && !s.cancelled && ((s.spec && s.spec.kind === 'test') || /test/i.test(s.title || ''));
-    const dropped = days.filter((d: any) => d.date >= C.addDays(today, -14)).flatMap((d: any) => d.sessions.filter((s: any) => s && s.droppedTest && !s.cancelled && ['run', 'bike', 'swim'].includes(s.sport)).map((s: any) => ({ d, s })));
+    // Auftrag 41: „Locker statt: Lauftest 30 min“ ist kein Test mehr (das Wort steht nur noch im Titel)
+    const isTestS = (s: any) => !!s && !s.cancelled && !/statt: /.test(String(s.title || '')) && ((s.spec && s.spec.kind === 'test') || /test/i.test(s.title || ''));
+    // Auftrag 41: auch Tests, die anders umgewandelt oder gestrichen wurden (Ampel, Krankheit, Wochen-Anpassung …), verschwinden nicht still.
+    // Automatische Änderungen → neuer Termin gleich eingeplant; eigene Änderungen (Plan bearbeiten, Umwandeln) → Vorschlag mit „Übernehmen“.
+    const testLikeOrig = (s: any) => !!(s && s._orig) && isTestS({ title: s._orig.title, spec: s._orig.spec }) && !/wettkampf|rennen|race|triathlon/i.test(String(s._orig.title || ''));
+    const byUser = (s: any) => (s._adj || []).some((id: string) => { const a = (st.adjustments || {})[id]; return a && (a.from_user || /^user-/.test(a.id)); });
+    const raceDays = days.filter((d: any) => d.sessions.some((s: any) => s && s.race && !s.cancelled)).map((d: any) => d.date);
+    const nearRace = (date: string) => raceDays.some((r: string) => date >= r && date <= C.addDays(r, 14));
+    const dropped = days.filter((d: any) => d.date >= C.addDays(today, -14)).flatMap((d: any) => d.sessions.filter((s: any) => s && ['run', 'bike', 'swim'].includes(s.sport) && (
+      (s.droppedTest && !s.cancelled) || (testLikeOrig(s) && (!isTestS(s) || s.cancelled) && !s.removed && !/zählt als Test/.test(String(s.description || '')))
+    )).map((s: any) => ({ d, s, race: s.droppedTest ? String(s.droppedTest) : null as string | null, user: !s.droppedTest && byUser(s) })));
     const seen = new Set<string>();
     const SPN: Record<string, string> = { run: 'Lauf', bike: 'Rad', swim: 'Schwimm' };
     const MINS: Record<string, number> = { run: 40, bike: 45, swim: 30 };
     const wk = (d: string) => weeks.find((w: any) => w.days.some((x: any) => x.date === d));
+    const fmtDm = (d: string) => `${+d.slice(8, 10)}.${+d.slice(5, 7)}.`;
     for (const x of dropped) {
-      const sp = x.s.sport as string; const race = String(x.s.droppedTest); if (seen.has(sp)) continue; seen.add(sp);
-      const earliest = [C.addDays(race, 15), C.addDays(today, 1)].sort().pop()!;
-      if (days.some((d: any) => d.date >= earliest && d.date <= C.addDays(race, 56) && d.sessions.some((s: any) => s.sport === sp && isTestS(s)))) continue;
-      const fmtDm = (d: string) => `${+d.slice(8, 10)}.${+d.slice(5, 7)}.`;
-      const cand = days.filter((d: any) => d.date >= earliest && d.date <= C.addDays(race, 42) && !(wk(d.date) || {}).isRecoveryWeek && !['race', 'taper'].includes((wk(d.date) || {}).phase))
-        .flatMap((d: any) => d.sessions.filter((s: any) => s.sport === sp && !s.cancelled && !s.race && !s.stage && !s.fixed && !s.pinned && !s.droppedTest && !isTestS(s) && (s.plannedMinutes || 0) >= MINS[sp] && !(st.sessions || {})[s.id]).map((s: any) => ({ d, s })))[0];
-      const was = `Dein ${SPN[sp]}test am ${fmtDm(x.d.date)} lag in den 2 Wochen nach dem Wettkampf (${fmtDm(race)}); dort wird nicht getestet, deshalb steht da jetzt eine normale Einheit.`;
+      const sp = x.s.sport as string; const race = x.race; if (seen.has(sp)) continue; seen.add(sp);
+      const earliest = [race ? C.addDays(race, 15) : C.addDays(x.d.date, 3), C.addDays(today, 1)].sort().pop()!;
+      const latest = race ? C.addDays(race, 42) : C.addDays(earliest, 28);
+      if (days.some((d: any) => d.date >= (race ? earliest : C.addDays(x.d.date, -3)) && d.date <= (race ? C.addDays(race, 56) : C.addDays(latest, 14)) && d.sessions.some((s: any) => s.sport === sp && isTestS(s) && s.id !== x.s.id))) continue;
+      const cand = days.filter((d: any) => d.date >= earliest && d.date <= latest && !nearRace(d.date) && !(wk(d.date) || {}).isRecoveryWeek && !['race', 'taper'].includes((wk(d.date) || {}).phase))
+        .flatMap((d: any) => d.sessions.filter((s: any) => s.sport === sp && !s.cancelled && !s.race && !s.stage && !s.fixed && !s.pinned && !s.droppedTest && !isTestS(s) && !testLikeOrig(s) && (s.plannedMinutes || 0) >= MINS[sp] && !(st.sessions || {})[s.id]).map((s: any) => ({ d, s })))[0];
+      const how = x.s.cancelled ? 'gestrichen' : `zu „${x.s.title}“ geworden`;
+      const was = race ? `Dein ${SPN[sp]}test am ${fmtDm(x.d.date)} lag in den 2 Wochen nach dem Wettkampf (${fmtDm(race)}); dort wird nicht getestet, deshalb steht da jetzt eine normale Einheit.`
+        : `Dein ${SPN[sp]}test am ${fmtDm(x.d.date)} ist ${how}${x.user ? ' (deine Änderung)' : ''}.`;
+      const key = race || x.d.date;
       if (cand) {
         const pctx = { ...((cand.s.spec && cand.s.spec.ctx) || {}), lthrRun: prof.thresholds.lthrRun || null, lthrBike: prof.thresholds.lthrBike || null, ftp: prof.thresholds.ftp || null, runThrSec: prof.thresholds.thresholdPaceRunSec || null, cssSec: prof.thresholds.cssSec || null };
         const b = W.build(sp === 'run' ? W.runTest(pctx as any) : sp === 'bike' ? W.bikeTest(pctx as any) : W.swimTest(pctx as any));
-        const a = { id: `test-moved-${cand.s.id}`, type: 'modify', sessionId: cand.s.id, set: { title: b.title, description: b.description, spec: b.spec, plannedMinutes: b.plannedMinutes, ...(b.zone ? { zone: b.zone } : {}), hard: true }, what: `${cand.s.title} → ${b.title}`, reason: 'Neuer Termin für den Test nach dem Wettkampf' };
-        proposals.push({ id: `test-moved-${sp}-${race}`, title: `Vorschlag: ${b.title} am ${fmtDm(cand.d.date)}`, text: `${was} Neuer Termin: „${cand.s.title}“ am ${fmtDm(cand.d.date)} wird zum ${b.title}.`, changes: [{ kind: 'adjust', key: a.id, data: a }] });
+        const a = { id: `test-moved-${cand.s.id}`, type: 'modify', sessionId: cand.s.id, group: `test-moved-${sp}-${key}`, set: { title: b.title, description: b.description, spec: b.spec, plannedMinutes: b.plannedMinutes, ...(b.zone ? { zone: b.zone } : {}), hard: true }, what: `${cand.s.title} (${fmtDm(cand.d.date)}) → ${b.title}`, reason: race ? 'Neuer Termin für den Test nach dem Wettkampf' : `Neuer Termin für den ${SPN[sp]}test vom ${fmtDm(x.d.date)}` };
+        if (x.user) proposals.push({ id: `test-moved-${sp}-${key}`, title: `Vorschlag: ${b.title} am ${fmtDm(cand.d.date)}`, text: `${was} Soll ich ihn neu einplanen? „${cand.s.title}“ am ${fmtDm(cand.d.date)} würde zum ${b.title}.`, changes: [{ kind: 'adjust', key: a.id, data: a }] });
+        // Tests verschwinden nicht still – neuer Termin gleich eingeplant (rückgängig machbar), deutliche Nachricht
+        else { auto.push(a); testMsgs.push({ id: `msg-ana-test-${sp}-${key}`, title: `${SPN[sp]}test neu eingeplant`, text: `${was} Neuer Termin: ${fmtDm(cand.d.date)} (statt „${cand.s.title}“). Der Rhythmus bleibt: danach alle 8 Wochen. Du kannst das rückgängig machen.`, ids: [a.id] }); }
       } else add({ id: `test-moved-${sp}`, kind: 'trend', tone: 'info', score: 35, title: `${SPN[sp]}test verschoben`, why: `${was} Im Plan ist danach kein passender Tag mehr frei.`, tip: `Frühestens ab ${fmtDm(earliest)}: Der Test kommt mit dem nächsten Planabschnitt, oder du tauschst ihn selbst gegen eine Einheit (Plan → Einheit → Umwandeln).` });
     }
   }
@@ -328,7 +344,9 @@ export function analyze(ctx: EngineCtx, trigger: Trigger = 'view'): Analysis {
   for (const i of top.filter(x => x.tone === 'warn' || x.tone === 'bad')) { const id = `msg-ana-${i.id}-${wk}`; if (!has(id) && fresh(i)) messages.push({ id, at: ctx.now, date: today, kind: 'warning', from: 'coach', title: i.title, text: `${i.why} ${i.tip}`, important: i.tone === 'bad', anaSig: i.sig ?? i.title }); }
   for (const i of top.filter(x => x.tone === 'good')) { const id = `msg-ana-${i.id}-${wk}`; if (trigger !== 'view' && !has(id) && fresh(i)) messages.push({ id, at: ctx.now + 1, date: today, kind: 'info', from: 'coach', title: i.title, text: `${i.why} ${i.tip}`, anaSig: i.sig ?? i.title }); }
   const autoNew = auto.filter(a => !(st.adjustments || {})[a.id]);
-  if (autoNew.length) { const id = `msg-ana-adj-${today}`; if (!has(id)) messages.push({ id, at: ctx.now + 2, date: today, kind: 'adjust', from: 'coach', title: 'Plan angepasst', text: `${autoNew.map(a => a.what).join('. ')}. Grund: ${autoNew[0].reason}. Du kannst das rückgängig machen.`, refs: { adjustmentIds: autoNew.map(a => a.id) } }); }
+  for (const m of testMsgs) if (!has(m.id) && m.ids.some(x => autoNew.some(a => a.id === x))) messages.push({ id: m.id, at: ctx.now + 2, date: today, kind: 'adjust', from: 'coach', title: m.title, text: m.text, important: true, refs: { adjustmentIds: m.ids } });
+  const autoOther = autoNew.filter(a => !/^test-moved-/.test(a.id));
+  if (autoOther.length) { const id = `msg-ana-adj-${today}`; if (!has(id)) messages.push({ id, at: ctx.now + 2, date: today, kind: 'adjust', from: 'coach', title: 'Plan angepasst', text: `${autoOther.map(a => a.what).join('. ')}. Grund: ${autoOther[0].reason}. Du kannst das rückgängig machen.`, refs: { adjustmentIds: autoOther.map(a => a.id) } }); }
   for (const p of proposals) { const id = `msg-ana-prop-${p.id}`; if (!has(id)) messages.push({ id, at: ctx.now + 3, date: today, kind: 'proposal', from: 'coach', title: p.title, text: p.text, proposal: { changes: p.changes, status: 'open' } }); }
   if (trigger === 'weekly') { const id = `msg-ana-week-${today}`; if (!has(id) && top.length) messages.push({ id, at: ctx.now + 4, date: today, kind: 'week', from: 'coach', title: 'Was der Coach gerade sieht', text: top.map((i, n) => `${n + 1}. ${i.title}: ${i.why}`).join(' ') }); }
 

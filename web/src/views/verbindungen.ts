@@ -33,12 +33,16 @@ export async function loadConnections(force = false) {
   LOADING = false;
   // Auftrag 26: beim Start baute das jedes Mal die ganze Ansicht neu (auch auf Heute). Jetzt nur, wenn sich etwas geändert hat
   // und die Ansicht Verbindungen zeigt (Mehr: Hinweis „neu anmelden“, Verbindungen, Fragebogen).
-  if (JSON.stringify([CONN, ERR]) !== before && (!HAS_PLAN || UI.sub === 'verbindungen' || UI.sub === 'onboarding' || (UI.tab === 'mehr' && !UI.sub))) nav.refresh();
+  if (JSON.stringify([CONN, ERR]) !== before && (!HAS_PLAN || UI.sub === 'verbindungen' || UI.sub === 'onboarding' || (UI.tab === 'mehr' && !UI.sub) || (UI.tab === 'heute' && !UI.sub))) nav.refresh();
 }
 function connectionRetry(): string { return ERR ? '<button class="btn ghost" data-act="conn-retry">Erneut versuchen</button>' : ''; }
 on('conn-retry', () => loadConnections(true));
 /* Stand der Liste: mit Konto (true) oder nur der Katalog (false) */
 let ACCOUNT = false;
+/* Auftrag 41: für „Heute“: Verbindungen mit Problem (abgelaufen oder Fehler), mit letztem erfolgreichen Abruf */
+export function connIssues(): { id: string; label: string; status: string; since: number | null }[] {
+  return (CONN || []).filter(c => c.status === 'reauth' || c.status === 'error').map(c => ({ id: c.id, label: c.label, status: c.status, since: c.lastOkAt || null }));
+}
 /* Für „Heute“: Verbindungen, die neu angemeldet werden müssen */
 export function reauthHints(): string[] {
   return (CONN || []).filter(c => c.status === 'reauth').map(c => t('conn.reauthHint', { name: c.label }));

@@ -277,7 +277,8 @@ export async function decideProposal(env: Env, uid: number, msgId: string, accep
     if (session?.data?.completed) throw new HttpError(409, 'Diese Einheit ist inzwischen absolviert. Bitte einen aktuellen Vorschlag anfordern.');
   }
   const t = Math.max(Date.now(), rec.updatedAt + 1);
-  const changes = accept ? (rec.data.proposal.changes || []).map((c: any, i: number) => ({ kind: c.kind, key: c.key, data: c.data, updatedAt: t + i })) : [];
+  // Auftrag 41: angenommene Anpassungen gelten ab der Annahme (createdAt), nicht ab dem Vorschlag oder ganz vorn (fehlender Zeitstempel)
+  const changes = accept ? (rec.data.proposal.changes || []).map((c: any, i: number) => ({ kind: c.kind, key: c.key, data: c.kind === 'adjust' ? { ...c.data, createdAt: t + i } : c.data, updatedAt: t + i })) : [];
   if (rec.data.proposal.skillsOnly) for (const c of changes) if (c.kind === 'profile') {
     const current = (await getRecord(env, uid, 'profile', 'main'))?.data || {};
     c.data = { ...current, skills: { ...(current.skills || {}), ...c.data.skills } };

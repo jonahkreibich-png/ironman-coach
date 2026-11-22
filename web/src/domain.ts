@@ -67,9 +67,11 @@ export function effStatus(s) {
   if (s.cancelled) return 'cancelled';
   if (st.skipped) return 'skipped';
   if (illnessAt(s.date)) return 'sick';
-  if (s.date < todayStr()) return 'missed';
+  // Auftrag 41: nach 3 Wochen ohne Eintrag „unbekannt“ (nicht ewig nachtragen; zählt weder als gemacht noch als ausgefallen)
+  if (s.date < todayStr()) return s.date < addDays(todayStr(), -UNKNOWN_AFTER_DAYS) ? 'unknown' : 'missed';
   return 'open';
 }
+export const UNKNOWN_AFTER_DAYS = 21;
 export function forgottenSessions() { return SESS.filter(s => effStatus(s) === 'missed'); }
 export function dayStats(d) {
   const real = d.sessions.filter(s => s.sport !== 'rest' && !(s.cancelled && !sessState(s.id).completed));
@@ -78,8 +80,9 @@ export function dayStats(d) {
   const skipped = st.filter(x => x === 'skipped').length;
   const sick = st.filter(x => x === 'sick').length;
   const missed = st.filter(x => x === 'missed').length;
+  const unknown = st.filter(x => x === 'unknown').length;
   const custom = (effectiveCustomWorkouts()[d.date] || []).length;
-  return { total: real.length, done, skipped, sick, missed, custom, open: real.length - done - skipped - sick - missed };
+  return { total: real.length, done, skipped, sick, missed, unknown, custom, open: real.length - done - skipped - sick - missed - unknown };
 }
 
 /* ================= Zones ================= */

@@ -302,6 +302,20 @@ export function runEngine(ctx: EngineCtx, ev: EngineEvent): EngineOut {
     out.adjustments.push(...W.adjustments);
     push(weeklyReview(ctx, today, W.adjustments, W.summary));
   }
+  // Auftrag 41: Woche schon mit einer älteren Fassung geplant (ohne Anpassung an das echte Training) → einmal am Morgen nachholen,
+  // nur für noch offene Einheiten dieser Woche (eigene Gruppe „week-N-cap“, Erklärung in der Wochen-Notiz)
+  if (ev.type === 'daily') {
+    const mon = C.weekRange(today)[0]; const cur = (ctx.baseWeeks || []).find((w: any) => (w.days || []).some((d: any) => d.date === mon));
+    const sum = cur && (ctx.state.adjustments || {})[`week-${cur.weekNumber}-summary`];
+    if (sum && !sum.v41 && !(ctx.state.adjustments || {})[`week-${cur.weekNumber}-cap-summary`]) {
+      try {
+        const W = C.weeklyAdjustments(ctx.state, ctx.baseWeeks, C.addDays(mon, -1), { planMeta: ctx.planMeta, now: ctx.now, today });
+        out.adjustments.push(...W.adjustments);
+        const note = W.adjustments.find((a: any) => a.type === 'note' && !a.retired);
+        if (note && W.adjustments.some((a: any) => a.type !== 'note')) push(msg(ctx, { id: `msg-cap-${cur.weekNumber}`, date: today, kind: 'adjust', title: 'Plan an dein Training angepasst', text: `${note.what}. ${note.reason}`.replace(/\.\./g, '.'), important: true, refs: { adjustmentIds: W.adjustments.map((a: any) => a.id) } } as any));
+      } catch (e) { /* der Morgen darf daran nie scheitern */ }
+    }
+  }
   return out;
 }
 

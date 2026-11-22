@@ -178,6 +178,8 @@ export function swimSkillUpdate(profile: any, weeks: any[], adjustments: any, to
         what: `${s.title} → ${b.title}`, reason: `${best.authoritative ? 'Aktualisierte Schwimmnachweise' : 'Neue Bestwerte'} (${source}): ${crawl} m Kraul am Stück${pull ? `, ${pull} m mit Pull Buoy` : ''}` });
     }
   }
+  // Auftrag 41: Einheiten, an denen sich nichts Sichtbares ändert (gleicher Titel, gleiche Dauer, gleicher Inhalt), nicht anpassen
+  adj.splice(0, adj.length, ...C.realAdjustments(weeks, adjustments || {}, adj));
   const label = stage ? (stage.ladder === 'swimBreast' ? 'Brust und Kraul-Technik' : W.SWIM_LADDER[stage.n].label) : `normales Training mit Stücken bis ${repNew} m`;
   // Auftrag 17: klar sagen, was passiert ist (Korrektur nach geänderten Werten, neue Stufe nach 2 Einheiten, eigene Angabe)
   const old = num(sk.swimCrawlM) || 0;

@@ -91,9 +91,17 @@ function choose(i: number) {
   const c = concernsFor(CUR.s, CUR.list[i]);
   CUR.pick = i; CUR.warn = c.warn; CUR.rule = c.rule;
 }
+/* Auftrag 41: immer vom Original aus umwandeln (Einheit ohne frühere Umwandlungen) – sonst entstanden Titel wie „Zone 2 statt: Rad-Intervalle …“
+   aus einer schon umgewandelten Einheit; die vorige Umwandlung wird beim Übernehmen ersetzt */
+function withoutConversions(s0: any): any {
+  const ids = new Set(convAdjs(s0).map((a: any) => a.id)); if (!ids.size) return { ...s0 };
+  const rest = Object.fromEntries(Object.entries(STATE.adjustments || {}).filter(([id]) => !ids.has(id)));
+  const x = C.planDays(C.applyAdjustments(PLAN.weeks, rest)).flatMap((d: any) => d.sessions).find((y: any) => y.id === s0.id);
+  return x ? { ...x, _adj: s0._adj, _orig: s0._orig } : { ...s0 };
+}
 on('conv', el => {
   const s0 = SESS_BY_ID[el.dataset.sid!]; if (!s0) return;
-  const s = { ...s0 }; const kind = el.dataset.k as ConvKind;
+  const s = withoutConversions(s0); const kind = el.dataset.k as ConvKind;
   const list = convertVariants(s, kind); if (!list.length) return;
   CUR = { s, kind, list, pick: 0, warn: [], rule: false };
   choose(0);
@@ -105,6 +113,9 @@ on('conv-apply', el => {
   const rule = concernsFor(s, o).rule;
   CUR = null; closeSheet();
   const adj = adjOf(s, o);
+  // die vorige Umwandlung dieser Einheit gilt nicht mehr (Box zeigt nur Original → jetzt)
+  const prev = SESS_BY_ID[s.id] ? convAdjs(SESS_BY_ID[s.id]).map((a: any) => a.id) : [];
+  prev.forEach((id: string) => { const a = STATE.adjustments[id]; if (a) STATE.adjustments[id] = { ...a, undone: true, retired: true, replacedBy: adj.id, updatedAt: Date.now() }; });
   commitAdjustments([adj], `Umgewandelt: ${o.set.title}`, rule);
   // Auftrag 38: Rückgängig direkt nach dem Antippen
   if (STATE.adjustments[adj.id]) toast(`Umgewandelt: ${o.set.title}`, { label: 'Rückgängig', run: () => setUndone([adj.id], true, 'Umwandlung zurückgenommen.') });

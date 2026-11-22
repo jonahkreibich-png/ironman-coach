@@ -43,7 +43,7 @@ describe('Plan geht weiter (kein Neustart)', () => {
     expect(plan.weeks.slice(0, 5)).toEqual(oldPlan().weeks);
     expect(w6.weekNumber).toBe(6);
     expect(w6.label).toBe('Woche 6');
-    expect(w6.headline).toMatch(/^Woche 6 · Block 2, Woche 1 · Grundlage → /);
+    expect(w6.headline).toMatch(/^Woche 6 · 1. Woche im Block 2 · Grundlage → /); // Auftrag 41: Woche nicht doppelt
     expect(plan.meta.blockName).toMatch(/^Block 2/);
     expect(plan.meta.previousBlock).toBe('Block 1 · Grundlage');
   });
@@ -108,7 +108,7 @@ describe('Plan geht weiter (kein Neustart)', () => {
     const b2 = plan.weeks.filter((w: any) => w.block === 2);
     expect(b2.map((w: any) => w.weekNumber)).toEqual([6, 7, 8, 9]);
     expect(b2.map((w: any) => !!w.isRecoveryWeek)).toEqual([false, false, false, true]);
-    expect(plan.weeks.find((w: any) => w.weekNumber === 10).headline).toMatch(/Block 3, Woche 1/);
+    expect(plan.weeks.find((w: any) => w.weekNumber === 10).headline).toMatch(/1. Woche im Block 3/);
     expect(r.gen.violations).toEqual([]);
   });
 });

@@ -507,7 +507,7 @@ export function sessionMarks(s: any): Mark[] {
   if (!s.race && !test && (kindOf(s) === 'technique' || /technik|lauf-abc|drill/i.test(s.title || ''))) out.push('technique');
   if (!s.race && !out.includes('hard') && longOf(s)) out.push('long');
   if (!out.length && /erholung|regeneration|ausrollen|ganz locker|sehr locker|mobility/i.test(s.title || '')) out.push('recovery');
-  if ((s._adj && s._adj.length) || s.movedFrom) out.push('adjusted');
+  if ((s._adj && s._adj.length) || s.movedFrom) out.push('adjusted'); // Auftrag 41: _adj enthält nur Anpassungen mit sichtbarem Unterschied
   return [...new Set(out)];
 }
 export type Band = 'easy' | 'moderate' | 'hard';

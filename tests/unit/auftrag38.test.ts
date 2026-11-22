@@ -65,7 +65,7 @@ describe('Gemacht gilt überall', () => {
   it('Titel, Änderungen, Gesamtdauer aus dem Ablauf', () => {
     const d = doneSummary(ss, st, null, THR, 'bike')!;
     expect(d.changed).toBe(true);
-    expect(d.title).toBe('Rad 3 × 10 min Sweet Spot, statt 2 × 8 min');
+    expect(d.title).toBe('Rad 3 × 10 min Sweet Spot'); // Auftrag 41: kurz, Unterschied nur in „Anders als geplant“
     expect(d.changes).toContain('3 × 10 min statt 2 × 8 min');
     expect(d.changes).toContain('Aufwärmen 10 statt 15 min');
     expect(d.more).toBe('more');

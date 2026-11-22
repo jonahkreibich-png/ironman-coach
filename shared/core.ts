@@ -404,28 +404,47 @@ function titleIssue(s, spec) {
   return null;
 }
 /* ---------- Effektiver Plan: Coach-Plan + Anpassungen ---------- */
-const ADJ_FIELDS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description'];
+const ADJ_FIELDS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description', 'spec'];
 function activeAdjustments(adjustments) {
   return Object.values(adjustments || {}).filter(a => a && !a.undone && a.type !== 'note').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
 }
-function applyAdjustments(weeks, adjustments) {
+/* Auftrag 41: was der Nutzer an einer Einheit sieht (Titel, Datum, Dauer, Strecke, Zone, Inhalt, Sportart, fällt aus). Eine Anpassung,
+   die daran nichts ändert, gilt nicht als Änderung: kein Abzeichen, keine Box, sie wird nicht mehr gespeichert und beim Start aufgeräumt. */
+const VIS_KEYS = ['title', 'plannedMinutes', 'plannedKm', 'zone', 'description', 'sport', 'cancelled', 'removed', 'hard', 'long']; // hart/lang wirken auf Plan-Regeln und Zeichen
+function visSnap(s, date) {
+  return JSON.stringify([date, ...VIS_KEYS.map(k => s[k] == null || s[k] === false ? null : s[k]), s.spec && Array.isArray(s.spec.steps) ? s.spec.steps : null, s.trainingBlocks || null, s.exercises || null]);
+}
+/* „Zone 2 statt: Locker statt: Intervalle“ → „Zone 2 statt: Intervalle“ (jede Umwandlung geht vom Original aus, Titel ohne Kette) */
+function flatStatt(t) {
+  const m = STATT.exec(String(t || '')); if (!m) return t;
+  let inner = m[2]; for (let k = 0; k < 6 && STATT.test(inner); k++) inner = STATT.exec(inner)[2];
+  return m[1] + inner;
+}
+function applyAdjustments(weeks, adjustments, noop = null) {
   const out = clone(weeks || []);
   const dayByDate = {}; const where = {};
   out.forEach(w => (w.days || []).forEach(d => { dayByDate[d.date] = d; (d.sessions || []).forEach(s => { where[s.id] = d; }); }));
   for (const a of activeAdjustments(adjustments)) {
     // Neue Einheit (vom Nutzer hinzugefügt)
     if (a.type === 'add') {
-      const to = dayByDate[a.to]; if (!to || !a.session || where[a.session.id]) continue;
+      const to = dayByDate[a.to]; if (!to || !a.session || where[a.session.id]) { if (noop && to && a.session && where[a.session.id]) noop.push(a.id); continue; }
       to.sessions = to.sessions.filter(x => x.sport !== 'rest');
       to.sessions.push(Object.assign({}, a.session, { _adj: [a.id], added: true }, a.override ? { ruleOverride: true } : {})); where[a.session.id] = to; continue;
     }
     const d = where[a.sessionId]; if (!d) continue;
     const s = d.sessions.find(x => x.id === a.sessionId); if (!s) continue;
     if (!s._orig) { s._orig = {}; ADJ_FIELDS.forEach(k => { s._orig[k] = s[k] == null ? null : s[k]; }); s._orig.date = d.date; }
-    s._adj = (s._adj || []).concat(a.id);
+    const before = visSnap(s, d.date);
+    applyOne(a, s, d);
+    // Auftrag 41: nur Anpassungen mit sichtbarem Unterschied zählen (Abzeichen, Box, Liste der Schritte)
+    if (visSnap(s, where[s.id].date) !== before) s._adj = (s._adj || []).concat(a.id);
+    else if (noop) noop.push(a.id);
+  }
+  return finishAdjusted(out, where, dayByDate);
+  function applyOne(a, s, d) {
     // bewusste Ausnahme von einer harten Regel: gilt nur für diese eine Einheit (Auftrag 5 A4)
     if (a.override) s.ruleOverride = true;
-    if (a.type === 'modify') { const prevSpec = s.spec || null; Object.assign(s, a.set || {}); harmonizeModified(s, a.set || {}, prevSpec); }
+    if (a.type === 'modify') { const prevSpec = s.spec || null; Object.assign(s, a.set || {}); harmonizeModified(s, a.set || {}, prevSpec); if (STATT.test(String(s.title || ''))) s.title = flatStatt(s.title); }
     // Auftrag 21: vom Coach gekürzte Woche (weniger Umfang nach Krankheit/verpassten Einheiten) gilt als reduzierte Woche: die Woche danach
     // darf wieder zum Plan zurück, ohne als zu großer Sprung zu zählen (wie bei geplanten reduzierten Wochen)
     if (a.type === 'modify' && /-vol-/.test(a.id || '') && /Umfang -/.test(a.reason || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) { w.reduced = true; w.reducedByCoach = true; } }
@@ -433,12 +452,16 @@ function applyAdjustments(weeks, adjustments) {
     if (a.type === 'modify' && /^pause-/.test(a.id || '')) { const w = out.find(x => (x.days || []).includes(d)); if (w) { w.reduced = true; w.reducedByCoach = true; w.returnWeek = true; } }
     else if (a.type === 'cancel') { s.cancelled = true; s.cancelReason = a.reason; if (a.removed) s.removed = true; }
     else if (a.type === 'move') {
-      const to = dayByDate[a.to]; if (!to || to === d) continue;
+      const to = dayByDate[a.to]; if (!to || to === d) return;
       d.sessions = d.sessions.filter(x => x !== s);
       (d.moved = d.moved || []).push({ id: s.id, title: s.title, sport: s.sport, to: a.to });
       s.movedFrom = s._orig.date; s.date = a.to; to.sessions = to.sessions.filter(x => x.sport !== 'rest'); to.sessions.push(s); where[s.id] = to;
     }
   }
+}
+function finishAdjusted(out, where, dayByDate) {
+  // Auftrag 41: ohne sichtbare Änderung kein „Original“ (sonst Box „vorher = nachher“)
+  Object.entries(where).forEach(([id, d]) => { const s = d.sessions.find(x => x.id === id); if (s && s._orig && !(s._adj && s._adj.length)) delete s._orig; });
   // Tagesverweise aus dem ENDGUELTIGEN Standort ableiten, nicht aus Zwischenstationen.
   out.forEach(w => (w.days || []).forEach(d => { delete d.moved; }));
   Object.entries(where).forEach(([id, d]) => {
@@ -449,6 +472,52 @@ function applyAdjustments(weeks, adjustments) {
     if (origin && !s.cancelled && !s.removed) (origin.moved = origin.moved || []).push({ id, title: s.title, sport: s.sport, to: d.date });
   });
   return out;
+}
+/* Auftrag 41: Anpassungen, die beim Anwenden nichts Sichtbares ändern (leer oder doppelt) */
+function noopAdjustmentIds(weeks, adjustments) { const noop = []; applyAdjustments(weeks, adjustments, noop); return noop; }
+/* Auftrag 41: nur Anpassungen speichern, die etwas ändern. list = neue Anpassungen (in dieser Reihenfolge nach den bestehenden) */
+function realAdjustments(weeks, existing, list) {
+  if (!list || !list.length) return list || [];
+  const t0 = Math.max(Date.now(), ...Object.values(existing || {}).map(a => (a && a.createdAt) || 0)) + 1;
+  const all = Object.assign({}, existing || {});
+  list.forEach((a, i) => { all[a.id] = Object.assign({}, a, { createdAt: a.createdAt || t0 + i, undone: false }); });
+  const noop = new Set(noopAdjustmentIds(weeks, all));
+  return list.filter(a => !noop.has(a.id));
+}
+/* Auftrag 41: Aufräumen beim Laden (über den normalen Sync, nie direkt auf dem Server). Liefert nur geänderte Datensätze.
+   - leere bzw. doppelte Anpassungen (nichts Sichtbares geändert) → stillgelegt (undone + retired, wie nach dem Neu-Planen)
+   - interne Platzhalter im Text („Trainingsangabe (Begründung nicht für die KI freigegeben)“) → Name der Einheit */
+const CLEAN_SET_KEYS = new Set(['title', 'plannedMinutes', 'plannedKm', 'zone', 'description', 'spec', 'stage', 'hard', 'long', 'sport']);
+const PLACEHOLDER_RE = /Trainingsangabe \(Begründung nicht für die KI freigegeben\)/g;
+function adjustmentCleanup(weeks, adjustments) {
+  const out = {};
+  const names = {}; planDays(weeks || []).forEach(d => (d.sessions || []).forEach(s => { names[s.id] = s.title; }));
+  for (const id of noopAdjustmentIds(weeks, adjustments)) {
+    const a = adjustments[id]; if (!a || a.override || a.type === 'note') continue;
+    if (a.type === 'modify' && Object.keys(a.set || {}).some(k => !CLEAN_SET_KEYS.has(k))) continue;
+    out[id] = Object.assign({}, a, { undone: true, retired: true, cleaned: 'ohne Änderung' });
+  }
+  Object.values(adjustments || {}).forEach(a => {
+    if (!a || !a.id || out[a.id]) return;
+    const txt = ['what', 'reason'].filter(k => typeof a[k] === 'string' && a[k].includes('Begründung nicht für die KI freigegeben'));
+    if (!txt.length) return;
+    const name = names[a.sessionId] || 'Einheit'; const x = Object.assign({}, a);
+    txt.forEach(k => { x[k] = a[k].replace(PLACEHOLDER_RE, name); });
+    out[a.id] = x;
+  });
+  return out;
+}
+/* Auftrag 41: Netto-Unterschied Original → jetzt (nur Felder, die sich wirklich unterscheiden). moved = anderer Tag. */
+function netChange(s) {
+  if (!s || !s._orig || !(s._adj && s._adj.length)) return s && s.added ? { moved: false, adjusted: false, added: true, fields: [] } : null;
+  const o = s._orig; const fields = [];
+  const same = (a, b) => JSON.stringify(a == null || a === '' ? null : a) === JSON.stringify(b == null || b === '' ? null : b);
+  for (const k of ['title', 'plannedMinutes', 'plannedKm', 'zone']) if (!same(o[k], s[k])) fields.push(k);
+  if (!same(o.description, s.description)) fields.push('description');
+  if (s.cancelled) fields.push('cancelled');
+  const moved = !!(o.date && s.date && o.date !== s.date);
+  if (!moved && !fields.length) return null;
+  return { moved, adjusted: fields.length > 0, added: false, fields };
 }
 /* Vom Nutzer als „fest“ markiert: die Engine ändert diese Einheit nicht mehr (Auftrag 4 C5) */
 function isLocked(weeks, id) { const s = planDays(weeks).flatMap(d => d.sessions).find(x => x.id === id); return !!(s && s.locked); }
@@ -704,7 +773,10 @@ function dailyAdjustments(state, baseWeeks, date, opts) {
   let weeks = applyAdjustments(baseWeeks, Object.assign({}, existing));
   const dayOf = d => planDays(weeks).find(x => x.date === d) || null;
   const live = d => { const x = dayOf(d); return x ? x.sessions.filter(s => s.sport !== 'rest' && !s.cancelled) : []; };
-  const push = a => { if (has(a.id)) return false; if (a.sessionId && isLocked(weeks, a.sessionId)) return false; a.createdAt = now + res.length; a.date = date; if (R.sources.includes('oura')) a.aiExcluded = true; res.push(a); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return true; };
+  const push = a => { if (has(a.id)) return false; if (a.sessionId && isLocked(weeks, a.sessionId)) return false; a.createdAt = now + res.length; a.date = date; if (R.sources.includes('oura')) a.aiExcluded = true; res.push(a); const noop = []; weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x]))), noop);
+    // Auftrag 41: nichts Sichtbares geändert → nicht speichern
+    if (noop.includes(a.id)) { res.pop(); weeks = applyAdjustments(baseWeeks, Object.assign({}, existing, Object.fromEntries(res.map(x => [x.id, x])))); return false; }
+    return true; };
   const pain = painFlag(state, weeks, date);
   const rules = rulesOf(state.profile, parseFor(date));
 
@@ -1032,6 +1104,25 @@ function ownDoneMinutes(state, weeks, mon, sun) {
   recordedActivities(state).filter(a => a.date >= mon && a.date <= sun && !a.sessionId && !used.has(a.id) && a.sport !== 'football' && toNum(a.min)).forEach(a => { min += toNum(a.min); n++; });
   return { min: Math.round(min), n };
 }
+/* Auftrag 41: was wirklich trainiert wurde (letzte 4 Wochen bis date): Minuten je Woche (eigenes Training, ohne Teamsport), längste Einheit
+   je Sportart (Plan-Einheiten mit Werten bzw. wie geplant, eigene Einheiten, Aufzeichnungen der Uhr) und ob überhaupt etwas eingetragen ist.
+   unknown: in den letzten 14 Tagen fast nichts eingetragen (weder erledigt noch „nicht gemacht“) und keine Aufzeichnung → nicht als
+   „ausgefallen“ werten, sondern als unbekannt (der Plan bleibt, die App fragt nach). */
+function actualTraining(state, baseWeeks, date) {
+  const mon = weekRange(date)[0];
+  const weeksMin = []; for (let k = 0; k < 4; k++) { const m = addDays(mon, -7 * k), s = addDays(m, 6); weeksMin.push(ownDoneMinutes(state, baseWeeks, m, s > date ? date : s).min); }
+  const from = addDays(date, -27);
+  // längste echte Einheit je Sportart: dieselbe Stelle wie beim Neu-Planen (recentLongest)
+  const longest = { run: recentLongest(state, baseWeeks, addDays(date, 1), 'run', 28) || 0, bike: recentLongest(state, baseWeeks, addDays(date, 1), 'bike', 28) || 0, swim: recentLongest(state, baseWeeks, addDays(date, 1), 'swim', 28) || 0 };
+  let planned14 = 0, entered14 = 0;
+  planDays(applyAdjustments(baseWeeks, state.adjustments || {})).filter(d => d.date >= addDays(date, -13) && d.date < date).forEach(d => d.sessions.forEach(x => {
+    if (!x || x.sport === 'rest' || x.cancelled || x.sport === 'football') return;
+    const st = (state.sessions || {})[x.id]; planned14++; if (st && (st.completed || st.skipped)) entered14++;
+  }));
+  const acts14 = recordedActivities(state).filter(a => a.date >= addDays(date, -13) && a.date <= date && a.sport !== 'football').length;
+  const unknown = acts14 === 0 && planned14 >= 3 && entered14 < planned14 * 0.4;
+  return { weeksMin, maxWeek: Math.max(...weeksMin), avgWeek: Math.round(weeksMin.reduce((a, b) => a + b, 0) / 4), longest, unknown, planned14, entered14 };
+}
 /* Bezug für die Steigerung: das meiste eigene Training einer der letzten 3 abgeschlossenen Wochen. Wochen mit mindestens 2 Krankheitstagen
    zählen nicht, dafür geht es eine Woche weiter zurück (höchstens 5 Wochen). null ohne Daten. */
 function recentOwnMinutes(state, weeks, date) {
@@ -1105,8 +1196,12 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   const S = weekSummary(state, baseWeeks, date);
   const illness = state.illnessPeriods || [];
   const pain = painFlag(state, weeks, date);
-  const group = 'week-' + next.weekNumber;
-  if (existing[group + '-summary']) return { adjustments: res, summary: S };
+  let group = 'week-' + next.weekNumber;
+  // Auftrag 41: Woche schon mit älterer Fassung geplant → nur noch die Anpassung an das echte Training nachholen (eigene Gruppe „-cap“)
+  const prevSum = existing[group + '-summary'];
+  const capOnly = !!prevSum && !prevSum.v41;
+  if (prevSum && !capOnly) return { adjustments: res, summary: S };
+  if (capOnly) { group = group + '-cap'; if (existing[group + '-summary']) return { adjustments: res, summary: S }; }
   const push = a => { if (existing[a.id] || res.some(x => x.id === a.id)) return; if (a.sessionId && isLocked(weeks, a.sessionId)) return; a.createdAt = now + res.length; a.date = date; a.group = group; res.push(a); };
 
   // Umfang
@@ -1144,7 +1239,29 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
       if (capPct < pct) { pct = capPct; why = `Diese Woche ${Math.round(od.min / 6) / 10} h eigenes Training erledigt: nächste Woche höchstens etwa 10 % mehr`.replace('.', ','); }
     }
   }
-  pct = Math.max(-20, Math.min(10, pct));
+  // Auftrag 41: Der Plan richtet sich nach dem echten Training der letzten 4 Wochen – auch mit festem Wochenplan und wenigen erledigten
+  // Einheiten (vorher griff die Deckelung oben nur ab 60 % erledigt). Wochenumfang höchstens etwa 10 % (+20 min) über der stärksten der
+  // letzten 4 Wochen, lange Einheiten höchstens etwa 10 min (Rad 15 min) über der längsten echten. Fast nichts eingetragen → unbekannt:
+  // nicht kürzen (das wäre geraten), die App fragt nach. Wer wieder mehr trainiert, bekommt automatisch wieder mehr (Bezug wächst mit).
+  if (capOnly) { pct = 0; why = ''; }
+  const real = actualTraining(state, baseWeeks, date);
+  let capLow = -20, capWhy = '';
+  const capOk = !S.sick && !next.isRecoveryWeek && !returnStageActive(illness, addDays(date, 1));
+  if (capOk && real.unknown) {
+    if (pct <= 0 && S.red < 2) { pct = 0; why = `In den letzten 2 Wochen ist fast nichts eingetragen (${real.entered14} von ${real.planned14}): der Umfang bleibt, bis du einträgst, was du gemacht hast`; }
+  } else if (capOk) {
+    const own = planDays([next]).flatMap(d => d.sessions).filter(s => !['football', 'rest'].includes(s.sport) && !s.cancelled && !s.race && !s.fixed).reduce((a, s) => a + (s.plannedMinutes || 0), 0);
+    const allow = Math.max(60, real.maxWeek * 1.1 + 20);
+    if (own > allow) {
+      const capPct = Math.max(-50, Math.round((allow / own - 1) * 100));
+      if (capPct < pct) {
+        pct = capPct; capLow = -50;
+        const h = (m) => String(Math.round(m / 6) / 10).replace('.', ',');
+        why = capWhy = `In den letzten 4 Wochen hast du höchstens ${h(real.maxWeek)} h pro Woche trainiert (Schnitt ${h(real.avgWeek)} h). Geplant waren ${h(own)} h – das wäre zu viel auf einmal. ${capOnly ? 'Diese' : 'Nächste'} Woche deshalb etwa ${h(allow)} h; sobald du mehr trainierst, steigt der Plan wieder`;
+      }
+    }
+  }
+  pct = Math.max(capLow, Math.min(10, pct));
 
   const nextSessions = planDays([next]).flatMap(d => d.sessions.map(s => Object.assign({}, s, { date: d.date })));
   const wRules = rulesOf(state.profile, parseFor(date));
@@ -1153,7 +1270,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     .sort((a, b) => a.date.localeCompare(b.date));
   const last = doneSS[doneSS.length - 1];
   let ladderWhy = null;
-  if (last) {
+  if (last && !capOnly) {
     const cur = ladderIndex(last.s.title);
     if (cur >= 0) {
       const lthrBike = (thrOf(state).lthrBike) || LTHR_DEFAULT.bike;
@@ -1182,7 +1299,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
     const lthrBike = (thrOf(state).lthrBike) || LTHR_DEFAULT.bike;
     const libDone = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -28)).flatMap(d => d.sessions.filter(x => x && x.spec && x.spec.lib && LIB[x.spec.lib.key] && LIB[x.spec.lib.key].quality && ['run', 'bike'].includes(x.sport) && !x.cancelled).map(x => ({ s: x, st: (state.sessions || {})[x.id] || {}, date: d.date })))
       .sort((a, b) => a.date.localeCompare(b.date));
-    const keys = [...new Set(libDone.map(x => x.s.spec.lib.key))];
+    const keys = capOnly ? [] : [...new Set(libDone.map(x => x.s.spec.lib.key))];
     for (const key of keys) {
       const list = libDone.filter(x => x.s.spec.lib.key === key); const last = list[list.length - 1]; const prev = list[list.length - 2];
       const verdictOf = (x) => x.st.completed ? ladderVerdict(x.s, x.st, (state.activities || {})[x.st.activityId], { ...thrOf(state), lthrBike }) : x.st.skipped || x.date < date ? { result: 'stay', why: 'nicht erledigt' } : null;
@@ -1210,6 +1327,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
       const s = Object.assign({}, s0, ...res.filter(a => a.sessionId === s0.id && a.type === 'modify').map(a => a.set || {}));
       if (!['swim', 'bike', 'run'].includes(s.sport) || s.cancelled || isTestOrRace(s) || !s.plannedMinutes) return;
       if (s.stage || s.race || s.fixed) return;
+      if (capOnly && (sessDone(state, s) || s.date < (opts.today || date))) return;
       const f = 1 + pct / 100;
       if (pct > 0 && !ruleOk(wRules, { ...s, plannedMinutes: round5(s.plannedMinutes * f) }, s.date, nextSessions.filter(x => x.date === s.date && x.id !== s.id && !x.cancelled))) return;
       // Titel-Änderung ohne Bauplan (Sweet-Spot-Leiter alter Pläne) bleibt: dann nur die Minuten
@@ -1222,9 +1340,30 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
 
   volStep();
 
+  // Auftrag 41: lange Einheiten höchstens etwa 10 min (Rad 15 min) über der längsten echten der letzten 4 Wochen (Laufen, Rad, Schwimmen).
+  // Ohne Einheit dieser Sportart in 4 Wochen: Neustart mit kurzer Dauer. Nur, wenn eingetragen wurde (sonst unbekannt, s. o.).
+  const longWhy = [];
+  if (capOk && !real.unknown) {
+    const MARGIN = { run: 10, bike: 15, swim: 10 }, RESTART = { run: 30, bike: 45, swim: 35 }, LONG = { run: 'längster Lauf', bike: 'längste Radeinheit', swim: 'längste Schwimmeinheit' }, NONE = { run: 'kein Lauf', bike: 'keine Radeinheit', swim: 'keine Schwimmeinheit' };
+    nextSessions.forEach(s0 => {
+      const s = Object.assign({}, s0, ...res.filter(a => a.sessionId === s0.id && a.type === 'modify').map(a => a.set || {}));
+      if (!MARGIN[s.sport] || s.cancelled || isTestOrRace(s) || s.stage || s.fixed || !s.plannedMinutes) return;
+      if (sessDone(state, s) || (capOnly && s.date < (opts.today || date))) return;
+      const lg = real.longest[s.sport]; const cap = lg > 0 ? round5(lg + MARGIN[s.sport]) : RESTART[s.sport];
+      if (s.plannedMinutes <= cap + 2) return;
+      const rb = W.rebuildScaled(s, cap / s.plannedMinutes);
+      const nm = rb ? rb.plannedMinutes : cap;
+      if (nm >= s.plannedMinutes) return;
+      const txt = lg > 0 ? `${LONG[s.sport]} zuletzt ${Math.round(lg)} min` : `in den letzten 4 Wochen ${NONE[s.sport]}`;
+      push({ id: `${group}-long-${s.id}`, type: 'modify', sessionId: s.id, set: rb || { plannedMinutes: cap, plannedKm: s.plannedKm ? r1(s.plannedKm * cap / s.plannedMinutes) : s.plannedKm ?? null },
+        what: `${s.title}: ${s.plannedMinutes} → ${nm} min`, reason: `An dein Training angepasst: ${txt}, deshalb höchstens etwa ${cap} min` });
+      if (!longWhy.includes(txt)) longWhy.push(txt);
+    });
+  }
+
   // Lernstufen (Kraul lernen, Lauf-Geh-Wechsel): eine Stufe weiter nur, wenn die letzte laut Daten geklappt hat (Auftrag 4 C1)
   const stageWhy: string[] = [];
-  for (const ladder of ['swim', 'swimBreast', 'runwalk']) {
+  for (const ladder of capOnly ? [] : ['swim', 'swimBreast', 'runwalk']) {
     const done = planDays(weeks).filter(d => d.date <= date && d.date > addDays(date, -21)).flatMap(d => d.sessions.filter(s => s.stage && s.stage.ladder === ladder && sessDone(state, s)).map(s => ({ s, date: d.date })))
       .sort((a, b) => a.date.localeCompare(b.date));
     const last = done[done.length - 1]; if (!last) continue;
@@ -1254,7 +1393,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
 
   // Schwimmtest: ab 400 m Kraul am Stück wird aus dem Kraul-Check der CSS-Test (400 m + 200 m)
   const crawlBest = longestCrawl(state, weeks, date);
-  if (crawlBest >= 400) nextSessions.filter(s => s.sport === 'swim' && /Kraul-Check/.test(s.title || '') && !s.cancelled).forEach(s => {
+  if (!capOnly && crawlBest >= 400) nextSessions.filter(s => s.sport === 'swim' && /Kraul-Check/.test(s.title || '') && !s.cancelled).forEach(s => {
     const b = W.build(W.swimTest((s.spec && s.spec.ctx) || {}));
     push({ id: `${group}-css-${s.id}`, type: 'modify', sessionId: s.id, set: { title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, hard: true },
       what: `${s.title} → ${b.title}`, reason: `Du schaffst ${crawlBest} m Kraul am Stück: jetzt der Test für deine Schwimm-Schwelle (CSS)` });
@@ -1262,7 +1401,7 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
 
   // Schutzregeln für die nächste Woche
   nextSessions.forEach(s => {
-    if (s.sport === 'run' && isIntervals(s) && (!meta.runIntervalsAllowed || pain)) {
+    if (!capOnly && s.sport === 'run' && isIntervals(s) && (!meta.runIntervalsAllowed || pain)) {
       push({ id: 'guard-' + s.id, type: 'modify', sessionId: s.id,
         set: { title: 'Zone 2 statt: ' + s.title, zone: 'Zone 2', description: 'Lauf-Intervalle sind ' + (pain ? 'wegen ' + painLabel(pain) + ' über 2/10 ' : '') + 'gerade nicht freigegeben. Locker in Zone 2 laufen.' },
         what: `${s.title} → lockerer Lauf in Zone 2`, reason: pain ? painLabel(pain) + ' über 2/10 in deinen Notizen' : 'Lauf-Intervalle hat der Coach noch nicht freigegeben' });
@@ -1275,9 +1414,10 @@ function weeklyAdjustments(state, baseWeeks, date, opts) {
   const whyTxt = next.isRecoveryWeek && pct === 0 ? '' : String(why || '').replace(/^Diese Woche ([\d,]+) h eigenes Training erledigt: nächste Woche höchstens etwa 10 % mehr$/, 'Du hast diese Woche $1 h trainiert, mehr als etwa 10 % darüber wäre zu viel auf einmal');
   const sentence = (t: string) => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
   push({ id: group + '-summary', type: 'note',
-    what: volTxt, reason: [whyTxt ? 'Grund: ' + whyTxt : '', ladderWhy ? 'Rad: ' + ladderWhy : '', ...stageWhy.map(sentence)].filter(Boolean).join('. '),
-    stats: { ratio: S.ratio, red: S.red, green: S.green, withValues: S.withValues, sick: S.sick, loadRatio: S.loadRatio, pct } });
-  return { adjustments: res, summary: S };
+    what: volTxt, reason: [whyTxt ? 'Grund: ' + whyTxt : '', longWhy.length ? 'Lange Einheiten nach deinem Training: ' + longWhy.join(', ') + ' – höchstens etwa 10 min mehr' : '', ladderWhy ? 'Rad: ' + ladderWhy : '', ...stageWhy.map(sentence)].filter(Boolean).join('. '),
+    stats: { ratio: S.ratio, red: S.red, green: S.green, withValues: S.withValues, sick: S.sick, loadRatio: S.loadRatio, pct }, v41: true, ...(capOnly && !res.some(x => x.type !== 'note') ? { retired: true } : {}) });
+  // Auftrag 41: nur Anpassungen mit sichtbarem Unterschied (z. B. „42 → 40 min“, das die Bausteine wieder auf 42 min bringen)
+  return { adjustments: realAdjustments(baseWeeks, existing, res), summary: S };
 }
 
 /* ================= Phase 5: Hilfen für Mitteilungen ================= */
@@ -1366,7 +1506,7 @@ export {
   ruleOk, hashOf,
   sessionTime, isEarly, zoneBpm, nutritionKcalLow, perfEntries, bests,
   addDays, illnessAt, hasRecovery, readinessInputs, readinessSnapshot, readinessFor, readinessHistory, readinessLine, levelOfScore, READY_WORDS, READY_GREEN, READY_YELLOW, baselineOf, BASE_DAYS, MIN_DAYS,
-  isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, planDays, titleIssue as sessionTitleIssue, titleWithoutNumbers,
+  isGame, isIntervals, isLong, isKey, isHard, isTestOrRace, sessionLoad, plannedLoad, applyAdjustments, activeAdjustments, noopAdjustmentIds, realAdjustments, netChange, flatStatt, adjustmentCleanup, planDays, titleIssue as sessionTitleIssue, titleWithoutNumbers,
   recordedActivities, dailyLoadEntries, dailyLoads, ownLoadSeries, loadBaseline, groinFlag, groinComplaint, painFlag, painInfo, thrOf, ladderIndex, LADDER, dailyAdjustments, weeklyAdjustments, weekSummary, weekRange, returnStageActive, trainingGap, pauseFactor, returnAfterPause,
-  isLocked, stageVerdict, stageSession, ladderVerdict as ladderVerdictOf, libStatus, canonicalActivityId, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest
+  isLocked, stageVerdict, stageSession, ladderVerdict as ladderVerdictOf, libStatus, canonicalActivityId, swimProofs, confirmedOf, swimStageVerdict, swimRate, swimPace100, swimStrokePaces, ownDoneMinutes, recentOwnMinutes, recentLongest, actualTraining
 };

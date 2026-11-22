@@ -23,8 +23,8 @@ const future = plan.weeks.filter((w: any) => w.startDate >= '2026-10-19');
 describe('Woche 5 bleibt, ab 19.10. der neue Plan', () => {
   test('Wochen 1-5 unverändert, Woche 6 = Block 2, Woche 1', () => {
     expect(plan.weeks.slice(0, 5)).toEqual(oldPlan().weeks);
-    expect(W('2026-10-19').headline).toMatch(/^Woche 6 · Block 2, Woche 1/);
-    expect(W('2026-11-16').headline).toMatch(/^Woche 10 · Block 3, Woche 1/);
+    expect(W('2026-10-19').headline).toMatch(/^Woche 6 · 1. Woche im Block 2/);
+    expect(W('2026-11-16').headline).toMatch(/^Woche 10 · 1. Woche im Block 3/);
     expect(plan.meta.pattern).toBe(true);
   });
   test('keine Regel verletzt (Umfang, Laufumfang, harte Tage)', () => {

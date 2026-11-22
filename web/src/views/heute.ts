@@ -2,23 +2,24 @@ import { cycleHint, shoeHint } from '../../../shared/care';
 /* Heute: das Zentrum der App. Oben die Antwort des Tages (Ampel + Einheit + ein Satz vom Coach), darunter Morgen,
    Zuletzt, Woche. Details erst beim Antippen. Zwei Entwürfe: A „Antwort“ (Standard) und B „Feed“ (siehe DESIGN.md). */
 import * as C from '../../../shared/core';
-import { STATE, UI, PLAN, findDay, BASE_WEEKS, profile } from '../store';
+import { STATE, UI, PLAN, findDay, BASE_WEEKS, profile, HAS_PLAN } from '../store';
 import { activeInjury } from '../../../shared/coach/ops';
-import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween } from '../util';
+import { esc, fmtDate, dowShort, dowLong, addDays, daysBetween, ymd } from '../util';
 import { t, tn, num, duration } from '../../../shared/i18n';
 import { D, RETURN_STAGES, coachText } from '../data';
 import { on, ring, li, sec, srcBadge, sportIc, ic, pill, bar, openSheet, closeSheet, armed, safeBlock, refreshSheet } from '../kit';
 import { sessState, effStatus, forgottenSessions, dayStats, ensureSess } from '../domain';
 import { saveState } from '../store';
 import { toast } from '../toast';
-import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml, openSession } from './session';
+import { sessionRow, metaLine, doneLine, sessionTitle, plannedHtml, openSession, adjLabel } from './session';
 import { changedOf } from '../../../shared/results';
 import { openCheckin } from './werte';
 import { nav } from '../nav';
 import { SPORT_COLOR, sportIcon } from '../icons';
 import { nutritionToday } from './essen';
 import { daysUntil } from '../../../shared/race';
-import { syncStatusLine } from '../sync';
+import { syncStatusLine, pushSupported, enablePush, ensurePush } from '../sync';
+import { connIssues } from './verbindungen';
 import { recoveryReminder } from './intro';
 
 const STATUS_KEY = ['heute.st.ready', 'heute.st.easy', 'heute.st.rest', 'heute.st.novalues'];
@@ -33,7 +34,10 @@ export function todayStatus() {
   let line: string;
   if (level === 3) {
     const few = R.uncertain === 'few' ? R.crits.filter((c: any) => ['HFV', 'Ruhepuls', 'Schlaf', 'Gefühl'].includes(c.k)).map((c: any) => t(CRIT_LABEL[c.k] || c.k)).join(', ') : '';
-    line = few ? t('heute.unsureFew', { v: few }) : t('heute.unsureNone') + (R.staleLevel != null ? ' ' + t('heute.unsureStale', { c: t(['heute.c.green', 'heute.c.yellow', 'heute.c.red'][R.staleLevel] || 'heute.c.green') }) : '');
+    // Auftrag 41: ehrlich sagen, seit wann keine Morgenwerte mehr kamen (z. B. abgelaufene Verbindung)
+    const lastRec = [...(STATE.trend || [])].filter((p: any) => p && p.date < d.today && C.hasRecovery(p)).map((p: any) => p.date).sort().pop();
+    const since = lastRec && lastRec < addDays(d.today, -1) ? t('heute.noDataSince', { d: `${dowShort(lastRec)} ${fmtDate(lastRec)}` }) : '';
+    line = few ? t('heute.unsureFew', { v: few }) : (since || t('heute.unsureNone')) + (R.staleLevel != null ? ' ' + t('heute.unsureStale', { c: t(['heute.c.green', 'heute.c.yellow', 'heute.c.red'][R.staleLevel] || 'heute.c.green') }) : '');
   } else line = t(['heute.line.green', 'heute.line.yellow', 'heute.line.red'][level], { s: R.score }) + (level > 0 ? ' ' + (reasons || t('heute.yellowLine')) + '.' : '');
   return { level, word: t(STATUS_KEY[level] || STATUS_KEY[3]), line };
 }
@@ -70,7 +74,7 @@ function answerCard(): string {
     const st = sessState(x.id); const status = effStatus(x);
     return `<div class="session-hero ${st.completed ? 'done' : ''}" style="--c:${SPORT_COLOR[x.sport]}">
       <button class="row grow" data-act="sess-open" data-sid="${esc(x.id)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px"><span class="ic">${sportIcon(x.sport)}</span>
-      <span class="grow"><span class="t">${esc(sessionTitle(x, st))}</span>${plannedHtml(x, st)}${x._adj ? ' ' + pill(t('st.adjusted'), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span></span></button>
+      <span class="grow"><span class="t">${esc(sessionTitle(x, st))}</span>${plannedHtml(x, st)}${adjLabel(x) ? ' ' + pill(adjLabel(x), 'warn') : ''}<br><span class="m">${esc(st.completed ? (doneLine(x) || metaLine(x)) : metaLine(x))}</span>${!st.completed && status !== 'cancelled' && (x.spec || x.description) ? `<br><span class="xs link" data-guide-link>${esc(t('sess.guide'))} ›</span>` : ''}</span></button>
       ${status === 'cancelled' || status === 'sick' ? '' : `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(x.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>`}</div>`;
   }).join('') : `<div class="session-hero" style="--c:var(--rest)"><span class="ic">${sportIcon('rest')}</span><span class="grow"><span class="t">${esc(t(beforeStart ? 'plan.beforeStart' : 'heute.restDay'))}</span><br><span class="m">${esc(t(beforeStart ? 'heute.startsSoon' : 'heute.restLine'))}</span></span></div>`;
   return `<div class="answer l${s.level}">
@@ -173,6 +177,48 @@ function careHints(): string {
   const l = [(d.profile as any).sex !== 'm' ? cycleHint(st.cycle, d.today) : null, shoeHint(STATE, BASE_WEEKS, st.shoe, d.today)].filter(Boolean) as string[];
   return l.length ? `<div class="card stack" data-care-hints style="margin-top:var(--s3)">${l.map(x => `<div class="hint">${esc(x)}</div>`).join('')}</div>` : '';
 }
+/* Auftrag 41: abgelaufene bzw. fehlerhafte Verbindung deutlich im Heute-Tab (vorher nur unter Mehr bzw. im Fehlerprotokoll) */
+function connBanner(): string {
+  const list = connIssues(); if (!list.length) return '';
+  return `<div class="banner warn stack" data-conn-issue style="margin-top:var(--s3)">${list.map(c => `<div class="spread" style="gap:8px;flex-wrap:wrap"><span class="small"><b>${esc(c.label)}:</b> ${esc(c.status === 'reauth' ? 'Anmeldung abgelaufen' : 'Abruf klappt gerade nicht')}${c.since ? ` – keine neuen Daten seit ${esc(dowShort(ymd(new Date(c.since))))} ${esc(fmtDate(ymd(new Date(c.since))))}` : ''}.</span><button class="btn sm" data-act="conn-open" data-id="${esc(c.id)}">${esc(t('conn.reconnect'))}</button></div>`).join('')}</div>`;
+}
+/* Auftrag 41: einmal pro Woche kurz fragen, was mit offenen Einheiten der letzten 7 Tage ist (schnell abhaken bzw. „nicht gemacht“).
+   Nach 3 Wochen ohne Eintrag gelten Einheiten als „ohne Eintrag“ (unbekannt) und tauchen hier nicht mehr auf. */
+function weekAskList(): any[] { const d = D(); return forgottenSessions().filter((s: any) => s.date >= addDays(d.today, -7)).sort((a: any, b: any) => a.date.localeCompare(b.date)); }
+function weekAskCard(): string {
+  const d = D(); const wk = C.weekRange(d.today)[0];
+  if ((STATE.settings || {}).weekAsk === wk) return '';
+  const list = weekAskList(); if (list.length < 2) return '';
+  return `<div class="card stack" data-week-ask style="margin-top:var(--s3)"><b>Hast du diese Woche trainiert?</b><div class="hint">${esc(`${list.length} Einheiten der letzten 7 Tage sind noch offen. Kurz abhaken hilft dem Plan – sonst rät er.`)}</div>
+    <div class="list">${list.map((s: any) => `<div class="li" data-week-ask-row="${esc(s.id)}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}"><span class="grow small">${esc(missedLabel(s))}</span><button class="btn sm" data-act="wa-done" data-sid="${esc(s.id)}" aria-label="${esc('Gemacht: ' + missedLabel(s))}">${ic('check')}</button><button class="btn ghost sm" data-act="wa-skip" data-sid="${esc(s.id)}">nicht gemacht</button></div>`).join('')}</div>
+    <div class="row wrap"><button class="btn soft sm" data-act="wa-all" data-v="done">Alles gemacht</button><button class="btn ghost sm" data-act="wa-all" data-v="skip">Nichts davon gemacht</button><button class="btn ghost sm" data-act="wa-later">Später</button></div></div>`;
+}
+function weekAskClose(): void { const left = weekAskList(); if (!left.length) { STATE.settings = { ...(STATE.settings || {}), weekAsk: C.weekRange(D().today)[0] }; } }
+on('wa-done', el => { const st = ensureSess(el.dataset.sid!); st.completed = true; st.skipped = false; weekAskClose(); saveState(); nav.rerender(); });
+on('wa-skip', el => { const st = ensureSess(el.dataset.sid!); st.skipped = true; st.completed = false; weekAskClose(); saveState(); nav.rerender(); });
+on('wa-all', el => { const done = el.dataset.v === 'done'; weekAskList().forEach((s: any) => { const st = ensureSess(s.id); st.completed = done; st.skipped = !done; }); weekAskClose(); saveState(); nav.rerender(); toast(done ? 'Als erledigt eingetragen' : 'Als nicht gemacht eingetragen'); });
+on('wa-later', () => { STATE.settings = { ...(STATE.settings || {}), weekAsk: C.weekRange(D().today)[0] }; saveState(); nav.rerender(); });
+/* Auftrag 41: Mitteilungen einmal freundlich anbieten (bisher hatte sie nur ein Nutzer an). iPhone: nur aus der App vom Home-Bildschirm. */
+function notifyOffer(): string {
+  const st = STATE.settings || {};
+  if (st.notifyOffer || !HAS_PLAN) return '';
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+  const standalone = (navigator as any).standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches);
+  const supported = pushSupported();
+  let granted = false; try { granted = typeof Notification !== 'undefined' && Notification.permission === 'granted'; } catch (e) { granted = false; }
+  if (granted || (!supported && !ios)) return '';
+  const home = ios && !standalone;
+  return `<div class="card stack" data-notify-offer style="margin-top:var(--s3)"><b>Erinnerungen einschalten?</b><div class="hint">${esc('Die App erinnert dich an Einheiten und sagt Bescheid, wenn sich dein Plan ändert. Du kannst es jederzeit unter Mehr → Einstellungen ausschalten.')}</div>
+    ${home ? `<div class="hint" data-notify-home>${esc('Auf dem iPhone geht das nur in der App vom Home-Bildschirm: in Safari unten auf „Teilen“ tippen → „Zum Home-Bildschirm“, dann die App von dort öffnen.')}</div>` : ''}
+    <div class="row wrap">${home ? '' : `<button class="btn sm" data-act="notify-offer-on">Einschalten</button>`}<button class="btn ghost sm" data-act="notify-offer-no">${esc(home ? 'Verstanden' : 'Nein, danke')}</button></div></div>`;
+}
+on('notify-offer-no', () => { STATE.settings = { ...(STATE.settings || {}), notifyOffer: 'no' }; saveState(); nav.rerender(); });
+on('notify-offer-on', async el => {
+  (el as HTMLButtonElement).disabled = true;
+  try { await enablePush(); await ensurePush(true); STATE.settings = { ...(STATE.settings || {}), notifyOffer: 'on' }; saveState(); toast(t('set.notifyOn')); }
+  catch (e: any) { toast(e && e.message ? e.message : 'Mitteilungen konnten nicht eingeschaltet werden.'); (el as HTMLButtonElement).disabled = false; }
+  nav.rerender();
+});
 export function renderHeute(): string {
   const d = D();
   // Fix 3.23.0: Datum schrumpft nicht (bei langem Zielnamen war es 12 px breit), die Ziel-Pille bricht in die nächste Zeile um
@@ -180,8 +226,8 @@ export function renderHeute(): string {
   // Auftrag 28: jede Karte für sich – ein Fehler in einer Karte zeigt nur dort „konnte nicht geladen werden“
   const b = (name: string, fn: () => string) => safeBlock('heute-' + name, fn);
   const week = () => sec(t('heute.week'), weekStrip());
-  if (UI.heuteVariant === 'feed') return head + b('feed', feedVariant) + b('illness', illnessBlock) + b('race', raceBanner) + b('week', week) + b('food', foodMini);
-  return head + b('answer', answerCard) + b('illness', illnessBlock) + b('race', raceBanner) + b('care', careHints) + b('next', nextRows) + b('week', week) + b('coach', coachPreview) + b('food', foodMini) + b('recovery', recoveryReminder); // Auftrag 28: unten, damit nichts verrutscht
+  if (UI.heuteVariant === 'feed') return head + b('conn', connBanner) + b('feed', feedVariant) + b('illness', illnessBlock) + b('race', raceBanner) + b('week', week) + b('food', foodMini);
+  return head + b('conn', connBanner) + b('answer', answerCard) + b('illness', illnessBlock) + b('weekask', weekAskCard) + b('race', raceBanner) + b('care', careHints) + b('next', nextRows) + b('notify', notifyOffer) + b('week', week) + b('coach', coachPreview) + b('food', foodMini) + b('recovery', recoveryReminder); // Auftrag 28: unten, damit nichts verrutscht
 }
 
 on('plan-day', el => { UI.planDate = el.dataset.date; nav.go('plan'); });

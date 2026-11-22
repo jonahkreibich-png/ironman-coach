@@ -25,6 +25,7 @@ import { SPORT_COLOR } from '../icons';
 import { kmOf, totalOf } from '../planview';
 import { convertBlock } from './convertui';
 import { doneSummary, type DoneSummary } from '../../../shared/ablauf';
+import { shortPlan } from '../../../shared/workouts';
 import { ivThr } from '../../../shared/coach/review';
 
 export function zoneText(s: any): string {
@@ -62,21 +63,70 @@ export function doneLine(s: any): string {
   if (s.sport === 'strength') parts.push(...actualStrength(sessState(s.id), STATE.activities?.[sessState(s.id).activityId]).exercises.slice(0, 3).map((e: any) => e.name));
   return parts.join(' · ');
 }
+/* ---------- Auftrag 41: Änderungs-Box ohne Wiederholungen ----------
+   Netto-Unterschied Original → jetzt (nur Felder, die sich wirklich unterscheiden), darunter die Schritte ohne Doppelte, mit Datum.
+   Ohne echten Unterschied keine Box und kein Abzeichen. Interne Platzhalter erscheinen nie (KI-Sperre bleibt auf dem Server). */
+const INTERNAL_TXT = /Trainingsangabe \(Begründung nicht für die KI freigegeben\)/g;
+const isTestLike = (x: any) => !!x && C.isTestOrRace(x) && !x.race && !/statt: /.test(String(x.title || ''));
+export function adjLabel(s: any): string {
+  const nc = C.netChange(s); if (!nc) return '';
+  if (nc.added) return t('st.added');
+  if (s._orig && isTestLike({ title: s._orig.title }) && !isTestLike(s) && !s.cancelled) return t('st.testChanged');
+  return nc.moved && nc.adjusted ? t('st.movedAdjusted') : nc.moved ? t('st.moved') : t('st.adjusted');
+}
+const dayTxt = (d: string) => (d ? `${dowShort(d)} ${fmtDate(d)}` : '');
+function cleanTxt(x: any, s: any): string { return String(x || '').replace(INTERNAL_TXT, (s._orig && s._orig.title) || s.title || 'Einheit').trim(); }
+function stepText(a: any, s: any): string {
+  let w = cleanTxt(a.what, s);
+  const m = /^(.+?)\s+→\s+(.+)$/.exec(w); if (m && m[1].trim() === m[2].trim()) w = '';
+  if (!w) w = a.type === 'move' && a.to ? `verschoben auf ${dayTxt(a.to)}` : a.type === 'cancel' ? 'entfällt' : 'angepasst';
+  return w;
+}
+function amountTxt(x: any): string { return x.plannedKm ? (x.sport === 'swim' ? `${Math.round(x.plannedKm * 1000)} m` : dist(x.plannedKm)) : ''; }
+export function adjBox(s: any): string {
+  const nc = C.netChange(s); if (!nc) return '';
+  const list = (s._adj || []).map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
+  const o = s._orig || {};
+  const rows: [string, string, string, string][] = [];
+  const add = (key: string, label: string, a: string, b: string) => { if (String(a) !== String(b)) rows.push([key, label, a || '–', b || '–']); };
+  if (!nc.added) {
+    if (nc.moved) add('date', 'Tag', dayTxt(o.date), dayTxt(s.date));
+    if (nc.fields.includes('title')) add('title', 'Titel', o.title, s.title);
+    if (nc.fields.includes('plannedMinutes')) add('min', 'Dauer', o.plannedMinutes ? duration(o.plannedMinutes) : '', s.plannedMinutes ? duration(s.plannedMinutes) : '');
+    if (nc.fields.includes('plannedKm')) add('km', 'Strecke', amountTxt({ ...o, sport: s.sport }), amountTxt(s));
+    if (nc.fields.includes('zone')) add('zone', 'Zone', o.zone, s.zone);
+    if (nc.fields.includes('description')) {
+      const pa = shortPlan(o.spec), pb = shortPlan(s.spec);
+      if (pa && pb && pa !== pb) add('content', 'Inhalt', pa, pb);
+      else if (!rows.some(r => r[0] !== 'date')) rows.push(['content', 'Inhalt', '', 'angepasst']);
+    }
+    if (s.cancelled) rows.push(['cancelled', '', '', 'fällt aus']);
+    if (!rows.length) return '';
+  }
+  const why = [...new Set(list.map((a: any) => cleanTxt(a.reason, s)).filter(Boolean))].join('; ');
+  const seen = new Set<string>();
+  const steps = list.map((a: any) => { const txt = stepText(a, s); const d = a.date || (a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : ''); return { txt, d }; })
+    .filter((x: any) => { if (seen.has(x.txt)) return false; seen.add(x.txt); return true; });
+  const label = adjLabel(s);
+  const rowHtml = rows.map(([k, l, a, b]) => `<div data-adj-row="${k}">${l ? `<span class="muted">${esc(l)}:</span> ` : ''}${a ? `${esc(a)} → ` : ''}<b>${esc(b)}</b></div>`).join('');
+  const stepHtml = steps.length ? `<div class="adj-steps" data-adj-steps>${steps.map((x: any) => `<div class="muted" data-adj-step>${x.d ? esc(fmtDate(x.d)) + ': ' : ''}${esc(x.txt)}</div>`).join('')}</div>` : '';
+  return `<details class="adj-info card flat tight" data-adj-info data-key="adj-info"><summary><span class="pill warn">${esc(label)}</span>${why ? ` <span class="small">${esc(why)}</span>` : ''}<span class="chev">${ic('down')}</span></summary><div class="body small">${rowHtml}${stepHtml}</div></details>`;
+}
 export function statusIcon(status: string): string {
-  return ({ done: pill('✓ ' + t('st.done'), 'good'), skipped: pill(t('st.skipped')), sick: pill(t('st.sick'), 'bad'), missed: pill(t('st.missed'), 'warn'), cancelled: pill(t('st.cancelled')) } as any)[status] || '';
+  return ({ done: pill('✓ ' + t('st.done'), 'good'), skipped: pill(t('st.skipped')), sick: pill(t('st.sick'), 'bad'), missed: pill(t('st.missed'), 'warn'), unknown: pill(t('st.unknown')), cancelled: pill(t('st.cancelled')) } as any)[status] || '';
 }
 /* Kompakte Zeile für Listen */
 export function sessionRow(s: any, opts: { check?: boolean } = {}): string {
   const st = sessState(s.id);
   const status = effStatus(s);
   const sub = status === 'done' ? (doneLine(s) || metaLine(s)) : metaLine(s);
-  const badges = (s._adj && s._adj.length ? pill(s.movedFrom ? t('st.moved') : t('st.adjusted'), 'warn') : '') + (st.source ? ' ' + srcBadge(st.source) : '');
+  const al = adjLabel(s); const badges = (al ? pill(al, 'warn') : '') + (st.source ? ' ' + srcBadge(st.source) : '');
   const check = opts.check !== false && s.sport !== 'rest' && status !== 'cancelled' && status !== 'sick'
     ? `<button class="check ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   return `<div class="li wo ${status === 'cancelled' ? 'cancelled' : ''}" style="--c:${SPORT_COLOR[s.sport] || 'var(--rest)'}">
     <button class="row grow" data-act="sess-open" data-sid="${esc(s.id)}" style="border:0;background:none;text-align:left;padding:0;color:inherit;min-height:44px">
       ${sportIc(st.completed ? actualSport(s, st) : s.sport)}<span class="grow"><span class="t">${esc(sessionTitle(s, st))}</span> ${gearChips(s)}${badges}${plannedHtml(s, st) ? '<br>' + plannedHtml(s, st) : ''}<br><span class="s">${esc(sub)}</span></span></button>
-    <span class="wo-status">${status === 'done' || status === 'open' || status === 'missed' ? check : statusIcon(status)}</span></div>`;
+    <span class="wo-status">${status === 'done' || status === 'open' || status === 'missed' || status === 'unknown' ? check : statusIcon(status)}</span></div>`;
 }
 
 /* Auftrag 21: Status des letzten Abrufs je Einheit */
@@ -114,36 +164,41 @@ function sessionSheet(id: string): string {
   const done = st.completed ? doneLine(s) : '';
   const ds = doneOf(s, st);
   const changed = st.completed && (changedOf(st) || (ds && ds.changed));
-  const urteil = [st.completed ? (changed ? pill('anders gemacht', 'warn') : st.asPlanned ? pill('wie geplant', 'good') : '') : '', st.completed ? zonePill(tg) : ''].filter(Boolean).join(' ');
+  // Auftrag 41: Status nur einmal – ein Abzeichen („✓ erledigt · anders als geplant“); die Zonen-Angabe ist eigene Information
+  const badge = status === 'done' ? pill('✓ ' + t('st.done') + (changed ? ' · anders als geplant' : st.asPlanned ? ' · wie geplant' : ''), changed ? 'warn' : 'good') : statusIcon(status);
+  const urteil = st.completed ? zonePill(tg) : '';
+  // Auftrag 41: Sportart nur einmal (steht sie im Titel, nicht noch einmal in der Datumszeile); „Geplant“ nur einmal (mit Plan-Titel, wenn anders gemacht)
+  const shown = sessionTitle(s, st); const sp = String(sportLabel(s.sport) || '');
+  const STEM: Record<string, RegExp> = { run: /lauf/i, bike: /rad|ausfahrt|rolle/i, swim: /schwimm|kraul/i, strength: /kraft/i, football: /fußball|spiel|training/i };
+  const spInTitle = !!sp && (STEM[s.sport] ? STEM[s.sport].test(shown) : shown.toLowerCase().includes(sp.toLowerCase().slice(0, 5)));
+  const planTxt = [shown !== s.title ? s.title : '', metaLine(s) || (shown !== s.title ? '' : s.title)].filter(Boolean).join(' · ');
   // Kopf
   let h = `<div class="stack sess-page">
     <div class="stack sess-kopf" data-kopf>
-      <div class="row">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<div class="grow"><div class="lbl" data-kopf-date>${esc(dowShort(s.date))}, ${fmtDate(s.date)} · ${esc(sportLabel(s.sport))}</div>
-        <div class="small" data-kopf-plan><span class="muted">Geplant:</span> ${esc(metaLine(s) || s.title)}</div>
-        ${done ? `<div class="small" data-kopf-done><span class="muted">Gemacht:</span> <b>${esc(done)}</b></div>` : ''}${ds && ds.changed ? `<div class="small" data-kopf-changes><span class="muted">Anders als geplant:</span> ${esc(ds.short)}</div>` : ''}${plannedHtml(s, st)}${gearChips(s)}</div>${statusIcon(status)}</div>
+      <div class="row">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<div class="grow"><div class="lbl" data-kopf-date>${esc(dowShort(s.date))}, ${fmtDate(s.date)}${spInTitle ? '' : ` · ${esc(sp)}`}</div>
+        ${planTxt ? `<div class="small" data-kopf-plan><span class="muted">Geplant:</span> ${esc(planTxt)}</div>` : ''}
+        ${done ? `<div class="small" data-kopf-done><span class="muted">Gemacht:</span> <b>${esc(done)}</b></div>` : ''}${ds && ds.changed ? `<div class="small" data-kopf-changes><span class="muted">Anders als geplant:</span> ${esc(ds.short)}</div>` : ''}${gearChips(s)}</div><span data-badge>${badge}</span></div>
       ${urteil ? `<div class="row pills" data-urteil>${urteil}</div>` : ''}`;
-  if (s._adj && s._adj.length) {
-    const list = s._adj.map((aid: string) => STATE.adjustments[aid]).filter(Boolean);
-    const o = s._orig || {};
-    // Auftrag 29: oben steht der neue Titel; hier ein kleines Abzeichen „angepasst“ mit Grund, Antippen zeigt „vorher → nachher“
-    const why = [...new Set(list.map((a: any) => String(a.reason || '').trim()).filter(Boolean))].join('; ');
-    const was = [o.title, o.plannedMinutes ? duration(o.plannedMinutes) : null, o.zone].filter(Boolean).join(' · ');
-    const now = [s.title, s.plannedMinutes ? duration(s.plannedMinutes) : null, s.zone].filter(Boolean).join(' · ');
-    h += `<details class="adj-info card flat tight" data-adj-info data-key="adj-info"><summary><span class="pill warn">${esc(s.movedFrom ? t('st.moved') : t('st.adjusted'))}</span> <span class="small">${esc(why || list.map((a: any) => a.what || '').join('; '))}</span><span class="chev">${ic('down')}</span></summary><div class="body small">${o.title ? `<div data-adj-before><span class="muted">vorher:</span> ${esc(was)}</div><div data-adj-after><span class="muted">nachher:</span> ${esc(now)}</div>` : ''}${list.map((a: any) => `<div class="muted">${esc(a.what || '')}</div>`).join('')}</div></details>`;
-  }
+  h += adjBox(s);
   if (real && status !== 'cancelled') {
-    h += `<div class="row sess-actions">
-      <button class="btn ${st.completed ? '' : 'ghost'} grow" data-act="sess-toggle" data-sid="${esc(id)}">${ic('check')} ${esc(st.completed ? t('sess.isDone') : t('sess.markDone'))}</button>
+    // Auftrag 41: erledigt → nur „Als nicht erledigt markieren“ (kein „Fällt aus“)
+    h += st.completed ? `<div class="row sess-actions"><button class="btn ghost grow" data-act="sess-toggle" data-sid="${esc(id)}">${esc(t('sess.markUndone'))}</button></div>`
+      : `<div class="row sess-actions">
+      <button class="btn ghost grow" data-act="sess-toggle" data-sid="${esc(id)}">${ic('check')} ${esc(t('sess.markDone'))}</button>
       <button class="btn ghost" data-act="sess-skip" data-sid="${esc(id)}" aria-pressed="${!!st.skipped}">${esc(st.skipped ? t('sess.unskip') : t('sess.skip'))}</button></div>`;
   }
   h += `<div data-undo-slot data-tk="session" data-tid="${esc(id)}" data-attrs="${esc(attrsOf(tg))}">${undoButton(tg, attrsOf(tg))}</div>`;
   if (st.skipped) h += field('f-skipReason', t('sess.skipReason'), st.skipReason || '', { data: `data-sf="skipReason" data-sid="${esc(id)}"`, wide: true });
   if (editable) h += changeBlock(tg);
   h += '</div>';
+  // Auftrag 41: Anleitung (Schritte, Übungen, Wie hart, Achte auf, Warum) vor dem Training direkt unter dem Kopf, danach eingeklappt über dem Ablauf
+  const guide = !Array.isArray(s.trainingBlocks) ? structureHtml(s, { noDiagram: true, noToggle: true }) : '';
+  if (guide && !st.completed) h += `<div data-guide data-guide-top>${guide}</div>`;
   // vor dem Training: „Lieber kürzer / Lieber Intervalle …“ sichtbar (nach dem Abhaken leer)
   h += convertBlock(s, !!st.completed);
   // Ablauf (geplante Trainingsvorlage: Inhalt als Text, darunter die eingetragenen Teile)
   if (Array.isArray(s.trainingBlocks)) h += structureHtml(s);
+  if (guide && st.completed) h += `<details class="more sess-guide" data-key="sess-guide"><summary>${esc(t('sess.guide'))}<span class="chev">${ic('down')}</span></summary><div class="body" data-guide>${guide}</div></details>`;
   if (real) h += ablaufPart(tg, editable);
   // Gesamtwerte (mit Aufzeichnung und „Jetzt abrufen“)
   if (editable) {
@@ -155,10 +210,10 @@ function sessionSheet(id: string): string {
   h += coachReview(id);
   // Gefühl und Notiz
   if (editable) h += feelBlock(tg);
-  // mehr: Anleitung (geplante Schritte in Worten, Tipps), Uhrzeit, Vorlage, Umwandeln
-  const guide = !Array.isArray(s.trainingBlocks) ? structureHtml(s, { noDiagram: true, noToggle: true }) : '';
-  const extra = [guide ? `<div data-guide>${guide}</div>` : '', templateButtons(s, !!st.completed), real ? `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>` : ''].filter(Boolean).join('');
-  if (extra) h += `<details class="more sess-more" data-key="sess-more"><summary>Mehr: Anleitung, Uhrzeit, Vorlage<span class="chev">${ic('down')}</span></summary><div class="body stack">${extra}</div></details>`;
+  // mehr: Uhrzeit, Vorlage
+  const tpl = templateButtons(s, !!st.completed);
+  const extra = [tpl, real ? `<div class="fgrid">${field('f-time', t('sess.time'), st.time || '', { type: 'time', data: `data-sf="time" data-sid="${esc(id)}"` })}</div>` : ''].filter(Boolean).join('');
+  if (extra) h += `<details class="more sess-more" data-key="sess-more"><summary>${esc(tpl ? 'Mehr: Uhrzeit, Vorlage' : 'Mehr: Uhrzeit')}<span class="chev">${ic('down')}</span></summary><div class="body stack">${extra}</div></details>`;
   return h + '</div>';
 }
 /** Auftrag 37: die Bewertung des Coachs zu dieser Einheit (dieselbe Nachricht wie im Coach-Tab) */

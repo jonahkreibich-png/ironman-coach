@@ -78,14 +78,14 @@ test('Rad 2 × 8 → per [+] 3 × 10, Aufwärmen 10 statt 15: Titel, Geplant/Gem
   await page.keyboard.press('Escape');
   // Titel in der Liste: das Gemachte, darunter „geplant: …“
   const row = page.locator('[data-act="sess-open"][data-sid="b38"]').first();
-  await expect(row).toContainText('Rad 3 × 10 min Sweet Spot, statt 2 × 8 min');
+  await expect(row).toContainText('Rad 3 × 10 min Sweet Spot');
   await expect(row).toContainText(`geplant: ${SS.title}`);
   await page.reload(); await expect(page.locator('[data-act="sess-open"][data-sid="b38"]').first()).toContainText('Rad 3 × 10 min Sweet Spot');
   // Coach (Bewertung, Chat, KI-Kontext) und Belastung lesen das Gemachte
   const st = await stored(page);
   const ctx = ctxOf(st, plan);
   const d = doneItems(ctx, TODAY, TODAY).find(x => x.key === 'b38')!;
-  expect(d.title).toBe('Rad 3 × 10 min Sweet Spot, statt 2 × 8 min');
+  expect(d.title).toBe('Rad 3 × 10 min Sweet Spot');
   const review = autoReview(ctx, d, 'full');
   expect(review).toContain('3 × 10 min statt 2 × 8 min – mehr Sweet-Spot-Zeit (30 min statt 16 min), gut');
   const chat = reviewAnswer(ctx, 'Wie war mein Training heute?');

@@ -132,6 +132,9 @@ function previewAdjustments(adj:any[],label:string,warnings:string[]=[]) {
 on('edit-preview-confirm',()=>{if(!PENDING)return;const p=PENDING;PENDING=null;propose(p.adj,p.label);});
 const BUILD_SPORTS = ['run', 'bike', 'swim', 'strength'];
 const INT: [string, string][] = [['easy', 'edit.int.easy'], ['long', 'edit.int.long'], ['tempo', 'edit.int.tempo'], ['intervals', 'edit.int.intervals']];
+/* Auftrag 41: was die Auswahl „Intensität“ beim Öffnen zeigt. Tests, Sweet Spot, Berg usw. haben keine eigene Auswahl und zeigen „locker“ –
+   umgebaut wird nur, wenn der Nutzer die Auswahl wirklich ändert (vorher wurde z. B. der Lauftest beim Verschieben still zum lockeren Lauf). */
+const shownKind = (s: any) => s.spec ? (['intervals', 'threshold'].includes(s.spec.kind) ? 'intervals' : s.spec.kind === 'tempo' ? 'tempo' : s.spec.kind === 'long' ? 'long' : 'easy') : 'easy';
 function weekOf(date: string) { return PLAN.weeks.find((w: any) => w.days.some((d: any) => d.date === date)); }
 function editSheet(): string {
   const x = sess(); if (!x) return '';
@@ -139,7 +142,7 @@ function editSheet(): string {
   const w = weekOf(d.date);
   if(s.trainingBlocks) return '<div class="stack" data-edit-sheet><b>'+esc(s.title)+'</b><div class="hint">Dauer, Sportart und Beschreibung werden gemeinsam in den Trainingsbausteinen bearbeitet.</div><button class="btn block" data-act="edit-prescription">Trainingsbausteine bearbeiten</button>'+select('ed-day',t('edit.day'),d.date,allDayOptions())+'<button class="btn ghost block" data-act="edit-move">Verschieben: Vorschau</button><button class="btn ghost block" data-act="edit-session-swap">Einzelne Einheit tauschen</button>'+(!s._custom26?'<button class="btn danger" data-act="edit-del">'+esc(t('edit.delete'))+'</button>':'')+'</div>';
   if(s._custom26) return '<div class="stack"><b>'+esc(s.title)+'</b>'+select('ed-day',t('edit.day'),d.date,allDayOptions())+'<button class="btn block" data-act="edit-move">Verschieben: Vorschau</button><button class="btn ghost block" data-act="edit-session-swap">Einzelne Einheit tauschen</button></div>';
-  const kind = s.spec ? (['intervals', 'threshold'].includes(s.spec.kind) ? 'intervals' : s.spec.kind === 'tempo' ? 'tempo' : s.spec.kind === 'long' ? 'long' : 'easy') : 'easy';
+  const kind = shownKind(s);
   return `<div class="stack" data-edit-sheet><div class="hint">${esc(dowLong(d.date))}, ${fmtDate(d.date)} · ${esc(s.title)}</div>
     <div class="fgrid">${select('ed-day', t('edit.day'), d.date, allDayOptions())}
     ${/* Auftrag 39: Teamsport bzw. andere Sportarten behalten ihre Sportart (vorher stand „Laufen“ vorgewählt und die Einheit wurde beim Speichern still zum Lauf umgebaut) */ BUILD_SPORTS.includes(s.sport) ? select('ed-sport', t('common.sport'), s.sport, BUILD_SPORTS.map(k => [k, sportLabel(k)] as [string, string])) : ''}
@@ -183,8 +186,7 @@ on('edit-save', () => {
   const lock = !!(document.getElementById('ed-lock') as HTMLInputElement)?.checked;
   const group = uid(); const adj: any[] = [];
   let set: any = {};
-  const curKind = s.spec ? (['intervals', 'threshold'].includes(s.spec.kind) ? 'intervals' : s.spec.kind) : 'easy';
-  if (BUILD_SPORTS.includes(sport) && (sport !== s.sport || (v('ed-int') && kind !== curKind))) {
+  if (BUILD_SPORTS.includes(sport) && (sport !== s.sport || (v('ed-int') && kind !== shownKind(s)))) {
     const b = W.build(specFor(sport, kind, min, s));
     set = { sport, title: b.title, plannedMinutes: b.plannedMinutes, plannedKm: b.plannedKm ?? null, description: b.description, spec: b.spec, zone: b.zone || null, hard: !!b.hard, stage: null };
   } else if (min !== s.plannedMinutes || (kmRaw && s.plannedKm && Math.abs(+kmRaw / (s.sport === 'swim' ? 1000 : 1) - s.plannedKm) > 0.01)) {

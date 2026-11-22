@@ -40,7 +40,7 @@ export function repairNow(rules?: Rule[]): string[] {
   const today = todayStr();
   const r = rules || rulesOf(profile(), parseFor(today));
   const eff = C.applyAdjustments(BASE_WEEKS, STATE.adjustments || {});
-  const adj = repairWeek(eff, STATE, r, today, 'rules-' + Date.now());
+  const adj = C.realAdjustments(BASE_WEEKS, STATE.adjustments || {}, repairWeek(eff, STATE, r, today, 'rules-' + Date.now()));
   const now = Date.now();
   adj.forEach((a, i) => { STATE.adjustments[a.id] = { ...a, createdAt: now + i, date: today }; });
   if (adj.length) rebuildPlanIndex();

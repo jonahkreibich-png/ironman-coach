@@ -9,14 +9,30 @@ import { dataCheck, summarize } from '../../shared/datacheck';
 import { segmentsFromStreams } from '../../shared/activity/structure';
 import { plannedIntervals } from '../../shared/intervals';
 import * as C from '../../shared/core';
+import { planUpkeep, upkeepText } from '../../shared/replan';
 
 export async function runDataCheck(env: Env, uid: number, today = berlinDate()): Promise<any> {
   const revision = await recordsRevision(env, uid);
   const L = await loadState(env, uid);
   if (!L.plan && !Object.keys(L.state.activities || {}).length) return { skipped: 'keine Daten' };
-  const r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today });
+  let r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today });
   const now = Date.now();
   const changes: Change[] = r.fixes.map(f => ({ kind: f.kind, key: f.key, deleted: true, updatedAt: now }));
+  // Auftrag 41: Plan-Regeln nicht nur melden, sondern gleich mit der Plan-Pflege beheben (dieselbe Stelle wie am Morgen: normale
+  // Anpassungen mit Mitteilung und Rückgängig). Gemeldet wird danach nur, was übrig bleibt.
+  if (L.plan && r.findings.some(f => f.group === 'rules' && !f.fixed)) {
+    try {
+      const up = planUpkeep(L.baseWeeks, L.state, L.profile, L.goals || [], today, now + 300, L.planMeta);
+      if (up.adjustments.length) {
+        up.adjustments.forEach((a: any, i: number) => { L.state.adjustments[a.id] = a; changes.push({ kind: 'adjust', key: a.id, data: a, updatedAt: now + 300 + i }); });
+        const mid = 'msg-plancheck-' + today;
+        if (!L.state.coachMsgs[mid]) changes.push({ kind: 'coachMsg', key: mid, data: { id: mid, at: now + 5, date: today, kind: 'adjust', from: 'coach', title: 'Plan an die Trainingsregeln angepasst', text: upkeepText(up), refs: { adjustmentIds: up.adjustments.map((a: any) => a.id) } }, updatedAt: now + 299 });
+        const fixedKeys = new Set(r.fixes.map(f => f.key));
+        r = dataCheck({ state: L.state, baseWeeks: L.baseWeeks, profile: L.profile, goals: L.goals, today });
+        r = { ...r, fixes: r.fixes.filter(f => fixedKeys.has(f.key)) };
+      }
+    } catch (e) { /* der Daten-Check darf daran nie scheitern */ }
+  }
   // ältere Aufzeichnungen: harte Abschnitte aus dem Verlauf, wenn die Einheit Intervalle vorsieht (einmal je Aufzeichnung)
   let segAdded = 0;
   const checked: string[] = (await getMeta(env, uid, 'seg_checked')) || [];

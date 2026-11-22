@@ -973,7 +973,7 @@ function generatePlanIn(inp: GenInput): GenResult {
     const others2 = otherRaces.filter(r => r.goalId !== segGoal(wi).goalId);
     const extra = `${others2.length ? ', mit ' + others2.map(r => `${r.name} am ${DOW_LONG[dowOf(r.date)]}`).join(' und ') : ''}${races.some(r => r.goalId === A.id) || segRace ? ': Wettkampf!' : ''}`;
     const sgH = segGoal(wi); const toward = sgH.goalName || A.name;
-    const headline = cont ? `Woche ${wn} · Block ${blockNo}, Woche ${blockWeek} · ${PHASE_NAME[ph.phase as keyof typeof PHASE_NAME]} → ${toward}${extra}` : `Woche ${wi + 1} von ${nTotal} · ${PHASE_NAME[ph.phase as keyof typeof PHASE_NAME]} → ${toward}${extra}`;
+    const headline = cont ? `Woche ${wn} · ${blockWeek}. Woche im Block ${blockNo} · ${PHASE_NAME[ph.phase as keyof typeof PHASE_NAME]} → ${toward}${extra}` : `Woche ${wi + 1} von ${nTotal} · ${PHASE_NAME[ph.phase as keyof typeof PHASE_NAME]} → ${toward}${extra}`;
     const blk = { block: blockNo, blockWeek };
     if (ph.recovery) { blockNo++; blockWeek = 0; }
     weeks.push({

@@ -38,9 +38,14 @@ export function deviceInfo(): string {
   const browser = /CriOS|Chrome/.test(ua) ? 'Chrome' : /FxiOS|Firefox/.test(ua) ? 'Firefox' : /Safari/.test(ua) ? 'Safari' : 'Browser';
   return `${deviceName()}${ios ? ' iOS ' + ios[1] + '.' + ios[2] : ''}, ${browser}${isStandalone() ? ', als App installiert' : ''}, ${window.innerWidth}×${window.innerHeight}`;
 }
+/* Auftrag 41: nur Fehler seit dem letzten Bericht und höchstens der letzten 7 Tage (vorher hing an jedem Bericht der alte Startfehler vom 1.11.) */
+const FB_LAST_KEY = 'ec_fb_last';
+function lastReportAt(): number { try { return +(localStorage.getItem(FB_LAST_KEY) || 0) || 0; } catch (e) { return 0; } }
+function markReported(at: number) { try { localStorage.setItem(FB_LAST_KEY, String(at)); } catch (e) { /* egal */ } }
+export function recentErrors(now = Date.now()) { const since = Math.max(now - 7 * 86400000, lastReportAt()); return readErrors().filter(e => (e.at || 0) > since).slice(-5); }
 export function context() {
   const trail: string[] = (UI.trail || []).slice(-5);
-  return { screen: trail.join(' → '), version: APP_VERSION, device: deviceInfo(), errors: readErrors().slice(-5).map(e => ({ msg: e.msg, where: e.where, at: e.at })) };
+  return { screen: trail.join(' → '), version: APP_VERSION, device: deviceInfo(), errors: recentErrors().map(e => ({ msg: e.msg, where: e.where, at: e.at })) };
 }
 /* Nur mit ausdrücklicher Freigabe: was der Betreiber zum Nachstellen braucht (Plan dieser Woche, Regeln, Ampel) */
 function sharedData() {
@@ -167,6 +172,7 @@ on('fb-send', async el => {
   if (!text) { toast(t('fb.empty')); return; }
   const body: any = { kind: KIND, text, ...context(), ...(SHOT ? { screenshot: SHOT } : {}), ...(SHARE ? { shared: sharedData() } : {}), createdAt: Date.now() };
   (el as HTMLButtonElement).disabled = true;
+  markReported(body.createdAt);
   if (isSyncOn()) {
     try { await apiCall('POST', '/api/feedback', body); SENT = 'sent'; DRAFT = ''; SHOT = null; SHARE = false; MINE = null; LIST = null; nav.rerender(); toast(t('fb.thanksShort')); return; }
     catch (e: any) { if (e.status && e.status < 500 && e.status !== 401) { toast(e.message); (el as HTMLButtonElement).disabled = false; return; } }

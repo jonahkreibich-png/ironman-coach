@@ -22,7 +22,7 @@ function sessionsFor(date: string): DaySession[] {
   const day = findDay(date);
   if (day) day.sessions.forEach((s0: any) => {
     const s = { ...s0, date }; if (s.sport === 'rest') return;
-    const status = effStatus(s); if (status === 'skipped' || status === 'sick' || status === 'missed' || status === 'cancelled') return;
+    const status = effStatus(s); if (status === 'skipped' || status === 'sick' || status === 'missed' || status === 'unknown' || status === 'cancelled') return;
     const m = sessState(s.id).metrics || {};
     const min = status === 'done' && m.min ? parseNum(m.min) : (s.plannedMinutes || (s.sport === 'football' ? (/spiel/i.test(s.title) ? 60 : 90) : 0));
     out.push({ sport: s.sport, title: s.title, zone: s.zone, minutes: min || 0, race: !!s.race });

@@ -4,7 +4,7 @@ import { STATE, PLAN, UI, saveState, rebuildPlanIndex, currentWeekIdx, findDay, 
 import { esc, fmtDate, dowShort, dowLong, addDays, todayStr } from '../util';
 import { t, num, hours } from '../../../shared/i18n';
 import { on, sec, ic, pill, empty, more } from '../kit';
-import { metaLine, statusIcon, sessionTitle, plannedHtml } from './session';
+import { metaLine, statusIcon, sessionTitle, plannedHtml, adjLabel } from './session';
 import { editBar, editing, canUndoGroups } from './planedit';
 import { sportIc, gearChips } from '../kit';
 import { SPORT_COLOR, sportIcon } from '../icons';
@@ -45,7 +45,8 @@ function weekChip(x: any, i: number, sel: number, cw: number): string {
 const shortDate = (d: string) => `${+d.slice(8)}.${+d.slice(5, 7)}.`;
 /* Auftrag 30: kleine Symbole (einheitliche Icons) und Farbstreifen je Intensität – eine Stelle: shared/intensity.ts */
 export function marksHtml(marks: Mark[], s: any = null): string {
-  return marks.map(k => { const m = MARKS.find(x => x.key === k)!; const label = k === 'adjusted' && s && s.movedFrom ? t('st.moved') : m.label;
+  // Auftrag 41: Etikett aus dem Netto-Unterschied; ohne echten Unterschied kein Zeichen
+  return marks.filter(k => k !== 'adjusted' || !s || !!adjLabel(s)).map(k => { const m = MARKS.find(x => x.key === k)!; const label = k === 'adjusted' && s ? adjLabel(s) || m.label : m.label;
     return `<span class="pr-mark mk-${k}" role="img" aria-label="${esc(label)}" title="${esc(label)}" data-mark="${k}">${ic(m.icon)}</span>`; }).join('');
 }
 function planRow(s: any): string {
@@ -57,7 +58,7 @@ function planRow(s: any): string {
   // Auftrag 38: erledigt → die gemachte Dauer (aus dem Ablauf bzw. eingetragen), sonst die geplante
   const doneMin = st.completed ? parseFloat(String((st.metrics || {}).min ?? '').replace(',', '.')) : NaN;
   const dur = Number.isFinite(doneMin) && doneMin > 0 ? duration(doneMin) : s.plannedMinutes && !new RegExp('\\b' + s.plannedMinutes + ' min').test(s.title || '') ? duration(s.plannedMinutes) : '';
-  const check = status === 'done' || status === 'open' || status === 'missed'
+  const check = status === 'done' || status === 'open' || status === 'missed' || status === 'unknown'
     ? `<button class="check sm ${st.completed ? 'on' : ''}" data-act="sess-toggle" data-sid="${esc(s.id)}" aria-pressed="${!!st.completed}" aria-label="${esc(st.completed ? t('sess.undone') : t('sess.done'))}">${ic('check')}</button>` : statusIcon(status);
   const test = marks.includes('test') && !st.completed && status !== 'cancelled';
   return `<div class="pr wo ${status === 'cancelled' ? 'cancelled' : ''} ${band ? 'int-' + band : ''} ${test ? 'pr-test' : ''}" style="--c:${SPORT_COLOR[actualSport(s, st)] || 'var(--rest)'}" data-band="${band || ''}"><button class="pr-b" data-act="sess-open" data-sid="${esc(s.id)}">${sportIc(st.completed ? actualSport(s, st) : s.sport)}<span class="pr-t"><span class="t">${esc(sessionTitle(s, st))}</span>${plannedHtml(s, st)}${gearChips(s)}${marks.length ? ` <span class="pr-marks">${marksHtml(marks, s)}</span>` : ''}</span>${dur ? `<span class="pr-m">${esc(dur)}</span>` : ''}</button><span class="wo-status">${check}</span></div>`;
@@ -92,7 +93,8 @@ export function renderPlan(): string {
   h += explain.length ? `<div class="card plan-explain" style="margin-bottom:var(--s3)">${more(t('plan.explain'), explain.map(s => `<p class="small">${esc(s)}</p>`).join(''), false)}</div>` : '';
   // Wochenleiste: bleibt bei der gewählten Woche (centerWeekBar), „Heute“ springt zur aktuellen Woche
   h += `<div class="wkbar"><div class="wkbar-s" id="wkbar" role="tablist" aria-label="${esc(t('plan.weekBar'))}">${PLAN.weeks.map((x: any, i: number) => weekChip(x, i, UI.planWeek!, cw)).join('')}</div><button class="btn ghost sm wkbar-today" data-act="plan-today">${esc(t('plan.todayBtn'))}</button></div>`;
-  const head = w.headline || [t('plan.weekShort', { n: w.weekNumber }), t('tl.' + (w.phase || 'base'))].join(' · ');
+  // Auftrag 41: „Woche 4 · Block 1, Woche 4 · …“ → „Woche 4 · 4. Woche im Block 1 · …“ (Woche nicht doppelt; gilt auch für gespeicherte Pläne)
+  const head = String(w.headline || [t('plan.weekShort', { n: w.weekNumber }), t('tl.' + (w.phase || 'base'))].join(' · ')).replace(/Block (\d+), Woche (\d+)/, '$2. Woche im Block $1');
   h += `<div class="card wk-sum"><div class="spread wk-head"><div class="wk-l"><div class="lbl"><i class="wkc-dot tl-${esc(w.phase || 'base')}"></i>${fmtDate(w.startDate)} – ${fmtDate(w.endDate)}${w.isRecoveryWeek ? ' · ' + esc(t('plan.recovery')) : ''}</div><div class="week-head" data-week-head>${esc(head)}</div>${volTxt ? `<div class="xs muted" data-week-volume>${esc(volTxt)}</div>` : ''}
     <div class="xs wk-line" data-week-line>${esc(weekLine(w.days.flatMap(liveS), currentSummary.plannedMinutes))}</div></div>
     <div class="wk-r" data-week-count><div class="big">${done}/${total}</div><div class="xs muted">${esc(hours(currentSummary.plannedMinutes / 60))}${currentSummary.unknownPlannedMinutes ? ' + ?' : ''}</div></div></div>
@@ -192,7 +194,7 @@ function adjustmentsList(): string {
     const changes = g.items.filter((a: any) => a.type !== 'note');
     const reason = (note && note.reason) || (changes[0] && changes[0].reason) || '';
     return `<div class="li" data-group="${esc(g.id)}" style="align-items:flex-start"><span class="grow"><span class="lbl">${g.date ? dowShort(g.date) + ' ' + fmtDate(g.date) : ''} ${changes.some((a: any) => a.from_ai) ? '· KI' : ''}</span><br>
-      ${note ? `<span class="t">${esc(note.what)}</span><br>` : ''}${changes.slice(0, 4).map((a: any) => `<span class="${undone ? 'muted' : ''}" style="${undone ? 'text-decoration:line-through' : ''}">${esc(a.what || '')}</span>`).join('<br>')}${changes.length > 4 ? `<br><span class="s">+${changes.length - 4}</span>` : ''}
+      ${note ? `<span class="t">${esc(note.what)}</span><br>` : ''}${changes.slice(0, 4).map((a: any) => `<span class="${undone ? 'muted' : ''}" style="${undone ? 'text-decoration:line-through' : ''}">${esc(String(a.what || '').replace(/Trainingsangabe \(Begründung nicht für die KI freigegeben\)/g, 'Einheit'))}</span>`).join('<br>')}${changes.length > 4 ? `<br><span class="s">+${changes.length - 4}</span>` : ''}
       <br><span class="s">${esc(t('adj.why'))}: ${esc(reason)}</span></span>${changes.length ? `<button class="btn ghost sm" data-act="adj-undo">${esc(undone ? t('plan.redo') : t('plan.undo'))}</button>` : ''}</div>`;
   }).join('')}</div>`;
 }
