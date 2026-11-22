@@ -4,7 +4,7 @@ import {effectiveCustomBuckets} from './custom-state26';
    zeigen „ab X … verfügbar“ statt einer wackligen Zahl. Extra-Einheiten zählen überall mit (sie stecken in activities). */
 import * as C from './core';
 import { intervalsOf } from './activity/structure';
-import type { Activity } from './activity/analyze';
+import { zoneSeconds, type Activity } from './activity/analyze';
 import { sleepNeed, type Profile } from './profile';
 import { wattsTrusted, withMain } from './scores';
 
@@ -241,8 +241,11 @@ function intensityCard(I: TrendInput, from: string): TrendCard {
   let easy = 0, mid = 0, hard = 0, n = 0;
   for (const a of acts) {
     const min = a.min || 0;
-    if (a.hrZones && a.hrZones.some(z => z > 0)) { const z = a.hrZones; const s = z.reduce((x, y) => x + y, 0) || 1; easy += min * (z[0] + z[1]) / s; mid += min * z[2] / s; hard += min * (z[3] + z[4]) / s; n++; continue; }
     const t: any = I.profile.thresholds || {}; const l = a.sport === 'bike' ? t.lthrBike : a.sport === 'run' ? t.lthrRun : null;
+    // Zeit in den Zonen aus dem Pulsverlauf, sonst (Auftrag 40, Vorschlag 3) aus den Runden bzw. eingetragenen Intervallen – vorher
+    // zählte eine Intervall-Einheit ohne Verlauf ganz nach dem Ø Puls (bzw. pauschal 70/30)
+    const zs = zoneSeconds(a, l);
+    if (zs) { const z = zs; const s = z.reduce((x, y) => x + y, 0) || 1; easy += min * (z[0] + z[1]) / s; mid += min * z[2] / s; hard += min * (z[3] + z[4]) / s; n++; continue; }
     if (a.avgHr && l) { const f = a.avgHr / l; if (isHardAct(a)) { hard += min * 0.3; easy += min * 0.7; } else if (f < 0.87) easy += min; else if (f < 0.95) mid += min; else hard += min; n++; continue; }
     if (a.rpe != null || isHardAct(a)) { const r = a.rpe != null ? a.rpe : 7; if (isHardAct(a)) { hard += min * 0.3; easy += min * 0.7; } else if (r <= 4) easy += min; else if (r <= 6) mid += min; else hard += min; n++; }
   }
@@ -300,8 +303,11 @@ function bestsOf(acts: Activity[]): Best[] {
   const R = acts.filter(a => a.sport === 'run' && a.km && a.min);
   // bester 1-km-Abschnitt aus Runden (automatische Runde je km)
   pick('1 km (schnellste Runde)', R.flatMap(a => (a.laps || []).filter(l => l.m && l.m >= 950 && l.m <= 1050 && l.sec).map(l => ({ v: l.sec * 1000 / l.m!, date: a.date }))), true, v => mmss(v));
-  for (const [km, lab] of [[5, '5 km'], [10, '10 km'], [21.1, 'Halbmarathon']] as [number, string][])
-    pick(`${lab} (schnellster Lauf ab ${lab})`, R.filter(a => a.km! >= km * 0.98).map(a => ({ v: (a.min! * 60 / a.km!) * km, date: a.date })), true, v => fmtTime(v));
+  // Auftrag 40 (Vorschlag 4): 5 und 10 km auch aus dem schnellsten Abschnitt (km-Zeiten von Uhr oder Hand, sonst Runden mit Strecke) –
+  // vorher nur der Schnitt ganzer Läufe (ein schneller Abschnitt in einem langen Lauf zählte nicht)
+  for (const [km, lab] of [[5, '5 km'], [10, '10 km']] as [number, string][])
+    pick(`${lab} (schnellster Abschnitt)`, R.flatMap(a => { const w = a.km! >= km * 0.98 ? [(a.min! * 60 / a.km!) * km] : []; const s = segmentBest(a, km); return [...w, ...(s ? [s] : [])].map(v => ({ v, date: a.date })); }), true, v => fmtTime(v));
+  pick('Halbmarathon (schnellster Lauf ab Halbmarathon)', R.filter(a => a.km! >= 21.1 * 0.98).map(a => ({ v: (a.min! * 60 / a.km!) * 21.1, date: a.date })), true, v => fmtTime(v));
   const B = acts.filter(a => a.sport === 'bike' && a.min);
   pick('Rad: beste Ø-Leistung ab 20 min', B.filter(a => a.avgPower && a.min! >= 20).map(a => ({ v: a.avgPower!, date: a.date })), false, v => `${Math.round(v)} W`);
   pick('Rad: beste Ø-Leistung ab 60 min', B.filter(a => a.avgPower && a.min! >= 60).map(a => ({ v: a.avgPower!, date: a.date })), false, v => `${Math.round(v)} W`);
@@ -311,6 +317,25 @@ function bestsOf(acts: Activity[]): Best[] {
   pick('Längster Lauf', R.map(a => ({ v: a.km!, date: a.date })), false, v => `${de(v, 1)} km`);
   pick('Längste Fahrt', B.filter(a => a.km).map(a => ({ v: a.km!, date: a.date })), false, v => `${de(v, 0)} km`);
   return out;
+}
+/** Auftrag 40 (Vorschlag 4): schnellste zusammenhängende Strecke von km Kilometern (Sekunden, auf genau km hochgerechnet) aus den
+ *  km-Zeiten (je 1 km) bzw. den Runden mit Strecke; null, wenn die Einheit keine passenden Abschnitte hat */
+export function segmentBest(a: Activity, km: number): number | null {
+  const ps = (v: any) => { const m = /^(\d{1,2})[:.,](\d{2})$/.exec(String(v || '').trim()); return m ? +m[1] * 60 + +m[2] : null; };
+  const fromSplits = (a.splits || []).map(s => ({ m: 1000, sec: ps(s.pace) || 0 }));
+  const parts = fromSplits.length && fromSplits.every(p => p.sec > 0) ? fromSplits : (a.laps || []).filter(l => l.m && l.m > 0 && l.sec > 0).map(l => ({ m: l.m!, sec: l.sec }));
+  const need = km * 1000 * 0.99;
+  if (parts.length < 2 || parts.reduce((s, p) => s + p.m, 0) < need) return null;
+  let best: number | null = null;
+  for (let i = 0; i < parts.length; i++) {
+    let m = 0, sec = 0;
+    for (let j = i; j < parts.length; j++) {
+      m += parts[j].m; sec += parts[j].sec;
+      if (m >= need) { const v = sec * km * 1000 / m; if (v > 0 && (best == null || v < best)) best = v; break; }
+    }
+  }
+  // Plausibel: nicht schneller als 2:30/km
+  return best != null && best >= km * 150 ? best : null;
 }
 function fmtTime(sec: number) { sec = Math.round(sec); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; }
 function bestsCard(I: TrendInput, from: string): TrendCard {
@@ -327,7 +352,7 @@ function bestsCard(I: TrendInput, from: string): TrendCard {
   });
   const nNew = rows.filter(r => r.badge === 'neu').length;
   return { id: 'bests', group: 'bests', title: 'Bestwerte', value: String(rows.length), unit: rows.length === 1 ? 'Wert' : 'Werte', delta: nNew ? `${nNew} neu in den letzten 2 Wochen` : undefined, rows,
-    text: nNew ? `${nNew === 1 ? 'Ein neuer Bestwert' : nNew + ' neue Bestwerte'} – stark! Markiert mit „neu“.` : 'Beste Werte im Zeitraum. ★ = bester Wert überhaupt. Strecken-Zeiten aus dem Schnitt ganzer Einheiten.', tone: nNew ? 'good' : 'info' };
+    text: nNew ? `${nNew === 1 ? 'Ein neuer Bestwert' : nNew + ' neue Bestwerte'} – stark! Markiert mit „neu“.` : 'Beste Werte im Zeitraum. ★ = bester Wert überhaupt. 5 und 10 km: schnellster Abschnitt aus km-Zeiten oder Runden, sonst Schnitt ganzer Läufe.', tone: nNew ? 'good' : 'info' };
 }
 
 /* ---------- Lange Einheiten ---------- */

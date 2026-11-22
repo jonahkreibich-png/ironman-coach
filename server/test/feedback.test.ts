@@ -70,6 +70,7 @@ test('Auftrag 14: gleiche Fehler als eine Zeile („9× …“), kurzer Text, �
   expect(r.groups).toHaveLength(1);
   expect(r.groups[0]).toMatchObject({ count: 3, users: ['Papa'] });
   expect(r.groups[0].text.length).toBeLessThanOrEqual(92);
+  await new Promise(res => setTimeout(res, 5)); // gleiche Millisekunde wie die Meldung zählt absichtlich als neu (unter Last kam das vor)
   await call(env, 'POST', '/api/admin/errors/ack', { key: r.groups[0].key }, A);
   await call(env, 'POST', '/api/admin/errors/ack', { key: 'op-dropbox-appfolder' }, A);
   r = (await call(env, 'GET', '/api/admin/errors', undefined, A)).data;

@@ -1,5 +1,10 @@
 /* „Neu in dieser Version“ (Auftrag 5 E6): nach einem Update einmal 2-3 Punkte, damit Tester wissen, was sie ausprobieren sollen. */
 export const WHATS_NEW: { version: string; items: string[] }[] = [
+  { version: '3.28.0', items: [
+    'Coach: versteht „Wie fit bin ich?“ und „Bin ich übertrainiert?“, nennt deine Zonen für Laufen, Rad und Schwimmen und bietet bei roter Ampel eine Pause statt nur „kürzer“ an. Fitness-Ziel ohne Wettkampf: alle 8 Wochen ein Test als Vorschlag.',
+    'Auswertung genauer: Lauf-Geh-Wechsel zählt nur die Laufteile, Teamsport und die Verteilung locker/mittel/hart rechnen mit der Zeit in den Zonen, 5 und 10 km auch aus dem schnellsten Abschnitt eines längeren Laufs. Triathlon-Teilzeiten und Freiwasser aktualisieren die Zonen.',
+    'Dauern überall gleich geschrieben (z. B. „1 h 30 min“, „45 min 30 s“), unter Zeitfeldern steht immer, was gespeichert ist. Der Hinweis „Neue Version“ verdeckt kein offenes Fenster mehr, und die App lädt in Teilen.'
+  ] },
   { version: '3.27.0', items: [
     'Zeiten ohne Doppelpunkt: einfach Ziffern tippen, der Doppelpunkt kommt von selbst (530 → 5:30, 14530 → 1:45:30). Komma und Punkt gehen auch. Unter dem Feld steht, was die App verstanden hat; ist es unklar (z. B. 5,3), fragt sie kurz nach.',
     'Ein Wettkampf zählt als Test: Er aktualisiert deine Zonen (z. B. Halbmarathon → Schwellen-Pace), und der nächste Test seiner Sportart kommt erst 8 Wochen später. In den 2 Wochen nach einem Wettkampf gibt es keinen Test.',

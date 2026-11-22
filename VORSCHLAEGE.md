@@ -1,6 +1,8 @@
-# Vorschläge zur Entscheidung (Stand Auftrag 39, 21.11.)
+# Vorschläge zur Entscheidung (Stand Auftrag 40, 22.11.)
 
-Nicht eingebaut. Du entscheidest, was umgesetzt wird. Aufwand: klein (unter 1 Tag), mittel (1–3 Tage), groß (mehr).
+**Alle 15 sind seit Auftrag 40 eingebaut** (Version 3.28.0, Entscheidungen 621–635). Abweichung bei Nr. 13: Datei in Teile zerlegt, Plan-Bearbeiten wird weiter gleich mit geladen (siehe Entscheidung 635).
+
+Frühere Liste: Aufwand: klein (unter 1 Tag), mittel (1–3 Tage), groß (mehr).
 
 | Nr. | Was | Warum | Aufwand | Betrifft |
 |---|---|---|---|---|
@@ -20,4 +22,4 @@ Nicht eingebaut. Du entscheidest, was umgesetzt wird. Aufwand: klein (unter 1 Ta
 | 14 | **Zeile „= 45 min 30 s“ unter Zeitfeldern dauerhaft zeigen** (heute beim Tippen und bis zum Neuzeichnen) | Wer später nachsieht, sieht nur „45,5“ im Minutenfeld | klein | alle |
 | 15 | **Dauer-Feld zeigt gespeicherte Werte als Zeit** („45:15“ statt „45,25“) | Wer „45,25“ nur leicht ändert (z. B. „45,26“), bekommt nach der neuen Regel 45 min 26 s; die App liest es eindeutig, aber anders als angezeigt | klein | alle, die Dauern von Hand ändern |
 
-**Eingebaut wurde nur, was ein Fehler war** (Liste in ERGEBNIS.md).
+

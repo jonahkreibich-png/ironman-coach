@@ -195,7 +195,20 @@ function trainDays(c: Ctx, sport: string): { trained: string[]; cross: string[] 
    (bei der einfachen Rolle ist sie geschätzt, beim Smart-Trainer zählen die Watt). Laufband-Pace zählt schwächer. GPS-Ausreißer
    (unrealistische Werte) zählen nicht. Bei niedrigem Puls (unter 80 % der Schwelle) wird nur vorsichtig hochgerechnet: die Messung zählt
    weniger; unter 60 % sagt sie nichts über die Leistung. Was nicht zählt, steht mit Grund im „Warum?“. */
-export interface Ignored { date: string; title: string; value: string; why: string; key: 'trainer' | 'watts' | 'gps' | 'lowhr' | 'intervals' | 'swim' }
+export interface Ignored { date: string; title: string; value: string; why: string; key: 'trainer' | 'watts' | 'gps' | 'lowhr' | 'intervals' | 'swim' | 'runwalk' }
+/* Auftrag 40 (Vorschlag 1): Lauf-Geh-Wechsel – Laufteile aus den Runden (schneller als 1,9 m/s ≈ 8:46/km = Laufen, langsamer = Gehen).
+   Der Schnitt mit Gehpausen ist viel zu langsam und machte Score und Urteil falsch. null = keine getrennten Lauf- und Gehrunden. */
+export const RUNWALK_RE = /lauf-geh|geh-lauf|run-walk|walk-run/i;
+export function runWalkParts(laps: { sec: number; m: number | null; avgHr: number | null }[] | null | undefined): { paceSec: number; hr: number | null; runMin: number; walkMin: number; runs: number } | null {
+  const ls = (laps || []).filter(l => l && l.m && l.m > 0 && l.sec > 0);
+  const run = ls.filter(l => l.m! / l.sec >= 1.9), walk = ls.filter(l => l.m! / l.sec < 1.9);
+  if (!run.length || !walk.length) return null;
+  const sec = run.reduce((s, l) => s + l.sec, 0), m = run.reduce((s, l) => s + l.m!, 0);
+  if (sec < 300) return null;
+  const hrL = run.filter(l => l.avgHr); const hrSec = hrL.reduce((s, l) => s + l.sec, 0);
+  const hr = hrSec ? Math.round(hrL.reduce((s, l) => s + l.avgHr! * l.sec, 0) / hrSec) : null;
+  return { paceSec: Math.round(sec * 1000 / m), hr, runMin: Math.round(sec / 60), walkMin: Math.round(walk.reduce((s, l) => s + l.sec, 0) / 60), runs: run.length };
+}
 export const isSmartTrainer = (p: Pick<Profile, 'trainerType' | 'powerMeter'>) => p.trainerType === 'smart' || (p.trainerType == null && !!p.powerMeter);
 /* Stammen die Watt dieser Fahrt von einem Messgerät? */
 export function wattsTrusted(a: Pick<Activity, 'indoor' | 'bikeType' | 'name'>, p: Pick<Profile, 'trainerType' | 'powerMeter' | 'bikes'>): boolean {
@@ -244,6 +257,16 @@ function runObs(c: Ctx, lthr: number, ign: Ignored[] = []): FObs[] {
     // Laufband: Tempo ungenau (Kalibrierung), zählt schwächer
     const tm = v20 && !!a.indoor;
     const add: Add = (v, kind, base, value, extra) => add0(v, kind, (tm ? base * 1.6 : base) * (kind === 'effort' || kind === 'laps' || kind === 'hr' ? hrF : 1), value, [tm ? 'Laufband, zählt weniger' : '', extra || ''].filter(Boolean).join(', ') || undefined);
+    // Auftrag 40 (Vorschlag 1): Lauf-Geh-Wechsel – nur die Laufteile zählen; ohne eigene Lauf- und Gehrunden gar nicht (der Schnitt mit
+    // Gehpausen ist viel zu langsam und drückte den Score)
+    if (RUNWALK_RE.test(a.name || '')) {
+      const rw = runWalkParts(a.laps);
+      if (!rw || !rw.hr) { if (v20) ign.push({ date: a.date, title: titleOf(a), value: val0, why: 'Lauf-Geh-Wechsel ohne eigene Lauf- und Gehrunden: der Schnitt mit Gehpausen sagt nichts über dein Lauftempo.', key: 'runwalk' }); return; }
+      const frw = rw.hr / lthr; const sp1 = 1000 / rw.paceSec;
+      if (frw >= 0.92) add(sp1 * flatSpeedFactor(a) * heatFactor(a) * lthr / rw.hr, 'effort', 0.035, `Laufteile ${mmss(rw.paceSec)}/km bei Puls ${rw.hr}`, 'Gehpausen herausgerechnet');
+      else if (!v20 || frw >= 0.6) add(sp1 * flatSpeedFactor(a) * heatFactor(a) / runFrac(frw), 'hr', v20 ? lowHrSd(0.06, frw) : 0.06, `Laufteile ${mmss(rw.paceSec)}/km bei Puls ${rw.hr}`, 'Gehpausen herausgerechnet');
+      return;
+    }
     if (a.avgHr && a.speedKmh && a.min >= 15 && a.min <= 75 && a.avgHr >= 0.92 * lthr) {
       const test = TEST_RE.test(a.name || '');
       add(a.speedKmh / 3.6 * flatSpeedFactor(a) * heatFactor(a) * lthr / a.avgHr, test ? 'test' : 'effort', test ? 0.025 : 0.035, `${mmss(3600 / a.speedKmh)}/km bei Puls ${a.avgHr}`);
@@ -1166,6 +1189,8 @@ export function legacyActivities(state: any, weeks: any[], profile: Profile): Ac
       laps: [...testLap(sport, m), ...rowsToLaps(Array.isArray(m.intervals) ? m.intervals : [], sport)], intervals: Array.isArray(m.intervals) && m.intervals.length >= 2 ? statsOf(rowsToLaps(m.intervals, sport), sport === 'bike') : null,
       swim: sport === 'swim' ? { poolLengthM: (profile.skills || {}).poolM === 50 ? 50 : 25, lengths: 0, activeLengths: 0, strokesPerLength: spl, metersPerStroke: dps || (spl ? Math.round(25 / spl * 100) / 100 : null), pace100: p100 ? Math.round(p100) : null, byStroke: {}, longestContinuousM: num(m.longestCrawl), longestCrawlM: num(m.longestCrawl), longestPullM: num(m.longestPull), strokeRate: num(m.rate) } : null,
       rpe: num(s && s.rpe), ...(s && s.race ? { race: true } : {}),
+      // Auftrag 40 (Vorschlag 4): km-Zeiten von Hand (für den schnellsten 5-/10-km-Abschnitt)
+      ...(sport === 'run' && Array.isArray(m.splits) && m.splits.length ? { splits: m.splits } : {}),
       // Auftrag 36: eingetragene Kraftübungen (für den Kraft-Score)
       ...(sport === 'strength' && Array.isArray(m.exercises) ? { exercises: m.exercises } : {}),
       // Auftrag 35: Abschnitte von Hand → Hauptteil

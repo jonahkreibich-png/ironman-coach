@@ -91,6 +91,18 @@ export function activityId(source: string, startMs: number, sport: string): stri
   return `${source}-${sport}-${Math.round(startMs / 1000)}`;
 }
 const ZONE_BOUNDS = [0.81, 0.89, 0.93, 1.0]; // Anteil vom Schwellenpuls: Z1 < 81 %, Z2 bis 89 %, Z3 bis 93 %, Z4 bis 100 %, Z5 darüber
+export const zoneIdx = (hr: number, lthr: number) => { const f = hr / lthr; return f < ZONE_BOUNDS[0] ? 0 : f < ZONE_BOUNDS[1] ? 1 : f < ZONE_BOUNDS[2] ? 2 : f <= ZONE_BOUNDS[3] ? 3 : 4; };
+/** Auftrag 40 (Vorschläge 2 und 3): Zeit in den Zonen (Sekunden je Zone 1-5) – aus dem Pulsverlauf, sonst aus den Runden bzw. eingetragenen
+ *  Intervallen (Ø Puls je Runde); null, wenn weder Verlauf noch Runden mit Puls mindestens 60 % der Dauer abdecken */
+export function zoneSeconds(a: { hrZones?: number[] | null; laps?: { sec: number; avgHr: number | null }[] | null; min?: number | null }, lthr: number | null | undefined): number[] | null {
+  if (a.hrZones && a.hrZones.some(z => z > 0)) return a.hrZones;
+  if (!lthr) return null;
+  const ls = (a.laps || []).filter(l => l && l.sec > 0 && l.avgHr && l.avgHr > 40);
+  const tot = ls.reduce((s, l) => s + l.sec, 0);
+  if (ls.length < 2 || (a.min && tot < a.min * 60 * 0.6)) return null;
+  const z = [0, 0, 0, 0, 0]; for (const l of ls) z[zoneIdx(l.avgHr!, lthr)] += l.sec;
+  return z;
+}
 
 export function analyze(raw: RawActivity, o: AnalyzeOpts): Activity {
   const T = raw.totals;

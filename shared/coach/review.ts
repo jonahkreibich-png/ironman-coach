@@ -14,7 +14,7 @@ import { fieldsOf } from '../fields';
 import { valueStory, storyText, STORY_METRICS } from '../valuestory';
 import { actualMetrics, effectiveActivity, crawlOf, actualStrength, STRENGTH_AREA_LABEL, type StrengthArea, changedOf, actualSport, actualTitle, plannedLoadDropped, intervalsMode, changeZone, changeParts, placeLabel, omitLabel } from '../results';
 import { HR_ZONES } from '../sports';
-import { wattsTrusted } from '../scores';
+import { wattsTrusted, runWalkParts, RUNWALK_RE } from '../scores';
 import { paceCtx } from '../plangen';
 import { speedRange, kindOf, bikeSpeedsOf } from '../bikespeed';
 import { de, mmss, dowName, joinDe } from './texts';
@@ -132,8 +132,13 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
   const z = plannedZone(s) ?? (hard ? 4 : 2);
   // Auftrag 35: Zielzone nur am Hauptteil bewerten (Aufwärmen und Ausklang zählen nicht), mit Zeit in der Zielzone, wenn es einen Verlauf gibt
   const mp: MainPart | null = (d.sport === 'run' || d.sport === 'bike') ? mainPart(s || { sport: d.sport }, d.st, d.act ? effectiveActivity(d.act, d.st) : null, th, d.sport) : null;
-  const hrJ = mp && mp.hr ? mp.hr : v.hr;
-  const inMain = mp && mp.hr ? ' im Hauptteil' : '';
+  // Auftrag 40 (Vorschlag 1): Lauf-Geh-Wechsel – Laufteile getrennt (Tempo und Puls ohne Gehpausen)
+  const rwOn = d.sport === 'run' && (RUNWALK_RE.test(d.title || '') || !!(s && ((s.spec && s.spec.kind === 'runwalk') || (s.stage && s.stage.ladder === 'runwalk'))));
+  const rw = rwOn ? runWalkParts(((d.act ? effectiveActivity(d.act, d.st) : {}) as any).laps) : null;
+  if (rw) good.push(`Laufteile Ø ${mmss(rw.paceSec)}/km${rw.hr ? ` bei Puls ${rw.hr}` : ''} (${rw.runs}× gelaufen, ${rw.walkMin} min Gehen herausgerechnet).`);
+  else if (rwOn && v.pace) good.push(`Lauf-Geh-Wechsel: Der Schnitt mit Gehpausen (${mmss(v.pace)}/km) sagt wenig über dein Lauftempo. Mit einer Runde je Lauf- und Gehteil (Runden-Taste der Uhr) sehe ich die Laufteile.`);
+  const hrJ = rw && rw.hr ? rw.hr : mp && mp.hr ? mp.hr : v.hr;
+  const inMain = rw && rw.hr ? ' in den Laufteilen' : mp && mp.hr ? ' im Hauptteil' : '';
   const notCounted = mp && (mp.warmMin || mp.coolMin) ? ` (${[mp.warmMin ? `${Math.round(mp.warmMin)} min Aufwärmen` : '', mp.coolMin ? `${Math.round(mp.coolMin)} min Ausklang` : ''].filter(Boolean).join(' und ')} nicht mitgezählt)` : '';
   const zs = mp && mp.zoneSec; const ztot = zs ? zs.reduce((a, x) => a + x, 0) : 0;
   const shareAbove = zs && ztot ? zs.slice(z).reduce((a, x) => a + x, 0) / ztot : null;
@@ -208,7 +213,7 @@ export function reviewOne(ctx: EngineCtx, d: Done): { good: string[]; better: st
     }
   } else if ((d.sport === 'run' || d.sport === 'bike') && !hrJ) missing.push('Puls');
   // Tempo, Leistung, km/h gegen die Vorgabe
-  const paceJ = mp && mp.paceSec ? mp.paceSec : v.pace;
+  const paceJ = rw ? rw.paceSec : rwOn ? null : mp && mp.paceSec ? mp.paceSec : v.pace;
   if (d.sport === 'run' && paceJ && !hard) {
     const rg = W.runPaceRange(pc, z);
     if (paceJ < rg[0] - 10 && !(hrJ && lthr && hrZoneOf(hrJ, lthr) <= z)) better.push(`Mit ${mmss(paceJ)}/km${inMain} schneller als die Vorgabe (${mmss(rg[0])}-${mmss(rg[1])}/km).`);

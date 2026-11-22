@@ -150,7 +150,7 @@ function secVerdict(r: SecRow | null, part: SecPart, planned: any, sport: string
   if (!r || r.off || !secIst(r, sport)) return done && !watch && !(r && r.off) && plannedPart(planned, part) != null ? VERDICT.plan : null;
   if (r.plan) return VERDICT.plan;
   const z = part === 'main' ? plannedShape(planned).zone : null;
-  if (z && lthr && num(r.hr) != null && sport !== 'swim') { const got = zoneOfHr(num(r.hr)!, lthr); return got > z ? VERDICT.hard : got < z - 1 ? VERDICT.easy : VERDICT.ok; }
+  if (z && lthr && num(r.hr) != null && sport !== 'swim') { const got = zoneOfHr(num(r.hr)!, lthr); return got > z ? VERDICT.hard : got < z - 1 && !(planned && planned.spec && planned.spec.kind === 'runwalk') /* Auftrag 40: Gehpausen drücken den Puls */ ? VERDICT.easy : VERDICT.ok; }
   const pm = plannedPart(planned, part);
   const got = sport === 'swim' ? num(r.meters) : num(r.min);
   if (pm && got != null && Math.abs(got - pm) / pm > 0.25) return VERDICT.other;

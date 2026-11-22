@@ -10,6 +10,7 @@ import { parseFor } from './ruleparse';
 import { actualMetrics, effectiveActivity, changedOf, actualSport, plannedLoadDropped, effectiveSession, changeKeepsStage, changeZone } from './results';
 import { evaluateIntervals } from './intervals';
 import { hardBlocked } from './trainingrules';
+import { zoneSeconds } from './activity/analyze';
 import { LIB } from './workoutlib';
 import { runQualitySpec, bikeQualitySpec, runEasyForm, bikeEasyForm } from './workoutbuild';
 /* ---------- Datum ---------- */
@@ -298,6 +299,13 @@ function sessionLoad(s, st, thr?) {
   // Ohne NP ist Durchschnittsleistung nur eine Näherung für gleichmäßige Fahrten.
   const power = toNum(m.normalizedPower) ?? toNum(m.power);
   if (s.sport === 'bike' && power > 0 && toNum(thr && thr.ftp) > 0) return Math.round(h * Math.pow(power / thr.ftp, 2) * 100);
+  // Auftrag 40 (Vorschlag 2): Teamsport aus der Zeit in den Zonen (Pulsverlauf oder Runden der Uhr) – Halbzeit und Bank drücken den
+  // Ø Puls, die harten Abschnitte eines Spiels gingen darin unter. Je Zone die Mitte des Bereichs (Anteil vom Schwellenpuls).
+  if (s.sport === 'football') {
+    const zs = zoneSeconds({ hrZones: st.hrZones, laps: st.laps, min }, (thr && thr.lthrRun) || LTHR_DEFAULT.run);
+    const tot = zs ? zs.reduce((a, x) => a + x, 0) : 0;
+    if (zs && tot >= 600) { const IFZ = [0.7, 0.85, 0.91, 0.965, 1.05]; return Math.round(zs.reduce((a, sec, i) => a + sec / 3600 * IFZ[i] * IFZ[i] * 100, 0)); }
+  }
   if (hr && hr > 60 && s.sport !== 'swim' && s.sport !== 'strength') {
     const lthr = s.sport === 'bike' ? ((thr && thr.lthrBike) || LTHR_DEFAULT.bike) : ((thr && thr.lthrRun) || LTHR_DEFAULT.run);
     return Math.round(h * Math.pow(hr / lthr, 2) * 100);
@@ -470,7 +478,7 @@ function dailyLoadEntries(state, weeks) {
     const aid = canonicalActivityId(state, st.activityId), dedup = aid ? 'act:' + aid : key;
     if (seen.has(dedup)) return; seen.add(dedup);
     const a = aid && state.activities?.[aid];
-    const record = { ...st, metrics: actualMetrics(st, a), rpe: st.rpe ?? a?.rpe };
+    const record = { ...st, metrics: actualMetrics(st, a), rpe: st.rpe ?? a?.rpe, hrZones: a?.hrZones || null, laps: a?.laps || null };
     // Abgehakt bedeutet abgeschlossen, nicht dass die geplante Dauer gemessen wurde.
     if (toNum(record.metrics?.min) == null && toNum(record.icuLoad) == null) return;
     out.push({ date, sport: actualSport(s, st), key, load: sessionLoad(s, record, thrOf(state)) });

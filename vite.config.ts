@@ -54,7 +54,18 @@ export default defineConfig({
   base: './',
   publicDir: 'public',
   define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(VERSION), 'import.meta.env.VITE_APP_RELEASE': JSON.stringify(RELEASE) },
-  build: { outDir: '../dist', emptyOutDir: true, target: 'es2020', sourcemap: false },
+  /* Auftrag 40 (Vorschlag 13): die Hauptdatei (1,5 MB) in Teile – Texte, Coach, Plan-Erstellung, Auswertung. Der Browser lädt sie
+     parallel; nach einem Update kommen nur geänderte Teile neu (der Rest bleibt im Speicher des Service Workers). */
+  build: { outDir: '../dist', emptyOutDir: true, target: 'es2020', sourcemap: false, chunkSizeWarningLimit: 800,
+    rollupOptions: { output: { manualChunks(id: string) {
+      const f = id.replace(/\\/g, '/');
+      if (!f.includes('/shared/')) return undefined;
+      // reine Texte ohne eigene Importe (ändern sich selten) und die gemeinsame Logik; shared importiert nie aus web → keine Kreise
+      if (/\/shared\/(lang\/|whatsnew|trainingknowledge)/.test(f)) return 'texte';
+      // Coach (nur von der Oberfläche und dem Daten-Check genutzt; die übrige Logik greift nie auf ihn zu)
+      if (/\/shared\/(coach\/|datacheck)/.test(f)) return 'coach';
+      return 'logik';
+    } } } },
   server: { port: 5173, proxy: { '/api': 'http://localhost:8787' } },
   plugins: [brandAndOffline()]
 } as any);
