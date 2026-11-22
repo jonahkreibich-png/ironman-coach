@@ -1,3 +1,35 @@
+# Auftrag 40: alle 15 Vorschläge eingebaut (22.11.)
+
+**Stand:** Version **3.28.0** – veröffentlicht am 22.11. (erst Test-App, dann echte App mit Sicherung; Kopie der echten Daten aller Nutzer geprüft, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler).
+
+## Was neu ist
+| Nr. | Vorschlag | Jetzt |
+|---|---|---|
+| 1 | Lauf-Geh-Wechsel | Laufteile werden getrennt gewertet (Pace und Puls nur der Laufrunden, Gehpausen herausgerechnet). Ohne Runden: Hinweis statt falscher Pace. |
+| 2 | Teamsport | Belastung aus der Zeit in den Pulszonen statt aus dem Ø Puls (Halbzeit und Bank drücken den Schnitt nicht mehr). |
+| 3 | Intensitätsverteilung | Aus der Zeit in den Zonen, notfalls aus den Runden; nicht mehr die ganze Einheit nach Ø Puls. |
+| 4 | 5-km-/10-km-Bestwert | Auch der schnellste zusammenhängende Abschnitt aus km-Zeiten oder Runden. |
+| 5 | Coach: „Wie fit bin ich?“, „Bin ich übertrainiert?“ | Eigene Antworten mit Form, Fitness, Ampel, Ruhepuls und Belastung, immer mit Arzt-Hinweis. |
+| 6 | Coach: Zonen | Je Sportart: Laufen Puls, Rad Watt und/oder Puls, Schwimmen Tempo pro 100 m. |
+| 7 | Tests ohne Wettkampfziel | Coach schlägt einen Test vor (mit „Übernehmen“), wenn der letzte über 8 Wochen her ist. |
+| 8 | Verschobener Test passt nicht mehr | Coach nennt einen neuen Termin (oder „frühestens ab …“). |
+| 9 | Zonen aus Wettkämpfen | Auch aus Rad- und Laufteil im Triathlon und aus Freiwasser. |
+| 10 | Dauer überall gleich | „45 min 30 s“, „1 h 10 min“ statt „45′“, „1:10“ oder „45,5 min“. |
+| 11 | „kürzer“ bei roter Ampel | Coach bietet stattdessen Pause an. |
+| 12 | Hinweis „Neue Version“ | Verdeckt kein offenes Fenster mehr. |
+| 13 | Ladezeit | App-Code in 4 Teile zerlegt (vorher 1,5 MB in einer Datei); nach Updates lädt nur, was sich geändert hat. **Abweichung:** nicht erst bei Bedarf nachgeladen, weil die App offline sicher starten muss (Entscheidung 635). |
+| 14 | „= 45 min 30 s“ unter Zeitfeldern | Steht dauerhaft da, auch nach dem Öffnen. |
+| 15 | Dauer-Feld | Zeigt gespeicherte Werte als Zeit („45:30“ statt „45,5“). |
+
+## Beim Release gefunden
+- **Echter Fehler (nie live):** Durch die Aufteilung (13) kam der Coach-Teil erst nach dem Laden der Seite. Ging das Netz genau dann weg, startete die App nicht. Jetzt kommen alle Teile mit der Seite (Entscheidung 638, neuer Test).
+- Drei Tests angepasst (alte Schreibweise „1:10“, Zeitablauf im Test, Dateiname) – Entscheidungen 638–640.
+
+## Tests
+- Unit: 3.386 grün. Browser: 846 grün (WebKit iPhone und Chromium).
+- Großer Test 26 min: 9 Abläufe nur unter Last rot, einzeln alle 189 grün (Entscheidung 637).
+- Echte Daten (Kopie): alle 3 Nutzer laden und starten fehlerfrei, auch mit dem Stand der Vorversion.
+
 # Auftrag 39: Zeiteingabe ohne Doppelpunkt, Wettkampf zählt als Test, große Fehlersuche (21.11.)
 
 **Stand:** Version **3.27.0** – veröffentlicht am 21.11. (erst Test-App, dann echte App mit Sicherung; Kopie der echten Daten aller Nutzer geprüft, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler).
