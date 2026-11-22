@@ -29,7 +29,7 @@ test('Alle Teile des App-Codes kommen mit der Seite: Netz direkt nach dem Laden 
   await page.goto('/?go=heute');
   await context.setOffline(true);
   await expect.poll(() => page.evaluate(() => (document.getElementById('app') as HTMLElement).dataset.appState), { timeout: 15000 }).toBe('ready');
-  const pre = await page.evaluate(() => [...document.querySelectorAll('link[rel="modulepreload"]')].map(l => (l.getAttribute('href') || '').replace(/^.*\//, '').replace(/-[^-]+\.js$/, '')));
+  const pre = await page.evaluate(() => [...document.querySelectorAll('link[rel="modulepreload"]')].map(l => (l.getAttribute('href') || '').replace(/^.*\//, '').split('-')[0]));
   for (const part of ['main', 'logik', 'coach', 'texte']) expect(pre, 'vorab geladen: ' + part).toContain(part);
   await context.setOffline(false);
 });
