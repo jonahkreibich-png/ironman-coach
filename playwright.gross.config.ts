@@ -8,7 +8,7 @@ const PORT = Number(process.env.PW_PORT || 4181);
 const TEST_VAPID = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ format: 'jwk' }));
 export const GROSS_FLOWS = [
   // Auftrag 39: Zeitfelder (jedes Feld), Rundgang 19 Nutzer, jeder Knopf; dazu Felder, Überlauf, Layout, Fragebogen, 60 Nutzer
-  'auftrag40', 'auftrag37', 'plan-dashboard27', 'auftrag39-zeit', 'auftrag39-rundgang', 'auftrag39-knoepfe', 'auftrag29-felder', 'auftrag29-ueberlauf', 'layout', 'auftrag4', 'auftrag25-gesamt', 'auftrag15-many',
+  'auftrag40', 'plan-dashboard27', 'auftrag39-zeit', 'auftrag39-rundgang', 'auftrag39-knoepfe', 'auftrag29-felder', 'auftrag29-ueberlauf', 'layout', 'auftrag4', 'auftrag25-gesamt', 'auftrag15-many',
   // Auftrag 38: ganze Einheit, Gemachtes überall, Satz-Fenster, Umwandeln-Vorschau; Auftrag 37: Ablauf, Fenster, Rückgängig, Nachtragen
   'auftrag38', 'auftrag37', 'auftrag22', 'dashboard-extra27', 'auftrag36-intervalle', 'auftrag36-ablaeufe', 'auftrag35-umwandeln', 'auftrag35-km', 'auftrag35-abschnitte', 'auftrag31-coach', 'auftrag30-plan', 'app', 'strength-templates'
 ];
