@@ -46,7 +46,7 @@ test('verpasste Einheit ueber drei Wochen verschieben, einzeln tauschen und neu 
 });
 test('Tagesklappen erhaelt DOM/Fokus, Extras und 100-40-70 Minuten sowie Anpassungszustand',async({page})=>{
  await seed(page,{extra:d=>{d.profile={...(d.profile||{}),birthYear:1990,sports:['run','bike','swim','strength'],teamSport:null};for(const w of d.plan.weeks)for(const day of w.days)day.sessions=day.sessions.filter((s:any)=>s.sport!=='football');const day=d.plan.weeks.flatMap((w:any)=>w.days).find((x:any)=>x.date===TODAY);day.sessions=[{id:'run40',sport:'run',title:'SYNTHETIC Lauf',plannedMinutes:40},{id:'swim60',sport:'swim',title:'SYNTHETIC Schwimmen',plannedMinutes:60}];d.sessions={swim60:{skipped:true}};d.customWorkouts={[TODAY]:[{id:'extra30',sport:'bike',title:'SYNTHETIC Radextra',plannedMinutes:30,completed:false,metrics:{}}]};}});
- await open(page,'/?go=plan');const head=page.locator('.cday-h[data-date="'+TODAY+'"]');await expect(head).toContainText('1:10');await expect(head).toContainText('Rad');
+ await open(page,'/?go=plan');const head=page.locator('.cday-h[data-date="'+TODAY+'"]');await expect(head).toContainText('1 h 10 min');await expect(head).toContainText('Rad');
  await page.evaluate(()=>{(window as any).__nodes26={app:document.querySelector('#app'),view:document.querySelector('.view'),bar:document.querySelector('#wkbar'),head:document.querySelector('.cday.today .cday-h')};});
  await head.focus();for(let i=0;i<12;i++)await page.keyboard.press('Enter');
  await expect(head).toBeFocused();for(let i=0;i<12;i++)await head.click();

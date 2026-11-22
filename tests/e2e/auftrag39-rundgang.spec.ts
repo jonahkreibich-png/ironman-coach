@@ -102,7 +102,9 @@ async function tour(page: Page, found: string[]) {
 }
 
 function watch(page: Page, errors: string[]) {
-  page.on('pageerror', e => errors.push('Fehler: ' + e.message));
+  // WebKit meldet eine beim Seitenwechsel abgebrochene Abfrage als Seitenfehler („due to access control checks“), obwohl die App sie
+  // abfängt (sync.ts loadFreePublic). Unter Last tritt das zufällig auf (Entscheidung 637/638) – kein Fehler der App.
+  page.on('pageerror', e => { if (!/api\/health due to access control checks/.test(e.message)) errors.push('Fehler: ' + e.message); });
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|ERR_CONNECTION|404|status of 40[0-9]/i.test(m.text())) errors.push('Konsole: ' + m.text().slice(0, 160)); });
 }
 

@@ -18,9 +18,15 @@ function brandAndOffline(): Plugin {
       let out = html.replace(/%APP_NAME%/g, BRAND.name).replace(/%APP_SHORT%/g, BRAND.shortName).replace(/%APP_DESCRIPTION%/g, BRAND.description)
         .replace(/%THEME_TOP_LIGHT%/g, STATIC_COLORS.light.top).replace(/%THEME_TOP_DARK%/g, STATIC_COLORS.dark.top);
       // Auftrag 26: den App-Code (main, per import() nachgeladen) gleich mit der Seite anfordern, parallel zum Lesen des Speichers
+      // Release 3.28.0: samt allen Teilen, die main importiert (z. B. der Coach-Teil). Vorher kamen die erst nach dem Lesen von main –
+      // nach dem Laden der Seite; fiel dann das Netz aus, startete die App nicht (tests/e2e/auftrag40.spec.ts „Alle Teile“).
       if (ctx && ctx.bundle) {
-        const lazy = Object.values(ctx.bundle).filter((c: any) => c.type === 'chunk' && c.isDynamicEntry && /(^|[\/])main-[^/]*.js$/.test(c.fileName)).map((c: any) => c.fileName);
-        if (lazy.length) out = out.replace('</head>', lazy.map(f => '<link rel="modulepreload" crossorigin href="./' + f + '">').join('') + '</head>');
+        const bundle: any = ctx.bundle;
+        const lazy: string[] = Object.values(bundle).filter((c: any) => c.type === 'chunk' && c.isDynamicEntry && /(^|[\/])main-[^/]*.js$/.test(c.fileName)).map((c: any) => c.fileName);
+        const all: string[] = [];
+        const add = (f: string) => { if (all.includes(f) || out.includes('href="./' + f + '"') || (bundle[f] && bundle[f].isEntry)) return; all.push(f); for (const i of (bundle[f] && bundle[f].imports) || []) add(i); };
+        lazy.forEach(add);
+        if (all.length) out = out.replace('</head>', all.map(f => '<link rel="modulepreload" crossorigin href="./' + f + '">').join('') + '</head>');
       }
       return out;
     },

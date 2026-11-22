@@ -18,3 +18,18 @@ test('Vorschlag 12: Hinweis „Neue Version“ verdeckt kein offenes Fenster (32
   await expect(page.locator('#sheet')).toBeHidden();
   await expect(page.locator('#upd')).toBeVisible();
 });
+
+/* Release 3.28.0 (erster Lauf rot): seit der Aufteilung (Vorschlag 13) holte der Browser den Coach-Teil erst, nachdem die Hauptdatei
+   gelesen war – nach dem Laden der Seite. Fiel das Netz genau dann aus, startete die App nicht („Die App konnte nicht gestartet werden“).
+   Jetzt werden alle Teile mit der Seite angefordert: ist die Seite geladen, ist der ganze App-Code da. */
+test('Alle Teile des App-Codes kommen mit der Seite: Netz direkt nach dem Laden weg → App startet trotzdem', async ({ page, context }) => {
+  await seed(page);
+  // Teile langsam ausliefern (wie ein schwaches Netz)
+  await page.route(/\/assets\/[^/]+\.js$/, async route => { await new Promise(r => setTimeout(r, 400)); await route.continue(); });
+  await page.goto('/?go=heute');
+  await context.setOffline(true);
+  await expect.poll(() => page.evaluate(() => (document.getElementById('app') as HTMLElement).dataset.appState), { timeout: 15000 }).toBe('ready');
+  const pre = await page.evaluate(() => [...document.querySelectorAll('link[rel="modulepreload"]')].map(l => (l.getAttribute('href') || '').replace(/^.*\//, '').replace(/-[^-]+\.js$/, '')));
+  for (const part of ['main', 'logik', 'coach', 'texte']) expect(pre, 'vorab geladen: ' + part).toContain(part);
+  await context.setOffline(false);
+});
