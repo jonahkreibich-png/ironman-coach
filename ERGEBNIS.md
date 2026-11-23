@@ -1,3 +1,52 @@
+# Auftrag 41 (von dir „Auftrag 40“ genannt): keine Wiederholungen, Anleitung oben, Kopf aufgeräumt (23.11.)
+
+**Stand:** Version **3.29.0** – veröffentlicht am 23.11. (erst Test-App, dann echte App mit Sicherung; Kopie der echten Daten aller Nutzer geprüft, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler). Intern „Auftrag 41“, weil es Auftrag 40 (3.28.0) schon gab.
+
+## 1. Box „verschoben/angepasst“ ohne Wiederholungen
+- **Ursache:** Jede Anpassung wurde gespeichert, auch solche ohne sichtbaren Unterschied (z. B. dieselbe Verschiebung zweimal, hin und zurück). Die Box listete alle. Dazu stand bei alten KI-Verschiebungen ein interner Platzhalter im Titel.
+- **Jetzt:** Anpassungen ohne Unterschied werden nicht gespeichert. Die Box zeigt nur Original → jetzt, jeden Schritt einmal mit Datum, und heißt „verschoben“, „angepasst“ oder „verschoben und angepasst“. Ohne echten Unterschied gibt es keine Box. Platzhalter sind nie sichtbar.
+- **Bestehende Daten:** Leere oder doppelte Anpassungen werden beim Start über den normalen Abgleich stillgelegt, nicht direkt am Server (Nutzer 1: 6, Nutzer 2: 1, Nutzer 5: 1).
+
+## 2. Anleitung oben
+Vor dem Training steht die Anleitung direkt unter dem Kopf, nach dem Training eingeklappt als „Anleitung“ über dem Ablauf. Im Heute-Tab führt „Anleitung ›“ mit einem Tipp dorthin.
+
+## 3. Kopf aufgeräumt
+Kurzer Titel (z. B. „Rad 3 × 10 min Sweet Spot“), Schwimmsätze immer mit Lage, Sportart einmal, „Geplant“ einmal (mit Grund), ein Abzeichen („✓ erledigt · anders als geplant“). Bei erledigten Einheiten steht „Als nicht erledigt markieren“ statt „Fällt aus“.
+
+## 4. Tests verschwinden nicht mehr still
+- **Ursache Lauftest 25.10. (Nutzer 1):** Beim Bearbeiten war „Locker“ vorausgewählt. Speichern ohne Änderung machte aus dem Test einen lockeren Lauf. Dazu verschob die Wochenauswertung auch Tests.
+- **Jetzt:** Das Bearbeiten wählt die echte Art vor und baut nur bei echter Änderung um. Die Wochenauswertung fasst Tests nicht an. Ein umgewandelter oder gestrichener Test wird neu eingeplant, mit Mitteilung („… entfällt als Test → neuer Termin“).
+
+## 5. Wiederholungs-Prüfer
+Er läuft dauerhaft im großen Test über Heute, Plan, Einheiten (vor und nach dem Abhaken), Coach, Fortschritt und Mehr, für 8 Testnutzer und die Demo. Gefunden und behoben: doppelte „Woche“-Angaben im Wochenkopf (jetzt „Woche 12 · 3. Woche im Block 2“) und ein doppelter Name in der Diagramm-Legende.
+
+## 6. Weitere Ideen
+In VORSCHLAEGE.md (A–H), mit Aufwand für Englisch und Einheiten.
+
+## 7. Weitere Fehler
+- **Verbindung abgelaufen:** Hinweis auf Heute mit „Neu verbinden“; dazu ehrlich „keine aktuellen Daten seit …“.
+- **Plan folgt dem echten Training:** Wochenumfang nach den letzten 4 Wochen, lange Einheiten höchstens etwa 10 min über der längsten echten, jeweils mit Begründung. Trainierst du mehr, steigt der Plan wieder. Eine schon geplante Woche wird einmal nachgeholt. Kopie der echten Daten: Nutzer 1 von 7,6 auf 5,5 h, längster Lauf höchstens 50 min; Nutzer 2 von 3,8 auf 3 h; Nutzer 5 unverändert (zu wenig Einträge, um es zu beurteilen).
+- **Offene Einheiten ohne Eintrag:** einmal pro Woche auf Heute „Hast du diese Woche trainiert?“ zum schnellen Abhaken. Nach 21 Tagen gilt eine Einheit als „ohne Eintrag“.
+- **Mitteilungen:** Heute bietet sie an; auf dem iPhone mit Hinweis auf den Home-Bildschirm.
+- **Fehlerbericht:** hängt nur Fehler seit dem letzten Bericht an (höchstens 7 Tage).
+- **Test nach Wettkampf:** Der nächtliche Daten-Check führt jetzt erst die Plan-Pflege aus. Vorher lief er vor ihr und meldete Tests, die gleich danach verschoben wurden.
+- **Umwandeln in Ketten:** Es wird immer vom Original aus umgewandelt, ohne „Locker statt: Tempo statt: …“.
+
+## Daten-Check je Nutzer
+| Nutzer | Vorher (Fehlerprotokoll) | Nachher (frische Sicherung 23.11.) |
+|---|---|---|
+| 1 | 22.11. Test nach Wettkampf 3×; 18.11. Wert „Intervall: m“ (Schwimmen); 11.11. Erholung nach Wettkampf, langer Tag; 8.11. Erholungswoche 3×, langer Schritt | 0 Befunde, 0 Regel-Verstöße |
+| 2 | 8.11. Wert „cad“ (Schwimmen), Erholungswoche 4×; 31.10. mehrere Regeln | 0 Befunde; 6 bekannte Lücken im Plan (Entscheidung 538, unverändert) |
+| 5 | 8.11. Erholungswoche 5×; 31.10. Wettkampfwoche | 0 Befunde, 0 Regel-Verstöße |
+
+Alle drei starten fehlerfrei, auch mit dem lokalen Stand der Vorversion.
+
+## Tests
+- Release-Lauf: Unit 3.396 grün, Browser 861 grün, 0 rot (WebKit iPhone und Chromium, inkl. neuem Wiederholungs-Prüfer).
+- Großer Test 34 min: Simulation (36 Nutzer, 19.292 Tage) 0 Fehler. Gefunden und behoben: „Grund“ fehlte im Kopf, „nur hart gesetzt“ galt als ohne Unterschied (Entscheidung 658).
+- Release: zwei Läufe wegen Tests angehalten, die nur unter voller Last rot waren (Tab-Leiste, Service Worker), einzeln grün. Die Grenzen sind jetzt an der echten Größe festgemacht (Entscheidungen 659–660).
+- Entscheidungen 641–660.
+
 # Auftrag 40: alle 15 Vorschläge eingebaut (22.11.)
 
 **Stand:** Version **3.28.0** – veröffentlicht am 22.11. (erst Test-App, dann echte App mit Sicherung; Kopie der echten Daten aller Nutzer geprüft, Start-Test aller Nutzer ok, 10 Minuten ohne Startfehler).
