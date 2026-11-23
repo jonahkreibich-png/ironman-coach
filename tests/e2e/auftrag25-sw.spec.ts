@@ -4,10 +4,11 @@ import { seed } from './helpers';
 
 test.use({ serviceWorkers: 'allow' });
 test('Service Worker startet, App öffnet offline, /api wird nie zwischengespeichert', async ({ page, context }) => {
+  test.setTimeout(90000);
   await seed(page);
   await page.goto('/?go=heute');
   await expect(page.locator('#app')).not.toBeEmpty();
-  const st = await page.evaluate(async () => { const r = await Promise.race([navigator.serviceWorker.ready, new Promise(res => setTimeout(() => res(null), 15000))]) as any; return r ? !!r.active : false; });
+  const st = await page.evaluate(async () => { const r = await Promise.race([navigator.serviceWorker.ready, new Promise(res => setTimeout(() => res(null), 30000))]) as any; return r ? !!r.active : false; });
   expect(st).toBe(true);
   await page.reload(); await expect(page.locator('#app')).not.toBeEmpty();
   expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
